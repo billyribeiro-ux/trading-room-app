@@ -1838,8 +1838,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       174 -> 173, 2026-08-31 (MSB-01). The nested body's five hand-listed props became one spread,
       which is a line SHORTER as well as a prop that can no longer be forgotten — `extraChatMsg` was
       the one that had been. A ceiling that falls out of a fix is the shape this ratchet wants.
+
+      173 -> 187, 2026-08-31 (MSB-04). Fourteen lines, ONE of which is code: `chatGif = false,`
+      became `chatGif = true,`. The other thirteen are the docblock over it, and they are the whole
+      value of the change.
+
+      The declaration disagreed with `RoomMessage.svelte`, which is the boundary that receives this
+      preference and has always declared `true`, and with the reference's own blob (`chatGif:!0`).
+      It was UNREACHABLE — all eight `<MessageBody …>` call sites pass the value — which is exactly
+      why it was free to be wrong for a day, and exactly why deleting the fallback was the wrong
+      repair: Svelte's `$props` contract applies a fallback when the parent does not set the prop
+      *or sets it to `undefined`*, so one call site handing over an optional value reaches it, and
+      reached with `false` this component mutes every gif in the room behind a placeholder nobody
+      asked for. A defect that no current caller can trigger is still a defect aimed at the next one.
+
+      The comment records the direction of the failure, because a bare `= true` reads as arbitrary
+      and the next reader flipping it back would find nothing to stop them — `chat-gif-muted-contract`
+      now asserts BOTH declarations, which is the test half of the same pair.
     */
-    max: 173,
+    max: 187,
     why: 'one parsed message body - six segment kinds, and the gif reveal that belongs to them'
   },
   {
@@ -2685,8 +2702,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1089 -> 1105, 2026-08-30. Sixteen lines at the `<ScreenPane>` call site: four new props for
       `SV-SP-02`/`03`, two callbacks for `SV-SP-04`, and the note recording that NO `volume` and no
       `muted` are passed any more and why that is the fix rather than an omission.
+
+      1105 -> 1106, 2026-08-31 (MTS-02). ONE line: `canEditNotes={data.canEditNotes}` in the
+      `<MainTabStrip …/>` props. The notes cog's gate is `isP || user.canEditNotes` (byte 2,016,713)
+      and the strip carried no prop that could answer the second term, so it drew the cog for
+      everyone. The value is read off `data`, which is where every authority answer in this room is
+      decided, and passed by NAME rather than through a spread — `unfed-props-contract` can only see
+      a supplier it can find spelled out.
     */
-    max: 1105,
+    max: 1106,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -2742,7 +2766,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       has one, `RoomOverlays`, and the room's other renderer of the same image is a popped-out
       window built by `RoomModals.showImage` — a different surface, deliberately not merged.
     */
-    max: 95,
+    /*
+      95 -> 117, 2026-08-31 (ROV-04). ONE line of markup — `<div class="modal-backdrop fade show">`
+      — and twenty-one of comment over it, and the ratio is the right way round for this file.
+
+      This dialog wore `bootbox modal fade imgur-modal show` and emitted no backdrop, so the one
+      modal in the room whose entire job is to be looked at was the only one you could see the room
+      through. `showImagePreview` (byte 1,992,730) is a plain `bootbox.dialog({…})` and bootbox
+      emits a backdrop with every dialog; `BootboxDialog.svelte:145` already did.
+
+      The comment is long because the element's POSITION is load-bearing and invisible: `app.css:762`
+      selects `.bootbox.modal.above-note-modal + .modal-backdrop`, an adjacent-sibling combinator, so
+      a backdrop moved inside the dialog to look tidier would still render and would silently stop
+      matching. That is precisely the "simplified back into the bug it was fixing" this ratchet's
+      comments exist to prevent, and the contract test asserts the ORDER rather than the presence for
+      the same reason — its negative control was the nested form, seen red.
+
+      The row this closes had recorded itself blocked behind extracting this very component out of
+      `RoomOverlays.svelte`. The extraction had already happened, for `dta-02`, on the same day.
+    */
+    max: 117,
     why: 'the imgur lightbox - one image, a download that does not dismiss, and one alt rule'
   },
   {
@@ -2788,8 +2831,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       two hand-wirings that had drifted apart — see that file. The room made by the extraction paid
       for the files cog's `{#if isPresenter}` gate (byte 2,017,076) and for the measurement of the
       one gate this strip deliberately does NOT reproduce, `z('hidden', o.hideScreens)`.
+
+      371 -> 399, 2026-08-31 (MTS-02). Twenty-eight lines, of which the CODE is four: a prop, its
+      entry in the destructure, and `{#if isPresenter || canEditNotes}` around the notes cog.
+
+      The rest is the two things this file's own header says must never be lost. First, why the
+      capability is a PROP and not `noteGates.editorMounted`, which the page already computes and
+      `PresentationArea` already holds: that value is `notesEnabled && canEditNotes`, so reusing it
+      would AND the room setting into the member's half of the gate and not the presenter's, which
+      is a gate the reference does not have. Second, why the gate is on the COG and not the `<li>` —
+      a member who may not author still reads notes, and `hidden={hideNotes}` one line up is where
+      the room's setting is answered.
+
+      The old comment at this site said the missing gate was mild because `requestNewNote` refuses
+      anyway. It is replaced rather than kept: a control whose only effect is nothing is the shape
+      the root standard names outright, and describing it as harmless is how it stayed.
     */
-    max: 371,
+    max: 399,
     why: 'ul#mainTabs - eight tabs, two dropdowns, and a byte citation on every gate'
   },
   {

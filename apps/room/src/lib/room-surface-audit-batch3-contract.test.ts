@@ -480,19 +480,55 @@ describe('ROV-03 — the viewer the pinned chunk does not contain', () => {
  * room — and `showImagePreview` (byte 1,992,730), the only image viewer the pinned bundle contains,
  * is a plain `bootbox.dialog({…})` and therefore has one.
  *
- * NOT BUILT, and the reason is the ratchet rather than doubt: `RoomOverlays.svelte` was at 1081 of
- * 1081 when this batch ran and the backdrop is an element, which is a line. `source-size-contract`
- * ceilings only go down, so this is blocked behind lifting the lightbox out into its own component —
- * which is worth doing on its own terms (it is 41 lines with its own dismiss handling) and is not
- * this batch's work. Recorded here so the next reader of that extraction knows what to add.
+ * BUILT 2026-08-31, and the block below is INVERTED rather than deleted — it used to assert the
+ * absence, and it now asserts the presence.
+ *
+ * **The blocker this batch recorded was real on the day and was gone by the time it was read
+ * again.** It said the backdrop was blocked behind lifting the lightbox out of `RoomOverlays.svelte`
+ * (1081 of 1081, ceilings only going down) into its own component, "which is not this batch's work".
+ * That extraction happened the same day for `dta-02`: `ImageLightbox.svelte` exists, is 94 lines,
+ * and carries `class="bootbox modal fade imgur-modal show"` at its root. The one line the row was
+ * waiting on had nothing left in its way.
+ *
+ * Worth naming, because it is the second stale blocker found in this register in one session: a row
+ * that says "blocked behind X" goes stale the moment somebody does X for an unrelated reason, and
+ * nothing re-reads it. The measurement, not the row, is what decides.
  */
-describe('ROV-04 — the missing backdrop, and the sibling that has one', () => {
+describe('ROV-04 — the backdrop the lightbox opened without', () => {
   it('shows the room s own bootbox rendering a backdrop', () => {
     expect(BOOTBOX).toContain('<div class="modal-backdrop fade show"></div>');
   });
 
-  it('shows the lightbox claiming bootbox and rendering none', () => {
+  it('and the lightbox, which claims bootbox, now renders the identical element', () => {
     expect(LIGHTBOX).toContain('class="bootbox modal fade imgur-modal show"');
+    expect(LIGHTBOX).toContain('<div class="modal-backdrop fade show"></div>');
+  });
+
+  it('as a SIBLING after the dialog, which is what the app.css rule selects on', () => {
+    /*
+      `app.css` selects `.bootbox.modal.above-note-modal + .modal-backdrop` — an adjacent-sibling
+      combinator. A backdrop nested inside the dialog satisfies `toContain` and falls silently out
+      of that rule, so the assertion is on the ORDER rather than on the presence: the backdrop's
+      offset is past the dialog root's closing tag, which is the same shape `BootboxDialog` has.
+
+      Anchored on locals rather than inlined, because `slice-anchor-contract` refuses the inline
+      form and because a `-1` from either `indexOf` would otherwise make this pass by arithmetic.
+    */
+    const dialog = LIGHTBOX.indexOf('class="bootbox modal fade imgur-modal show"');
+    const backdrop = LIGHTBOX.indexOf('<div class="modal-backdrop fade show"></div>');
+    expect(dialog, 'the lightbox dialog root is missing').toBeGreaterThan(-1);
+    expect(backdrop, 'the lightbox backdrop is missing').toBeGreaterThan(-1);
+    expect(backdrop).toBeGreaterThan(dialog);
+    /* It is the LAST node, so nothing was appended after it that would break the combinator. */
+    expect(LIGHTBOX.trimEnd().endsWith('<div class="modal-backdrop fade show"></div>')).toBe(true);
+  });
+
+  it('and RoomOverlays still renders no backdrop of its own', () => {
+    /*
+      Kept from the original block, with its meaning changed by the move: it used to record the
+      lightbox's absence (the markup was inline there), and it now guards against a SECOND backdrop
+      being added at the call site beside the component's own. Two backdrops dim twice.
+    */
     expect(OVERLAYS).not.toContain('modal-backdrop');
   });
 });

@@ -4816,16 +4816,41 @@ check, unlike its notes twin which at least refuses inside `requestNewNote`.
 
 ### MTS-02 — The Notes cog has no gate; the reference instantiates it only for a presenter or a member who may author notes
 
-**BLOCKED 2026-08-31.** The gate cannot be applied from `MainTabStrip.svelte`: its eleven props
-carry `isPresenter` but nothing carrying the VIEWER's `canEditNotes`, and inventing a default is
-worse than leaving it — `false` takes the New Note cog away from a member who legitimately has it,
-`true` is no gate at all.
+**BUILT 2026-08-31 19:05 UTC.** `MainTabStrip.svelte` takes a `canEditNotes` prop, fed by name at
+`PresentationArea.svelte:500` as `canEditNotes={data.canEditNotes}`, and the cog is
+`{#if isPresenter || canEditNotes}` — the disjunction at byte 2,016,713, verbatim.
 
-**The one line that unblocks it:** `apps/room/src/lib/components/PresentationArea.svelte:507`, in the
-`<MainTabStrip … />` props between `{hideNotes}` and `{menus}`, add
-`canEditNotes={data.canEditNotes === true}` — `data.canEditNotes` is already on that component's
-`data` prop. Then `{#if isPresenter || canEditNotes}` around the `<TabGearMenu id="dropdownMenuNotes" …/>`,
-exactly as MTS-01 now has. That file is outside this task's editable set.
+**Two corrections to what this row prescribed, both small and both worth recording.**
+
+*It is not "the one line".* The row said to add the prop at the call site and the `{#if}` in the
+strip, which is two edits, and the prop did not exist on `MainTabStrip` — so it is three: a `Props`
+member, a destructure entry, and the call site. The same sentence had been copied into
+`main-tab-strip-gates.svelte.test.ts`, so the estimate was wrong in two places at once and is
+corrected in both.
+
+*`=== true` is dropped.* The row wrote `data.canEditNotes === true`. That idiom is this room's rule
+for `sessData`, which is JSON off the wire and typed loosely; `data.canEditNotes` is not that. It is
+`connectedUser.canEditNotes` at `+page.server.ts:677`, typed `boolean` by the load, so the comparison
+compares a boolean to `true` and reads as though the value were untrusted. Passed directly.
+
+**Not folded into `noteGates.editorMounted`, which was the tempting shortcut.** The page already
+computes it and `PresentationArea` already holds it — but it is `notesEnabled && canEditNotes`, so
+using it would AND the room's setting into the MEMBER's half of the gate and not the presenter's.
+That is a gate the reference does not have. The room setting is answered one line up by
+`hidden={hideNotes}` on the `<li>`, and the two questions stay separate.
+
+**The gate is on the COG, not the tab.** A member who may not author notes still has the Notes tab
+and still reads them. Slot 23 upstream is the cog.
+
+**Verified.** Four mount cases in `main-tab-strip-gates.svelte.test.ts` — all four corners of the
+disjunction — plus one asserting the Notes tab survives for a member without the permission. Three
+negative controls seen RED: `&&` for `||` (fails exactly the two MIXED corners, which are the two
+that describe real people — a Participant granted the tick, a Presenter denied it — and passes the
+presenter-only and nobody cases a thinner test would have stopped at); `isPresenter` alone, which is
+the exact bug `+page.server.ts:670-677` records having already been fixed once on the server side;
+and `hidden` in place of `{#if}`, which fails only the "no element, not a hidden one" half and is
+invisible to every source-text instrument in this repository. Ceilings raised with arguments at the
+entries: `MainTabStrip` 371 -> 399, `PresentationArea` 1105 -> 1106.
 
 This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.
@@ -4837,11 +4862,13 @@ O(23,o.isP||o.appService.globals.user.canEditNotes?23:-1)
 function KCe(t,n){if(1&t){const e=Y();d(0,"div",15)(1,"span",53),T(2,"i",54),u(),d(3,"ul",55)(4,"li",56),x("click",function(){return D(e),E(g().newNote())}),d(5,"a",57),T(6,"i",58),v(7," New Note"),u()()()()}}
 ```
 
-**Ours:** the cog is drawn for everybody. It is less severe than MTS-01 because the ACTION behind
-it already refuses — `RoomNotes.requestNewNote` sets `newNoteOpen` to `this.#noteGates().editorMounted`,
-so a member who may not author gets nothing when they press it. That is precisely the shape the
-root standard names, though: a control whose only effect is nothing. The reference declines to draw
-it at all.
+**Ours:** the cog was drawn for everybody, and the sentence that followed here — *"it is less severe
+than MTS-01 because the ACTION behind it already refuses"* — is the part of this row that was wrong
+in spirit and is left standing as the record of it. `RoomNotes.requestNewNote` does refuse, setting
+`newNoteOpen` from `#noteGates().editorMounted`, so a member who may not author got nothing when they
+pressed it. **A control whose only effect is nothing is not a milder defect than a missing gate; it
+is the specific shape the root standard names outright**, and calling it "less severe" is how it sat
+open. The reference declines to draw it at all, and so does this room now.
 
 ### MTS-03 — The Recordings tab does not exist here at all
 
@@ -7396,7 +7423,27 @@ and why it stays.
 
 ### NAV-09 — The recording reminder is missing `!micMuted`, and the gate string is pinned
 
-**BLOCKED 2026-08-31.** The reference's condition has five terms and this bar carries three of them:
+**ALREADY BUILT — this row is a DUPLICATE of `RNB-03`, and it was stale within the same day.**
+Re-dispositioned 2026-08-31 18:25 UTC by reading both files rather than trusting the row.
+`RoomNavbar.svelte:667` reads
+
+```
+{#if recordingReminderAllowed && media.recordingReminder && !media.micMuted && (!media.recording || media.recordingPaused)}
+```
+
+and `recording-reminder-contract.test.ts:72` pins that exact string, `!media.micMuted` included, under
+a docblock that cites `RNB-03` and explains why the fifth term `micDisabled` is deliberately left
+out. Both edits the row prescribes were already made; nothing here was rebuilt.
+
+**Two rows for one defect is the finding worth keeping.** This row and `RNB-03` were written by
+different batches on the same day against the same five-term gate at the same reference byte, and
+neither cites the other — so the register had one defect open twice and would have had it fixed
+twice. `RNB-03` is the surviving entry because it is the one the code and the test cite by name.
+
+The original text follows, unedited, because the reasoning in it is correct and the byte offsets are
+the ones `RNB-03` also carries:
+
+**~~BLOCKED 2026-08-31.~~** The reference's condition has five terms and this bar carries three of them:
 
 ```js
 O(5, !sessData.recordingReminder || !e.recordingReminder || e.micDisabled
@@ -8298,7 +8345,7 @@ onclick="openImageModal(event,'${a}')"
 
 ### MSB-04 — `chat-gif-muted-contract.test.ts` reads a file that no longer holds any of the four strings it asserts
 
-**BLOCKED 2026-08-31 04:05 UTC.**
+**FIXED 2026-08-31 18:20 UTC — and the prescribed one-line repair was WRONG, which is the finding.**
 This row was ADDED after this document was committed, by the seventh batch.
 That file's whole `describe('ours')` block reads `MESSAGE = readFileSync(new
 URL('./components/RoomMessage.svelte', …))` and asserts it contains `class="chat-gif-muted"`,
@@ -8315,15 +8362,50 @@ assertions fail. This is the same shape as the `room-message-render.test.ts` fin
 own header records: a test whose subject moved out from under it, kept out of sight by the exclusion
 banner.
 
-**What unblocks it, exactly one line**, at `chat-gif-muted-contract.test.ts:48`:
+**The row prescribed exactly one line**, at `chat-gif-muted-contract.test.ts:48` — re-point the
+single `MESSAGE` constant at `MessageBody.svelte` — and said *"all four strings are in that file
+verbatim … which is why re-pointing the constant is sufficient and nothing below it needs
+rewording."*
 
-```ts
-const MESSAGE = readFileSync(new URL('./components/MessageBody.svelte', import.meta.url), 'utf8');
+**Measured before doing it, and it is not sufficient.** `grep -cF` over both files, per string:
+
+```
+RoomMessage=0 MessageBody=1  class="chat-gif-muted"
+RoomMessage=0 MessageBody=1  'click to hide' : 'gif muted, click to show'
+RoomMessage=0 MessageBody=1  return !chatGif && url.toLowerCase().includes('.gif');
+RoomMessage=0 MessageBody=1  { 'd-none': isMutedGif(segment.url) && !revealedGifs[segment.url] }
+RoomMessage=1 MessageBody=0  chatGif = true,
 ```
 
-All four strings are in that file verbatim, including the `isMutedGif` body and the `<img>` tag,
-which is why re-pointing the constant is sufficient and nothing below it needs rewording. It is a
-test file this batch did not create, so it is named rather than edited.
+There are **five** `messageCode` assertions in that block, not four — the row missed the `d-none`
+one — and a **sixth**, `expect(messageCode).toContain('chatGif = true,')` inside
+`it('defaults ON, matching the reference blob')`, which matches only `RoomMessage.svelte`. Moving the
+one constant would have fixed five assertions and silently broken the sixth, because a default is a
+property of the boundary that RECEIVES the preference and `RoomMessage` is still that boundary.
+
+**Fixed with two constants** — `MESSAGE` for the default, a new `BODY` for the five renderer
+assertions — each pointing at the file that owns its subject, which is the rule the file's own
+`PREFS_SOURCE` split already followed.
+
+**And the sixth assertion surfaced a real defect the row could not have known about.**
+`MessageBody.svelte:39` declared `chatGif = false,` — the opposite of `RoomMessage.svelte:181`'s
+`chatGif = true,` and the opposite of the reference's `chatGif:!0`. It was unreachable on the day:
+all **eight** `<MessageBody …>` call sites pass the value (`MessageBody.svelte:142` through
+`{...inherited}`, `RoomMessage.svelte` at :868/:871/:884/:1126/:1130/:1183, and
+`AlertQaAlertCard.svelte:236`). Unreachable is not harmless — Svelte's `$props` contract applies a
+fallback when the parent does not set the prop **or sets it to `undefined`**, so one call site
+handing over an optional value reaches it, and reached with `false` every gif in the room hides
+behind a placeholder nobody asked for. It is `true` now, in both declarations, and the test asserts
+both.
+
+**Verified.** The file reads `docs/source/`, so `gate/evidence-bound-tests.mjs` still excludes it on
+this checkout — it is one of the 42 — and it therefore **could not be run here**. The assertions were
+run instead through an identical throwaway harness reading only the two component files, and its
+negative controls were seen RED four ways: the pre-fix constant (fails on the first renderer
+assertion, which is the defect this row reports, reproduced); `chatGif = true,` reverted to `false`;
+`.gif` dropped from `isMutedGif`; `uploaded-img` renamed. Restored green after each. The harness was
+deleted; it is named here rather than kept, because it duplicates a file that already exists and
+only the owner's checkout can run the real one.
 
 **high** · `defect` · reference byte **1,326,195**
 
@@ -10179,18 +10261,42 @@ two-verifier pass the tables above describe, and therefore deliberately outside 
 
 ### ROV-04 — The lightbox calls itself a bootbox and renders no backdrop
 
-**BLOCKED 2026-08-31.** Every other dialog in this room gets one: `BootboxDialog.svelte:145` renders
+**BUILT 2026-08-31 18:40 UTC — and the blocker below was already gone when it was written down.**
+Every other dialog in this room gets one: `BootboxDialog.svelte:145` renders
 `<div class="modal-backdrop fade show"></div>` as its last node, because that is what bootbox emits
 and what `.modal-backdrop`'s `z-index: 1050` is for — `app.css` already writes those three z-indexes
 down. The lightbox wears `bootbox modal fade imgur-modal show` and has no backdrop at all, so it
 opens over an undimmed room; and `showImagePreview` at byte 1,992,730, the only image viewer the
 pinned bundle contains (see ROV-03), is a plain `bootbox.dialog({…})` and therefore has one.
 
-**Not built, and the reason is the ratchet rather than doubt.** A backdrop is an element, an element
-is a line, and `RoomOverlays.svelte` was at 1081 of 1081 with `source-size-contract.test.ts` ceilings
-only going down. It is blocked behind lifting the lightbox into its own component — 41 lines with its
-own dismiss handling, worth extracting on its own terms and not this batch's work. Recorded here so
-whoever does that extraction knows the one line to add on the way.
+**The recorded blocker was the ratchet, and it was STALE.** The row said a backdrop is an element,
+an element is a line, `RoomOverlays.svelte` was at 1081 of 1081, and so this was blocked behind
+lifting the lightbox into its own component — *"worth extracting on its own terms and not this
+batch's work."*
+
+**That extraction had already happened, the same day, for `dta-02`.**
+`src/lib/components/ImageLightbox.svelte` exists, is 94 lines, and carries
+`class="bootbox modal fade imgur-modal show"` at its root. Nothing was in the way of the one line
+the row was waiting on; the row simply was not re-read after the thing it was waiting for was done.
+
+**This is the second stale blocker in this register in one session** (`NAV-09` and `MTS-03` are the
+others, for different reasons), and the pattern is worth naming: *"blocked behind X"* goes stale the
+moment somebody does X for an unrelated reason, and nothing re-reads the row. **Measure the blocker,
+do not inherit it.**
+
+**Built as a SIBLING after the dialog, which is not cosmetic.** `app.css:762` selects
+`.bootbox.modal.above-note-modal + .modal-backdrop` — an adjacent-sibling combinator. A backdrop
+nested inside the dialog would render, would satisfy a `toContain`, and would fall silently out of
+that rule; `BootboxDialog.svelte:145` puts its own in the same place. The contract test therefore
+asserts the ORDER rather than the presence, and its negative control was the nested form, seen red.
+
+**Verified.** `room-surface-audit-batch3-contract.test.ts`'s ROV-04 block was INVERTED rather than
+deleted — it asserted the absence and now asserts the presence, the sibling ordering, and that
+`RoomOverlays` still emits no backdrop of its own (which now guards against a duplicate at the call
+site rather than recording the lightbox's gap). Three negative controls seen RED: the backdrop
+removed; the backdrop nested inside the dialog; a second backdrop added beside `<ImageLightbox />`.
+Green after each restore. `ImageLightbox.svelte`'s ratchet ceiling went 95 -> 117 with the argument
+at the entry.
 
 *This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
 two-verifier pass the tables above describe, and therefore deliberately outside them.*

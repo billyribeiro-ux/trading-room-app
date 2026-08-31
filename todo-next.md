@@ -80,7 +80,7 @@ guessed.
 | 4 | `lib/components/AlertChatArea.svelte` | 1,522 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,258 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,171 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
-| 7 | `lib/components/PresentationArea.svelte` | 1,104 | no |
+| 7 | `lib/components/PresentationArea.svelte` | 1,105 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,148 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
 | 10 | `lib/components/EmojiPicker.svelte` | 858 | `## EmojiPicker.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against |
@@ -98,7 +98,7 @@ guessed.
 | 22 | `lib/components/PrivateChatPanel.svelte` | 524 | no |
 | 23 | `lib/components/VideoPlayer.svelte` | 411 | `## VideoPlayer.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle: the class methods at bytes 1,979,590–1,981,860, |
 | 24 | `lib/components/AlertQaModal.svelte` | 408 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Plus §QAM, 13 rows from a whole re-read on 2026-08-31: 4 built, 2 fixed, 1 already built, 1 measured refusal, 4 blocked. |
-| 25 | `lib/components/MainTabStrip.svelte` | 370 | `## MainTabStrip.svelte` in the v4 register — 7 gaps, read 2026-08-31 against `app-presentationarea` — selector block at byte 1,994,350, consts |
+| 25 | `lib/components/MainTabStrip.svelte` | 398 | `## MainTabStrip.svelte` in the v4 register — 7 gaps, read 2026-08-31 against `app-presentationarea` — selector block at byte 1,994,350, consts |
 | 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | `room-surface-audit-2026-08-30.md` §DayTradeAlertForm — 5 rows (`DTF-01` … `DTF-05`) against `Ewe`, bundle byte 1,940,236, read end to end 2026-08-31 with all fourteen sub-templates and the component's consts table walked BY VALUE. 1 BUILT, 1 FIXED, 1 ALREADY BUILT, 2 MEASURED REFUSAL; gated by `trade-alert-form-contract.test.ts`. |
 | 27 | `lib/components/ScreenTabs.svelte` | 341 | no |
 | 28 | `lib/components/AvDevicePane.svelte` | 338 | `## AvDevicePane.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle: `loadDevices` at bytes 2,162,037–2,165,010, |
@@ -115,7 +115,7 @@ guessed.
 | 39 | `lib/components/ScreenShareMenu.svelte` | 203 | `## ScreenShareMenu.svelte` in the v4 register — 4 rows (SSM-01…04) read end to end 2026-08-31. The whole dropdown had no focusable element; SSM-04 corrected all four byte offsets in its own entry table, each of which landed INSIDE the function it named. |
 | 40 | `lib/components/NavbarSoundCloud.svelte` | 200 | §NAV — born 2026-08-31 out of `RoomNavbar`, carrying `NAV-02` and the presenter dropdown it belongs beside. |
 | 41 | `lib/components/RichTextEditor.svelte` | 190 | `## components/RichTextEditor.svelte` in the v4 register — 6 rows (RTE-01…06) against `app-rich-text-editor`, read end to end 2026-08-31. |
-| 42 | `lib/components/MessageBody.svelte` | 172 | `## components/MessageBody.svelte` in the v4 register — 7 rows (MSB-01…07) against `urlwrapImg` and `showChatGif`, read end to end 2026-08-31. |
+| 42 | `lib/components/MessageBody.svelte` | 186 | `## components/MessageBody.svelte` in the v4 register — 7 rows (MSB-01…07) against `urlwrapImg` and `showChatGif`, read end to end 2026-08-31. |
 | 43 | `lib/components/AlertQaAlertCard.svelte` | 243 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
 | 44 | `lib/components/FollowChatStylePane.svelte` | 152 | `## FollowChatStylePane.svelte` in the v4 register — 3 rows (FCS-01…03) read end to end 2026-08-31. FCS-01 is a real defect: `bind:value` on the Text Size number input writes `null` for an empty box, and `null + 1` is `1`, so clearing it and saving drew that person's username at 1px on every later message. |
 | 45 | `lib/components/AlertQaComposer.svelte` | 223 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
@@ -140,7 +140,7 @@ guessed.
 | 64 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 65 | `lib/components/CloseSessionPane.svelte` | 104 | no |
 | 66 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
-| 67 | `lib/components/ImageLightbox.svelte` | 94 | no |
+| 67 | `lib/components/ImageLightbox.svelte` | 116 | §ROV — `ROV-04`, the backdrop this dialog opened without. |
 | 68 | `lib/components/NavbarRecIndicator.svelte` | 108 | §NAV — born 2026-08-31 out of `RoomNavbar`; the three REC badges, and where `breathing-rec` is not. |
 | 69 | `lib/components/RoomBranding.svelte` | 91 | no |
 | 70 | `lib/components/CompactMessageRow.svelte` | 77 | no |
@@ -158,7 +158,7 @@ guessed.
 | 82 | `routes/+layout.svelte` | 27 | no |
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 
-**38 of 83 surfaces audited · 15,272 of 37,014 lines · 41.3%.**
+**40 of 83 surfaces audited · 16,535 of 37,079 lines · 44.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

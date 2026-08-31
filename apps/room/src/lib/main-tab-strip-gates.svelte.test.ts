@@ -72,14 +72,16 @@ import type { MainTab } from './types.js';
  *
  * ## What is NOT here, and what would unblock it
  *
- * **The notes cog's gate.** `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)`,
- * byte 2,016,713 — the same shape as the files cog's, with the viewer's own authoring capability
- * as the second term. `MainTabStrip` receives no prop carrying it, and inventing a default is worse
- * than leaving it: `false` would take the New Note cog away from a member who legitimately has it,
- * `true` would be no gate at all. The one-line repair is at the call site —
- * `apps/room/src/lib/components/PresentationArea.svelte:507`, adding `canEditNotes={data.canEditNotes === true}`
- * to the `<MainTabStrip …/>` props — and then a `{#if isPresenter || canEditNotes}` here, exactly
- * as the files cog now has.
+ * **The notes cog's gate was here, and it is BUILT** — `MTS-02`, 2026-08-31; the block for it is
+ * below. `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)`, byte 2,016,713, the
+ * same shape as the files cog's with the viewer's own authoring capability as the second term.
+ * `canEditNotes` is a prop of `MainTabStrip` now, fed by name at
+ * `PresentationArea.svelte:500` off `data`, which is where every authority answer in this room is
+ * decided; the gate is `{#if isPresenter || canEditNotes}` around the cog, not the `<li>`.
+ *
+ * The paragraph this replaces said the repair was one line at the call site. It was two — the prop
+ * did not exist — and the reason it is recorded rather than quietly corrected is that the same
+ * sentence had been copied into the register row, so the estimate was wrong in two places at once.
  *
  * **The Recordings tab.** `H(24, YCe, 7, 3, "li", 16)` under
  * `O(24, o.archivesAvailableTo() && o.appService.globals.sessData.recsInRoom ? 24 : -1)` at byte
@@ -149,7 +151,9 @@ const tradeAlerts = (enabled: boolean): Stub => ({ enabled });
  * stub that records calls would let the two cogs go on disagreeing about which calls to make while
  * the test recorded both faithfully.
  */
-function mountStrip(over: { isPresenter?: boolean; mainTab?: MainTab } = {}) {
+function mountStrip(
+  over: { isPresenter?: boolean; canEditNotes?: boolean; mainTab?: MainTab } = {}
+) {
   const host = document.createElement('div');
   document.body.append(host);
   const menus = new RoomMenus();
@@ -165,6 +169,13 @@ function mountStrip(over: { isPresenter?: boolean; mainTab?: MainTab } = {}) {
       },
       viewerOnlyMode: false,
       isPresenter: over.isPresenter ?? false,
+      /*
+        DEFAULTS FALSE, and that matters for every test above that does not name it: the notes cog
+        is now gated on `isPresenter || canEditNotes`, so a case passing neither is a member with no
+        authoring permission and must NOT get the cog. The MTS-07 cases pass `isPresenter: true`,
+        which is why they still find `#dropdownMenuNotes`.
+      */
+      canEditNotes: over.canEditNotes ?? false,
       hideStreams: false,
       hideNotes: false,
       menus,
@@ -181,7 +192,7 @@ function mountStrip(over: { isPresenter?: boolean; mainTab?: MainTab } = {}) {
 
 const mounted: { host: HTMLElement; component: Record<string, unknown> }[] = [];
 
-const strip = (over: { isPresenter?: boolean; mainTab?: MainTab } = {}) => {
+const strip = (over: { isPresenter?: boolean; canEditNotes?: boolean; mainTab?: MainTab } = {}) => {
   const result = mountStrip(over);
   mounted.push({ host: result.host, component: result.component as Record<string, unknown> });
   return result;
@@ -211,6 +222,54 @@ describe('MTS-01 — the files cog is instantiated only for a presenter', () => 
     expect(host.innerHTML).not.toContain('dropdownMenuFiles');
     // And the tab it sits on is still there — this gates the cog, not the Files tab.
     expect(host.querySelector('[data-bs-target="#files"]')).not.toBeNull();
+  });
+});
+
+describe('MTS-02 — the notes cog is instantiated for a presenter OR a member who may author', () => {
+  /*
+    `O(23, o.isP || o.appService.globals.user.canEditNotes ? 23 : -1)`, byte 2,016,713.
+
+    A DISJUNCTION, and all four corners are asserted rather than the two that would look sufficient.
+    Either term alone drawing the cog is the behaviour; a gate that had been written `&&` passes a
+    presenter-only test and a nobody test and fails only on the two mixed corners, which are the two
+    that describe real people — a Participant the owner ticked `canEditNotes` for, and a Presenter in
+    a room where the tick was withheld. `+page.server.ts:677` records both as the bug that came from
+    deciding this from the ROLE.
+  */
+  it('draws it for a presenter with no authoring permission', () => {
+    const { host } = strip({ isPresenter: true, canEditNotes: false });
+    expect(host.querySelector('#dropdownMenuNotes')).not.toBeNull();
+  });
+
+  it('draws it for a MEMBER who has the permission — the corner a role check gets wrong', () => {
+    const { host } = strip({ isPresenter: false, canEditNotes: true });
+    expect(host.querySelector('#dropdownMenuNotes')).not.toBeNull();
+  });
+
+  it('draws it for a presenter who also has it', () => {
+    const { host } = strip({ isPresenter: true, canEditNotes: true });
+    expect(host.querySelector('#dropdownMenuNotes')).not.toBeNull();
+  });
+
+  it('and draws NOTHING for a member without it — no element, not a hidden one', () => {
+    const { host } = strip({ isPresenter: false, canEditNotes: false });
+    /*
+      Both halves, the same pair MTS-01 asserts for the files cog and for the same reason: `-1`
+      instantiates nothing, so the property is absence of the ELEMENT. A source-text grep cannot
+      tell that from `hidden`, which is the distinction `MainTabStrip`'s own header exists to keep.
+    */
+    expect(host.querySelector('#dropdownMenuNotes')).toBeNull();
+    expect(host.innerHTML).not.toContain('dropdownMenuNotes');
+  });
+
+  it('gates the COG and not the Notes tab — a member who cannot author still reads notes', () => {
+    /*
+      The gate upstream is on slot 23, which is the cog. The `<li>` is gated by `hidden` on the
+      ROOM's `hideNotes` setting, one line up and answering a different question. Moving this gate
+      onto the tab would take notes away from every member in the room.
+    */
+    const { host } = strip({ isPresenter: false, canEditNotes: false });
+    expect(host.querySelector('[data-bs-target="#notes"]')).not.toBeNull();
   });
 });
 

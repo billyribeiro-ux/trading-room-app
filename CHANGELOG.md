@@ -33,6 +33,87 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 19:40 UTC — Four BLOCKED rows closed, and three of the four blockers were not real
+
+**Runtime impact: YES**, three changes a person in a room can see. The image lightbox dims the room
+behind it. The New Note cog is drawn for a member the owner granted `canEditNotes`, and is drawn for
+nobody without it. And `MessageBody`'s `chatGif` fallback no longer mutes every gif in the room on
+the day something reaches it.
+
+The register had 23 BLOCKED rows. It has 19. **Three of the four closed here were not blocked on
+anything** — each named a blocker that had stopped being true, and nothing re-read the row.
+
+**`MSB-04` — the prescribed one-line fix was wrong, and measuring it found a second defect.**
+`chat-gif-muted-contract.test.ts` read `RoomMessage.svelte` for a `describe('ours')` block whose
+subject had moved to `MessageBody.svelte`. The row said to re-point the one constant: *"all four
+strings are in that file verbatim … nothing below it needs rewording."* `grep -cF` per string over
+both files said otherwise — there are FIVE renderer assertions, not four, and a SIXTH,
+`expect(messageCode).toContain('chatGif = true,')`, that matches only `RoomMessage`. Re-pointing the
+one constant would have fixed five and silently broken the sixth, because a default is a property of
+the boundary that receives the preference.
+
+Two constants now, each on the file that owns its subject. And the sixth assertion surfaced the real
+find: `MessageBody.svelte` declared `chatGif = false,` against `RoomMessage.svelte`'s
+`chatGif = true,` and the reference's `chatGif:!0` — **the opposite default**. Unreachable on the day
+(all eight call sites pass the value), which is why it survived; Svelte's `$props` contract applies a
+fallback when a parent passes `undefined`, so one call site handing over an optional value reaches
+it, and reached with `false` every gif in the room hides behind a placeholder nobody asked for. Both
+declarations are `true` now and the test asserts both.
+
+**`ROV-04` — blocked behind an extraction that had already happened.** The lightbox wore
+`bootbox modal fade imgur-modal show` and emitted no backdrop, so the one dialog in the room whose
+whole job is to be looked at was the only one you could see the room through. The row said it was
+blocked behind lifting the lightbox out of `RoomOverlays.svelte` — *"not this batch's work"*. That
+extraction happened the same day, for `dta-02`. `ImageLightbox.svelte` had existed the whole time.
+
+The backdrop is a SIBLING after the dialog, not a child, and that is load-bearing rather than
+stylistic: `app.css:762` selects `.bootbox.modal.above-note-modal + .modal-backdrop`, an
+adjacent-sibling combinator a nested backdrop falls silently out of. The contract test asserts the
+ORDER for that reason, and its negative control was the nested form.
+
+**`MTS-02` — the notes cog had no gate.** `O(23, o.isP || o.appService.globals.user.canEditNotes ?
+23 : -1)`, byte 2,016,713. `MainTabStrip` takes a `canEditNotes` prop now, fed by name off `data` at
+`PresentationArea.svelte:500`, and the cog is `{#if isPresenter || canEditNotes}`.
+
+Not folded into `noteGates.editorMounted`, which the page already computes and `PresentationArea`
+already holds — that value is `notesEnabled && canEditNotes`, so reusing it would AND the room
+setting into the member's half of the gate and not the presenter's. And the row's own estimate was
+wrong twice: it is three edits, not one (the prop did not exist), and its `=== true` is this room's
+idiom for `sessData` JSON, not for a `boolean` the load already typed.
+
+The row also called this *"less severe than MTS-01 because the ACTION behind it already refuses"*.
+That sentence is left standing in the register as the record of why it sat open. A control whose only
+effect is nothing is not a milder defect; it is the shape the root standard names outright.
+
+**`NAV-09` — a duplicate.** It prescribed adding `!media.micMuted` to the recording reminder and
+pinning the new string. `RoomNavbar.svelte:667` and `recording-reminder-contract.test.ts:72` both
+already carry it, under `RNB-03`, written by a different batch on the same day against the same
+reference byte. Two rows for one defect, neither citing the other; the register would have had it
+fixed twice.
+
+**Verified.** Ten negative controls, all seen RED and green again after restore: MSB-04 — the pre-fix
+constant (fails on the first renderer assertion, reproducing the reported defect), the default
+reverted, `.gif` dropped from `isMutedGif`, `uploaded-img` renamed. ROV-04 — backdrop removed,
+backdrop nested inside the dialog, a duplicate backdrop at the call site. MTS-02 — `&&` for `||`
+(fails exactly the two MIXED corners, the two that describe real people, and passes the two a thinner
+test would have stopped at), `isPresenter` alone (the bug `+page.server.ts:670-677` records already
+fixing once server-side), and `hidden` in place of `{#if}` (invisible to every source-text instrument
+here).
+
+`chat-gif-muted-contract.test.ts` reads `docs/source/`, so `gate/evidence-bound-tests.mjs` excludes it
+on this checkout — it is one of the 42 — and **it could not be run here**. Its assertions were run
+through an identical throwaway harness reading only the two component files, which was then deleted.
+On the owner's machine, where the symlinks resolve, it is the real one that runs.
+
+Svelte MCP: `list-sections` then `get-documentation` on `$props` before the fallback change (it is
+what settles that a fallback applies to an explicit `undefined`, which is the whole argument for
+fixing an unreachable default); `svelte-autofixer` clean on `MessageBody.svelte` and
+`ImageLightbox.svelte`. rust-analyzer MCP: not used and not needed — no `.rs` file was touched.
+
+Ratchet ceilings raised with the argument at each entry: `MessageBody.svelte` 173 -> 187,
+`ImageLightbox.svelte` 95 -> 117, `MainTabStrip.svelte` 371 -> 399, `PresentationArea.svelte`
+1105 -> 1106.
+
 ### 2026-08-31 19:20 UTC — A citation that named the wrong function while quoting the right gate
 
 **Runtime impact: NO** — one docblock corrected, one note added, three assertions.

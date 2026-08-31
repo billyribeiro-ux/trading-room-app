@@ -35,8 +35,22 @@
     segments,
     /** `parseStock`'s colour for a `stockColor` span, or nothing for the bare captured span. */
     stockStyle,
-    /** The viewer's preference. `false` mutes gifs behind a click-to-show placeholder. */
-    chatGif = false,
+    /**
+     * The viewer's preference. `false` mutes gifs behind a click-to-show placeholder.
+     *
+     * `MSB-04` — the fallback was `false` and it is `true` now, matching `RoomMessage.svelte`, which
+     * is the boundary that receives this preference, and matching the reference's own blob
+     * (`chatGif:!0`).
+     *
+     * Every one of the eight call sites passes it today, so the fallback is unreachable through all
+     * of them — which is exactly why it was free to be wrong, and exactly why it is worth fixing
+     * rather than deleting. Svelte's `$props` contract is that a fallback applies when the parent
+     * does not set the prop **or sets it to `undefined`**, so one call site handing over an
+     * optional value is enough to reach it. Reached with `false`, this component mutes every gif in
+     * the room behind a placeholder the viewer never asked for; two declarations of one preference
+     * disagreeing about its default is the shape this repository refuses on its own terms.
+     */
+    chatGif = true,
     /** `id_<messageId>` on a trade span and `gif_<messageId>` on a placeholder are both the msg's. */
     messageId,
     /**

@@ -45,7 +45,34 @@ const SHIPPED_CSS = readFileSync(
   new URL('../../docs/source/styles.d622cb9ed2bbc221.css', import.meta.url),
   'utf8'
 );
+/*
+  TWO source constants, because the subject of this block is in TWO files and `MSB-04` prescribed
+  moving the whole thing to one.
+
+  `MessageBody.svelte` was extracted out of `RoomMessage.svelte` on 2026-08-30 and the segment
+  renderer went with it — the placeholder, both labels, the `.gif` test and the `<img>`. The
+  constant did not follow, so five assertions below were reading a file that no longer holds any of
+  the strings they name. Invisible on a checkout without the capture symlinks, where
+  `gate/evidence-bound-tests.mjs` excludes this whole file; red on one that has them.
+
+  The register's prescribed repair was to re-point the single constant, and **measurement refused
+  it**: `grep -cF` over both files, per string, on 2026-08-31 —
+
+      RoomMessage=0 MessageBody=1  class="chat-gif-muted"
+      RoomMessage=0 MessageBody=1  'click to hide' : 'gif muted, click to show'
+      RoomMessage=0 MessageBody=1  return !chatGif && url.toLowerCase().includes('.gif');
+      RoomMessage=0 MessageBody=1  { 'd-none': isMutedGif(segment.url) && !revealedGifs[segment.url] }
+      RoomMessage=0 MessageBody=1  <img class="uploaded-img" src={segment.url} />
+      RoomMessage=1 MessageBody=1  chatGif = true,
+
+  Five moved; the DEFAULT did not, because a default is a property of the boundary that receives the
+  preference and `RoomMessage` is still that boundary. Re-pointing the one constant would have taken
+  the last line's assertion off the only file that had ever carried it and quietly onto a file that,
+  on that day, declared the OPPOSITE — see `defaults ON` below. Two constants, each pointing at the
+  file that owns its subject, which is the same rule the `PREFS_SOURCE` split below already follows.
+*/
 const MESSAGE = readFileSync(new URL('./components/RoomMessage.svelte', import.meta.url), 'utf8');
+const BODY = readFileSync(new URL('./components/MessageBody.svelte', import.meta.url), 'utf8');
 const APP_CSS = readFileSync(new URL('../app.css', import.meta.url), 'utf8');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
@@ -59,6 +86,7 @@ const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
 const messageCode = stripComments(MESSAGE);
+const bodyCode = stripComments(BODY);
 const pageCode = stripComments(PAGE);
 const prefsCode = stripComments(PREFS_SOURCE);
 
@@ -85,8 +113,8 @@ describe('the reference', () => {
 
 describe('ours', () => {
   it('renders the captured placeholder, with both labels', () => {
-    expect(messageCode).toContain('class="chat-gif-muted"');
-    expect(messageCode).toContain("'click to hide' : 'gif muted, click to show'");
+    expect(bodyCode).toContain('class="chat-gif-muted"');
+    expect(bodyCode).toContain("'click to hide' : 'gif muted, click to show'");
   });
 
   it('mutes gifs ONLY — a png is never hidden', () => {
@@ -94,21 +122,38 @@ describe('ours', () => {
       The one term that must not be loosened. Dropping `.gif` from the test would mute every inline
       image the moment a viewer unticks a box labelled "gif".
     */
-    expect(messageCode).toContain("return !chatGif && url.toLowerCase().includes('.gif');");
+    expect(bodyCode).toContain("return !chatGif && url.toLowerCase().includes('.gif');");
   });
 
   it('hides the image rather than dropping it, so revealing needs no refetch', () => {
     // Phase 4 converted the `class:` directive to the clsx attribute form. The guarantee is
     // unchanged - `d-none` is applied CONDITIONALLY and the <img> stays in the markup either way.
-    expect(messageCode).toContain(
+    expect(bodyCode).toContain(
       "{ 'd-none': isMutedGif(segment.url) && !revealedGifs[segment.url] }"
     );
     // The <img> stays in the markup unconditionally.
-    expect(messageCode).toContain('<img class="uploaded-img" src={segment.url} />');
+    expect(bodyCode).toContain('<img class="uploaded-img" src={segment.url} />');
   });
 
-  it('defaults ON, matching the reference blob', () => {
+  it('defaults ON in BOTH declarations, matching the reference blob', () => {
+    /*
+      `MSB-04` found the two disagreeing. `RoomMessage.svelte` declared `chatGif = true,` and
+      `MessageBody.svelte`, which the renderer moved into, declared `chatGif = false,` — the
+      opposite of each other and the opposite of `chatGif:!0` above.
+
+      It was unreachable on the day, and that is why it survived: all eight `<MessageBody …>` call
+      sites pass the value, so no render has ever taken the fallback. Unreachable is not harmless.
+      Svelte's `$props` contract is that a fallback applies when the parent does not set the prop
+      **or sets it to `undefined`**, so one call site handing over an optional value reaches it —
+      and reached with `false`, every gif in the room hides behind a placeholder nobody asked for.
+
+      BOTH are asserted rather than only the boundary's, because asserting one is what let the other
+      drift: the file this block used to read was the only one checked, and the file it should have
+      been reading was wrong for a day without anything going red.
+    */
     expect(messageCode).toContain('chatGif = true,');
+    expect(bodyCode).toContain('chatGif = true,');
+    expect(bodyCode).not.toContain('chatGif = false,');
     expect(prefsCode).toContain('this.#chatGif = $state(loadedSettings.chatGif !== false);');
     // `=== true` here would mute gifs for every viewer who has never touched the checkbox.
     expect(prefsCode).not.toContain('this.#chatGif = $state(loadedSettings.chatGif === true);');
