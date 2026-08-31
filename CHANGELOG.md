@@ -85,12 +85,27 @@ repository diffs RENDERED STRINGS.
 
 #### What the autofixer actually said, and every decline recorded at the code
 
-Run on four components. **Zero issues on all four.** The suggestions are declines and each is now
-written down beside the code it concerns rather than silently ignored:
+Run on five components — `EmojiPicker`, `StreamingView`, both alert panes, and `ScreenPaneStatus`.
+**Zero issues on all five.**
+
+**What was actually sent, stated precisely, because the tool takes source as a string and this
+repository's files carry more prose than code.** `ScreenPaneStatus` is 111 lines and went whole. The
+other four were given with their PROSE comments removed and every `svelte-ignore` directive
+preserved — a directive is compiler input, not prose, and stripping one would have manufactured
+a11y findings the real file suppresses. The
+stripper is `scratchpad/strip.mjs`; it is a tool of this session, not a repository artifact. That
+distinction matters in one direction only: the autofixer's rule set is AST-based, so prose cannot
+change its verdict, but a comment CAN break parsing — which is exactly the `CLAUDE.md` rule about
+template syntax inside comments. **That risk is covered by a different instrument**: `svelte-check`
+and `vite build` compile the REAL files, comments and all, and both are green (1,574 files, 0
+errors). Neither instrument is being asked to do the other's job.
+
+The suggestions are declines and each is now written down beside the code it concerns rather than
+silently ignored:
 
 | suggestion | disposition |
 | --- | --- |
-| *"Unexpected mustache interpolation with a string literal value"* × 14 | declined — `apps/room/AGENTS.md`'s standing decline, exercised live for the first time |
+| *"Unexpected mustache interpolation with a string literal value"* × 30 | declined — `apps/room/AGENTS.md`'s standing decline, exercised live for the first time. Sixteen of the thirty are the eight pads in each alert pane, which came back identical on both — the twins agree, which is what `dta-01` … `dta-04` exist to keep true |
 | *"the stateful variable `staged` is assigned inside an `$effect`"* (EmojiPicker) | declined — a `$derived` cannot express "one macrotask has passed since mount" |
 | *"calling `loadStream` inside an `$effect`"* × 2 (StreamingView) | declined — the docs name *"third-party library integration"* as what effects are for |
 | *"`bind:this` … consider an attachment"* (StreamingView) | declined, and **load-bearing**: `STV-05` pinned that the reference re-reads the SAME `<video>` across reloads; an attachment rebuilds the handle per re-run and would silently break that |
