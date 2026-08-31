@@ -2649,7 +2649,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       while the first was still resolving, and the pane looked identical throughout), and SC-16
       gives the loading state the same `alert` shape its error twin already had.
     */
-    max: 343,
+    /*
+      LOWERED 343 -> 339 on 2026-08-31, by the extraction AVD-01/03/04 forced. `partitionInputDevices`,
+      `selectedDeviceLabel`, `resolveSelectedDevice` and the five failure sentences are
+      `#lib/device-enumeration.ts` now — pure, and executed for the first time. The pane grew the two
+      defect fixes and still came out four lines below where it started, which is the ratchet working
+      as designed rather than as an obstacle. It was three lines lower again until the `DeviceOption`
+      note landed — and that note went to `#lib/device-enumeration.ts`, beside the type it is about,
+      which is the move this file's own header calls the extraction itself rather than a raise.
+    */
+    max: 339,
     why: 'which microphone and camera this browser captures with, and the three processing flags'
   },
   {
@@ -4543,6 +4552,56 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the 500ms composer flash, as an attachment, and why the nonce is a counter'
   },
   {
+    file: 'lib/device-enumeration.ts',
+    /*
+      Created 2026-08-31 and capped at what it landed at, for `AVD-01`, `AVD-03` and `AVD-04`.
+
+      The slice `av-device-pane-contract.test.ts` said out loud it could not reach: *"every path to
+      `devicesLoadError` goes through `navigator.mediaDevices`, which jsdom does not implement —
+      stubbing it would test the stub."* So the five captured error sentences and the two
+      duplicate-device rules — the pieces most likely to be quietly reworded — were the pieces
+      nothing could execute. Pure now, and executed.
+
+      If this climbs, the question is whether a DEVICE decision has arrived in it that belongs to the
+      capture instead.
+    */
+    max: 252,
+    why: 'turning one enumerateDevices() answer into two dropdowns, and the five failure sentences'
+  },
+  {
+    file: 'lib/video-list.ts',
+    /*
+      Created 2026-08-31 and capped at what it landed at, for `VID-06`.
+
+      `sendVideoToRoom` is a four-refusal ladder wrapped in three lines of state assignment, and the
+      ladder was the part nothing could execute. Most of the file is the account of the reference's
+      own DEAD playlist arm, which is reproduced by not being written — deleting it silently would
+      answer a question upstream has not answered.
+
+      If this climbs, the question is whether the YouTube pattern has grown a third consumer here
+      while `ModalHost` and `YoutubePlayerOverlay` still hold their own copies. It should not; it
+      should take theirs.
+    */
+    max: 184,
+    why: 'what may go into the presenter video list, and where the list is kept'
+  },
+  {
+    file: 'lib/scheduled-alert-table.ts',
+    /*
+      Created 2026-08-31 and capped at what it landed at, for `SCH-01` and `SCH-02`.
+
+      Two values, both transcriptions: the repeat pill's three colour classes — which
+      `docs/decoded/alert-scheduler-filter-labels.md` explicitly recorded as NOT READ, "do not guess
+      them" — and the question asked before a scheduled alert is destroyed.
+
+      NOT in `scheduled-alert.ts`, and that is the reason for a second file rather than a section: the
+      server imports that one, and a badge class name and a browser confirmation have no business
+      crossing that boundary.
+    */
+    max: 83,
+    why: 'the manage table two captured values: the repeat pill colours and the delete question'
+  },
+  {
     file: 'lib/download-image.ts',
     /*
       Saving an image the room is showing. It was a method on `RoomModals` with one caller, and
@@ -6157,8 +6216,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       those two fields, so the clause would quote values that cannot vary and would imply a choice
       the presenter does not have.
     */
-    max: 357,
+    /*
+      LOWERED 357 -> 320 on 2026-08-31. The manage table's ROWS are
+      `lib/components/ScheduledAlertsTable.svelte`, which is where `SCH-03`, `SCH-04` and `SCH-05`
+      landed. The split above is untouched by it — see that file's header for why drawing a row is not
+      the question this component refuses to split.
+    */
+    max: 320,
     why: 'the send-later pane and the manage table; one question, one component'
+  },
+  {
+    file: 'lib/components/ScheduledAlertsTable.svelte',
+    /*
+      Created 2026-08-31 and capped at what it landed at, for `SCH-03`, `SCH-04` and `SCH-05`.
+
+      NOT the split `ScheduledAlerts.svelte` refuses. That component argues the send-later pane and
+      the manage table are one component because they share one question — what is already scheduled
+      — and every word of it still holds: this child asks nothing and owns nothing. The list arrives
+      as a prop and the removal leaves as a callback; the fetch, the refetch and the confirmation all
+      stayed put. What came out is the DRAWING of a row, which was never part of the question, and
+      upstream draws it in its own component (`app-scheduled-alerts-modal`).
+
+      If this climbs, the question is whether the table has started deciding something.
+    */
+    max: 164,
+    why: 'the manage table rows, decoded cell by cell from app-scheduled-alerts-modal'
   },
   {
     file: 'lib/components/ScreenTabs.svelte',
@@ -6251,7 +6333,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/VideoPlayer.svelte',
-    max: 414,
+    /*
+      LOWERED 414 -> 412 on 2026-08-31, and it absorbed five rows on the way down.
+
+      `VID-01` REMOVED about ninety lines: the two `bootbox.dialog` calls were hand-copied
+      `<div class="bootbox modal fade show">` markup with no backdrop, no focus move and no focus
+      restore, and `BootboxDialog` — with the `footer` snippet that exists for exactly this — does all
+      three. `VID-06`'s validation ladder went to `#lib/video-list.ts` with the storage half beside it.
+      What came back was the account of both, which is the half worth keeping.
+    */
+    max: 412,
     why: 'the video-only player'
   },
   {
