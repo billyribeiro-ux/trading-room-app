@@ -81,6 +81,94 @@ Contracts: `chat-composer-key-contract.test.ts`, `alert-chat-nav-contract.test.t
 `message-renderer-differences-contract.test.ts` — 54 assertions, every bundle claim read from the
 pinned v4 file at run time rather than quoted. Eleven negative controls seen red.
 
+### 2026-08-31 02:05 UTC — `ptr_clone_app` is retired, and the live cluster taught the migration three things
+
+**Runtime impact: NO from this commit** — the migration ships, it has not been run against any
+deployed database. What it does when run is below, measured rather than described.
+
+`0010_retire_ptr_clone_app.sql` finishes what `0009` began. `0009` mirrored every privilege of the
+baseline role onto `tradingroom_app` and retargeted all 22 RLS policies to it, leaving
+`ptr_clone_app` inert with respect to tenant data — proven at 01:10 today. What it still held was
+**object privilege**: 87 table grants, 26 column ACLs, 6 routine grants, `USAGE` on `public`, and
+`CONNECT` on the database. A login-capable identity with broad DML rights on every table in a
+multi-tenant fintech database, alive only because `0001_baseline.sql` names it.
+
+**Three things only a live cluster could have taught, each found by a run failing.**
+
+**1. `DROP ROLE` is cluster-global; privileges are per-database.** The first draft dropped
+unconditionally. On the second database it failed:
+
+```
+ERROR:  role "ptr_clone_app" cannot be dropped because some objects depend on it
+DETAIL: 72 objects in database interlock_probe
+```
+
+That is not an obstacle to route around — it is the normal state of a multi-tenant cluster
+mid-rollout, because `0001` re-creates this role on every new database. A migration that failed
+there would block the chain on every database but the last, in an order nobody controls. So the drop
+is attempted and **exactly one** failure is tolerated — `dependent_objects_still_exist`, SQLSTATE
+2BP01 — and announced. Anything else propagates. Not `WHEN OTHERS`, which would swallow the
+interlock's own exception and turn the migration into the silent no-op it exists not to be.
+
+**2. A LOGIN role always holds a DATABASE grant.** `CONNECT` lives on the database, in an ACL that
+no table-level revoke touches, and `DROP ROLE` refuses while it stands. The very first live run
+failed on exactly that. `current_database()` rather than a literal, because the chain is applied to
+whatever database it runs against.
+
+**3. The residual count has to read the catalogue.** The first draft counted through
+`information_schema` and was wrong in both directions: too narrow — no database, schema or type ACL,
+which is how it missed the grant in (2) — and too wide, because `column_privileges` reflects table
+grants down onto every column and reported **922** where **26** column ACLs existed. It counts the
+seven catalogue relations `DROP ROLE` itself walks now, and asserts zero before attempting the drop.
+Its own assertion is what caught the 26: *"still holds 26 privilege facts after the revoke; refusing
+to drop"*.
+
+**The interlock, which is the property that makes any of this safe.** The migration REFUSES unless
+`tradingroom_app` is already named by an RLS policy. Without it, a database whose chain has not
+reached `0009` would lose the only role its policies admit and every tenant read would return
+nothing. Verified by running a database to `0008` only and watching it refuse — and the role
+survived the refusal.
+
+**The full rollout, across three databases on one PostgreSQL 16.13 cluster:**
+
+| database | chain | outcome |
+| --- | --- | --- |
+| `ptr_clone` | `0001`→`0009` | revoked, **role dropped** — the only database granting at the time |
+| `fresh_chain` | `0001`→`0009` | revoked, **not** dropped, and said why. 0 grants remaining here |
+| `interlock_probe` | `0001`→`0008` | **refused**, role survived. `0009` applied, then `0010` **dropped the role from the cluster** |
+
+Idempotent: a re-run on a retired database answers *"already retired"*. And after retirement
+`tradingroom_app` kept all 87 table grants and all 22 policies, tenant A saw only A's room, tenant B
+only B's, and an unset tenant saw **zero rows**.
+
+**Registered in all four places this repository requires, none of them silently:**
+
+- `verify-backend.mjs` — pinned by sha256 as a reviewed forward migration, with the three properties
+  written at the pin. 10 pinned migrations now.
+- `verify-backend-provenance.mjs` — `LOCALLY_AUTHORED`, the pair to
+  `migration_reappliability.rs`: that test states the chain must apply to any number of databases on
+  one cluster, and this migration is where that rule stops being about SQL and becomes about a
+  cluster-global role.
+- `naming-boundary.test.ts` — allowed to name `ptr_clone_app`, and its allow-list ceiling raised
+  **39 → 40** with the argument. Every other entry there is a use to be tolerated; this is the only
+  one working to shorten the list, and it deletes itself when the rollout completes.
+- `retire-baseline-role-contract.test.ts` — new, seven assertions on what the pinned bytes must
+  continue to MEAN. `verify-backend.mjs` pins the bytes; this pins the properties.
+
+**Four negative controls, each seen RED, each restored, the file verified byte-identical to its pin
+afterwards:** the interlock removed; `CASCADE` introduced; the handler widened to `WHEN OTHERS`; the
+database revoke deleted.
+
+**One thing the contract test needed that is worth recording.** Two of its assertions are negative —
+never CASCADE, never count through `information_schema` — and the migration's own prose EXPLAINS why
+it does neither, naming both. Read against the raw file they failed on the explanation of the thing
+they were checking is absent. It strips `--` and `/* */` comments first, which is the SQL form of
+the rule `codeOf` exists for and which `alert-report-modal-contract` already applies to migrations.
+
+**Verified:** `verify-backend.mjs --migrations-only` PASS (10 pinned); `verify-backend-provenance.mjs`
+PASS (98 imported + 3 authored here); `naming-boundary` 4/4; the new contract 7/7. **Not run against
+any deployed database** — the evidence above is a local cluster built from `0001` forward.
+
 ### 2026-08-31 01:10 UTC — The tenancy kernel, proven on a live cluster instead of read
 
 **Runtime impact: NO.** Two trackers. No `src` or `services` file changed — the database built here
