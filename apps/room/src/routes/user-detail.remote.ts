@@ -20,7 +20,21 @@ import { readUserDetail, type UserDetail } from '#lib/server/user-detail.js';
   sidebar politely declined to draw them, and the correction was to filter the WIRE. A second door
   onto the same fields that answered members would reopen it from the other side.
 
-  A member's modal is unchanged by this: both cells already read `n/a` for them and still do.
+  A member's modal is unchanged by this: those cells already read `n/a` for them and still do.
+
+  ## FOUR FIELDS NOW, AND THE TWO ADDED ON 2026-08-31 SIT INSIDE THE SAME ENVELOPE ON PURPOSE
+
+  `ip` and `userAgent` joined `email` and `loggedIn` here rather than getting a door of their own,
+  because they are the same question — *may this caller see another member's private details* — and a
+  second door is a second place to get the answer wrong. They are also strictly narrower than their
+  neighbours: `email` and `loggedIn` are answered for anyone with STANDING in the room, including
+  somebody who left years ago, while `liveConnectionFor` answers only about a connection this room's
+  hub is holding right now, and null otherwise. So no account becomes readable that was not already.
+
+  They are the server's own observation of the request that opened the stream, never anything the
+  client said about itself — a page cannot learn its own public address, and a `User-Agent` a browser
+  reports is a string it chose. `server/user-detail.ts` carries which of the System tab's five cells
+  are filled and the measurement refusing the other three.
 
   ## THE ROOM IS NEVER AN ARGUMENT
 

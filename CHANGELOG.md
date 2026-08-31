@@ -33,6 +33,58 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 03:55 UTC — A census over every remote function, written the day it was already true
+
+**Runtime impact: NO.** No door changed. What changed is that a door shipped without a gate now
+fails a test instead of answering whoever asks.
+
+**A `*.remote.ts` file is a door.** SvelteKit exposes every `query` and `command` it exports as an
+HTTP endpoint the browser can call directly, so a file that forgets its gate is not a component that
+renders the wrong thing — it is an unauthenticated route into a multi-tenant fintech application,
+and the page that stopped drawing the button does nothing to prevent the call.
+
+This repository has met that shape from two directions already and neither can see this one:
+
+- `authority-gate-contract.test.ts` — a control **rendered** for members whose server call refused
+  them. The gate worked; the render did not.
+- `roster-privacy.test.ts` — a **wire** that carried `locStr` and `email` to every subscriber while
+  the sidebar politely declined to draw them.
+
+Between them lies a door with **no gate at all**: nothing renders wrong, nothing leaks through a wire
+anybody reads, and the endpoint answers everyone.
+
+**Measured before it was written.** All 35 `*.remote.ts` files present today call at least one gate,
+so this fixes nothing — it makes the absence checkable, on every run, for every file added after it.
+A guard written the day a thing is already true is the cheapest one there is.
+
+Four things it asserts, and one it deliberately does not:
+
+| | |
+| --- | --- |
+| every door calls a gate | read from `codeOf`, not the raw file — several explain their gate at length in prose, and a raw search would pass for a file that only TALKS about being gated |
+| the gates are a NAMED vocabulary | a regex for "something that looks authoritative" is satisfied by any locally-defined `requireX` that checks nothing; naming them means a new gate is added deliberately, which is when somebody reads what it proves |
+| the vocabulary still exists in `auth.ts` | otherwise a rename empties every needle and "no file calls a gate" reads identically to "this list is stale" |
+| four named doors are presenter-ONLY | `user-detail`, `user-notes`, `session-history`, `permissions` — the ones answering with data about somebody who is not the caller |
+| **not** whether each gate is the RIGHT one | `presenterRoom()` on a member-facing query would pass here and be wrong; that judgement belongs to each door's own contract, and several exist |
+
+**And the room is kept out of the argument list on those four.** `presenterRoom()` takes it from the
+session; the reference sends `rid` from `globals.sessData.roomID`, a client-held value naming which
+room to ask about, and a presenter of room A could name room B. A door accepting `room:` as an
+argument would reopen exactly that, so the census refuses one.
+
+**Four negative controls, each seen RED and restored:** an ungated `probe-ungated.remote.ts` added
+(named in the failure); `presenterRoom()` swapped for `requireRoomShortCode()` in
+`user-detail.remote.ts`; `room: z.string()` added to its argument schema; and a gate renamed in the
+vocabulary so it no longer matches `auth.ts`.
+
+`user-detail.remote.ts`'s own docblock also says what the two fields added an hour ago are and why
+they sit inside the same envelope rather than getting a door of their own — they are the same
+question, and they are strictly narrower than their neighbours, since `liveConnectionFor` answers
+only about a connection the hub is holding right now.
+
+**Verified:** `pnpm run gate` in `apps/room`, exit read from a log — **291 files, 5,007 passed,
+1 skipped, gate-exit=0**.
+
 ### 2026-08-31 03:30 UTC — Three more surface audits merged, and two of them had to be reconciled against each other
 
 **Runtime impact: YES** — via the fifty-one rows merged, each with its own entry. What is recorded
