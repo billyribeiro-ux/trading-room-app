@@ -75,15 +75,36 @@ import { codeOf } from './source-comments';
  */
 const BUNDLE = readFileSync('docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', 'utf8');
 
+/**
+ * A string this repository writes across concatenated literals, rejoined.
+ *
+ * ## The false GAP this closes, and why the fix is this narrow
+ *
+ * `app-presentationarea`'s const 74 is a 258-character tooltip, and both `ScreenTabs.svelte` and
+ * `StreamTabs.svelte` carry it verbatim — as three literals joined by `+`, because one line of 258
+ * characters is not what prettier leaves behind. The sweep looks for the whole value as a substring
+ * and never found it, so it reported as MISSING a value that ships on two surfaces.
+ *
+ * The join is deliberately the smallest transformation that fixes it: only a quote, `+`, and the
+ * next quote, with whitespace between. It cannot reach across a variable, an expression or a
+ * template hole. What it CAN do, in principle, is glue two unrelated adjacent literals into a
+ * spurious match — so the risk it carries is hiding a true gap, never inventing one. Measured on the
+ * day it was added: exactly one residual moved, and it was this tooltip.
+ */
+const rejoinConcatenations = (source: string): string =>
+  source.replace(/'\s*\+\s*'/g, '').replace(/`\s*\+\s*`/g, '');
+
 /** Every shipping source file, comments stripped. See the module note. */
 const readOurs = (strip: boolean): string =>
-  globSync('src/**/*.{svelte,ts}')
-    .filter((path) => !path.includes('.test.'))
-    .map((path) => {
-      const source = readFileSync(path, 'utf8');
-      return strip ? codeOf(path, source) : source;
-    })
-    .join('\n');
+  rejoinConcatenations(
+    globSync('src/**/*.{svelte,ts}')
+      .filter((path) => !path.includes('.test.'))
+      .map((path) => {
+        const source = readFileSync(path, 'utf8');
+        return strip ? codeOf(path, source) : source;
+      })
+      .join('\n')
+  );
 
 /**
  * EVERYTHING this app contains — shipping code, docblocks and contract tests alike — MINUS this file.
@@ -93,10 +114,12 @@ const readOurs = (strip: boolean): string =>
  * as "already examined" and the remaining one only because it is redacted. A tautology that looks
  * like a result, and it was believed for about a minute.
  */
-const REPOSITORY = globSync('src/**/*.{svelte,ts}')
-  .filter((path) => !path.includes('reference-const-coverage'))
-  .map((path) => readFileSync(path, 'utf8'))
-  .join('\n');
+const REPOSITORY = rejoinConcatenations(
+  globSync('src/**/*.{svelte,ts}')
+    .filter((path) => !path.includes('reference-const-coverage'))
+    .map((path) => readFileSync(path, 'utf8'))
+    .join('\n')
+);
 
 /** Exclusion 3 — framework identifiers, read out of the bundle rather than listed by hand. */
 const angularApiNames = (): ReadonlySet<string> => {
@@ -332,6 +355,18 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     sometimes IS still needed — `app-closed-session-page` shows both halves, the target and the bare
     `navbarsExampleDefault` the reference also writes into `aria-controls`.
   */
+  /*
+    Ten `data-bs-target`s, and three values that are not:
+
+    - `streaming-link-playyer` (upstream's own typo) is the id of the readonly field in the Stream
+      Player tab, read by `copyToClipboardPlayer()`. That whole feature is REFUSED at length in
+      `ModalHost.svelte`: `playerURL` arrives from the reference's server, this room composes
+      nothing, and the page it links to is an anonymous view of one room's screenshares — an
+      authorization decision the root standard forbids inventing.
+    - `audioID` and `videoID` are the `name` attributes on the two AV device selects. They are
+      Angular's `ngModel` binding keys, not something the DOM needs; ours carry the ids and the
+      `label for` (`AvDevicePane.svelte`), which is the half that does anything.
+  */
   'app-session-control-modal': [
     '#reset-session',
     '#close-session',
@@ -347,6 +382,12 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'audioID',
     'videoID'
   ],
+  /*
+    Four tab targets and one modal target. The PANES all exist — `ModalHost.svelte` carries
+    `id="nav-info"`, `id="nav-system"`, `id="nav-options"` and `id="nav-notes"` — and only the
+    `#`-prefixed selectors Bootstrap's JavaScript would look them up by are absent, because this room
+    decides which pane is showing in Svelte state. The clearest instance of group three there is.
+  */
   'app-user-info-modal': [
     '#nav-info',
     '#all-user-pm-modal',
@@ -365,11 +406,22 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'followChatStyle.tickerColor',
     'followChatStyle.fontSize'
   ],
+  /*
+    The navbar collapse toggler — `data-bs-target="#navbarsExampleDefault"` plus the matching
+    `aria-controls` and the id it names — and one class on the page body. This room's closed-session
+    page is not a Bootstrap navbar with a collapsible menu, so the toggler has nothing to toggle.
+  */
   'app-closed-session-page': [
     '#navbarsExampleDefault',
     'navbarsExampleDefault',
     'closed-container'
   ],
+  /*
+    All three are `ariaLabelledBy` strings handed to `modalService.open(...)`, and all three are the
+    same recorded divergence: these dialogs name themselves with `role="dialog"` plus an `aria-label`
+    rather than pointing at a title element's id. `CarouselDialog.svelte` states it at the file
+    browser (byte 1,477,226) and `note-file-browser-chrome-contract.test.ts` carries the measurement.
+  */
   'app-note': ['carousel-modal-title', 'file-browser-modal-title', 'modal-basic-title'],
 
   /*
@@ -453,13 +505,7 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'ignoreWeekendsChk'
   ],
   /* `recordings` is the archive tab — blocked on an archive service, and recorded as such. */
-  'app-presentationarea': [
-    'recordings',
-    'recordings-tab',
-    '#recordings',
-    'fa-file-video',
-    'This is the default screen users are taken to right now. If you are a presenter and talking whichever screen you select will be forced on others. You can also select a specific screen and click the gear icon on this tab to force everyone to watch that screen.'
-  ],
+  'app-presentationarea': ['recordings', 'recordings-tab', '#recordings', 'fa-file-video'],
   /* `discord-settings` is the Discord-registration blocker; the two `presenterStyle.` are group three's defect again. */
   'app-user-settings-modal': [
     'discord-settings',
@@ -476,11 +522,23 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   */
   'app-chat': ['Save chat messages'],
   'app-extra-chat': ['Save chat messages'],
+  /*
+    The id and class of the `<video>` inside the reference's IN-PAGE preview card. This room's
+    preview is a separate WINDOW, argued in `room/recording.ts`: upstream points its card at a
+    server-supplied `recPreviewLocation`, there is no such URL here, and the window shows the local
+    recording instead. No card, so no element to carry either name.
+  */
   'app-rec-preview': ['recScreenLocalPreview', 'recPreviewScreen'],
   /*
     `fullScreen()` is the value of `data-ng-dblclick` — an ANGULARJS 1 attribute left in an Angular 17
     template. No runtime in the reference reads it and the browser does not either, because the
     attribute is not `ondblclick`. Dead in the original; correctly dead here.
+  */
+  /*
+    `#ffcc00` is the inline colour on `W0e`, the local-preview invitation — node 3 of the pane's
+    status stack, and `SP2-04` in `docs/decoded/room-surface-audit-2026-08-30.md` records the
+    measurement that it cannot be reached in this application. `ScreenPaneStatus.svelte` renders the
+    other three headings and names its absence.
   */
   'app-screenshare-view': ['#ffcc00', 'fullScreen()'],
   /* Already recorded in `poll-panel-v4-contract.test.ts`: ours is `/assets/…`, served from `static/`. */
@@ -522,7 +580,7 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-five components fully covered, one hundred and thirty values not', () => {
+  it('holds the ratchet: thirty-five components fully covered, one hundred and twenty-nine values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
@@ -530,7 +588,7 @@ describe('coverage of the reference const tables', () => {
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(35);
-    expect(residuals).toBe(130);
+    expect(residuals).toBe(129);
   });
 
   it('and the surfaces audited by hand this week are among the covered', () => {
@@ -562,10 +620,10 @@ describe('how much of the gap has already been written about', () => {
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
-  it('splits the 130 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(130);
+  it('splits the 129 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(129);
     expect(all.filter(mentioned)).toHaveLength(37);
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(93);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(92);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

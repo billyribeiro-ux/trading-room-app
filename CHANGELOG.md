@@ -33,6 +33,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 04:21 UTC — every remaining residual traced, and a measurement bug found while doing it
+
+**Runtime impact: NO** — verdicts recorded at the table, and one narrowing of how the sweep reads our
+source. No shipping file changed.
+
+**A false GAP, and the fix is narrower than the bug.** `app-presentationarea`'s const 74 is a
+258-character tooltip and the sweep reported it missing. It ships on TWO surfaces: `ScreenTabs.svelte`
+and `StreamTabs.svelte` both carry it verbatim, as three literals joined by `+`, because one line of
+258 characters is not what prettier leaves behind. The sweep looked for the whole value as a substring
+and never found it — so the gap map named as unfinished a string that renders on two bars.
+
+The sweep now rejoins `' + '` concatenations. Deliberately the smallest transformation that fixes it:
+a quote, a `+`, and the next quote, with whitespace between, so it cannot reach across a variable or a
+template hole. What it CAN do in principle is glue two unrelated adjacent literals into a spurious
+match — the risk it carries is hiding a true gap, never inventing coverage. Measured: exactly one
+residual moved, and it was this tooltip. **130 residuals to 129.** Negative control: with the rejoin
+made an identity function, three cases go red.
+
+**The other eight components were traced value by value, and none of them is unexamined work.**
+
+- `app-session-control-modal` (13) — ten `data-bs-target`s, plus `streaming-link-playyer`, the id of
+  the Stream Player tab's readonly link field, inside a feature `ModalHost.svelte` refuses at length
+  because `playerURL` comes from the reference's server and the page it links to is an anonymous view
+  of one room's screenshares; plus `audioID`/`videoID`, which are Angular `ngModel` binding keys where
+  ours carry the ids and the `label for`.
+- `app-user-info-modal` (10) — four tab targets and one modal target whose PANES all exist here, plus
+  the five `followChatStyle.*` values that are the reference's own static-attribute defect.
+- `app-note` (3) — `ariaLabelledBy` strings; these dialogs name themselves with `role="dialog"` plus
+  `aria-label`, already recorded in `CarouselDialog.svelte`.
+- `app-rec-preview` (2) — the id and class of the `<video>` in the reference's IN-PAGE preview card.
+  Ours is a separate window, argued in `room/recording.ts`, because there is no server-supplied
+  `recPreviewLocation` here.
+- `app-screenshare-view` (2) — `#ffcc00` is the local-preview invitation's colour, which `SP2-04`
+  measured as unreachable in this application.
+- `app-closed-session-page` (3) — the Bootstrap navbar collapse toggler and the id it names.
+- `app-alert-send-report-modal` (12) — the `RPT-*` refusal, enumerated as orphans in its own contract.
+- `app-session-login` (32) — account management, which lives on the controller.
+
+Each verdict is written at its own entry in the table rather than in a summary, so the next reader
+finds it beside the values it explains.
+
+Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files / 5,680 passed / 1
+skipped.
+
 ### 2026-09-01 03:52 UTC — two more residual blocks traced: one owner decision, one already-argued set
 
 **Runtime impact: NO** — findings recorded at the code and in the tracker. No shipping file changed.

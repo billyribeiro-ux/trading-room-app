@@ -279,10 +279,43 @@ under someone else's name and address. `alert-send-later-time` and `ignoreWeeken
 room does not need, because ours WRAPS each input in its label rather than pairing them by id — a
 better association, and the only one of the seven that had no reason on record anywhere.
 
-**Still to work, largest first:** `app-session-control-modal` (11 of 13, mostly `data-bs-target`),
-`app-alert-send-report-modal` (7 of 12, the `RPT-*` refusal), `app-user-info-modal` (6 of 10),
-`app-closed-session-page` (3), `app-note` (2), `app-rec-preview` (2), `app-screenshare-view` (1). And
-`app-session-login` (29 of 32), which is account management and lives on the CONTROLLER.
+### Every remaining component traced, 2026-08-31. None of it is unexamined work.
+
+`app-session-control-modal` (13) — ten `data-bs-target`s, plus `streaming-link-playyer` (the id of the
+Stream Player tab's readonly link field, inside a feature `ModalHost.svelte` REFUSES at length because
+`playerURL` comes from the reference's server and the page it links to is an anonymous view of one
+room's screenshares) and `audioID`/`videoID` (Angular `ngModel` binding keys; ours carry the ids and
+`label for`, which is the half that does anything).
+
+`app-user-info-modal` (10) — four tab targets and one modal target, and the panes all exist:
+`ModalHost.svelte` carries `id="nav-info"`, `nav-system`, `nav-options`, `nav-notes`. Plus the five
+`followChatStyle.*` values, which are the reference's own defect — static attributes where a binding
+was meant.
+
+`app-note` (3) — `ariaLabelledBy` strings handed to `modalService.open(...)`. These dialogs name
+themselves with `role="dialog"` plus `aria-label` instead, recorded in `CarouselDialog.svelte` and
+measured in `note-file-browser-chrome-contract.test.ts`.
+
+`app-rec-preview` (2) — the id and class of the `<video>` in the reference's IN-PAGE preview card.
+Ours is a separate WINDOW, argued in `room/recording.ts`: upstream points its card at a server-supplied
+`recPreviewLocation` and there is no such URL here.
+
+`app-screenshare-view` (2) — `#ffcc00` is the inline colour on the local-preview invitation, which
+`SP2-04` measured as unreachable in this application; `fullScreen()` is an AngularJS 1 attribute in an
+Angular 17 template.
+
+`app-closed-session-page` (3) — the Bootstrap navbar collapse toggler and the id it names.
+
+`app-alert-send-report-modal` (12) — the `RPT-*` refusal, enumerated as orphans in its own contract.
+
+`app-session-login` (32) — account management, which lives on the CONTROLLER.
+
+**One measurement bug was found and fixed while doing this.** `app-presentationarea`'s 258-character
+tooltip was reported missing and ships on two surfaces: both `ScreenTabs.svelte` and
+`StreamTabs.svelte` carry it as three literals joined by `+`, and the sweep looked for the whole value
+as one substring. The sweep now rejoins `' + '` concatenations — the smallest transformation that
+fixes it, and one whose only risk is hiding a true gap rather than inventing coverage. Exactly one
+residual moved. **129 residuals, 35 components fully covered.**
 
 **The comment stripping in that file is load-bearing and its own case proves it on every run.** This
 repository quotes the reference by value constantly, so a raw-text search reports **122** gaps where
