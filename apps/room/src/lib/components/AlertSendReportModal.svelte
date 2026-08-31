@@ -45,6 +45,15 @@
     'Delivery reporting is not available here: this room records no per-recipient delivery for an alert, so there is nothing to report on.';
 </script>
 
+<!--
+  ASR-1 / ASR-2 / ASR-3 — three measurements on the chrome that SURVIVES the refusal below, taken
+  2026-08-31: the reference stylesheet's thirteen rules (eleven scoped to elements this refusal
+  means do not exist here, two already held by `app.css:1524`), the self-referential
+  `aria-labelledby` that leaves this dialog nameless in the capture and here, and the missing
+  focus-on-open that one line of `Modal.svelte` would close. Each is argued in full, with the
+  counts that decide it, in `alert-report-modal-contract.test.ts` — which is also what fails if
+  any of the three stops being true.
+-->
 <app-alert-send-report-modal>
   <Modal
     id="alert-send-report-modal"
@@ -134,9 +143,9 @@
       `drawPieChart` is the shape a pie would take here instead.
     -->
     <!--
-      No `{#if targetMessage?.id}` here any more, and its absence is the point.
+      No conditional on `targetMessage?.id` here any more, and its absence is the point.
 
-      This carried an `{:else}` rendering `No reports found.` — RPT-08's refusal, one step after the
+      This carried an else branch rendering `No reports found.` — RPT-08's refusal, one step after the
       dialog had already opened, because the component could not reach the opener. It can now:
       `RoomMessageActions` refuses at the entry point, where upstream refuses, so the modal is never
       constructed without an id and that branch became unreachable. It was deleted rather than kept

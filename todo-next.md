@@ -112,18 +112,18 @@ guessed.
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
 | 37 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
 | 38 | `lib/components/GiphyPicker.svelte` | 215 | no |
-| 39 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
+| 39 | `lib/components/ScreenShareMenu.svelte` | 203 | `## ScreenShareMenu.svelte` in the v4 register — 4 rows (SSM-01…04) read end to end 2026-08-31. The whole dropdown had no focusable element; SSM-04 corrected all four byte offsets in its own entry table, each of which landed INSIDE the function it named. |
 | 40 | `lib/components/NavbarSoundCloud.svelte` | 200 | §NAV — born 2026-08-31 out of `RoomNavbar`, carrying `NAV-02` and the presenter dropdown it belongs beside. |
 | 41 | `lib/components/RichTextEditor.svelte` | 190 | `## components/RichTextEditor.svelte` in the v4 register — 6 rows (RTE-01…06) against `app-rich-text-editor`, read end to end 2026-08-31. |
 | 42 | `lib/components/MessageBody.svelte` | 172 | `## components/MessageBody.svelte` in the v4 register — 7 rows (MSB-01…07) against `urlwrapImg` and `showChatGif`, read end to end 2026-08-31. |
 | 43 | `lib/components/AlertQaAlertCard.svelte` | 170 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
-| 44 | `lib/components/FollowChatStylePane.svelte` | 170 | no |
+| 44 | `lib/components/FollowChatStylePane.svelte` | 152 | `## FollowChatStylePane.svelte` in the v4 register — 3 rows (FCS-01…03) read end to end 2026-08-31. FCS-01 is a real defect: `bind:value` on the Text Size number input writes `null` for an empty box, and `null + 1` is `1`, so clearing it and saving drew that person's username at 1px on every later message. |
 | 45 | `lib/components/AlertQaComposer.svelte` | 166 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
 | 46 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
 | 47 | `lib/components/Modal.svelte` | 157 | no |
 | 48 | `lib/components/TabGearMenu.svelte` | 156 | no |
-| 49 | `lib/components/AlertSendReportModal.svelte` | 152 | no |
-| 50 | `lib/components/notes/NoteTabContent.svelte` | 150 | no |
+| 49 | `lib/components/AlertSendReportModal.svelte` | 161 | `## AlertSendReportModal.svelte` in the v4 register — 3 rows (ASR-01…03) read end to end 2026-08-31: 2 measured refusals, 1 blocked on a one-line change in `Modal.svelte` that this pass did not own. |
+| 50 | `lib/components/notes/NoteTabContent.svelte` | 134 | `## notes/NoteTabContent.svelte` in the v4 register — 3 rows (NTC-01…03) read end to end 2026-08-31. NTC-01 removed an INVENTED value: `title="Welcome Mat"` occurs 0 times in the 2,891,205-byte bundle. |
 | 51 | `lib/components/LogArchiveModals.svelte` | 147 | no |
 | 52 | `lib/components/BootboxDialog.svelte` | 145 | no |
 | 53 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
@@ -157,7 +157,7 @@ guessed.
 | 81 | `routes/logout/+page.svelte` | 31 | no |
 | 82 | `routes/+layout.svelte` | 27 | no |
 
-**15 of 82 surfaces audited · 5,134 of 36,022 lines · 14.3%.**
+**19 of 82 surfaces audited · 5,784 of 35,993 lines · 16.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

@@ -99,11 +99,26 @@ describe('NotesPane evidence contract', () => {
     expect(body).toContain('class="fas fa-pen mx-1"');
     expect(body).toContain('style="display: none;"');
     expect(body).toContain('<a class="editName mx-1">Bible Verses </a>');
+    /*
+      NTC-2, 2026-08-31 — `role`, `tabindex` and `aria-label` joined this span and are asserted with
+      the captured attributes rather than beside them, in ONE string, so the order cannot drift
+      either. Const 126 of `app-presentationarea` has none of the three: it is a bare
+      `dropdown-toggle` span whose only child is an `<i>`, which Bootstrap's dropdown plugin would
+      have adopted upstream and which nothing adopts here, so every action in this menu was
+      mouse-only. `note-tab-content-contract.test.ts` carries the measurement and the reference
+      const; this assertion is the RENDERED half of it.
+    */
     expect(body).toContain(
-      '<span id="notes-pane-menu-59" data-bs-toggle="dropdown" aria-expanded="false" class="dropdown-toggle">'
+      '<span id="notes-pane-menu-59" role="button" tabindex="0" aria-label="Note options" ' +
+        'data-bs-toggle="dropdown" aria-expanded="false" class="dropdown-toggle">'
     );
     expect(body).toContain('<ul aria-labelledby="notes-pane-menu-59" class="dropdown-menu">');
     expect(body.match(/href="#"/g)).toHaveLength(6);
+    /*
+      Contiguous, and that is why the menu's snippet takes a REQUIRED icon and Rename Note is
+      written out longhand beside it: `{#if icon}` and `{@render icon?.()}` both put an SSR anchor
+      comment between the two, which this assertion would not survive.
+    */
     expect(body).toContain('<i class="fas fa-edit"></i> Edit Note');
     expect(body).toContain('Rename Note');
     expect(body).toContain('<i class="fas fa-eye"></i> Bring everyone here');

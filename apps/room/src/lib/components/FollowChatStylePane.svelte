@@ -1,40 +1,14 @@
 <script lang="ts">
-  import type { FollowChatStyle } from '#lib/types.js';
+  import { nextFollowChatFontSize, type FollowChatStylePaneProps } from '#lib/follow-chat-style.js';
 
   /**
    * The follow-chat STYLE editor — `#user-modal`'s body when the target is already followed.
    *
-   * ## Why it moved out of `ModalHost.svelte`, which is the only reason it is a component
-   *
-   * The Admin Notes list arrived in that file on 2026-08-29 and took it 27 lines past its ceiling.
-   * `source-size-contract.test.ts` answers that with one instruction and it is not "raise the
-   * number": *extract a slice into a module or component*. This is the largest slice of the user
-   * modal that nothing else in it reads — 128 lines whose only outside dependencies were the style
-   * object and three handlers, which is what made it the right one to take rather than the first
-   * one found.
-   *
-   * Nothing here is rewritten. The markup is the same markup, re-indented, with `followChatStyle`
-   * renamed to the prop and the three inline handlers lifted to callbacks — so this extraction
-   * cannot have changed what the panel renders, and the browser suite is the check that it did not.
-   *
-   * ## `$bindable`, and not a mutated plain prop
-   *
-   * Every input here is `bind:value={style.x}`, which MUTATES the object the parent owns. Svelte's
-   * own guidance is explicit — mutation through a normal prop is "strongly discouraged" and warns at
-   * runtime when it detects a component writing to state it does not own — so the prop is declared
-   * `$bindable()` and the parent binds. The alternative, an `onchange` per field, would be five
-   * callbacks and a copy of the object for no gain.
+   * The props, why they are `$bindable`, why this is a component at all, and FCS-1 — the one rule
+   * here that is not a transcription — are all in `#lib/follow-chat-style.js`, beside the code they
+   * govern.
    */
-  interface Props {
-    style: FollowChatStyle;
-    /** Back to the room's defaults. The parent owns what "default" means; this only asks. */
-    onreset: () => void;
-    onsave: () => void;
-    /** `test-follow-sound` — plays the pling, and is disabled while the sound is off. */
-    ontestsound: () => void;
-  }
-
-  let { style = $bindable(), onreset, onsave, ontestsound }: Props = $props();
+  let { style = $bindable(), onreset, onsave, ontestsound }: FollowChatStylePaneProps = $props();
 </script>
 
 <div class="py-2">
@@ -91,12 +65,20 @@
         </label>
       </div>
       <div class="ml-5">
+        <!--
+          FCS-1 — `value` + `oninput`, never `bind:value`. Svelte's numeric binding writes `null`
+          for an empty box, and `null + 1` is `1`, so clearing this field rendered the followed
+          member's username at one pixel and saved it. `nextFollowChatFontSize` carries the
+          measurement and the three `message-styles.ts` lines it lands on.
+        -->
         <input
           type="number"
           name="follow-chat-text-size"
           id="follow-chat-text-size"
           class="form-check-input"
-          bind:value={style.fontSize}
+          value={style.fontSize}
+          oninput={(event) =>
+            (style.fontSize = nextFollowChatFontSize(event.currentTarget.value, style.fontSize))}
         />
         <label for="follow-chat-text-size" class="form-check-label ml-4 pl-2"> Text Size </label>
       </div>
@@ -110,7 +92,7 @@
           bind:checked={style.playSound}
         />
         <label for="follow-chat-donot-disturb" class="form-check-label">
-          Chat sound {style.playSound ? 'on' : 'off'}
+          Chat sound <span>{style.playSound ? 'on' : 'off'}</span>
         </label>
       </div>
     </div>
@@ -126,7 +108,7 @@
         UIM-16 (second half) — `fw-bold` on this `<strong>`, which is not the tautology it looks
         like.
 
-        Read at bundle byte 2,070,269: `d(36,"strong",120), v(37,"Username:")`, and const 120 —
+        Read at bundle byte 2,070,265: `d(36,"strong",120), v(37,"Username:")`, and const 120 —
         walked out of the user-info modal's own consts table at 2,087,748 — is `[1,"fw-bold"]`.
         A bare `<strong>` was here.
 
