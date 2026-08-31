@@ -33,6 +33,34 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 02:38 UTC — a residual is not the same thing as work, and the sweep now measures the difference
+
+**Runtime impact: NO** — two cases and a corrected note on the contract added forty minutes earlier.
+
+That entry called `app-room`'s six residuals *"four ASSETS a built feature draws"* and the group they
+sit in *"the work this sweep found"*. **Both were wrong, and checking them before building anything is
+what found it.** All six are recorded refusals with an argument already at the code: the Intercom help
+link is `RNB-01`, a control whose gate nothing in the bundle can turn on; `nolevelsImg` and
+`notalking.png` are `G08`, the idle waveform refused for want of a server-side activity signal; and
+`cssSoundCloudIcon` and `playing.gif` are the two SoundCloud const decisions in
+`NavbarSoundCloud.svelte`. **Zero false alarms on the most audited surface in the room** is the
+strongest thing the sweep has to say about itself, and it is the opposite of what the entry claimed.
+
+So the split is measured instead of asserted. **Of 146 residuals, 38 are already argued somewhere in
+this repository and 108 are named nowhere.** The 108 is a FLOOR and the case says why: it is a
+substring search, so a short generic value can be counted as examined by an incidental mention, which
+can only inflate the examined side, never the unexamined one.
+
+**The first version of that measurement was a tautology and was believed for about a minute.** Every
+residual is written out in the contract's own table, so reading the repository back reported 145 of 146
+as already examined — and the one exception only because it is redacted. The corpus now excludes this
+file, and the negative control is that exclusion: removed, the case fails with `expected 145 to have a
+length of 38`.
+
+`app-alert-send-report-modal`'s fifteen and the chat columns' `Save chat messages` were traced the same
+way and cited at the entry — the `RPT-*` refusal, enumerated as orphans in its own contract, and
+`ACA-06` in `ChatSearchBar.svelte`.
+
 ### 2026-09-01 02:12 UTC — the per-surface const audit became a sweep over all 51 reference components
 
 **Runtime impact: NO** — one contract test, one tracker section. No shipping file changed.

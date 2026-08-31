@@ -220,16 +220,35 @@ framework identifiers gathered from every `selectors:` and `inputs:` in the bund
 | Bootstrap's data API, replaced by state | `app-session-control-modal` (13), `app-user-info-modal` (10), `app-closed-session-page` (3), `app-note` (3) | every `#`-prefixed value is a `data-bs-target`. The pane it names is usually built; the SELECTOR has no counterpart |
 | real gaps on built surfaces | `app-alert-send-report-modal` (15), `app-post-alert-modal` (7), the two log modals (6 each), `app-room` (6), `app-user-settings-modal` (5), `app-presentationarea` (5), `app-rec-preview` (2), `app-chat` + `app-extra-chat` (1 each), `app-screenshare-view` (2), `app-poll-modal` (1) | the work this sweep found |
 
-Two findings inside that table are worth stating on their own:
+### A residual is not the same thing as work, and the file measures the difference
 
-- **`app-room` is missing four ASSETS a built feature draws** — `/assets/images/notalking.png` and
-  `nolevelsImg` (the roster's not-talking indicator), `/assets/images/playing.gif` and
-  `cssSoundCloudIcon` — plus the navbar's Intercom help link.
-- **Two of the residuals are reference DEFECTS and are correctly not transcribed.** The reference
-  writes `value="followChatStyle.color"` and four siblings as STATIC attributes where a binding was
-  meant, so those colour inputs ship with the literal text of an expression; and
-  `data-ng-dblclick="fullScreen()"` on the webcam screen is an AngularJS 1 attribute in an Angular 17
-  template, which no runtime reads.
+The fourth group was first written as *"the work this sweep found"*. Checking that before saying it is
+what corrected it. **Of the 146 residuals, 38 are already argued somewhere in this repository** — in a
+docblock or a contract test — and the sweep rediscovered them rather than finding them. **108 are named
+nowhere and have not been looked at by anyone.** That 108 is a FLOOR: the split is a substring search,
+so a short generic value can be counted as examined by an incidental mention, which can only inflate
+the examined side.
+
+`app-room` is the clearest case and the strongest thing the sweep says about itself: **all six of its
+residuals are recorded refusals, and none is a false alarm**, on the surface that has been read
+hardest here.
+
+- the Intercom help link is **`RNB-01`** — a control whose gate nothing can turn on. `hasSTHelpLink`
+  occurs three times in the whole bundle and the only occurrence inside `app-room` sets it FALSE.
+- `nolevelsImg` / `/assets/images/notalking.png` are **`G08`** in `RoomNavbar.svelte` — the idle
+  waveform, refused because `presenterTalking` is a live audio-activity signal from a server this room
+  does not have.
+- `cssSoundCloudIcon` / `/assets/images/playing.gif` are argued in `NavbarSoundCloud.svelte` — the
+  const carries `id` twice and Angular keeps the second, and the gif is not in this repository.
+
+Two more residuals are **reference DEFECTS, correctly not transcribed**: five colour inputs carry
+`value="followChatStyle.color"` as a STATIC attribute where a binding was meant, so they ship with the
+literal text of an expression; and `data-ng-dblclick="fullScreen()"` on the webcam screen is an
+AngularJS 1 attribute in an Angular 17 template that no runtime reads.
+
+**The largest unexamined blocks are the ones to work next:** `app-session-transcript` (26 of 28),
+`app-session-login` (29 of 32, and out of scope by decision), `app-session-control-modal` (11 of 13),
+`app-alert-send-report-modal` (7 of 15), and the two log modals (6 of 6 each).
 
 **The comment stripping in that file is load-bearing and its own case proves it on every run.** This
 repository quotes the reference by value constantly, so a raw-text search reports **122** gaps where

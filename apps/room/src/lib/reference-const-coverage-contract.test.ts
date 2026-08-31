@@ -85,6 +85,19 @@ const readOurs = (strip: boolean): string =>
     })
     .join('\n');
 
+/**
+ * EVERYTHING this app contains — shipping code, docblocks and contract tests alike — MINUS this file.
+ *
+ * The exclusion is the whole point and the first version of this measurement did not have it. Every
+ * residual is written out in `RESIDUALS` below, so reading this file back reports 145 of 146 values
+ * as "already examined" and the remaining one only because it is redacted. A tautology that looks
+ * like a result, and it was believed for about a minute.
+ */
+const REPOSITORY = globSync('src/**/*.{svelte,ts}')
+  .filter((path) => !path.includes('reference-const-coverage'))
+  .map((path) => readFileSync(path, 'utf8'))
+  .join('\n');
+
 /** Exclusion 3 — framework identifiers, read out of the bundle rather than listed by hand. */
 const angularApiNames = (): ReadonlySet<string> => {
   const names = new Set<string>();
@@ -333,11 +346,29 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   'app-note': ['carousel-modal-title', 'file-browser-modal-title', 'modal-basic-title'],
 
   /*
-    FOUR — REAL GAPS ON SURFACES THAT ARE OTHERWISE BUILT. This is the work the sweep found.
+    FOUR — GAPS ON SURFACES THAT ARE OTHERWISE BUILT.
 
-    `app-room`'s six are the roster and the navbar: a help link to the vendor's Intercom, the
-    not-talking indicator's image and id, and the SoundCloud icon's id and playing gif. Four of the
-    six are ASSETS that a built feature draws and this room does not.
+    This group was first written as "the work the sweep found", and checking it before saying so is
+    what corrected it: **most of these are already argued somewhere in this repository**, in a
+    docblock or a contract test, and the sweep rediscovered them rather than finding them. The case
+    below measures that split rather than leaving it as a claim in a comment.
+
+    `app-room` is the clearest instance, and it is the surface with the most audit behind it. All SIX
+    of its residuals are recorded refusals, each with its own argument at the code:
+
+    - the Intercom help link is `RNB-01` in `room-surface-audit-batch3-contract.test.ts` — a control
+      whose gate nothing can turn on. `hasSTHelpLink` occurs three times in the whole bundle, and the
+      only occurrence inside `app-room` sets it FALSE and never writes it again;
+    - `nolevelsImg` and `/assets/images/notalking.png` are `G08` in `RoomNavbar.svelte` — the idle
+      waveform, refused because `presenterTalking` is a live audio-activity signal from a server this
+      room does not have. Building the branch means an image that can never show or one that always
+      shows, and neither is the reference;
+    - `cssSoundCloudIcon` and `/assets/images/playing.gif` are argued in `NavbarSoundCloud.svelte` —
+      the const carries `id` TWICE and Angular keeps the second, and the gif is not in this
+      repository, so a faithful transcription would render a broken image on every play.
+
+    **Zero false alarms on the most-audited surface in the room** is the strongest thing this sweep
+    has to say about itself.
   */
   'app-room': [
     'https://intercom.help/simpler-trading/en/',
@@ -347,6 +378,7 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'cssSoundCloudIcon',
     '/assets/images/playing.gif'
   ],
+  /* All fifteen are the `RPT-*` refusal, enumerated as orphans in `alert-report-modal-contract.test.ts`. */
   'app-alert-send-report-modal': [
     'report-header-container',
     'report-header',
@@ -406,6 +438,12 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'presenterStyle.color',
     'presenterStyle.bgColor'
   ],
+  /*
+    `ACA-06` in `ChatSearchBar.svelte`: the chat toolbar's save control is `K_e` at byte 1,421,929 and
+    is not built, while the ALERTS column's twin is (`AlertChatArea.svelte`, "Save alerts messages").
+    Nothing stands in for it, which is deliberate — an empty toolbar section is a control whose only
+    effect is its own presence.
+  */
   'app-chat': ['Save chat messages'],
   'app-extra-chat': ['Save chat messages'],
   'app-rec-preview': ['recScreenLocalPreview', 'recPreviewScreen'],
@@ -476,6 +514,39 @@ describe('coverage of the reference const tables', () => {
     expect(covered).toContain('app-roomscroller');
     expect(covered).toContain('app-reply-modal');
     expect(covered).toContain('app-alert-qa-modal');
+  });
+});
+
+describe('how much of the gap has already been written about', () => {
+  /*
+    A residual is a value the room does not RENDER. It is a separate question whether anybody here has
+    ever looked at it — and the two answers want different work. A value named in a docblock or a
+    contract test has been examined and refused or deferred, with a reason on record; a value named
+    nowhere has not been looked at by anyone.
+
+    LIMITATION, stated because it bounds every number below: this is a substring search over the whole
+    repository, so a short generic value (`spinner-border`, `visually-hidden`) can be counted as
+    examined because it occurs incidentally in unrelated prose. It over-counts the examined side. It
+    cannot over-count the UNEXAMINED side, which is the side that means work, so the 108 is a floor.
+  */
+  const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
+  const all = ROWS.flatMap((row) => row.residuals);
+
+  it('splits the 146 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(146);
+    expect(all.filter(mentioned)).toHaveLength(38);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(108);
+  });
+
+  it('and app-room, the most audited surface here, has NO unexamined residual', () => {
+    /*
+      The claim the group-four note makes, asserted rather than written down: every one of the six is
+      a recorded refusal — `RNB-01`, `G08`, and the two SoundCloud const decisions. A sweep that
+      produced false alarms would produce them here first, on the surface that has been read hardest.
+    */
+    const room = ROWS.find((row) => row.component === 'app-room');
+    expect(room?.residuals).toHaveLength(6);
+    expect(room?.residuals.filter((value) => !mentioned(value))).toEqual([]);
   });
 });
 
