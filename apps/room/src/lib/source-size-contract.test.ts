@@ -2112,7 +2112,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the note saying which half of upstream's method crosses and which this component binds
       declaratively.
     */
-    max: 335,
+    /*
+      335 -> 312, 2026-08-31, and DOWN is the only direction this entry has ever moved on its own
+      merits. The v4 audit batch added the webinar notice's label and its correct parent, the send
+      arm's `showEmojiChooser = !1`, and the three-way Enter branch — and paid for all of it by
+      moving two regions to the files that own them: `autoExpand` and its two paragraphs to
+      `private-composer-auto-expand.ts`, the Enter branch and the six `onKey` offsets to
+      `chat-composer-enter.ts`. The const transcription became assertions in
+      `private-chat-composer-v4-contract.test.ts` instead of a fenced block nothing checks.
+    */
+    max: 312,
     why: "app-privchat's composer: the textarea, its three buttons, both popovers and autoExpand"
   },
   {
@@ -6016,7 +6025,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/SpeechRecoOverlay.svelte',
-    max: 254,
+    /*
+      254 -> 245, 2026-08-31. The v4 audit re-decoded this component against the PINNED bundle — its
+      const indices were the earlier dump's and six low — and added the `preventDefault` /
+      `stopPropagation` the two dismissal handlers make at bytes 1,957,104 and 1,957,875. The
+      auto-scroll slack, the `shortTime` formatter, the visibility predicate and that suppression
+      all moved to `speech-reco-overlay.ts`, which is what pays for the additions.
+    */
+    max: 247,
     why: 'the captions overlay and its transcript controls'
   },
   {

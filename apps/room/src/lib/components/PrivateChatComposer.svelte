@@ -1,9 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte';
 
+  import { composerEnterAction, composerEnterPrevents } from '#lib/chat-composer-enter.js';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
+  import { autoExpandPrivateComposer } from '#lib/private-composer-auto-expand.js';
 
   /*
     ── THE PRIVATE-CHAT COMPOSER — `pEe`, reference byte 2,198,563 ─────────────────────────────
@@ -17,7 +19,7 @@
     become.
 
     `autoExpand` is the one thing that reaches OUTSIDE this component, and it does so because the
-    reference does — see its own note.
+    reference does — see `private-composer-auto-expand.ts`, which now carries it and its reasons.
   */
 
   interface Props {
@@ -25,7 +27,7 @@
     draft: string;
     /** `canPostImages` — gates the upload and GIF buttons, and deliberately not the emoji one. */
     readonly canPostImages: boolean;
-    /** `webinarMode` — the notice and its transcribed tooltip. */
+    /** `webinarMode` — the notice, its label and its transcribed tooltip. */
     readonly webinarMode: boolean;
     /** The Giphy key, or empty when the room has none. */
     readonly giphyApiKey: string;
@@ -65,56 +67,8 @@
 
   let textarea = $state<HTMLTextAreaElement | null>(null);
 
-  /**
-   * `autoExpand(e)` — grow the box to the text, and shrink the LOG by the same amount — G11.
-   *
-   * ```js
-   * autoExpand(e) {                                              // byte 2,203,228
-   *   e.style.height = "0";
-   *   const i = window.getComputedStyle(e), o = e.scrollHeight + 2 + "px";
-   *   i.getPropertyValue("height") !== o && (
-   *     e.style.height = o,
-   *     this.elementRef.nativeElement.querySelector(".pc-messages").style.height =
-   *       `calc(100% - ${o} - 15px)`),
-   *   "" === e.value.trim() && (
-   *     e.style.height = "23px",
-   *     this.elementRef.nativeElement.querySelector(".pc-messages").style.height =
-   *       "calc(100% - 50px)")
-   * }
-   * ```
-   *
-   * The private composer never expanded at all: a member typing three lines saw one, with the rest
-   * scrolled out of a box the captured `.txt-area` rule gives `overflow-y: auto`.
-   *
-   * **The `+ 2` is the capture's and it is not padding for luck.** `+page.svelte`'s main-composer
-   * variant records why: setting the height to exactly `scrollHeight` leaves the content a hair
-   * taller than the box it was measured against, so the browser puts a scrollbar inside an empty
-   * one-line composer. Those two pixels are the whole reason the original does not have one.
-   *
-   * **THE SECOND HALF IS WHAT MAKES THIS DIFFERENT FROM THE MAIN COMPOSER'S.** `.pc-messages` is
-   * `height: calc(100% - 50px)` — fifty pixels reserved for a one-line composer — so a composer that
-   * grows without the log shrinking pushes the log's bottom off the panel, and the newest message
-   * disappears exactly when somebody is replying to it. The `- 15px` is the reference's own gap.
-   *
-   * Reaching out of this component is what upstream does too (`this.elementRef.nativeElement
-   * .querySelector`), and it is scoped the same way: `closest('app-privchat')` finds THIS panel's
-   * log rather than the first one in the document.
-   */
   function autoExpand(): void {
-    const element = textarea;
-    if (!element) return;
-    const log = element.closest('app-privchat')?.querySelector<HTMLElement>('.pc-messages');
-
-    element.style.height = '0';
-    const height = `${element.scrollHeight + 2}px`;
-    if (window.getComputedStyle(element).getPropertyValue('height') !== height) {
-      element.style.height = height;
-      if (log) log.style.height = `calc(100% - ${height} - 15px)`;
-    }
-    if (element.value.trim() === '') {
-      element.style.height = '23px';
-      if (log) log.style.height = 'calc(100% - 50px)';
-    }
+    if (textarea) autoExpandPrivateComposer(textarea);
   }
 
   /*
@@ -132,28 +86,67 @@
 </script>
 
 <!--
-  G21 — the composer's own consts, at byte 2,217,341:
-
-  ```
-  50 ["id","textAreaHolderPM",1,"textSendDiv"]
-  52 [1,"d-flex","mx-0"]                        the inner row
-  53 [1,"px-1","webinarMode"]                   the webinar notice
-  54 [1,"flex-fill","px-0"]                     the textarea's own wrapper
-  55 ["name","txt-area","id","textAreaTxtPM","rows","1","spellcheck","true",
-      "placeholder","Type your message here...",1,"txt-area","form-control",
-      3,"keyup","paste","focus"]
-  56 [1,"justify-content-center","align-items-center","d-flex","flex-row","p-0","m-0",
-      "text-center","textAreaBtnsCol"]          the button column
-  ```
+  G21 — the composer's own consts. Every value quoted below is decoded by BRACKET-WALKING
+  `consts:[[` at byte 2,214,572 to 2,219,021 (79 entries) and is asserted against the pinned bundle
+  by `private-chat-composer-v4-contract.test.ts` rather than restated here as prose, because a
+  transcription written into a comment is a number nothing checks.
 
   Four attributes were small inventions before this: two dots where the capture has three, `w-100`
   for `form-control`, no `name`, no `spellcheck`. `form-control` is the one that is not cosmetic —
   it gives the box its border, padding and focus ring, and `w-100` only made it wide.
 
   The FLEX ROW was on the wrong element too: the capture's holder carries no flex classes at all.
+
+  **`keyup` is the capture's event and `onkeydown` is ours** — the divergence `CarouselDialog.svelte`
+  already argued and recorded, and the one `AlertChatArea.svelte:985` makes for the same textarea
+  shape: `preventDefault()` on `keyup` runs after the browser has already inserted the newline, so
+  the branch below could not swallow anything. Every composer in this room binds `keydown`.
+
+  **`paste` is the capture's third binding and this composer has none** — see PCC-06 in
+  `docs/decoded/room-surface-audit-2026-08-30.md`, which is BLOCKED on one line in the panel.
 -->
 <div class="textSendDiv" id="textAreaHolderPM">
   <div class="d-flex mx-0">
+    <!--
+      ── THE WEBINAR NOTICE — `lEe`, and it is FIRST ────────────────────────────────────────
+
+      `H(2,lEe,5,0,"div",53)` sits at index 2 of `div.d-flex.mx-0` — BEFORE `d(3,"div",54)`, the
+      textarea's wrapper — and `lEe` itself is pinned in the contract test. Three things were wrong
+      here and each is visible:
+
+      * **the two words were missing.** `v(1," Webinar Mode ")` is the notice's whole point; without
+        it a member in webinar mode saw a bare question mark and a tooltip nobody hovers.
+      * **it was rendered inside `textAreaBtnsCol`, after the textarea.** The capture puts it at the
+        head of the row, and const 53's own rule — `.webinarMode { background: #aaa; color: #000;
+        width: 100% }`, byte 2,220,062 — is a full-width banner, which is not a thing that belongs
+        in a three-icon button column.
+      * **`ml-2` and the tooltip belong to the WRAPPING SPAN, not the icon.** Const 61 is
+        `["placement","top","ngbTooltip","…",1,"ml-2"]` and const 62 is `[1,"fas",
+        "fa-question-circle"]` — the icon carries no margin and no tooltip of its own.
+
+      `T(4,"i")` is the reference's own trailing empty `<i>`: no const, no class, no content. It is
+      not transcribed, because an element with no attributes and no children renders nothing and
+      copying it would be copying a typo. Recorded here so the next reader does not file it as a gap.
+
+      The tooltip is verbatim, including the reference's own missing apostrophe in "everyones" and
+      its trailing ellipsis.
+    -->
+    {#if webinarMode}
+      <div class="px-1 webinarMode">
+        {' Webinar Mode '}
+        <span
+          {...{
+            placement: 'top',
+            ngbtooltip:
+              'In webinar mode users only see their own chat messages, while Presenters see everyones messages...'
+          } as Record<string, string>}
+          {@attach ngbTooltip}
+          class="ml-2"
+        >
+          <i class="fas fa-question-circle"></i>
+        </span>
+      </div>
+    {/if}
     <div class="flex-fill px-0">
       <textarea
         name="txt-area"
@@ -167,41 +160,32 @@
         oninput={autoExpand}
         onfocus={() => onfocus()}
         onkeydown={(event) => {
-          if (event.key !== 'Enter') return;
-          event.preventDefault();
-          if (event.shiftKey || event.altKey) {
+          /*
+            The three-way branch lives in `chat-composer-enter.ts`, decoded from all six `onKey`
+            implementations in the bundle. Shift+Enter SWALLOWS — it does not insert a newline, which
+            is what this composer used to do and what no composer in the capture does.
+          */
+          const action = composerEnterAction(event);
+          if (composerEnterPrevents(action)) event.preventDefault();
+          if (action === 'newline') {
             draft += '\n';
             return;
           }
+          if (action !== 'send') return;
+          /* `this.showEmojiChooser = !1` is the first thing the send arm does, before `sendMessage`. */
+          composerPopover = null;
           onsend();
         }}></textarea>
     </div>
     <!--
       ── THE BUTTON COLUMN — G1 ──────────────────────────────────────────────────────────────
 
-      ```js
-      d(5,"div",56)                                   // textAreaBtnsCol
-        (6,"span",57), x("click", () => toggleEmojiPanel()), T(7,"i",58),
-        H(8, cEe, 2, 0, "span", 59)                   // the image upload
-        (9, hEe, 6, 1, "span", 60)                    // the GIF picker
-      // …
-      O(2, i.webinarMode ? 2 : -1)
-      O(8, i.canPostImages ? 8 : -1), O(9, i.canPostImages ? 9 : -1)
-      ```
-
-      and the rest of the consts, by value:
-
-      ```
-      57 ["placement","auto","container","body","autoClose","outside",
-          "popoverClass","popOverDiv",1,"textAreaBtns",3,"click","ngbPopover"]
-      58 ["placement","left","ngbTooltip","Add Emojis",1,"far","fa-smile"]
-      61 ["placement","top","ngbTooltip","In webinar mode users only see their own chat messages,
-          while Presenters see everyones messages...",1,"ml-2"]
-      62 [1,"fas","fa-question-circle"]
-      63 [1,"textAreaBtns",3,"click"]
-      64 ["ngbTooltip","Upload an Image","placement","left",1,"fas","fa-image"]
-      65 the GIF span: 57's popover attributes plus 2,"font-size","12px"
-      ```
+      `d(5,"div",56)` opens `textAreaBtnsCol`; the emoji span is const 57 with icon 58, and the two
+      gated buttons arrive as embedded views whose ANCHOR consts (59, 60) are not the consts of the
+      spans they create (63, 65). Reading the anchor is how the GIF span's attributes were once
+      described as "57's popover attributes plus a font-size", which const 60 refutes by value: it
+      carries a tooltip 57 has not, `placement: "top-right"` where 57 says `auto`, and
+      `triggers: "manual"`. All six are asserted in the contract test.
 
       **THE WHOLE COLUMN WAS ABSENT.** The private composer was a textarea and nothing else, so a
       private conversation could carry no emoji, no image and no GIF — every one of which the main
@@ -212,32 +196,16 @@
 
       **`openRTEModal` is deliberately absent**, as `AlertChatArea` already records: the reference
       puts it on exactly two composers and private chat is not one of them.
-
-      The webinar tooltip is verbatim, including the reference's own missing apostrophe in
-      "everyones" and its trailing ellipsis.
     -->
     <div
       class="justify-content-center align-items-center d-flex flex-row p-0 m-0 text-center textAreaBtnsCol"
     >
-      {#if webinarMode}
-        <span class="px-1 webinarMode">
-          <i
-            {...{
-              placement: 'top',
-              ngbtooltip:
-                'In webinar mode users only see their own chat messages, while Presenters see everyones messages...'
-            } as Record<string, string>}
-            {@attach ngbTooltip}
-            class="fas fa-question-circle ml-2"
-          ></i>
-        </span>
-      {/if}
       <!--
         `role="button"` and the keydown are OURS, on both popover spans. The capture puts a click
         handler on a bare `<span>`, which no keyboard can reach — the same divergence `GiphyPicker`
-        already makes for its own two, and for the same reason. Not a `<button>`, because
-        `textAreaBtns` is what gives these their shape in the column and a button would have to
-        un-style itself back to it.
+        already makes for its own, and for the same reason. Not a `<button>`, because `textAreaBtns`
+        is what gives these their shape in the column and a button would have to un-style itself
+        back to it.
 
         eslint cannot see the gap here: the spread means Svelte does not know statically that there
         is no role, so `a11y_click_events_have_key_events` never fires and an ignore for it is an
@@ -270,13 +238,20 @@
         ></i>
       </span>
       {#if composerPopover === 'emoji'}
-        <EmojiPicker
-          popoverId="ngb-popover-pm-emoji"
-          onselect={(glyph) => {
-            onemoji(glyph);
-            composerPopover = null;
-          }}
-        />
+        <!--
+          The panel STAYS OPEN across a selection, which is the capture's `autoClose: "outside"` on
+          const 57 read together with `selectEmoji` at byte 2,208,868:
+
+          ```js
+          selectEmoji(e){ let i = Ao("#textAreaTxtPM").val() + e.emoji.native;
+                          Ao("#textAreaTxtPM").val(i), this.selectedEmoji = e.emoji }
+          ```
+
+          — it appends and touches `showEmojiChooser` not at all. Only the send arm of `onKey` closes
+          it. This closed after every glyph, so picking three emoji meant three round trips through a
+          popover that has a search box and nine category tabs.
+        -->
+        <EmojiPicker popoverId="ngb-popover-pm-emoji" onselect={(glyph) => onemoji(glyph)} />
       {/if}
       {#if canPostImages}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -314,9 +289,15 @@
           <span>GIF</span>
         </span>
         {#if composerPopover === 'giphy' && giphyApiKey}
+          <!--
+            `panelHeight` and `searchButton` are this surface's own captured values, and both differ
+            from the three other hosts that share this component — see GIF-01 and GIF-02.
+          -->
           <GiphyPicker
             apiKey={giphyApiKey}
             popoverId="ngb-popover-pm-giphy"
+            panelHeight="400px"
+            searchButton={false}
             onclose={() => (composerPopover = null)}
             onselect={(title, url) => {
               onselectgif(title, url);

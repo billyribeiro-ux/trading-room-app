@@ -103,11 +103,11 @@ guessed.
 | 27 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | no |
 | 28 | `lib/components/StreamTabs.svelte` | 305 | no |
 | 29 | `lib/components/ScreenTabs.svelte` | 341 | no |
-| 30 | `lib/components/PrivateChatComposer.svelte` | 330 | no |
+| 30 | `lib/components/PrivateChatComposer.svelte` | 311 | no |
 | 31 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
 | 32 | `lib/components/MessageMenu.svelte` | 252 | no |
 | 33 | `lib/components/ScheduledAlerts.svelte` | 356 | no |
-| 34 | `lib/components/SpeechRecoOverlay.svelte` | 253 | no |
+| 34 | `lib/components/SpeechRecoOverlay.svelte` | 246 | no |
 | 35 | `lib/components/RoomShell.svelte` | 268 | no |
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
 | 37 | `lib/components/ScreenVolumeControl.svelte` | 227 | no |
@@ -134,7 +134,7 @@ guessed.
 | 58 | `lib/components/ChatTabStrip.svelte` | 104 | no |
 | 59 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 
-**2 of 72 surfaces audited · 1,072 of 34,937 lines · 3.1%.**
+**2 of 72 surfaces audited · 1,072 of 34,911 lines · 3.1%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

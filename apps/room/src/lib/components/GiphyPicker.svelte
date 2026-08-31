@@ -1,16 +1,6 @@
 <script lang="ts">
-  interface GiphyImage {
-    url: string;
-  }
-
-  interface GiphyResult {
-    id: string;
-    title: string;
-    images: {
-      downsized_large: GiphyImage;
-      original: GiphyImage;
-    };
-  }
+  import { giphyPopoverPortal } from '#lib/giphy-popover-portal.js';
+  import { imageBox, searchGiphy, type GiphyResult } from '#lib/giphy-search.js';
 
   interface Props {
     apiKey: string;
@@ -22,13 +12,11 @@
      *
      * The bundle carries this string four times and **one of them is different**: `app-note` says
      * `*Double click an image to insert it` at byte 1,467,154, while the other three say `select it`
-     * (offsets 1,425,716, 2,197,828 and 2,372,175). This is one shared component serving all of
-     * them, and it hardcoded `select it` — so the note surface said the wrong word, and the audit
-     * filed it as "a shared-component compromise, not a transcription error".
-     *
-     * A compromise is what it was, and it was not a necessary one: the difference is a prop. The
-     * default is the majority string so the three surfaces that were already right stay right
-     * without being touched, and the note surface passes the one the capture gives it.
+     * (offsets 1,425,716, 2,197,828 and 2,372,175). This is one shared component serving all four,
+     * and it hardcoded `select it` — so the note surface said the wrong word, and the audit filed it
+     * as "a shared-component compromise, not a transcription error". A compromise is what it was and
+     * it was not a necessary one: the difference is a prop. The default is the majority string so
+     * the three surfaces already right stay right untouched, and the note surface passes its own.
      *
      * The words are not interchangeable and that is why upstream varies them. Everywhere else the
      * double-click SELECTS a GIF the member then confirms and sends; in a note it goes straight into
@@ -36,6 +24,34 @@
      * consequence is different is the one that says it.
      */
     hint?: string;
+    /**
+     * `.giphy-search`'s own height — GIF-01, and the second value that varies by surface.
+     *
+     * Six hosts declare this rule and one is different: `app-privchat` says `400px` at byte
+     * 2,224,360 where `app-chat`, `app-note`, `app-reply-modal` and `app-extra-chat` say `700px`.
+     * Each rule is scoped to its own host element and this popover is portaled to `<body>` — see
+     * `giphy-popover-portal.ts` — so none of them reaches it, and the unscoped fallback at
+     * `app.css:551` paints every surface at the majority value.
+     *
+     * Inline, so it outranks that class rule from wherever the node ends up. The default is the
+     * majority; the private composer passes its own.
+     */
+    panelHeight?: string;
+    /**
+     * Whether the magnifier beside the field is rendered — GIF-02.
+     *
+     * **Three of the four Giphy templates in the bundle have no search button at all.** Each POPOVER
+     * variant builds exactly one `input-group-text` span and it is the CLEAR one — `d(13,"span",73)`
+     * in `app-privchat`'s `uEe` (byte 2,197,701), `d(13,"span",84)` in `app-chat`'s `r0e`
+     * (1,425,589), `d(13,"span",81)` in `app-extra-chat`'s `sMe` (2,372,048). Only `app-note`'s
+     * MODAL, `L0e` at 1,467,000, builds two: `d(12,"span",88)` then `d(14,"span",88)`.
+     *
+     * The default is `true` rather than the majority `false`, and that is a deliberate exception to
+     * how `hint` above chose its default: the only other consumer of this component is
+     * `notes/NoteEditor.svelte`, which IS the modal variant and is outside this change's scope, so a
+     * majority default would have silently taken a control off the one surface whose capture has it.
+     */
+    searchButton?: boolean;
   }
 
   let {
@@ -43,22 +59,22 @@
     popoverId,
     onclose,
     onselect,
-    hint = '*Double click an image to select it'
+    hint = '*Double click an image to select it',
+    panelHeight = '700px',
+    searchButton = true
   }: Props = $props();
   let query = $state('');
   let results = $state.raw<GiphyResult[]>([]);
 
   async function search() {
-    const url = new URL('https://api.giphy.com/v1/gifs/search');
-    url.searchParams.set('api_key', apiKey);
-    url.searchParams.set('q', query);
-    url.searchParams.set('rating', 'pg');
-
     try {
-      const response = await fetch(url);
-      const payload = (await response.json()) as { data?: GiphyResult[] };
-      results = payload.data ?? [];
+      results = await searchGiphy(apiKey, query);
     } catch (error) {
+      /*
+        `.catch(console.error)` is the reference's own handler (byte 2,213,709) and the shape that
+        matters is kept: a failed search leaves the previous grid standing rather than blanking it,
+        so a network blip does not read as "no GIFs match that word".
+      */
       console.error(error);
     }
   }
@@ -67,47 +83,11 @@
     query = '';
     results = [];
   }
-
-  function portalPopover(node: HTMLElement) {
-    const place = () => {
-      const trigger = document.querySelector<HTMLElement>(`[aria-describedby="${node.id}"]`);
-      if (!trigger) return;
-
-      const triggerRect = trigger.getBoundingClientRect();
-      const devicePixelRatio = window.devicePixelRatio || 1;
-      const roundToDevicePixel = (value: number) =>
-        Math.round(value * devicePixelRatio) / devicePixelRatio;
-      const x = roundToDevicePixel(
-        Math.max(
-          0,
-          Math.min(window.innerWidth - 400, triggerRect.left + triggerRect.width / 2 - 200)
-        )
-      );
-      const y = roundToDevicePixel(triggerRect.top - 8 - document.documentElement.clientHeight);
-      node.style.transform = `translate3d(${x}px, ${y}px, 0px)`;
-    };
-
-    document.body.append(node);
-    place();
-    window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
-
-    const resizeObserver = new ResizeObserver(place);
-    const trigger = document.querySelector<HTMLElement>(`[aria-describedby="${node.id}"]`);
-    if (trigger) resizeObserver.observe(trigger);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
-      node.remove();
-    };
-  }
 </script>
 
 <svelte:element
   this={"ngb-popover-window"}
-  {@attach portalPopover}
+  {@attach giphyPopoverPortal}
   id={popoverId}
   role="tooltip"
   class="popOverDiv popover fade show bs-popover-top"
@@ -116,7 +96,7 @@
 >
   <div class="popover-arrow" data-popper-arrow=""></div>
   <div class="popover-body">
-    <div class="giphy-search">
+    <div class="giphy-search" style:height={panelHeight}>
       <div class="giphy-header">
         <div class="d-flex align-items-center justify-content-between">
           <h4>Giphy Search</h4>
@@ -147,42 +127,39 @@
                 bind:value={query}
               />
               <!--
-                ── THE SEARCH BUTTON, `d(12,"span",88)` AT BYTE 1,467,345 ──────────────────────
+                ── THE INPUT-GROUP SPANS, AND WHAT THE CAPTURE ACTUALLY SAYS ────────────────────
 
-                ```js
-                d(12,"span",88), x("click", () => searchGiphy()), T(13,"i",89),   //  89 fa-search
-                d(14,"span",88), x("click", () => clearSearchGiphy()), T(15,"i",90)  // 90 fa-times
-                ```
+                An earlier reading of this pair took `app-note`'s modal for the whole story and
+                recorded two divergences from it: `text-white` for `text-dark`, and an `fa-2x` the
+                capture "does not have". **Decoding the other three tables by value refutes both.**
+                `text-white` and `fa-2x` are the POPOVER hosts' own captured values — app-privchat
+                73/74, app-chat 84/85 and app-extra-chat 81/82, three identical pairs — while
+                `text-dark` with a plain `fa-search`/`fa-times` belongs to the one MODAL, app-note
+                88/89/90. So this component matches its capture exactly and always did; what was
+                wrong was the note claiming it did not, which is the shape of mistake that gets
+                "corrected" back into a real defect later. The input's `border` class splits the same
+                way: on all three popover hosts, absent from `app-note`'s const 87. All four const
+                pairs are asserted against the pinned bundle in `giphy-picker-v4-contract.test.ts`.
 
-                Const 88 is `[1,"input-group-text","text-dark",3,"click"]` and BOTH spans use it —
-                they are a pair, and only the second one was here. A search could therefore be
-                started only by pressing Enter in the field, with a visible affordance sitting beside
-                it that did the opposite.
-
-                TWO WORDS DIVERGE FROM THE CAPTURE, and they diverge from it in the sibling below
-                too rather than being introduced here: `text-white` for `text-dark`, and the icon
-                carries `fa-2x`. The reference's picker is a light modal; ours is a dark popover —
-                `btn-close-white` on the header button above is the same decision, made when this
-                component was written. Matching the capture on this one span would have put dark text
-                on a dark ground, so it matches its own sibling instead, and the pair stays a pair.
-
-                `role="button"` and the keydown are ours as well, for the same reason they are on the
-                sibling: the capture puts a click handler on a bare `<span>`, which no keyboard can
-                reach. Not a `<button>`, because `input-group-text` is what gives the two their shape
-                inside the group and a button would have to un-style itself back to it.
+                `role="button"` and the keydown ARE ours, and that part of the note stands: the
+                capture puts a click handler on a bare `<span>`, which no keyboard can reach. Not a
+                `<button>`, because `input-group-text` is what gives these their shape inside the
+                group and a button would have to un-style itself back to it.
               -->
-              <span
-                class="input-group-text text-white"
-                role="button"
-                tabindex="0"
-                aria-label="Search Giphy"
-                onclick={() => void search()}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') void search();
-                }}
-              >
-                <i class="fa fa-2x fa-search"></i>
-              </span>
+              {#if searchButton}
+                <span
+                  class="input-group-text text-white"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Search Giphy"
+                  onclick={() => void search()}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') void search();
+                  }}
+                >
+                  <i class="fa fa-2x fa-search"></i>
+                </span>
+              {/if}
               <span
                 class="input-group-text text-white"
                 role="button"
@@ -200,11 +177,34 @@
         </form>
       </div>
       <ul class="search-results">
+        <!--
+          KEYED BY `id`, DELIBERATELY, AND IT IS NOT THE REFERENCE'S KEY — GIF-06.
+
+          Angular tracks these by TITLE: `KDe = (t,n) => n.title` for `app-privchat`, `y0e` for
+          `app-note`. Titles collide constantly on Giphy — the empty string is a common one — and a
+          duplicate key in Svelte is a runtime throw that takes the picker down, where a duplicate
+          trackBy in Angular merely reuses a node. So the reference's key is not transcribed and the
+          id stands in as the least-colliding field the payload offers.
+
+          It is still EXTERNAL and still not authority: it decides which DOM node is reused, never
+          what is sent. What is sent is the URL the member double-clicked, and the server decides
+          whether that may be posted.
+        -->
         {#each results as result (result.id)}
+          {const box = $derived(imageBox(result.images.downsized_large))}
           <li class="gif-result">
+            <!--
+              `width`/`height` from the payload when it states usable integers, nothing at all when
+              it does not. The reference sizes this with `max-width: 100%` and no intrinsic box, so
+              the grid reflowed as each GIF decoded; the ratio lets the browser reserve the row
+              first. `max-width: 100%` still wins on the rendered width, so these change the
+              RESERVATION, not the layout.
+            -->
             <img
               src={result.images.downsized_large.url}
               alt={result.title}
+              width={box?.width}
+              height={box?.height}
               ondblclick={() => onselect(result.title, result.images.original.url)}
             />
           </li>

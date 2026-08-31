@@ -316,6 +316,15 @@ describe('the second cluster — G5, G7 and G14', () => {
 
 describe('the composer button column — G1, G11 and G13', () => {
   const COMPOSER_SRC = read('./components/PrivateChatComposer.svelte');
+  /*
+    `autoExpand` MOVED on 2026-08-31, to `private-composer-auto-expand.ts`, with its two paragraphs.
+    `PrivateChatComposer.svelte` sat on its `source-size-contract` ceiling and the v4 audit batch
+    (PCC-01…09) had markup to add, so the ratchet's own remedy applied: a slice comes out, the
+    reasoning goes with it, and the tests that read it are re-pointed at the file that now owns the
+    subject rather than left asserting against text that has gone. That last part is not optional —
+    `source-size-contract`'s reader guard exists because two tests once fell out of it silently.
+  */
+  const AUTO_EXPAND_SRC = read('./private-composer-auto-expand.ts');
 
   it('has all three buttons, by the consts that name them', () => {
     /*
@@ -381,17 +390,19 @@ describe('the composer button column — G1, G11 and G13', () => {
       composer that grows without the log shrinking pushes the log's bottom off the panel, and the
       newest message disappears exactly when somebody is replying to it.
     */
-    expect(COMPOSER_SRC).toContain('`calc(100% - ${height} - 15px)`');
-    expect(COMPOSER_SRC).toContain("log.style.height = 'calc(100% - 50px)'");
+    expect(AUTO_EXPAND_SRC).toContain('`calc(100% - ${height} - 15px)`');
+    expect(AUTO_EXPAND_SRC).toContain("log.style.height = 'calc(100% - 50px)'");
     /* The `+ 2` is the capture's, and `+page.svelte` records why it is not padding for luck. */
-    expect(COMPOSER_SRC).toContain('`${element.scrollHeight + 2}px`');
-    expect(COMPOSER_SRC).toContain("element.style.height = '23px';");
+    expect(AUTO_EXPAND_SRC).toContain('`${textarea.scrollHeight + 2}px`');
+    expect(AUTO_EXPAND_SRC).toContain("textarea.style.height = '23px';");
+    /* And the composer still calls it — an extraction nobody invokes is the other way this rots. */
+    expect(COMPOSER_SRC).toContain('autoExpandPrivateComposer(textarea)');
   });
 
   it('G11 — finds THIS panel s log rather than the first one in the document', () => {
     /* `this.elementRef.nativeElement.querySelector` is component-scoped; `closest` is the same. */
-    expect(COMPOSER_SRC).toContain("element.closest('app-privchat')?.querySelector");
-    expect(COMPOSER_SRC).not.toContain("document.querySelector('.pc-messages')");
+    expect(AUTO_EXPAND_SRC).toContain("textarea.closest('app-privchat')?.querySelector");
+    expect(AUTO_EXPAND_SRC).not.toContain("document.querySelector('.pc-messages')");
   });
 
   it('G11 — re-runs when the draft changes from anywhere, not only on input', () => {
