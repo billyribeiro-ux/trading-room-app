@@ -1,0 +1,2 @@
+dcad77f4578fa9a75c46491dd3e31c534624b627afb6f4a2b74a6dcfdde6f439  app.min.js
+c526dd651e55f0fbdd58e09f81c593d88471abf436c39a8254b4f8103dac8a94  ptrApp.normalised.html

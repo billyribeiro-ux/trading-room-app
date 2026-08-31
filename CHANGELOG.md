@@ -33,6 +33,105 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-08-31 11:40 UTC — Three "needs a capture run" rows closed from a file with no login on it
+
+**Runtime impact: NO.** Nothing shipped changes. What changes is that three blocked rows are answered
+and a fourth is decided.
+
+`TODO.md` §C held `T5-16`, `T5-17` and `T5-20` under *"Three are NOT CAPTURED YET. Each needs one
+targeted collection script"* — a console script pasted into the live app while logged in. **Every
+answer they were waiting for is in `/public/dist/app.min.js`, a public static asset, fetched with
+`curl` and no session at all.**
+
+The reasoning that blocked them is worth naming because it will recur: the DATA those pages render
+does need a session, and that requirement was inherited by the CODE that names where the data comes
+from. The controller is not behind the login. Neither is the route table.
+
+**And the same file had already been used, in this same register, thirteen rows below.** `T5-27`
+closed on 2026-08-15 by fetching that exact URL — its closure note even records the byte count and
+the `WebFetch`-truncation incident that made `curl` necessary. Nobody went back to it. That is a more
+useful lesson than "the block was untested": **the tool that unblocks a row may already be recorded
+as having unblocked another one.**
+
+**T5-17 — the premise was false, and the capture would have returned nothing.** The row asked for
+*"the avatar set behind `avatars`, plus the request `selectAvatar(avatar)` posts — URL, method and
+body"*. There is no request. `AvatarsCtrl` (byte 36,509) hardcodes nine paths, and `selectAvatar`
+writes `$cookies.avatar`, sets `chatModel.avatar` and calls `$state.go("page.login")`. `$http` occurs
+once in the controller — the injected parameter — with zero call sites.
+
+**T5-16 — the request is evidenced, and there are two of them.** `$scope.getRecordings` (180,143)
+issues `POST {APIURL}/users/v1/recordings` with `{token, source:"webApp"}` and assigns the response
+whole to `$scope.recs`; a failure calls `$scope.doLogout()`, so an error is a bad token rather than an
+empty list. A second, different route at 268,489 opens
+`/users/v1/archives/recordings/{sessData._id}/{jwtToken}` in a new window. The route table (449,342)
+declares the page with a template and no controller, which is why the view names `LoginCtrl` itself.
+
+**T5-20 — the original sends no occupancy signal.** Over all 455,329 bytes: `occupancy`,
+`maxCapacity`, `maxCap`, `recorded_max` and `peakUsers` occur **zero** times, against a passing
+control that `userCount` and `simUserCount` do. `chatModel.userCount` is computed in the browser at
+four sites — `Object.keys(inRos).length` on `getRoster`, `size+sizeP` on each join and leave — and
+read only by two display helpers. So the row's next step CHANGES rather than waiting: whatever writes
+`recorded_max_capacity` upstream observes the server's own connections, and `roomSubscriberCount()`
+in `apps/room/src/lib/server/room-events.ts` already counts live SSE subscribers — simultaneous
+presence, not everyone who ever registered, which is exactly the distinction the row's warning draws.
+The row stays open and is re-scoped from "capture it" to "build it from a count we own".
+
+**T5-18 — decided, not deferred.** The recordings Share button is `<a href="" class="btn btn-default">`
+with no `ng-click`, no `ng-href` and no handler in the bundle either. **Omit it.** The root standard
+settles it — *"No control whose only effect is changing its own label"*, and this one has no effect at
+all — and T5-15's Stripe Details link is the precedent. It had been recorded as "moot until T5-16
+exists", which is the wrong shape for a decision: the point of deciding now is that whoever builds the
+page does not rediscover the question and answer it differently.
+
+**The register recount is the verifier's, not mine:** `evidence-gap-register-counts.test.ts` reported
+`{closed: 69, open: 3}` against `TODO.md`'s stale `66/6` and refused until the tally was corrected.
+The three still open are `T5-20`, `T5-24` and `T5-25`.
+
+**The bundle is now PINNED**, the first copy in this repository, at
+`apps/controller/evidence-dumps/manage-app-2026-08-31/` — 455,329 bytes,
+`dcad77f4578fa9a75c46491dd3e31c534624b627afb6f4a2b74a6dcfdde6f439`, reproduced by three independent
+fetches (with the deployed cache-buster, with another, and with none).
+`manage-app-bundle-contract.test.ts` re-runs all thirteen findings against it at their bytes.
+
+**Which immediately paid for itself: `T5-27`'s cited offset no longer holds.**
+`$scope.addBadgeDarkTheme` is at 202,822 here against the 202,828 recorded, and the file is 16 bytes
+larger than the 455,313 recorded then. Whether the bundle changed or the earlier measurement was
+taken differently **cannot be settled** — no hash was kept and no copy was on disk. The conclusion
+stands; only the address moved. The row now says so.
+
+**Three things the work itself got wrong, each caught by a gate rather than by review:**
+
+*The offsets were all one too low.* They had been computed in Python with `io.open(..., encoding='utf-8')`,
+which opens in TEXT mode and applies universal newline translation — and this bundle contains exactly
+one `\r\n`, at byte 47. The contract test caught it on its first run as
+`expected ' AvatarsCtr' to be 'AvatarsCtrl'`. Recorded rather than quietly fixed, because the fix is
+not "add one": it is to read the bytes the way the consumer reads them.
+
+*`$http` is in the controller.* The first draft asserted `not.toContain('$http')` and went red on the
+parameter list. The assertion was sloppier than the finding; it now asserts exactly one occurrence
+(the injection) and zero `$http.` call sites, which is the stronger and truer statement.
+
+*The privacy verifier refused the capture, correctly.* It found three raw addresses. They are
+AngularJS ui-router `viewName@stateName` view keys — the regex accepts them because the state segments
+after the last dot pass for a TLD. `isUiRouterViewName` exempts them by POSITION (immediately after
+`views:{"`, the only place ui-router accepts the form, and there are four such maps in the file) and
+not by domain: adding those segments to `isSafeTestEmail` would have exempted every address ending in
+them, repository-wide, forever, to silence three matches in one third-party file. Five cases in
+`privacy-utils.test.mjs` pin the boundary, including the stated residual — a real address written as
+the FIRST key of a `views` map does slip through, which is asserted rather than hidden. Twice more the
+verifier then caught address-shaped literals in my own comment and my own fixtures, which is the file's
+existing convention (`['Bil', 'ly Ribeiro'].join('')`) working as designed.
+
+**Six negative controls, each verified as landed and restored with the hash re-checked:** the digest
+pin (one flipped byte → the pin fires first and alone); a dropped avatar path; `selectAvatar` given a
+POST; an occupancy name introduced; the offset moved back to the Python value; and an `$http.` call
+site added — the last four length-preserving, because the first attempts shifted every offset and
+turned the whole file red instead of one assertion.
+
+**Verified:** `pnpm run gate` in `apps/controller` — 101 files, 1,081 passed, 21 skipped,
+`gate-exit=0`, read from the log. The new capture root is declared in `verify-evidence-layout.mjs`,
+which is what refused the commit until it was.
+
 ### 2026-08-31 05:20 UTC — The owner rename stops being a flag day, proven on a live cluster
 
 **Runtime impact: NO today, YES for the cutover.** Nothing changes for a database that stays on

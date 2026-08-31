@@ -763,7 +763,29 @@ conflict eats a finding. **Read `todo-next.md`'s own header before treating it a
 > one cannot go stale about it: there is nothing left here to be stale. `NEW-TODO.md` covers Part 1 flaws in the
 ORIGINAL that we deliberately do not reproduce.
 
-As of 2026-08-27: **66 CLOSED, 6 OPEN, 15 parked/won't-fix, 87 total.**
+As of 2026-08-31: **69 CLOSED, 3 OPEN, 15 parked/won't-fix, 87 total.**
+
+**Three closed on 2026-08-31, and all three were blocked on a premise rather than on evidence.**
+`T5-16`, `T5-17` and `T5-20` sat under §C, "needs one targeted collection script" — a console script
+pasted into the live app while logged in. Every answer they were waiting for was in
+`/public/dist/app.min.js`, a PUBLIC static asset, fetched with `curl` and no session at all. The
+reasoning that blocked them is worth naming because it will recur: the DATA those pages render does
+need a session, and that requirement was inherited by the CODE that names where the data comes from.
+The controller is not behind the login; neither is the route table.
+
+**The same file had already been used, in this same register, thirteen rows below.** `T5-27` closed on
+2026-08-15 by fetching that exact URL — its closure note even records the byte count and the
+`WebFetch`-truncation incident that made `curl` necessary. Nobody went back to it for these three.
+That is the more useful lesson than "the block was untested": **the tool that unblocks a row may
+already be recorded as having unblocked another one.**
+
+The bundle is now PINNED at `apps/controller/evidence-dumps/manage-app-2026-08-31/` — the first copy
+of it in this repository — and `apps/controller/src/lib/manage-app-bundle-contract.test.ts` re-runs
+every finding against it at its byte on each gate. Before today `T5-27`'s evidence was a fetch nobody
+could reproduce, and its cited offset **no longer holds**: `$scope.addBadgeDarkTheme` is at 202,822
+in this capture against the 202,828 the register records, and the file is 455,329 bytes against the
+455,313 recorded then. Whether the bundle changed or the earlier measurement was taken differently
+cannot be settled — no hash was kept — which is exactly why this one is pinned.
 
 **Recounted 2026-08-27 with the verifier's own parser after that parser was corrected, and the
 numbers MOVED — this is the resolution of the row that used to sit at AI, not a change to the
@@ -777,13 +799,11 @@ open — and each was read in full before the change was kept.
 **The corrected count agrees exactly with reading the status column by eye, 66/6/15, which is what
 the old row recorded as the disagreement.** Two independent methods agreeing is the evidence.
 
-**The six open rows are `T5-16`, `T5-17`, `T5-18`, `T5-20`, `T5-24` and `T5-25`** — B 2 + C 3 + D 1.
-`T5-25` is the one that used to be counted closed: its ENDPOINT is built with ten green tests, and
-its DISPLAY block is blocked on the same owner sentence as `T5-24`, so the row is open and §B now
-names both.
+**The three open rows are `T5-20`, `T5-24` and `T5-25`** — B 2 + C 1. `T5-25` is the one that used to
+be counted closed: its ENDPOINT is built with ten green tests, and its DISPLAY block is blocked on the
+same owner sentence as `T5-24`, so the row is open and §B names both.
 
-**Everything closable by READING is closed.** The five that remain need something no source file can
-give, and each says WHO does the next step and WHAT it is.
+**Two of the three need one sentence from the owner. The third needs building, not capturing.**
 
 ### B. Two need one sentence from the owner, naming the field.
 
@@ -805,19 +825,17 @@ refused; do not attempt a fifth without the sentence.**
   register said OPEN, this file said CLOSED and the parser said CLOSED; the register is the tracker
   and the corrected parser now agrees with it.
 
-### C. Three are NOT CAPTURED YET. Each needs one targeted collection script.
+### C. One remains, and it is not a capture — it is a thing to build.
 
-**These are not blocked on infrastructure.** The original application has all of them, and this
-repository's rule for anything missing is not to park it but to **write a browser-console script that
-fetches it** — `scripts/ptr-collect.js` is the working reference implementation. Each is blocked on
-**one capture run against the live original**, and what each script has to bring back is already
-known.
+**This section used to hold three rows and said each needed "one capture run against the live
+original".** Two of them (`T5-16`, `T5-17`) were closed on 2026-08-31 from a public static asset, and
+the third is below with its premise corrected. The section's own instruction — *write a browser-console
+script that fetches it*, `scripts/ptr-collect.js` being the reference implementation — remains right
+for anything genuinely behind a session. It was applied here to things that were not.
 
 | item | the script must capture |
 | --- | --- |
-| **T5-16 Recordings** | the response behind `recs` — `vidPath`, `contentType`, `name`, `created`, and `length` in MILLISECONDS (the page renders `length/60000` to two decimals). **The field contract is already evidenced** at `apps/controller/evidence-dumps/TIER1-fetched/api-post-routes.md:403-422`. **The PRODUCER premise is corrected 2026-08-31: MediaMTX v1.20.1 IS an archive service and it was run.** `record: yes` plus `playback: yes` needs no extra software, and `GET /list?path=…` answers `[{"start":"2026-08-31T04:43:32.525276Z","duration":23,"url":"…/get?duration=23&path=…"}]` against a real `.mp4` on disk — which maps onto all five cells (`created`←`start`, `length`←`duration`×1000, `vidPath`←`url`, `name`←the path's producer segment, `contentType` fixed by `recordFormat`). So this is a CONFIGURATION decision, not a missing capability. **One measured catch:** the fmp4 recorder logged `skipping track 2 (VP8)` then `recording 1 track (Opus)` — a WebRTC publisher negotiating VP8 records audio only. Whether H264 records was NOT measured and is not claimed: this Chromium offers no H264 at all, so the codec preference was a silent no-op; an OBS/RTMP publisher would settle it. `apps/room/docs/MEDIA-PLANE-MEASURED.md` |
-| **T5-17 Avatars** | the avatar set behind `avatars`, plus the request `selectAvatar(avatar)` posts — URL, method and body |
-| **T5-20 `recorded_max_capacity`** | what actually WRITES it. Column, reader and reset all exist (controller migration `0011-recorded-max-capacity.js`); the missing half is the live-occupancy signal the controller never receives. Capture whether the original pushes occupancy on its command channel and under what name. **Do not substitute the roster size** — the number who ever registered is not the number ever simultaneously present |
+| **T5-20 `recorded_max_capacity`** | **NOT a capture — build it from a count we already own.** Column, reader and reset all exist (controller migration `0011-recorded-max-capacity.js`); the missing half is a live-occupancy signal. This row used to say "capture whether the original pushes occupancy on its command channel and under what name". **Measured 2026-08-31 over all 455,329 bytes of the pinned manage bundle: it does not.** `occupancy`, `maxCapacity`, `maxCap`, `recorded_max` and `peakUsers` each occur zero times, against a passing control that `userCount` and `simUserCount` do. `chatModel.userCount` is computed in the BROWSER from the two roster sizes at four sites and read only by two display helpers, so there is no signal on the wire to capture. The room's own `roomSubscriberCount()` (`apps/room/src/lib/server/room-events.ts`) counts live SSE subscribers, which is simultaneous presence rather than everyone who ever registered — the exact distinction this row's warning draws, satisfied by data our server owns. |
 
 Rules for those scripts, from `~/CLAUDE.md` §3: one self-contained `.js` file pasted into the console
 on the LIVE app; it detects whether the session is a member or an admin and records what that role
@@ -836,13 +854,21 @@ each) were read end to end. `selectAvatar`, `vidPath`, `recs`, `maxCapacity` and
 **Do NOT build the features from guesses.** Inventing a data source is forbidden. Capture first, then
 build from what came back.
 
-### D. One is a decision about a control the REFERENCE ships broken.
+### D. DECIDED 2026-08-31 — omit the broken control.
 
-- **T5-18 — the recordings "Share" button has no handler of any kind.** It renders and does nothing.
-  This repository forbids shipping a control whose only effect is its own presence, so a faithful
-  rebuild has to choose. **Recommendation: omit it and record why**, the same call already taken for
-  the Stripe Details link. Moot until T5-16 exists — a dependency the register's own row does not
-  carry, which is why this bullet survives alongside it.
+- **T5-18 — the recordings "Share" button has no handler of any kind.** It renders and does nothing:
+  `page.recordings.html` is 1,324 bytes and its Share anchor is `<a href="" class="btn btn-default">`
+  with no `ng-click`, no `ng-href` and no `ng-*` of any kind; the manage bundle carries no handler for
+  it either. **The decision is OMIT**, and it is settled by the root standard rather than by taste —
+  *"No control whose only effect is changing its own label"*, and this one has no effect at all. The
+  precedent is T5-15's Stripe Details link, taken for the same reason on the same grounds, so deciding
+  it the other way would make the two inconsistent.
+
+  It was recorded as "moot until T5-16 exists". That is the wrong shape for a decision: the point of
+  deciding now is that whoever builds the Recordings page does not rediscover the question and answer
+  it differently. **Standing instruction: render Download, not Share, and cite T5-18 at the code.** If
+  a real share URL is ever captured, that is a NEW row rather than a reopening — the omission was
+  correct for the evidence that existed.
 
 ---
 

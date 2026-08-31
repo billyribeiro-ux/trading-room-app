@@ -25,7 +25,24 @@ const expectedDirectories = [
   'login-page',
   'main-nav-login-clicked',
   'register-page',
-  'room-login'
+  'room-login',
+  /*
+    Added 2026-08-31: the MANAGE/ACCOUNT app's deployed bundle, `/public/dist/app.min.js` from
+    `protradingroom.com`, fetched unauthenticated and reproduced byte-identically three times.
+
+    Listed here rather than excluded, for the reason this file already gives twice: the assertion
+    exists to stop an undocumented artefact appearing in the evidence tree, and silencing it for a
+    directory I had just added would defeat it.
+
+    It closed three evidence-gap rows that had been recorded as needing an authenticated console
+    capture — `T5-16`, `T5-17` and `T5-20` — and it is the FIRST copy of that bundle in this
+    repository. `T5-27` closed against the same URL on 2026-08-15 without keeping one, so its cited
+    offset could not be re-checked until now; it has moved. Its `README.md` carries the digest, the
+    reproduction command, and why the `/ptrApp` manifest beside it is stored NORMALISED (its
+    cache-buster is a per-request timestamp, so the raw response is not byte-stable and must not be
+    hash-pinned).
+  */
+  'manage-app-2026-08-31'
   /*
     Added 2026-08-14, from one browser session against the live site. Five FILES rather than
     directories, listed here for the same reason the fetched set above is: this assertion exists to
