@@ -106,7 +106,7 @@ guessed.
 | 30 | `lib/components/ScheduledAlerts.svelte` | 319 | no |
 | 31 | `lib/components/PrivateChatComposer.svelte` | 311 | no |
 | 32 | `lib/components/StreamTabs.svelte` | 304 | no |
-| 33 | `lib/components/RoomShell.svelte` | 268 | no |
+| 33 | `lib/components/RoomShell.svelte` | 268 | `## components/RoomShell.svelte` in the v4 register — 6 rows (SHL-01…06), 4 of them citation defects of ours. Read end to end 2026-08-31. |
 | 34 | `lib/components/MessageMenu.svelte` | 251 | §MSM — 6 rows against all four captured kebab menus: 1 fixed, 1 already built, 2 measured refusals, 2 deliberate divergences. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 35 | `lib/components/SpeechRecoOverlay.svelte` | 246 | no |
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | no |
@@ -114,8 +114,8 @@ guessed.
 | 38 | `lib/components/GiphyPicker.svelte` | 215 | no |
 | 39 | `lib/components/ScreenShareMenu.svelte` | 207 | no |
 | 40 | `lib/components/NavbarSoundCloud.svelte` | 200 | §NAV — born 2026-08-31 out of `RoomNavbar`, carrying `NAV-02` and the presenter dropdown it belongs beside. |
-| 41 | `lib/components/RichTextEditor.svelte` | 191 | no |
-| 42 | `lib/components/MessageBody.svelte` | 173 | no |
+| 41 | `lib/components/RichTextEditor.svelte` | 190 | `## components/RichTextEditor.svelte` in the v4 register — 6 rows (RTE-01…06) against `app-rich-text-editor`, read end to end 2026-08-31. |
+| 42 | `lib/components/MessageBody.svelte` | 172 | `## components/MessageBody.svelte` in the v4 register — 7 rows (MSB-01…07) against `urlwrapImg` and `showChatGif`, read end to end 2026-08-31. |
 | 43 | `lib/components/AlertQaAlertCard.svelte` | 170 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
 | 44 | `lib/components/FollowChatStylePane.svelte` | 170 | no |
 | 45 | `lib/components/AlertQaComposer.svelte` | 166 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
@@ -157,7 +157,7 @@ guessed.
 | 81 | `routes/logout/+page.svelte` | 31 | no |
 | 82 | `routes/+layout.svelte` | 27 | no |
 
-**12 of 82 surfaces audited · 4,504 of 36,024 lines · 12.5%.**
+**15 of 82 surfaces audited · 5,134 of 36,022 lines · 14.3%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

@@ -71,6 +71,12 @@
   function isMutedGif(url: string) {
     return !chatGif && url.toLowerCase().includes('.gif');
   }
+
+  /**
+   * Every prop a NESTED body inherits — all but `segments`, spread rather than respelled below,
+   * where a prop nobody listed (`extraChatMsg`) reached the outer body and not the inner one.
+   */
+  const inherited = $derived({ stockStyle, chatGif, messageId, extraChatMsg, onaction });
 </script>
 
 <!--
@@ -133,14 +139,7 @@
         event.preventDefault();
         event.stopPropagation();
         onaction('copy-trade', { text: segment.text });
-      }}
-      ><MessageBody
-        segments={segment.children ?? []}
-        {stockStyle}
-        {chatGif}
-        {messageId}
-        {onaction}
-      /></span
+      }}><MessageBody segments={segment.children ?? []} {...inherited} /></span
     >{:else if segment.kind === 'label' && segment.label}<span
       class={ALERT_LABEL_BADGE_CLASS}
       style={alertLabelBadgeStyle(segment.label)}>{segment.label.name}</span
