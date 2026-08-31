@@ -492,16 +492,87 @@ describe('DTP-02 and SWP-01 — the Ze/Ne split, which is what makes the five no
     }
   });
 
-  it('and loses them on the two Ne cells, which is the half the rows record', () => {
+  it('and now carries them on the two Ne cells, which is DTP-02 and SWP-01 closed', () => {
     /*
-      A NEGATIVE assertion with a positive twin above it: if somebody builds the row and adds
-      `{' '}`, this flips and the two rows have to be re-dispositioned rather than silently
-      contradicted. That is the intended failure, not a false alarm.
+      RE-DISPOSITIONED 2026-08-31, by the mechanism the previous version of this test described.
+
+      It used to assert the ABSENCE of the pads — `font-weight-bold">{row.symbol}</strong>` and the
+      bare date `<td>` — and its comment said: *"if somebody builds the row and adds `{' '}`, this
+      flips and the two rows have to be re-dispositioned rather than silently contradicted. That is
+      the intended failure, not a false alarm."* It flipped, on all four assertions at once, which
+      is the negative control for this change already run: the four went red the moment the two
+      panes were edited and no other assertion in this file moved.
+
+      `DTP-02` and `SWP-01` were BLOCKED on the Svelte MCP — step 3 of the mandatory workflow is
+      where the `{' '}` idiom is checked against `svelte/no-useless-mustaches` and declined. That
+      MCP is available now and the decline was exercised: `svelte-autofixer` reports *"Unexpected
+      mustache interpolation with a string literal value"* on each pad and it is refused, for the
+      reason `apps/room/AGENTS.md` records.
+
+      The `Ze` half above still asserts the ABSENCE of pads on the six `ɵɵtextInterpolate` cells,
+      and that is now the only direction this pair can drift: adding pads there would make ours
+      render six spaces the reference does not.
     */
-    expect(dayPaneCode).toContain('font-weight-bold">{row.symbol}</strong>');
-    expect(swingPaneCode).toContain('font-weight-bold">{row.symbol}</strong>');
-    expect(dayPaneCode).toContain('<td>{formatDayTradeAlertDate(row.entryDate)}</td>');
-    expect(swingPaneCode).toContain('<td>{formatSwingAlertDate(row.entryDate)}</td>');
+    expect(dayPaneCode).toContain(`font-weight-bold">{' '}{row.symbol}{' '}</strong>`);
+    expect(swingPaneCode).toContain(`font-weight-bold">{' '}{row.symbol}{' '}</strong>`);
+    expect(dayPaneCode).toContain(`<td>{' '}{formatDayTradeAlertDate(row.entryDate)}{' '}</td>`);
+    expect(swingPaneCode).toContain(`<td>{' '}{formatSwingAlertDate(row.entryDate)}{' '}</td>`);
+  });
+
+  it('and the three nodes outside the row carry them too', () => {
+    /*
+      The heading's two EDGE spaces and the empty state's pair — the other three of the five each
+      row names. The two spaces either side of the `<select>` are deliberately NOT asserted here:
+      they survive compilation untouched, so a mustache around them would render a double space.
+      That asymmetry is the whole reason `DTP-02` names five nodes rather than "the heading".
+    */
+    expect(dayPaneCode).toContain(`{' '}Latest Day Trade Alerts (Last`);
+    expect(swingPaneCode).toContain(`{' '}Latest Swing Trade Alerts (Last`);
+    for (const pane of [dayPaneCode, swingPaneCode]) {
+      expect(pane).toContain(`Months){' '}`);
+    }
+    expect(dayPaneCode).toContain(`{' '}No Day Trade Alerts to display.{' '}`);
+    expect(swingPaneCode).toContain(`{' '}No Swing Trade Alerts to display.{' '}`);
+  });
+
+  it('STV-06 — the buffer button carries its trailing space', () => {
+    /*
+      The fourteenth node of `DTF-01`'s shape. The LEADING space survives compilation, so only the
+      trailing one is restored; asserting the leading one as a mustache would render two.
+    */
+    expect(playerCode).toContain(`Buffer: {bufferSizeName}{' '}`);
+  });
+
+  it('STV-03 — the buffer reload is guarded by `hls`, and the first load is not', () => {
+    /*
+      The row's fix, asserted as the SHAPE rather than as text: two `$effect`s, the second reading
+      `bufferSizeLevel` and returning early when `hls` is null. Upstream's guard is
+      `"bufferSizeLevel" === e.key && this.hls && this.loadStream()` at byte 1,902,159, pinned
+      above; `this.hls` is null on exactly one path, native HLS, and this is what stops a native-HLS
+      viewer's stream restarting for a setting that cannot reach them.
+
+      The negative control that matters here is the coupling, not the guard: putting `bufferSizeLevel`
+      back into the first effect is what would silently re-open the row, so that effect is asserted
+      to read `videoSrc` and NOT `bufferSizeLevel`.
+    */
+    const LOAD_EFFECT = `$effect(() => {
+    void videoSrc;
+    if (!videoPlayer) return;
+    void loadStream();
+    return cleanup;
+  });`;
+    const BUFFER_EFFECT = `$effect(() => {
+    void bufferSizeLevel;
+    if (!hls) return;
+    void loadStream();
+  });`;
+
+    expect(playerCode).toContain(LOAD_EFFECT);
+    expect(playerCode).toContain(BUFFER_EFFECT);
+
+    /* The coupling, stated as its own assertion: exactly two effects, and the load one is first. */
+    expect(playerCode.split('$effect(').length - 1).toBe(2);
+    expect(playerCode.indexOf(LOAD_EFFECT)).toBeLessThan(playerCode.indexOf(BUFFER_EFFECT));
   });
 });
 

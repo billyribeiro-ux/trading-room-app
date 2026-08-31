@@ -330,19 +330,87 @@
   }
 
   /*
-    `ngAfterViewInit` -> `setupStream()`, plus the `bufferSizeLevel` subscription from `ngOnInit`
-    (lines 29-36) which reloads the stream when the preference changes.
+    `ngAfterViewInit` -> `setupStream()`. The URL and the element, and NOTHING else.
 
-    Keyed on the URL and the buffer level only. `currentPerformanceLevel` is deliberately NOT a
-    dependency — `adaptToPerformanceIssues` reloads directly, and tracking it here would make a
-    degradation trigger a second reload on top of the one it already asked for.
+    `currentPerformanceLevel` is deliberately NOT a dependency — `adaptToPerformanceIssues` reloads
+    directly, and tracking it here would make a degradation trigger a second reload on top of the
+    one it already asked for.
+
+    `bufferSizeLevel` is not one either, and that is `STV-03` below rather than an omission. It is
+    also not tracked by accident through `loadStream` -> `getHlsConfig()`, which does read it: that
+    read happens after `await import('hls.js')`, and Svelte's `$effect` documentation is explicit
+    that *"values that are read asynchronously — after an `await` or inside a `setTimeout`, for
+    example — will not be tracked"*. The dependency set of this effect is the two reads above it.
   */
   $effect(() => {
     void videoSrc;
-    void bufferSizeLevel;
     if (!videoPlayer) return;
     void loadStream();
     return cleanup;
+  });
+
+  /**
+   * `STV-03` — the `bufferSizeLevel` subscription from `ngOnInit` (lines 29-36), WITH the guard it
+   * has upstream and this used to drop.
+   *
+   * ```js
+   * this.bufferPreferenceSubscription = this.appService.guiEventBus.subscribe("preferenceChanged",
+   *   e => { "bufferSizeLevel" === e.key && this.hls &&
+   *     (console.log("Buffer size preference changed, reloading stream"), this.loadStream()) })
+   * ```                                                                    // byte 1,902,159
+   *
+   * `&& this.hls` is the whole row. Both of the reference's reload paths carry it — this one, and
+   * `setBufferSize` at byte 1,908,582 — and `this.hls` is null on exactly one path: `loadStream()`
+   * at **1,904,378** falls through to `canPlayType("application/vnd.apple.mpegurl") &&
+   * setupNativeHLS(e)` when `Hls.isSupported()` is false. **That is iOS Safari, where native HLS is
+   * the only path there is.** Every number `getHlsConfig()` computes is consumed by `new Hls(…)` and
+   * by nothing else, so a buffer-size change provably cannot reach a native-HLS viewer — and
+   * reloading for it costs them their whole buffered range and a jump back to the live edge, for a
+   * setting that could not have applied.
+   *
+   * ## Why this is a SECOND effect and not a guard inside the first
+   *
+   * The two reloads are not the same event. The first load must always happen and `hls` is
+   * legitimately null when it does; a buffer change must happen only when `hls` is not. One effect
+   * reading both `videoSrc` and `bufferSizeLevel` cannot tell which of its dependencies woke it, so
+   * any guard written inside it would have to suppress the first load too. Splitting them is what
+   * lets each carry its own condition, and it is also the reference's own shape: `ngAfterViewInit`
+   * loads unconditionally, the `ngOnInit` subscription reloads conditionally.
+   *
+   * **The first run of this effect is a no-op, and it is `hls` that makes it one rather than a
+   * mount latch.** Effects run in declaration order, so the effect above has already called
+   * `loadStream()` — which returns at its `await` with `hls` still null — by the time this one runs.
+   * The guard therefore suppresses the mount pass for the same reason it suppresses a native-HLS
+   * viewer, and there is no `staged`/`mounted` flag to keep in step with anything.
+   *
+   * `hls` is a plain `let` (see its declaration), so reading it here registers no dependency and
+   * assigning it inside `loadStream` schedules nothing. Only `bufferSizeLevel` is tracked.
+   *
+   * ## The three `svelte-autofixer` suggestions on this file, and why each is declined
+   *
+   * Run 2026-08-31 against the live MCP: **no issues**, three suggestions, recorded here rather
+   * than ignored — the same practice `EmojiPicker`, `PresentationArea` and `ExtraChatPane` follow.
+   *
+   *  - *"You are calling the function `loadStream` inside an `$effect`… check if it could use
+   *    `$derived`"*, raised once per effect. It could not: `loadStream` dynamically imports hls.js,
+   *    constructs a player, attaches it to a DOM element and registers listeners. Svelte's own
+   *    `$effect` documentation names *"third-party library integration"* and *"DOM manipulation"* as
+   *    what effects are for, and a `$derived` is a function of the values it reads — there is no
+   *    value here to derive. What the suggestion exists to catch is a derivation written as an
+   *    effect; this is the opposite.
+   *  - *"The usage of `bind:this` can often be replaced with an … attachment."* Declined, and this
+   *    one is load-bearing rather than stylistic: `STV-05` records that the reference re-reads the
+   *    SAME `<video>` on every reload and never removes a listener, and ours matches that only
+   *    because `bind:this` keeps one element across `$effect` re-runs. An attachment tears down and
+   *    re-runs with the element, which is the right default and the wrong answer here — it would
+   *    silently make ours diverge from the behaviour `STV-05` measured and pinned.
+   *  - *"Unexpected mustache interpolation with a string literal value"* on the buffer button's
+   *    `{' '}` — `STV-06`, declined at the node with the reason.
+   */
+  $effect(() => {
+    void bufferSizeLevel;
+    if (!hls) return;
+    void loadStream();
   });
 
   onDestroy(cleanup);
@@ -420,7 +488,23 @@
           class="btn btn-sm dropdown-toggle"
           onclick={() => menus.toggle('streamBuffer')}
         >
-          <i class="fas fa-database"></i> Buffer: {bufferSizeName}
+          <!--
+            `STV-06` — `Ne(" Buffer: ", o.getBufferSizeName(), " ")` at byte 1,910,654: one text
+            node, a leading AND a trailing space. The leading one survives; the trailing one does
+            not, because Svelte trims whitespace before a closing tag. Measured on
+            `svelte@5.57.0`'s emitted module rather than read off this template: its `set_text` call
+            for this node carries a template string that opens with a space before `Buffer:` and
+            closes immediately after the interpolation, with no space between it and the backtick.
+
+            `{' '}` restores it, which is the fourteenth node of `DTF-01`'s shape and the idiom
+            `apps/room/AGENTS.md` records as one of the two `svelte-autofixer` suggestions this
+            repository declines. That decline was exercised against the live MCP for this change:
+            it returns *"Unexpected mustache interpolation with a string literal value"* and it is
+            refused for the reason the AGENTS.md entry gives — every capture comparison here diffs
+            RENDERED STRINGS, so the space is evidence and not formatting. It is invisible on
+            screen, being the last thing in this button's line box, and it is carried anyway.
+          -->
+          <i class="fas fa-database"></i> Buffer: {bufferSizeName}{' '}
         </button>
         <!--
           Upstream these three are `<a class="dropdown-item">` with a click and no `href`

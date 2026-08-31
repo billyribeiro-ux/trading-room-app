@@ -275,11 +275,16 @@
       beside a control: `v(4," Latest Day Trade Alerts (Last ")` at byte 1,945,231, the select, then
       `v(8," Months) ")`. Both text nodes carry a leading and a trailing space.
 
+      `DTP-02` — and only TWO of those four spaces need carrying. The two INTERNAL ones, either
+      side of the `<select>`, survive compilation unchanged; the two at the block's edges do not,
+      because Svelte trims whitespace after an opening tag and before a closing one. Measured on
+      `svelte@5.57.0`'s emitted module for this file, not read off the template.
+
       Note the wording: "Latest Day Trade Alerts", where the TAB says the shorter "Day Trades". The
       two strings are different and both are verbatim.
     -->
     <h4 class="text-center m-0 p-1 px-3">
-      Latest Day Trade Alerts (Last
+      {' '}Latest Day Trade Alerts (Last
       <!--
         `onchange` after `bind:value`, which is safe and deliberate: Svelte updates a binding before
         it runs an event attribute on the same element, so `months` here is already the new value.
@@ -294,7 +299,7 @@
           <option value={option}>{option}</option>
         {/each}
       </select>
-      Months)
+      Months){' '}
     </h4>
 
     <!--
@@ -306,7 +311,10 @@
       `visibleAlerts.length` here instead would swap those two states.
     -->
     {#if alerts.length === 0}
-      <h4 class="text-center m-0 p-1 px-3 bg-secondary">No Day Trade Alerts to display.</h4>
+      <!-- `DTP-02` — `v(1," No Day Trade Alerts to display. ")`, byte 1,942,630: both edges. -->
+      <h4 class="text-center m-0 p-1 px-3 bg-secondary">
+        {' '}No Day Trade Alerts to display.{' '}
+      </h4>
     {:else}
       <div class="d-flex align-items-center justify-content-between flex-wrap">
         <div class="d-flex align-items-center">
@@ -390,7 +398,14 @@
                         <i class="fa fa-edit"></i>
                       </span>
                     {/if}
-                    <strong class="ms-2 font-weight-bold">{row.symbol}</strong>
+                    <!--
+                      `DTP-02` — `Ne(" ",e.symbol," ")`: this cell is one of exactly two the
+                      reference writes with `ɵɵtextInterpolate1` rather than `ɵɵtextInterpolate`,
+                      and the pads are inside the `<strong>` upstream. Same pixels either way, and
+                      a different rendered string — which is what every capture comparison here
+                      diffs.
+                    -->
+                    <strong class="ms-2 font-weight-bold">{' '}{row.symbol}{' '}</strong>
                   </span>
                 </td>
                 <!--
@@ -399,7 +414,8 @@
                   text colour. The green/red pair belongs to the form's radio labels alone.
                 -->
                 <td>{row.direction}</td>
-                <td>{formatDayTradeAlertDate(row.entryDate)}</td>
+                <!-- `DTP-02` — the row's other `Ne(" ",…," ")`, byte 1,943,655. -->
+                <td>{' '}{formatDayTradeAlertDate(row.entryDate)}{' '}</td>
                 <!-- No pipe, no `toFixed`, no currency: the strings the text inputs produced. -->
                 <td>{row.entryPrice}</td>
                 <td>{row.stop}</td>

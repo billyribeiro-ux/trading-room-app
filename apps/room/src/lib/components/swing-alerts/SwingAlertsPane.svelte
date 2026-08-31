@@ -254,9 +254,15 @@
       The heading is ONE `<h4>` with the months `<select>` inline in the sentence, not a heading
       beside a control: `v(4," Latest Swing Trade Alerts (Last ")`, the select, then
       `v(8," Months) ")`. Both text nodes carry a leading and a trailing space.
+
+      `SWP-01` — the swing half of `DTP-02`, filed as its own row rather than folded into the day
+      one for the reason `dta-01` … `dta-04` all exist: every one of those was missing from BOTH
+      panes, and a row that names one pane is a row that lets the pair drift. Only the two edge
+      spaces need carrying; the two either side of the `<select>` survive compilation. The
+      measurement and the rendered-string-versus-pixels split are argued once, on `DTP-02`.
     -->
     <h4 class="text-center m-0 p-1 px-3">
-      Latest Swing Trade Alerts (Last
+      {' '}Latest Swing Trade Alerts (Last
       <!--
         `onchange` after `bind:value`, which is safe and deliberate: Svelte updates a binding before
         it runs an event attribute on the same element, so `months` here is already the new value.
@@ -270,7 +276,7 @@
           <option value={option}>{option}</option>
         {/each}
       </select>
-      Months)
+      Months){' '}
     </h4>
 
     <!--
@@ -282,7 +288,10 @@
       `visibleAlerts.length` here instead would swap those two states.
     -->
     {#if alerts.length === 0}
-      <h4 class="text-center m-0 p-1 px-3 bg-secondary">No Swing Trade Alerts to display.</h4>
+      <!-- `SWP-01` — `v(1," No Swing Trade Alerts to display. ")`, byte 1,936,289: both edges. -->
+      <h4 class="text-center m-0 p-1 px-3 bg-secondary">
+        {' '}No Swing Trade Alerts to display.{' '}
+      </h4>
     {:else}
       <div class="d-flex align-items-center justify-content-between flex-wrap">
         <div class="d-flex align-items-center">
@@ -366,7 +375,9 @@
                         <i class="fa fa-edit"></i>
                       </span>
                     {/if}
-                    <strong class="ms-2 font-weight-bold">{row.symbol}</strong>
+                    <!-- `SWP-01` — `Ne(" ",e.symbol," ")` in `_we`; the pads are inside the
+                         `<strong>` upstream, as they are in the day pane. -->
+                    <strong class="ms-2 font-weight-bold">{' '}{row.symbol}{' '}</strong>
                   </span>
                 </td>
                 <!--
@@ -375,7 +386,8 @@
                   text colour. The green/red pair belongs to the form's radio labels alone.
                 -->
                 <td>{row.direction}</td>
-                <td>{formatSwingAlertDate(row.entryDate)}</td>
+                <!-- `SWP-01` — the row's other `Ne(" ",…," ")`, byte 1,937,310. -->
+                <td>{' '}{formatSwingAlertDate(row.entryDate)}{' '}</td>
                 <!-- No pipe, no `toFixed`, no currency: the strings the text inputs produced. -->
                 <td>{row.entryPrice}</td>
                 <td>{row.stop}</td>

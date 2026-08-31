@@ -117,7 +117,7 @@
   let searchResults = $state.raw<EmojiDumpEntry[] | null>(null);
   let frequentIds = $state.raw<string[]>(FREQUENTLY_DEFAULTS.slice(0, PER_LINE));
 
-  let emojiSearchInput: HTMLInputElement | null = null;
+  let emojiSearchInput: HTMLInputElement | undefined;
   let emojiScrollElement: HTMLElement | undefined;
   const categorySections: Array<HTMLElement | undefined> = [];
 
@@ -497,6 +497,28 @@
     };
   }
 
+  /*
+    The search field is reached the same way its two siblings are — by attachment, not `bind:this`.
+
+    `svelte-autofixer` raises `bind:this` on every file that uses one, and here the suggestion is
+    taken rather than declined: this component already held `emojiScrollElement` and every
+    `categorySections` entry through attachments, so the one binding was the odd handle out. All
+    three now clear IN PLACE on teardown and all three guard the clear with `=== node`, which is
+    what stops a handle belonging to a re-created element being nulled by the outgoing one's
+    cleanup.
+
+    Nothing renders from this handle — `clearQuery` writes `.value` and calls `.focus()` on it from
+    a click handler, long after mount — so it stays a plain `let`. `$state` would make reading it a
+    dependency of anything that touched it, for a value the template never shows.
+  */
+  function manageSearchInput(node: HTMLInputElement) {
+    emojiSearchInput = node;
+
+    return () => {
+      if (emojiSearchInput === node) emojiSearchInput = undefined;
+    };
+  }
+
   function portalPopover(node: HTMLElement) {
     // Measured here rather than in an $effect because it is one-shot mount-time DOM
     // work, and it has to settle before place() measures the popover.
@@ -604,7 +626,7 @@
               class="ng-untouched ng-pristine ng-valid"
               type="search"
               placeholder="Search"
-              bind:this={emojiSearchInput}
+              {@attach manageSearchInput}
               oninput={(event) => handleSearch(event.currentTarget.value)}
               onkeyup={handleSearchKeyup}
             />
