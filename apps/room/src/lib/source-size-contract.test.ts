@@ -2525,7 +2525,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       congratulated for a recovery from a failure they were never told about. The half that was
       built is the half nobody needs.
     */
-    max: 947,
+    /*
+      947 -> 998, 2026-09-01. The two captured `aria-labelledby` bindings and their title ids, and
+      the thirty-line note recording the premise that had kept them out.
+
+      Nearly all of it is that note, and it earns the lines because the reason it replaces was WRONG
+      rather than merely superseded: *"an editor that a room may hold more than one of"*, when
+      `NotesPane.svelte` three levels up says a second instance could never be reached. A correction
+      that only changed the code would leave the next reader re-deriving the same false premise from
+      the same file.
+
+      It also carries the sharper answer the old blanket reason was hiding — the Giphy modal's id
+      genuinely cannot be a literal, because that picker is mounted at four sites — which is the
+      distinction `note-editor-modal-labelling-contract.test.ts` now asserts.
+    */
+    max: 998,
     why: "app-note's carousel: the modal, its three-state slide row, the file browser and two confirms"
   },
   {

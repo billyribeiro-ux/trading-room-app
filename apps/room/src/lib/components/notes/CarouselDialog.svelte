@@ -450,7 +450,49 @@
   the reference stylesheet, and in every sheet this app ships. Removed with the file browser's
   `.note-modal-dialog`; `note-dead-control-contract.test.ts` carries both searches.
 -->
-<div class="note-modal open" aria-hidden="false" role="dialog" aria-label={title}>
+<!--
+    ── THE CAPTURED `aria-labelledby`, TRANSCRIBED 2026-09-01, AND THE REASON IT WAS NOT ──────────
+
+    ```js
+    modalService.open(this.carouselModal,   {ariaLabelledBy:"carousel-modal-title",     size:"lg"})
+    modalService.open(this.fileBrowserModal,{ariaLabelledBy:"file-browser-modal-title", size:"lg"})
+    modalService.open(this.giphySearchPopOver,{ariaLabelledBy:"modal-basic-title"})
+    ["id","carousel-modal-title",1,"modal-title"]        // byte 1,484,582
+    ["id","file-browser-modal-title",1,"modal-title"]    // byte 1,486,486
+    ["id","modal-basic-title",1,"modal-title"]           // byte 1,486,810
+    ```
+
+    These were `aria-label` on the dialog instead, and the recorded reason was:
+
+    > a literal document-unique id belongs to a component that is mounted once, and this one is
+    > mounted inside `{#if dialog === 'carousel'}` in an editor that a room may hold more than one of
+
+    **The second half is false about this codebase, and `NotesPane.svelte` says so three levels up:**
+    *"ours mounts `NoteEditor` only in the panel being edited … `editingNoteId` is a single value — a
+    second instance could never be reached."* One editor, one dialog at a time, so a literal id is
+    document-unique here exactly as it is upstream.
+
+    `aria-labelledby` is also the better of the two, which is why it is worth the correction rather
+    than merely the match: the accessible name becomes the visible heading element, so the two cannot
+    drift. `aria-label` is a second copy of the title that a rename leaves behind.
+
+    **The THIRD captured title, `modal-basic-title`, is NOT transcribed, and the difference is the
+    measurement rather than the effort.** It labels the Giphy modal, and `GiphyPicker` is mounted at
+    FOUR sites — the note editor, both chat columns and the private-chat composer — so a literal id
+    there really would appear four times in one document. It already carries an instance-suffixed
+    `popoverId` for exactly that reason. Two of the three ids are reproducible and one is not, which
+    is a sharper answer than the blanket one that covered all three.
+
+    `note-editor-modal-labelling-contract.test.ts` asserts both premises rather than trusting this
+    paragraph — a `{#each}` around `NoteEditor` would make these two ids collide, and the prose would
+    still read as true.
+  -->
+<div
+  class="note-modal open"
+  aria-hidden="false"
+  role="dialog"
+  aria-labelledby="carousel-modal-title"
+>
   <div class="note-modal-content">
     <div class="note-modal-header">
       <!--
@@ -461,7 +503,10 @@
       <button type="button" class="close" aria-label="Close" onclick={dismissCarouselModal}
         ><i class="note-icon-close"></i></button
       >
-      <h4 class="note-modal-title"><i class="fas fa-images"></i> {title}{' '}</h4>
+      <h4 id="carousel-modal-title" class="note-modal-title">
+        <i class="fas fa-images"></i>
+        {title}{' '}
+      </h4>
     </div>
     <div class="note-modal-body">
       <div class="form-row mb-3">
@@ -717,13 +762,18 @@
 
     `note-file-browser-chrome-contract.test.ts` carries the four measurements, the const values, and
     why upstream's empty `<span aria-hidden="true">` close-button child is the one thing here that is
-    deliberately not transcribed. `role="dialog"` plus `aria-label` are ours and stand in for the
-    reference's `ariaLabelledBy:"file-browser-modal-title"` (byte 1,477,226); that test says why.
+    deliberately not transcribed. `aria-labelledby` and its id are the CAPTURE's since 2026-09-01 —
+    see the note on the carousel dialog above for the premise that changed.
   -->
-  <div class="note-modal open" aria-hidden="false" role="dialog" aria-label="Select Image">
+  <div
+    class="note-modal open"
+    aria-hidden="false"
+    role="dialog"
+    aria-labelledby="file-browser-modal-title"
+  >
     <div class="note-modal-content">
       <div class="note-modal-header">
-        <h4 class="note-modal-title">
+        <h4 id="file-browser-modal-title" class="note-modal-title">
           <i class="fas fa-folder-open"></i> Select Image{' '}
         </h4>
         <button

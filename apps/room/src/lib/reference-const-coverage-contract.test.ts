@@ -476,7 +476,20 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     rather than pointing at a title element's id. `CarouselDialog.svelte` states it at the file
     browser (byte 1,477,226) and `note-file-browser-chrome-contract.test.ts` carries the measurement.
   */
-  'app-note': ['carousel-modal-title', 'file-browser-modal-title', 'modal-basic-title'],
+  /*
+    `carousel-modal-title` and `file-browser-modal-title` LEFT this list on 2026-09-01, transcribed
+    with their `aria-labelledby` bindings. The reason they were absent — *"a literal document-unique
+    id belongs to a component that is mounted once, and this one is mounted … in an editor that a
+    room may hold more than one of"* — was false about this codebase: `NotesPane.svelte` mounts
+    `NoteEditor` behind `editingNoteId === note.id`, a single value, and says *"a second instance
+    could never be reached"*.
+
+    `modal-basic-title` stays, and the difference is a measurement rather than a preference: it names
+    the Giphy modal, and `GiphyPicker` is mounted at FOUR sites, so a literal id there really would
+    appear four times in one document. It already carries an instance-suffixed `popoverId`.
+    `note-editor-modal-labelling-contract.test.ts` asserts both mount counts.
+  */
+  'app-note': ['modal-basic-title'],
 
   /*
     FOUR — GAPS ON SURFACES THAT ARE OTHERWISE BUILT.
@@ -652,7 +665,7 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-nine components fully covered, one hundred and nineteen values not', () => {
+  it('holds the ratchet: thirty-nine components fully covered, one hundred and seventeen values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
@@ -660,7 +673,7 @@ describe('coverage of the reference const tables', () => {
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(39);
-    expect(residuals).toBe(119);
+    expect(residuals).toBe(117);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -769,16 +782,16 @@ describe('how much of the gap has already been written about', () => {
     LIMITATION, stated because it bounds every number below: this is a substring search over the whole
     repository, so a short generic value (`spinner-border`, `visually-hidden`) can be counted as
     examined because it occurs incidentally in unrelated prose. It over-counts the examined side. It
-    cannot over-count the UNEXAMINED side, which is the side that means work, so the 90 below is a
+    cannot over-count the UNEXAMINED side, which is the side that means work, so the 88 below is a
     floor.
   */
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
-  it('splits the 119 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(119);
+  it('splits the 117 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(117);
     expect(all.filter(mentioned)).toHaveLength(29);
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(90);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(88);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

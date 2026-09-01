@@ -82,7 +82,7 @@ guessed.
 | 6 | `lib/components/RoomNavbar.svelte` | 1,093 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 7 | `lib/components/PresentationArea.svelte` | 1,108 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,184 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
-| 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
+| 9 | `lib/components/notes/CarouselDialog.svelte` | 996 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
 | 10 | `lib/components/EmojiPicker.svelte` | 858 | `## EmojiPicker.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against |
 | 11 | `lib/components/PollPanel.svelte` | 897 | `poll-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-poll-modal` (selector at byte 2,112,472), all 53 consts decoded BY VALUE and swept against `PollPanel` + `PollSavedList`. ZERO gaps; one recorded divergence (the loader's `../../assets/` path). The finding is the `app-poll-modal` ANCESTOR: all 17 style rules are scoped to it in the generated sheet, so deleting the wrapper unstyles the panel with nothing else noticing. |
 | 12 | `lib/components/RoomSidebar.svelte` | 887 | `roster-identity-contract.test.ts` — read end to end 2026-08-31 against `app-room-roster` (byte 2,038,159), all 24 consts decoded BY VALUE. Twenty built; the four absent are `RS-03`/`RS-04`, blocked on a server-side supply. Three CITATIONS were wrong (`C2e`→`E2e`, `u2e`→`g2e`, and a bundle this repo does not hold) and the `{#each}` key's equivalence to upstream's `userXrefID` was unrecorded. |
@@ -164,7 +164,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**51 of 89 surfaces audited · 21,030 of 38,436 lines · 54.7%.**
+**51 of 89 surfaces audited · 21,080 of 38,486 lines · 54.8%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

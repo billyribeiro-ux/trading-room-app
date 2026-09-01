@@ -33,6 +33,65 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 22:55 UTC — two captured modal labels, and a premise that was false about our own code
+
+**Runtime impact: YES, for screen-reader users** — the carousel and file-browser dialogs now take
+their accessible name from their own heading element, as the reference does.
+
+Three of the reference's note-editor modals name themselves through `ariaLabelledBy` and an id on the
+title (bytes 1,475,314 / 1,477,226 / 1,482,515, with consts at 1,484,582 / 1,486,486 / 1,486,810).
+All three were `aria-label` here, on one recorded reason:
+
+> a literal document-unique id belongs to a component that is mounted once, and this one is mounted
+> inside `{#if dialog === 'carousel'}` in an editor that a room may hold more than one of
+
+**`NotesPane.svelte` says the opposite three levels up:** *"ours mounts `NoteEditor` only in the panel
+being edited … `editingNoteId` is a single value — a second instance could never be reached."* The
+duplicate the reason was defending against cannot occur, so two of the three ids are document-unique
+here for the same reason they are upstream.
+
+`aria-labelledby` is also the better of the two and would be worth this without the match: the
+accessible name becomes the visible heading, so a rename cannot leave a stale copy behind. An
+`aria-label` is a second copy of the title.
+
+## The sharper answer the blanket reason was hiding
+
+The THIRD id is genuinely not reproducible, and the difference is a number rather than a preference.
+`modal-basic-title` names the Giphy modal, and `GiphyPicker` is mounted at **four** sites — the note
+editor, both chat columns and the private-chat composer — so a literal id there really would appear
+four times in one document. It already carries an instance-suffixed `popoverId`.
+
+One reason covering three cases was hiding that two of them were wrong and one was right.
+
+## The premise is now a gate, because it is a fact about OTHER files
+
+`note-editor-modal-labelling-contract.test.ts` asserts the mount counts: `NoteEditor` at exactly one
+site, gated on a single-valued id; `CarouselDialog` inside it; `GiphyPicker` at four or more. A
+`{#each}` around the editor would make two literal ids collide, and every word explaining why they
+are safe would still read as true — which is exactly the shape this repository writes tests for.
+
+## A contract case INVERTED, which is the record of the change
+
+`note-file-browser-chrome-contract` asserted `not.toContain('file-browser-modal-title')`, with the
+false premise written out beneath it. It asserts the opposite now and says why in place; deleting it
+would have thrown away the sentence that changed. What it keeps is the other half — the label must
+not ALSO be an `aria-label`, because one name needs one source.
+
+`app-note` goes from three residuals to one. Residuals 119 → 117.
+
+## Verification
+
+Three negative controls, each seen RED then restored: the `aria-label` re-added alongside; the id
+taken off the title element; and the PREMISE broken by making the editor per-note rather than
+per-edit — that last one is the case that matters, since it fails on a change in a different file
+that the prose alone would not have noticed.
+
+Room gate exit 0.
+
+**The Svelte MCP is still unavailable** (the server disconnected earlier in this session and has not
+returned), so `svelte-autofixer` did not run on the two `.svelte` files this touched. `svelte-check`
+is clean at 0/0. Saying so rather than implying the gate ran.
+
 ### 2026-09-01 21:40 UTC — `ACA-06`'s save control, and the third blocker this week that named the wrong thing
 
 **Runtime impact: YES** — the chat toolbar's "Save chat messages" button is built. It downloads the
