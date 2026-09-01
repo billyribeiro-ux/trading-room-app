@@ -31,7 +31,12 @@
   </div>
 
   <div class="rails" {@attach reveal({ y: 24 })}>
-    {#each rows as row, rowIndex (rowIndex)}
+    <!--
+      Unkeyed: `rows` is derived once from `TESTIMONIALS` and never replaced. The INNER loop below
+      keeps its key because `pass` is the item itself, not its position.
+    -->
+    <!-- eslint-disable-next-line svelte/require-each-key -->
+    {#each rows as row, rowIndex}
       <div class="rail" class:reverse={rowIndex === 1}>
         <div class="rail-track">
           {#each [0, 1] as pass (pass)}

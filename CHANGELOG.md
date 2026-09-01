@@ -33,6 +33,48 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 08:52 UTC — the room's rune gates run against the controller, and three index keys were promises with nothing behind them
+
+**Runtime impact: NO** — three `{#each}` keys removed, two contracts added. No list changed order or
+identity.
+
+Continuing the asymmetry the image gate exposed: the room enforces the root standard's Svelte traps
+and the controller mostly did not. **Checked before building, and one turned out to need nothing** —
+`browser-dialog-contract.test.ts` already scans BOTH apps from one place and says why in its own
+header, so the native-dialog rule was never an asymmetry. All 13 `confirm`/`prompt` calls in the
+controller are `bootbox.*`, its own primitive; the only `window.prompt` in the tree is inside a
+comment explaining why it is not used.
+
+**`{#each}` keys — three index keys, all removed.** Two in `DeskMock` (the candle chart and the chat
+replay) and one in `VoicesSection` (the testimonial rails). Every one iterates a `const` built at init
+and never replaced or reordered, so the honest outcome was the first of the two the rule offers: **no
+key at all**. Svelte's best practices are explicit — *"the key must uniquely identify the object. Do
+not use the index as a key"* — and index-keyed and unkeyed reuse the DOM identically, which makes
+`(i)` a promise with nothing behind it. `messages` lost its `, i` with the key, because nothing in
+that body ever read it.
+
+`svelte/require-each-key` wants a key on every block, so the three sites carry a
+`eslint-disable-next-line` with the reason: the official rule is the specific one and it forbids the
+only key available. Same resolution and the same argument as `MessageBody.svelte` in the room.
+
+The controller's `ALLOWED_INDEX_KEYS` is **empty on purpose** and says so — the room's copy has two
+entries where position genuinely IS the identity (`PollPanel`'s votes, `RoomMessage`'s slots), and
+nothing here has that shape. The positive assertions were re-pointed at this app's own three blocks,
+because "no offenders" is also satisfied by deleting the loop.
+
+**`$effect` that only synchronises state — clean, and the corpus is the finding.** The room's
+detector passed here on its first run. What it measured is worth recording: this app contains
+**exactly one `$effect`** in 48 components. It reaches for `$derived` almost everywhere, which is what
+the guidance asks for, and it makes the gate cheap to keep and easy to violate the first time
+somebody reaches for an effect out of habit. The floor is `>= 1` rather than the room's `> 20`, and
+the file says why a floor of one is weak as a tripwire and still worth having: the strong guards are
+the two `describe` blocks proving the detector still fires and still leaves legitimate shapes alone,
+and neither depends on the corpus.
+
+**Verification.** Two negative controls, each seen RED and restored: an index key returned to
+`VoicesSection`, and an assign-only `$effect` added to `RichTextEditor`. Controller gate exit 0: 107
+test files / 1,125 passed, up from 103 / 1,099 before this run of work.
+
 ### 2026-09-01 08:15 UTC — the controller had no image-sizing gate, and the room's rule found six images it had never seen
 
 **Runtime impact: NO** — one contract, one devDependency. No image changed.

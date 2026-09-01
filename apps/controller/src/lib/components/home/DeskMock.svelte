@@ -96,7 +96,15 @@
 
     <div class="stage">
       <svg viewBox="0 0 300 120" preserveAspectRatio="none" class="chart">
-        {#each candles as candle, i (i)}
+        <!--
+          UNKEYED, deliberately. `candles` is a `const` built once at init and never replaced or
+          reordered, so its items have no identity for a key to carry — and index-keyed and unkeyed
+          reuse the DOM identically, which makes `(i)` a promise with nothing behind it. Svelte's own
+          best practices are explicit: *"the key must uniquely identify the object. Do not use the
+          index as a key."* The `, i` stays because the body reads it to place the line.
+        -->
+        <!-- eslint-disable-next-line svelte/require-each-key -->
+        {#each candles as candle, i}
           <line
             x1={8 + i * 9.8}
             x2={8 + i * 9.8}
@@ -126,7 +134,16 @@
     </div>
 
     <div class="chat" {@attach chatLoop}>
-      {#each messages as message, i (i)}
+      <!--
+        Unkeyed for the same reason as the chart above: a `const` list, never replaced. The index is
+        dropped with the key — nothing in this body read it, and it was only ever there to be the key.
+
+        `svelte/require-each-key` wants a key on every block and is disabled here deliberately: the
+        official best-practice rule is the specific one and it forbids the only key available. Same
+        resolution, and the same reason, as `MessageBody.svelte` in the room.
+      -->
+      <!-- eslint-disable-next-line svelte/require-each-key -->
+      {#each messages as message}
         {#if message.alert}
           <div class="msg alert">
             <span class="alert-tag">TRADE ALERT</span>
