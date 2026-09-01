@@ -563,7 +563,8 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     TRACED VALUE BY VALUE ON 2026-08-31, and none of the seven is work. Written out because the group
     heading above would otherwise read them as unfinished, which is what the heading itself got wrong.
 
-    - `#scheduledAlertsModal` is group three, a `data-bs-target`.
+    - `#scheduledAlertsModal` WAS group three, a `data-bs-target`; it left this list on 2026-09-01
+      when `XTe`'s "See Scheduled Alerts" control was transcribed with its pair.
     - `alert-text-label` is the id of the "Text this out?" checkbox (`VTe`, byte 2,118,282, model
       `sendText`) and `alert-dont-cross-post-label` is "Don't cross post to linked alert rooms"
       (`WTe`, byte 2,119,672, model `dontCrossPost`). Both are in `direct-evidence-contract.ts`'s
@@ -573,18 +574,22 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
       `ScheduledAlerts.svelte`: upstream's form lets a presenter post an alert under someone else's
       name and address, so those two fields are not on the wire here and the server derives the
       sender from the session.
-    - `alert-send-later-time` and `ignoreWeekendsChk` are ids this room does not need. Upstream pairs
-      each control with a separate `<label for>`; ours WRAPS the input in its label, which associates
-      them without an id at all. A better association, not a missing one — and the only one of the
-      seven that had no reason on record anywhere before this note.
+    - `alert-send-later-time` and `ignoreWeekendsChk` **LEFT this list on 2026-09-01, and the reason
+      that held them here was a preference rather than an impossibility.** It read: *"ids this room
+      does not need. Upstream pairs each control with a separate `<label for>`; ours WRAPS the input
+      in its label … a better association, not a missing one."* Both associations are valid and the
+      wrap is arguably the more robust — but the decision is to match the dump wherever matching is
+      POSSIBLE, not wherever it is preferable, and it was possible: `PostAlertModal` is mounted at one
+      site behind `name === 'alert'`, so both ids are document-unique exactly as they are upstream.
+
+      Same measurement, same day, as the two note-modal titles — and the same one that keeps the
+      Giphy modal's `modal-basic-title` out, because that picker is mounted four times.
   */
   'app-post-alert-modal': [
     'alert-text-label',
     'alert-dont-cross-post-label',
-    'alert-send-later-time',
     'sendLaterAsEmail',
-    'sendLaterAsNick',
-    'ignoreWeekendsChk'
+    'sendLaterAsNick'
   ],
   /* `recordings` is the archive tab — blocked on an archive service, and recorded as such. */
   'app-presentationarea': ['recordings', 'recordings-tab', '#recordings', 'fa-file-video'],
@@ -665,7 +670,7 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-nine components fully covered, one hundred and seventeen values not', () => {
+  it('holds the ratchet: thirty-nine components fully covered, one hundred and fifteen values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
@@ -673,7 +678,7 @@ describe('coverage of the reference const tables', () => {
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(39);
-    expect(residuals).toBe(117);
+    expect(residuals).toBe(115);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -782,16 +787,16 @@ describe('how much of the gap has already been written about', () => {
     LIMITATION, stated because it bounds every number below: this is a substring search over the whole
     repository, so a short generic value (`spinner-border`, `visually-hidden`) can be counted as
     examined because it occurs incidentally in unrelated prose. It over-counts the examined side. It
-    cannot over-count the UNEXAMINED side, which is the side that means work, so the 88 below is a
+    cannot over-count the UNEXAMINED side, which is the side that means work, so the 86 below is a
     floor.
   */
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
-  it('splits the 117 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(117);
+  it('splits the 115 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(115);
     expect(all.filter(mentioned)).toHaveLength(29);
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(88);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(86);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

@@ -33,6 +33,75 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 23:41 UTC — PAM-08 and PAM-09's two captured ids, and the third control that keeps its wrap
+
+**Runtime impact: YES, small.** Two send-later controls in the alert composer are now associated with
+their labels by `for`/`id` rather than by being wrapped in them. Same accessible name either way; the
+labels are separately clickable now, and the DOM matches the reference.
+
+`reference-const-coverage-contract.test.ts` carried `alert-send-later-time` (byte 2,135,612) and
+`ignoreWeekendsChk` (byte 2,136,186) as residuals on one recorded reason:
+
+> ids this room does not need. Upstream pairs each control with a separate `<label for>`; ours WRAPS
+> the input in its label, which associates them without an id at all. A better association, not a
+> missing one.
+
+Both halves of that are true and the conclusion still does not follow. "Better" is a preference, and
+the standing decision is to match the dump wherever matching is POSSIBLE, not wherever it is
+preferable. **This is the fifth blocker this session that described the reference's mechanism and was
+read as a limit on what this room can do** — after `G08`, `SP2-04`, `ACA-06` and the note-modal
+titles. The pattern is the same every time and so is the cure: re-measure instead of inheriting.
+
+The measurement that makes a literal id safe is the one the note-modal titles used earlier the same
+day: an id may be a literal when its component is mounted once. `ModalHost.svelte` mounts
+`<PostAlertModal` at exactly one site, behind `open={name === 'alert'}`, so both ids are
+document-unique here exactly as they are upstream. That fact is now read from `ModalHost.svelte` by
+the contract rather than argued in prose, because it is a fact about another file.
+
+## The Repeat select keeps its wrap, and that is the more interesting half
+
+The obvious tidy-up after this change is to make all three controls consistent. The bundle says not
+to. Upstream's Repeat label const is `[1,"m-0","me-1"]` — **no `for`** — and its select const is
+`["aria-label","Repeat Scheduled Alert",1,"form-select","form-select-sm",3,"ngModelChange","ngModel"]`
+— **no `id`**. Upstream's Repeat label is unassociated: clicking it does nothing, and a screen reader
+reaches the select only through the `aria-label`. There is nothing there to transcribe, so the rule
+that moved the other two says nothing about it, and our wrap is a genuine improvement rather than a
+deviation. Asserted rather than left implicit, so the tidy-up cannot quietly delete an association.
+
+## Verification
+
+`send-later-contract.test.ts` reads the markup through a `labelIsOpenAt` predicate — "is a `<label>`
+still open at this position", which is a different question from "is there a `</label>` nearby", and
+the difference is the point: `<div class="check">` holds the checkbox and a SIBLING label, so a
+closing tag nearby proves nothing.
+
+**Seven negative controls, all seen red, each on the case it was aimed at.** Two of them were run
+because the first two did not exercise the predicate itself — they tripped a coarser `toContain`
+first, which is the "passes for the wrong reason" shape in reverse. Re-aimed: a wrap re-added INSIDE
+the surviving `<div>` fails `expected true to be false`, and the Repeat select moved out of its label
+fails `expected false to be true`. Both directions of the predicate are now proven.
+
+One control also found a defect in the test: the Repeat assertion sliced forward from the first
+`<label class="field">` in the file, so re-wrapping the DATE field made the REPEAT case fail. A
+control must fail the case it is aimed at; the slice is anchored on the Repeat caption and walked
+backwards now.
+
+`source-size-contract` refused the file at 141 (it is 182), and the raise is argued at the entry with
+the measurement behind it: **77 of the 182 lines are non-comment and non-blank, and 34 of those are
+the `<style>` block.** The growth is the decode — the consts by value, the byte offsets, the one-mount
+measurement, the Repeat reasoning — not markup. Extraction was considered and rejected: one component
+per field would cut ACROSS the reference, whose three controls are siblings in one node, and this file
+exists precisely because it followed the seam upstream already draws.
+
+`todo-next.md` restated its own totals (row 89: 140 → 181; the headline 21,080 → 21,121 of 38,527).
+`reference-const-coverage-contract` went from 6 residuals to 4 for `app-post-alert-modal`, 115 total.
+
+`pnpm run gate` in `apps/room`: **exit 0** — 323 files, 5,832 passed, 1 skipped; `svelte-check` 1,610
+files, 0 errors, 0 warnings. **The Svelte MCP has been disconnected for the remainder of this session,
+so `svelte-autofixer` did not run on `ScheduledAlertFields.svelte`.** That is a gate this repository
+requires and it was not met; `svelte-check` and the component's own render tests are what stand in its
+place, and they are not the same thing.
+
 ### 2026-09-01 22:55 UTC — two captured modal labels, and a premise that was false about our own code
 
 **Runtime impact: YES, for screen-reader users** — the carousel and file-browser dialogs now take

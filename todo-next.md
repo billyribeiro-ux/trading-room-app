@@ -132,7 +132,7 @@ guessed.
 | 86 | `lib/components/ChatArchiveLogPane.svelte` | 242 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 87 | `lib/components/NavbarTalkingIndicator.svelte` | 133 | `NavbarTalkingIndicator.svelte` — `NPe`/`LPe` transcribed with BOTH arms 2026-09-01, `G08` built: `presenterTalking` defaults FALSE as upstream (bytes 1,114,654 / 1,129,852) and is flipped by the two room commands at byte 1,014,971. |
 | 88 | `lib/components/ConnectivityModal.svelte` | 893 | `connectivity-audience-contract.test.ts`, `connectivity-test-contract.test.ts`, `connectivity-status-rows.test.ts`, `troubleshooter-retained-contract.test.ts` and `mobile-restore-contract.test.ts` — `app-webrtc-troubleshooter`, read against the v4 bundle across CONN-01…CONN-04 and pinned by five contracts that all moved onto this file when it left `ModalHost.svelte` on 2026-09-01. |
-| 89 | `lib/components/ScheduledAlertFields.svelte` | 140 | `send-later-contract.test.ts` — PAM-07, PAM-08 and PAM-09, the send-later date, repeat and weekend fields with their decoded consts (59, 60, 61, 64, 66, 67, 68). Extracted from `ScheduledAlerts.svelte` on 2026-09-01; the field-level assertions moved with the literals. |
+| 89 | `lib/components/ScheduledAlertFields.svelte` | 181 | `send-later-contract.test.ts` — PAM-07, PAM-08 and PAM-09, the send-later date, repeat and weekend fields with their decoded consts (59, 60, 61, 64, 66, 67, 68). Extracted from `ScheduledAlerts.svelte` on 2026-09-01; the field-level assertions moved with the literals. Grew 140 → 181 the same day when PAM-08's and PAM-09's captured ids were transcribed and the two wraps became `for`/`id` pairs — the added lines are the decode, not the markup. |
 | 56 | `lib/components/ChatSearchBar.svelte` | 450 | no |
 | 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 | 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
@@ -164,7 +164,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**51 of 89 surfaces audited · 21,080 of 38,486 lines · 54.8%.**
+**51 of 89 surfaces audited · 21,121 of 38,527 lines · 54.8%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

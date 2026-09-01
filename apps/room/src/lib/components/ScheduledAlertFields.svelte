@@ -66,11 +66,34 @@
   NOTE: All times should be on <span class="tz-underline">your local time zone</span>
 </p>
 <div class="row">
-  <label class="field">
-    <!-- PAM-09 — `d(8,"label",61), v(9,"Send on this date & time:")`, const 61 `[1,"me-1"]`. -->
-    <span>Send on this date &amp; time:</span>
-    <input type="datetime-local" bind:value={sendOnLocal} disabled={busy} />
-  </label>
+  <div class="field">
+    <!--
+      PAM-09 — `d(8,"label",61), v(9,"Send on this date & time:")`, const 61 `[1,"me-1"]`, and the
+      field is
+      `["type","datetime-local","id","alert-send-later-time","name","alert-send-later-time",3,…]`
+      at byte 2,135,612 — `id` and `name`, both the same string.
+
+      ## The id is TRANSCRIBED since 2026-09-01, and the reason it was not is worth keeping
+
+      This wrapped the input in its `<label>`, which associates the two without an id at all, and
+      the const sweep recorded that as *"a better association, not a missing one"*. Both are valid
+      and the wrap is arguably the more robust — but "better" is a preference, and the decision here
+      is to match the dump wherever matching is possible rather than wherever it is preferable.
+
+      It IS possible: `PostAlertModal` is mounted at one site, gated on `name === 'alert'`, so the
+      id is document-unique exactly as it is upstream. That is the same measurement that let the two
+      note-modal titles take their captured ids — and the same one that keeps the Giphy modal's,
+      whose picker is mounted four times, out.
+    -->
+    <label class="me-1" for="alert-send-later-time">Send on this date &amp; time:</label>
+    <input
+      type="datetime-local"
+      id="alert-send-later-time"
+      name="alert-send-later-time"
+      bind:value={sendOnLocal}
+      disabled={busy}
+    />
+  </div>
 
   <label class="field">
     <!-- PAM-09 — `d(12,"label",64), v(13,"Repeat:")`, const 64 `[1,"m-0","me-1"]`. -->
@@ -97,11 +120,29 @@
   </label>
 
   {#if weekendsApply}
-    <label class="check">
-      <input type="checkbox" bind:checked={ignoreWeekends} disabled={busy} />
-      <!-- PAM-08 — `v(3,"Ignore weekends?")` at byte 2,120,631. Ours read "Skip weekends". -->
-      <span>Ignore weekends?</span>
-    </label>
+    <!--
+      PAM-08 — `v(3,"Ignore weekends?")` at byte 2,120,631; ours read "Skip weekends".
+
+      ```js
+      ["type","checkbox","id","ignoreWeekendsChk",1,"form-check-input",3,"ngModelChange",…]
+      ["for","ignoreWeekendsChk"]                                        // byte 2,136,186
+      ```
+
+      Un-wrapped and given the captured id for the reason the date field above records. The
+      `form-check-input` class comes with the const and is carried; `.check` stays because it is
+      this component's own layout and the reference's own wrapper const is `[1,"form-check","mb-2"]`,
+      which this room's scoped sheet does not implement.
+    -->
+    <div class="check">
+      <input
+        type="checkbox"
+        id="ignoreWeekendsChk"
+        class="form-check-input"
+        bind:checked={ignoreWeekends}
+        disabled={busy}
+      />
+      <label for="ignoreWeekendsChk">Ignore weekends?</label>
+    </div>
   {/if}
 </div>
 

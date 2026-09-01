@@ -39,6 +39,11 @@ const FIELDS = readFileSync(
 const code = (text: string) =>
   text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
 
+const BUNDLE = readFileSync(
+  new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url),
+  'utf8'
+);
+
 const modal = code(MODAL);
 const pane = code(PANE);
 const fields = code(FIELDS);
@@ -184,5 +189,141 @@ describe('PAM-11 — scheduling asks first, and it used to happen on one click',
     expect(pane).toContain('onconfirm: (message: string, accept: () => void) => void;');
     expect(modal).toContain('{onalert}');
     expect(modal).toContain('{onconfirm}');
+  });
+});
+
+/**
+ * Is a `<label>` still OPEN at `index` — i.e. is the control there WRAPPED by one?
+ *
+ * The question the two ids turn on, and it is not the same question as "is there a `</label>`
+ * nearby". `<div class="check">` holds the checkbox and a SIBLING `<label for>`, so a nearby closing
+ * tag proves nothing either way; what matters is whether the most recent label tag before the
+ * control opened one or closed one.
+ *
+ * `fields` already has its comments stripped by `code()`, and the strip here is a second one on
+ * purpose: this predicate takes a raw source string, and this component's docblocks quote both forms
+ * of the markup they explain — an unclosed `<label` inside prose would otherwise answer for the code
+ * at whichever call site forgot.
+ */
+const labelIsOpenAt = (source: string, index: number) => {
+  expect(index, 'the control must be findable').toBeGreaterThan(-1);
+  const before = source.slice(0, index).replace(/<!--[\s\S]*?-->/g, '');
+  return before.lastIndexOf('<label') > before.lastIndexOf('</label>');
+};
+
+describe('PAM-08 and PAM-09 — the two captured ids, TRANSCRIBED 2026-09-01', () => {
+  /*
+    ── A PREFERENCE IS NOT AN IMPOSSIBILITY ────────────────────────────────────────────────────────
+
+    `reference-const-coverage-contract.test.ts` listed both ids as residuals with this reason:
+
+    > ids this room does not need. Upstream pairs each control with a separate `<label for>`; ours
+    > WRAPS the input in its label, which associates them without an id at all. A better association,
+    > not a missing one.
+
+    Both associations are valid HTML and the wrap is arguably the more robust — there is no id to
+    break. But "better" is a preference, and the decision here is to match the dump wherever matching
+    is POSSIBLE rather than wherever it is preferable.
+
+    It was possible, and the measurement is the same one that settled the note-modal titles the same
+    day: an id may be a literal when its component is mounted once. `PostAlertModal` is mounted at a
+    single site behind `name === 'alert'`, so both are document-unique exactly as upstream's are.
+  */
+
+  it('reads both consts, with the id AND name the datetime field carries', () => {
+    expect(BUNDLE).toContain(
+      '["type","datetime-local","id","alert-send-later-time","name","alert-send-later-time",' +
+        '3,"ngModelChange","ngModel"]'
+    );
+    expect(BUNDLE).toContain(
+      '["type","checkbox","id","ignoreWeekendsChk",1,"form-check-input",3,"ngModelChange",' +
+        '"ngModel","ngModelOptions"]'
+    );
+    expect(BUNDLE).toContain('["for","ignoreWeekendsChk"]');
+  });
+
+  it('pairs each control with its own label, as the reference does', () => {
+    expect(fields).toContain('<label class="me-1" for="alert-send-later-time">');
+    expect(fields).toContain('id="alert-send-later-time"');
+    expect(fields).toContain('name="alert-send-later-time"');
+    expect(fields).toContain('<label for="ignoreWeekendsChk">Ignore weekends?</label>');
+    expect(fields).toContain('id="ignoreWeekendsChk"');
+    /* `form-check-input` comes with the const and is carried. */
+    expect(fields).toContain('class="form-check-input"');
+  });
+
+  it('and no longer WRAPS the two of them, because two associations would be one too many', () => {
+    /*
+      Leaving the wrap in place beside a `for` is not an error, and that is exactly why it is worth
+      asserting: it would be invisible. One control, one label, one association.
+
+      Scoped to the two controls this describe block is about, and the scoping is the finding. The
+      first version of this assertion refused `<label class="field">` outright and went red on the
+      REPEAT select, which is a different case and keeps its wrap deliberately — see the test below.
+      A contract that refuses a construct everywhere is not evidence about the construct here.
+    */
+    expect(fields).toContain('<div class="field">');
+    expect(fields).toContain('<div class="check">');
+    expect(labelIsOpenAt(fields, fields.indexOf('type="datetime-local"'))).toBe(false);
+    expect(labelIsOpenAt(fields, fields.indexOf('type="checkbox"'))).toBe(false);
+  });
+
+  it('leaves the REPEAT select wrapped, because upstream has nothing to transcribe there', () => {
+    /*
+      ── THE ONE CONTROL WHERE THE WRAP IS AN IMPROVEMENT AND STAYS ──────────────────────────────
+
+      ```js
+      d(12,"label",64), v(13,"Repeat:")
+      64  [1,"m-0","me-1"]
+      ["aria-label","Repeat Scheduled Alert",1,"form-select","form-select-sm",3,"ngModelChange",
+       "ngModel"]
+      ```
+
+      The label const carries no `for` and the select const carries no `id`. Upstream's Repeat label
+      is UNASSOCIATED — clicking it does nothing and a screen reader reaches the select only through
+      its `aria-label`. There is no id to transcribe, so the rule that moved the two ids above ("match
+      the dump wherever matching is possible") says nothing here, and the wrap is a real improvement
+      over the reference rather than a deviation from it.
+
+      Asserted rather than left implicit because the obvious tidy-up — "make all three consistent" —
+      would delete an association and gain nothing.
+    */
+    expect(BUNDLE).toContain('["aria-label","Repeat Scheduled Alert",1,"form-select",');
+    expect(BUNDLE).not.toContain('"Repeat Scheduled Alert","id"');
+    /*
+      Anchored on the Repeat span and walked BACKWARDS to the label that opens it, not forwards from
+      the first `<label class="field">` in the file. Under the negative control for the test above —
+      re-wrapping the datetime field — a forward slice found THAT label and this case failed for a
+      reason that had nothing to do with Repeat. A control must fail the case it is aimed at.
+    */
+    const span = fields.indexOf('<span>Repeat:</span>');
+    expect(span, 'the Repeat caption must be findable').toBeGreaterThan(-1);
+    const opening = fields.lastIndexOf('<label class="field">', span);
+    expect(opening, 'the Repeat label must be findable').toBeGreaterThan(-1);
+    const closing = fields.indexOf('</label>', opening);
+    expect(closing, 'the Repeat label must be closed').toBeGreaterThan(-1);
+    const wrap = fields.slice(opening, closing);
+    /*
+      The same predicate the test above uses, asserted TRUE here, and asserted FIRST so that an
+      unwrap trips it rather than tripping a string case on the way past. That is what makes it a
+      measurement rather than a spelling check: one call site says "no label is open at this
+      control", the other says "one is", and no predicate that always answers the same way satisfies
+      both.
+    */
+    expect(labelIsOpenAt(fields, fields.indexOf('aria-label="Repeat Scheduled Alert"'))).toBe(true);
+    expect(wrap).toContain('<span>Repeat:</span>');
+    expect(wrap).toContain('aria-label="Repeat Scheduled Alert"');
+    expect(wrap).not.toContain('for=');
+  });
+
+  it('the PREMISE that makes the ids safe — one mount, one modal name', () => {
+    /*
+      A fact about another file, so it is read rather than argued. A second `<PostAlertModal>`, or a
+      `{#each}` around it, would put two of each id in one document while every word of the reasoning
+      above still read as true.
+    */
+    const host = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
+    expect(host.match(/<PostAlertModal\b/g) ?? []).toHaveLength(1);
+    expect(host).toContain("open={name === 'alert'}");
   });
 });

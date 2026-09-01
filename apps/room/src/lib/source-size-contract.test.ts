@@ -7421,7 +7421,48 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this climbs, the question is whether SCHEDULING RULES have arrived in it. They must not:
       `#lib/scheduled-alert.ts` owns the arithmetic and is pure.
     */
-    max: 141,
+    /*
+      RAISED 141 -> 182 on 2026-09-01, for `PAM-08` and `PAM-09`'s two captured ids, and argued here
+      rather than extracted because THERE IS NO SEAM AND THE GROWTH IS NOT CODE.
+
+      ## What the change was
+
+      Both ids — `alert-send-later-time` (byte 2,135,612) and `ignoreWeekendsChk` (byte 2,136,186) —
+      were carried as residuals with the reason *"a better association, not a missing one"*: this
+      component WRAPPED each control in its `<label>`, which associates the two with no id at all.
+      That is a preference, and the standing decision is to match the dump wherever matching is
+      possible. It was possible — `PostAlertModal` is mounted once, behind `name === 'alert'`, so
+      each id is document-unique exactly as upstream's is. Two wraps became two `for`/`id` pairs.
+
+      ## Why the number moved 41 and the code moved four attributes
+
+      Measured, not estimated: 182 lines total, **77** of them non-comment and non-blank, and 34 of
+      those 77 are the `<style>` block. The other 105 lines are the decode — the two consts quoted by
+      value, the byte offsets, the one-mount measurement that makes a literal id safe, and the
+      recorded reason the REPEAT select keeps its wrap while these two lost theirs (its label const
+      is `[1,"m-0","me-1"]` with no `for` and its select const carries no `id`, so upstream's Repeat
+      control is unassociated and there is nothing there to transcribe).
+
+      Shortening that is the one thing the root standard forbids in as many words: *"The comments are
+      a deliberate practice. Never shorten them to look tidy."* A rule with no recorded WHY gets
+      re-wrapped by the next engineer tidying up three inconsistent-looking form controls.
+
+      ## Why not extract, when this entry's own rule is extract-first
+
+      The alternative is one component per field, and that cuts across the reference instead of along
+      it: upstream's three controls are siblings in ONE node (`app-post-alert-modal`'s send-later
+      block), and this file exists precisely because the seam it followed — pane versus fields — was
+      the seam upstream already draws. There is no second one inside it. The three fields share no
+      logic to lift either: `weekendsApply` is four tokens, and the arithmetic is already out in
+      `#lib/scheduled-alert.ts`.
+
+      The ceiling stands at the file's measured size, so the next line still has to argue for itself.
+      `send-later-contract.test.ts` reads this markup through a `labelIsOpenAt` predicate asserted
+      FALSE at the two transcribed controls and TRUE at the Repeat select; both directions were put
+      through a negative control on 2026-09-01 — a wrap re-added inside the surviving `<div>`, and the
+      Repeat select moved out of its label — and each was seen red. A silent re-wrap is caught.
+    */
+    max: 182,
     why: 'the send-later date, repeat and weekend fields, decoded from app-post-alert-modal'
   },
   {
