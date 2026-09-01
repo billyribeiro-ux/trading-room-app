@@ -476,8 +476,23 @@ built. Nothing else would say so.
 
 | consumer | byte | what is missing |
 | --- | --- | --- |
-| transcript window title (`name`) | 1,958,716 and 2,532,633 | `openTranscript` passes the room name as a `&name=` query parameter to the transcript popup. Blocked with the transcript window itself, which this room does not open. |
-| private-chat tab flasher (`name`) | 2,207,601 | On an unread private message the title alternates between `"<sender> messaged you - <room>"` and the room name on a timer, and stops on focus. Needs the private-message unread signal, not the title. |
+| transcript window title (`name`) | 1,958,716 and 2,532,633 | `openTranscript` passes the room name as a `&name=` query parameter to the transcript popup. Blocked with the transcript window itself, which this room does not open — `alerts-pane.ts:239` raises `TRANSCRIPT_UNAVAILABLE` instead. |
 
-`moderator-message-contract.test.ts` asserts that neither has quietly appeared on the page, so adding
-one without deleting its row here fails a test rather than going unrecorded.
+**ONE row, not two, corrected 2026-09-01.** The private-chat tab flasher was built on 2026-08-30
+(surface-audit row `G27`) and this table still listed it. `moderator-message-contract.test.ts` caught
+the build the day it happened — its assertion went red, which is what it was for, and its docblock has
+said *"it was two"* ever since. **This document did not follow**, which is the failure it warns about
+in its own header: two places recording one thing, and the stale one is always the summary.
+
+The row was also wrong about what the feature needed. It said *"needs the private-message unread
+signal, not the title"*; the reference's gate is
+`(!$("#textAreaTxtPM").is(":focus") || !window.onfocus) && !e.isMine` — **composer FOCUS**, not an
+unread count. `private-chat.svelte.ts` uses `#composerHasFocus()` accordingly, and
+`private-chat-title-flash.ts` owns the interval and the title. Recorded because a blocker naming the
+wrong prerequisite is worse than one naming a real prerequisite: it sends the next reader to build
+something the feature never wanted.
+
+`moderator-message-contract.test.ts` asserts the remaining one has not quietly appeared on the page,
+so adding it without deleting its row here fails a test rather than going unrecorded. The flasher's
+half of that assertion moved to `private-chat-strip-contract.test.ts`, which asserts the string IS
+present — so between them the two still say where it may and may not appear.

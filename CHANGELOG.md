@@ -33,6 +33,51 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 19:05 UTC — a stale triage row, and the gate that would have caught it two days ago
+
+**Runtime impact: NO** — one document corrected and one contract case added.
+
+`missing-settings-triage.md`'s *"Consumers still unbuilt behind an ANSWERED setting"* listed two
+rows. One of them, the private-chat tab flasher, was **built on 2026-08-30** — surface-audit row
+`G27`, `private-chat-title-flash.ts`, wired through `private-chat.svelte.ts` and covered by
+`private-chat-strip-contract.test.ts`.
+
+`moderator-message-contract.test.ts` caught the build on the day it happened: its assertion went red,
+which is what it was for, and its docblock has read *"ONE CONSUMER IS NOT BUILT — it was two"* ever
+since. **The document did not follow**, and nothing noticed for two days.
+
+## Why the existing tripwire could not have caught it
+
+It fires on the CODE — "has the page quietly grown this consumer?" — and says nothing about whether
+the DOCUMENT that records the gap was updated. So the half that went stale was the half nothing read.
+
+`missing-command-census-contract.test.ts` does not have this problem for the commands triage, and its
+own header states the rule: *"the triage cannot go stale. This file could, and did."* The settings
+triage had no equivalent. It has one now: the section is parsed, its table ROWS are counted, and the
+one consumer it still lists is checked at the code — `alerts-pane.ts` raises `TRANSCRIPT_UNAVAILABLE`
+rather than opening a transcript window, so there is no `&name=` to pass.
+
+Both directions were controlled: re-adding the flasher's row fails on the count, and building the
+transcript window fails on the code read.
+
+## The row was also wrong about what the feature needed
+
+It said the flasher *"needs the private-message unread signal, not the title"*. The reference's gate
+is `(!$("#textAreaTxtPM").is(":focus") || !window.onfocus) && !e.isMine` — **composer FOCUS**, not an
+unread count — and that is what `#composerHasFocus()` implements. Recorded because a blocker naming
+the wrong prerequisite is worse than one naming a real prerequisite: it sends the next reader to
+build something the feature never wanted. The unread signal does exist (`#unreadByPeer`), which is
+what made the stale row look plausible on a quick read.
+
+## The self-reference trap, for the fourth time
+
+The new assertion first read the whole section and went red on **this correction's own prose**, which
+names the flasher while explaining that it was built. Fixed at the assertion's target rather than by
+loosening the string: the table ROWS are what the document claims, and the paragraphs around them are
+what explain the claim.
+
+Room gate exit 0.
+
 ### 2026-09-01 18:20 UTC — a browser answered the last evidence gap, and it had been costing four declarations
 
 **Runtime impact: YES** — every carousel saved through the note editor was losing its black backing,
