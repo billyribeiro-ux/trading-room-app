@@ -33,6 +33,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 04:25 UTC — a hidden card with two inert controls, and the sentence that said it wasn't there
+
+**Runtime impact: NONE.** The card was and remains invisible; what changed is that its state is now
+argued and gated instead of accidental.
+
+## What the new audit script found on its second batch
+
+Twelve surfaces run through `gate/audit-surface.mjs`. **Seven measured clean** —
+`app-muted-users-modal`, `app-mobile-app-info-modal`, `app-positions-container`,
+`app-scheduled-alerts-modal`, `app-webcam-holder`, `app-followed-users-modal`,
+`app-alert-filter-modal` — zero absent const values and zero absent text literals each.
+`app-alert-send-report-modal`'s nineteen are the `RPT-*` refusal, already argued in
+`alert-report-modal-contract.test.ts` against a system with no per-recipient delivery record.
+
+`app-rec-preview` reported three, and the read behind them found a defect the three did not name.
+
+## The card nothing could see
+
+`ModalHost.svelte` rendered `app-rec-preview` whole — holder, title, close icon, expand icon,
+"Recording paused." — and **every part of it was unreachable**. `.recsHolderScreen` carries
+`display: none`, which is the reference's own rule, and nothing in this room ever removes it: one
+markup site, no gate, no class toggle, no writer. The two icons had no handlers at all; upstream both
+are `x("click", …)` on `closePreview()` and `expandPreview()`, with the expand icon swapping to
+`fa-compress-arrows-alt` under `O(8, expandRecPreview ? 8 : 9)`.
+
+And the reason recorded for the two residuals ended: *"**No card**, so no element to carry either
+name."* There was a card. That is the ninth claim this session that was false about this repository's
+own code, found the same way as the rest — by measuring instead of reading the note.
+
+## Deleting it was wrong, and the gate said so
+
+The card was removed, and `captured-css-ancestor-contract` went red: `app-rec-preview` is a scoped
+host in the GENERATED stylesheet, so an absent host leaves its rules matching nothing and those
+components *"ship unstyled and silently"*. The generated sheet is regenerated from the capture and
+cannot be trimmed by hand, so the host is what keeps its rules attached to an element. Restored.
+
+## What replaces the deletion
+
+`RecordingPreviewCard.svelte` — extracted, because `source-size-contract` refused `ModalHost.svelte`
+the forty lines the decision costs and that rule's answer is extract, not raise. Eleven lines of
+markup and forty of why.
+
+`rec-preview-contract.test.ts` asserts the **conditional**, not the absence: *the icons may stay
+handler-less only while the card cannot be reached.* A test asserting "we did not build it" passes
+forever and stops nobody. `reachable` is computed from the two facts — the `display: none` rule and
+the presence of a gate — so it cannot be satisfied by editing a constant. The day somebody makes this
+card visible, the handlers become required.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 329 files, 5,926 passed, 1 skipped; `svelte-check` 1,620
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+**Four negative controls on the conditional, and the fourth stayed green.** Renaming
+`showRecPreview` did not fail, because the method's own docblock quotes `showRecPreview()` two lines
+above the declaration — the eighth time this session a check's subject matched the prose recording
+it. Comments stripped, it is red. The other three — the rule removed, a gate added, the host renamed
+— were red on target.
+
+`todo-next.md`: 57 of 92 surfaces, 23,152 of 38,857 lines (59.6%). The const sweep's examined split
+moved 32/79 → 34/77, both moves caused by audits rather than prose.
+
 ### 2026-09-02 03:51 UTC — the surface audit becomes a script and a ratchet, and substring matching cost a control
 
 **Runtime impact: NONE.** A new gate script, a new contract, and three surfaces pinned. No shipped

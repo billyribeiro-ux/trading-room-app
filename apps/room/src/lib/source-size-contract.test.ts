@@ -7536,6 +7536,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: "the login page while a sign-in is in flight - app-session-login's other root arm"
   },
   {
+    file: 'lib/components/RecordingPreviewCard.svelte',
+    /*
+      NEW 2026-09-01, and it is a DOCUMENT rather than a component — which is the only reason a static
+      card with no props is one at all.
+
+      `app-rec-preview` (byte 2,353,175) transcribed whole: the holder, the title, a close icon, an
+      expand icon and "Recording paused.". Eleven lines of markup and forty of why, and the forty are
+      the point: this card is UNREACHABLE — `.recsHolderScreen` is `display: none`, the reference's own
+      rule, with no writer in this room — and it stays anyway, because `captured-css-ancestor-contract`
+      goes red without it: `app-rec-preview` is a scoped host in the generated stylesheet, so an absent
+      host leaves its rules matching nothing.
+
+      It left `ModalHost.svelte` because that file was refused the forty lines, and this entry's own
+      rule is extract rather than raise. The seam is real: the decision is about ONE captured
+      component and nothing else in the host reads it.
+
+      `rec-preview-contract.test.ts` asserts the CONDITIONAL rather than the absence — the icons may
+      stay handler-less only while the card cannot be reached. If this file climbs, the question is
+      whether it has grown a HANDLER, which would mean the card became reachable and the whole
+      argument here needs rewriting rather than extending.
+    */
+    max: 61,
+    why: 'the recording preview card - app-rec-preview, transcribed, unreachable, and argued'
+  },
+  {
     file: 'lib/components/ScheduledAlertFields.svelte',
     /*
       Created 2026-09-01 and capped at what it landed at, extracted from `ScheduledAlerts.svelte`

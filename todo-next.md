@@ -74,7 +74,7 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,068 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,058 | no |
 | 2 | `routes/+page.svelte` | 1,888 | no |
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,541 | no |
@@ -135,6 +135,7 @@ guessed.
 | 89 | `lib/components/ScheduledAlertFields.svelte` | 217 | `send-later-contract.test.ts` — PAM-07, PAM-08 and PAM-09, the send-later date, repeat and weekend fields with their decoded consts (59, 60, 61, 64, 66, 67, 68). Extracted from `ScheduledAlerts.svelte` on 2026-09-01; the field-level assertions moved with the literals. Grew 140 → 181 the same day when PAM-08's and PAM-09's captured ids were transcribed and the two wraps became `for`/`id` pairs — the added lines are the decode, not the markup. PAM-11 the same day: seven captured classes the const SWEEP cannot report — it searches the whole application, so `form-select`, `d-flex` and `m-0` count as present while being absent from THIS component. The Repeat select had no classes at all. Three hand-written local rules came out with them. |
 | 90 | `routes/+error.svelte` | 158 | `error-page-contract.test.ts` + `app-html-contract.test.ts` — the page every refusal in this app lands on, NEW 2026-09-01. Built from `app-kicked-page`'s three captured consts (byte 2,561,780) after the `app-closed-session-page` residuals were re-measured: this app had no error boundary at all, so the closed room's presenter-written sentence and 123 other refusals rendered SvelteKit's unstyled fallback. The reference's `closed-container` (byte 2,573,542) is deliberately NOT reproduced — it matches no rule in the 444,793-byte captured sheet and its `innerHTML` is a stored-XSS surface. `src/error.html` is its other half, for errors thrown in `handle`. Both verified in a browser. |
 | 91 | `lib/components/SessionLoadingView.svelte` | 69 | `session-login-loading-contract.test.ts` — `gde`, `app-session-login`'s OTHER root arm (byte 1,170,863: five declarations, no variables), built 2026-09-01. The reference's root template swaps the whole page on `logginIn`; this room had only the form arm, plus a " Connecting " button label taken from `mue` INSIDE the arm that swap replaces — markup upstream ships and can never paint. Both gates re-read against the pinned bundle on every run. |
+| 92 | `lib/components/RecordingPreviewCard.svelte` | 60 | `rec-preview-contract.test.ts` — `app-rec-preview` (byte 2,353,175) transcribed whole, extracted from `ModalHost.svelte` 2026-09-01. UNREACHABLE by design: `.recsHolderScreen` is `display: none`, the reference's own rule, with no writer in this room, because this room's preview is a separate WINDOW (`room/recording.ts`). It stays because `captured-css-ancestor-contract` goes red without it — an absent scoped host leaves its generated rules matching nothing. The contract asserts the CONDITIONAL, not the absence: the two icons may stay handler-less only while the card cannot be reached. |
 | 56 | `lib/components/ChatSearchBar.svelte` | 450 | `surface-audit-contract.test.ts`, `chat-search-contract.test.ts`, `chat-mode-contract.test.ts` — READ END TO END 2026-09-01 against `app-chat`'s `chatToolbar` region (bytes 1,449,150–1,451,150; the extra column's copy at 2,395,378 is byte-identical, which is why this room has ONE component and the size contract refused the second transcription). **CLEAN — zero absent const values, zero absent text literals**, across 27 resolved views. Pinned as a ratchet, so a regression is a failing test rather than a thing somebody has to notice. |
 | 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 | 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
@@ -166,7 +167,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 114 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**56 of 91 surfaces audited · 23,092 of 38,807 lines · 59.5%.**
+**57 of 92 surfaces audited · 23,152 of 38,857 lines · 59.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
