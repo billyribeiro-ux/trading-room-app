@@ -80,14 +80,14 @@ guessed.
 | 4 | `lib/components/AlertChatArea.svelte` | 1,532 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,254 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,093 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
-| 7 | `lib/components/PresentationArea.svelte` | 1,105 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
+| 7 | `lib/components/PresentationArea.svelte` | 1,107 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,183 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
 | 10 | `lib/components/EmojiPicker.svelte` | 858 | `## EmojiPicker.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against |
 | 11 | `lib/components/PollPanel.svelte` | 897 | `poll-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-poll-modal` (selector at byte 2,112,472), all 53 consts decoded BY VALUE and swept against `PollPanel` + `PollSavedList`. ZERO gaps; one recorded divergence (the loader's `../../assets/` path). The finding is the `app-poll-modal` ANCESTOR: all 17 style rules are scoped to it in the generated sheet, so deleting the wrapper unstyles the panel with nothing else noticing. |
 | 12 | `lib/components/RoomSidebar.svelte` | 887 | `roster-identity-contract.test.ts` — read end to end 2026-08-31 against `app-room-roster` (byte 2,038,159), all 24 consts decoded BY VALUE. Twenty built; the four absent are `RS-03`/`RS-04`, blocked on a server-side supply. Three CITATIONS were wrong (`C2e`→`E2e`, `u2e`→`g2e`, and a bundle this repo does not hold) and the `{#each}` key's equivalence to upstream's `userXrefID` was unrecorded. |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
-| 14 | `lib/components/ScreenPane.svelte` | 684 | `## ScreenPane.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with |
+| 14 | `lib/components/ScreenPane.svelte` | 726 | `## ScreenPane.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with |
 | 15 | `lib/components/PostAlertModal.svelte` | 656 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 761 | §XCP — 9 rows against `app-extra-chat` read whole: 3 built, 3 fixed, 1 measured refusal, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 638 | `## DayTradeAlertsPane.svelte` in the v4 register — **5 rows. |
@@ -160,11 +160,11 @@ guessed.
 | 80 | `lib/components/PositionsControls.svelte` | 44 | no |
 | 81 | `routes/logout/+page.svelte` | 31 | no |
 | 82 | `routes/+layout.svelte` | 27 | no |
-| 83 | `lib/components/ScreenPaneStatus.svelte` | 111 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
+| 83 | `lib/components/ScreenPaneStatus.svelte` | 167 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**51 of 89 surfaces audited · 20,919 of 38,094 lines · 54.9%.**
+**51 of 89 surfaces audited · 21,019 of 38,194 lines · 55.0%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

@@ -33,6 +33,127 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 13:40 UTC — `SP2-04` BUILT, `RNB-01` reclassified, and a sweep defect the new text exposed
+
+**Runtime impact: YES** — a presenter sharing a screen now sees the reference's invitation instead of
+their own capture, and the `<video>` takes no `srcObject` until they click.
+
+## `SP2-04` — the local-preview invitation, and the refusal was about OUR choice
+
+`W0e` is the yellow line a presenter gets over their own screen:
+`" (You are sharing your screen as " + screenName + " click here for larger preview) "`, const 11
+`[1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]`. It was recorded as *"it cannot be reached in
+this application"*, and `ScreenPane.svelte` said the gate is *"FALSE by construction here: our own
+screens render from the local capture, i.e. we always local-preview"*.
+
+**Both sentences describe a choice this room made and then read back as a property of the reference.**
+`#addLocalScreen` attached our own capture eagerly; that is what made
+`isPresentingThisScreen && !localpreview` unreachable. Upstream's default is the opposite, and the
+five occurrences of `localpreview` say so:
+
+    this.localpreview = !1                          byte 1,494,561   the default
+    largePreview(){ this.localpreview = !0; …
+      i.srcObject = e.localStream; i.play();
+      this.isConnected = !0 }                       byte 1,499,849   its only writer
+    O(3, isScreenSharing && localSharingStreams[…]
+         && !localpreview ? 3 : -1)                 byte 1,501,588   the gate
+
+The load-bearing measurement is the THREE writers of `isConnected` — `newScreenStream` (1,497,433),
+the `playing` listener (1,498,827), and `largePreview` (1,500,073). Two are the remote paths, so
+**exactly one is reachable for a screen you share yourself**, and upstream is therefore not connected
+to its own screen until you ask. A fourth writer would change the answer, which is why all three are
+pinned by byte rather than counted.
+
+Why upstream bothers, which is what makes this worth matching rather than merely matching: decoding
+your own capture into a `<video>` is a second live decode of a picture already on your monitor, on the
+machine that is also encoding and uploading it. A presenter sharing three screens paid for three.
+
+Built as: `RoomScreens.#localPreviews`, a `$state.raw` list keyed by producer id beside `#detachedHere`;
+`ScreenPaneStatus` renders node 3 between `Video Disabled` and `Connecting To Screen of`, which is
+where the create block puts it; `ScreenPane`'s attachment withholds the `srcObject` until the flag
+flips. **Both halves matter** — drawing the invitation while still attaching would reproduce the
+markup and none of the point.
+
+**One line this room needs and the reference does not.** Upstream's flag dies with the component;
+ours is room-lived, and `restartLocalScreens` re-produces the same capture onto a NEW producer id. So
+`screenRemoved` forgets it, beside the three ids it already forgets — one place, not four callers each
+remembering. The idempotence case catches the leak: it opts in three times, removes once, and asserts
+the flag is gone.
+
+## `RNB-01` reclassified from a refusal to a false gap, and the hole in its own method closed
+
+"It occurs three times" proves nothing about a framework that can write fields without naming them.
+`app-room`'s class body is now searched for all four bulk-write shapes — `Object.assign(this`, a
+`for…in`, a computed `this[key] =`, and its three `Object.keys` calls (all webcam bookkeeping). With
+those ruled out, `hasSTHelpLink` really is initialised false and never written, so **upstream's own
+room never renders the Intercom link either**: the DOMs agree, and this is a false gap, not a choice
+we made differently.
+
+`app-room`'s four residuals are now asserted as a PARTITION — three false gaps, one missing asset —
+so a fifth cannot be waved through by a paragraph written about four others. The asset half reads the
+directory rather than assuming: `static/assets/images/` has no `playing.gif`, and the capture has no
+images at all.
+
+## A sweep defect the new text exposed, reported rather than banked
+
+`#ffcc00` closed honestly — `app-screenshare-view` is fully covered now, 36 → **37** components.
+`larger` also "closed", and did not: it is a `font-size` VALUE on `app-session-login`
+(`[2,"text-decoration","underline","font-size","larger"]`, byte 1,208,985), and the sweep's rule is
+`ours.includes(value)`, which cannot tell a rendered value from an English word. Our new
+` click here for larger preview) ` collided with it.
+
+**A collision, not a closure**, and the fourth of that shape this repository has paid for. Banking it
+as coverage would have been a free number. Instead the row is replaced by a case asserting BOTH halves
+— that the collision is real, and that we still ship no `font-size: larger` anywhere — so if the
+invitation is ever reworded, the residual returns and this case failing is how anyone finds out.
+
+Residuals 123 → **121**.
+
+## Four ceilings RAISED, and they are raises rather than extractions
+
+Argued at each entry, which is what those entries' own history requires. The feature is about forty
+lines over four files that are already the right four: the flag belongs with the other per-screen ids,
+the invitation with the other status headings, the gate with the other gates, the wiring at the call
+site. There is no slice that is not one of those.
+
+**What was extracted is the reasoning.** The first draft wrote the five `localpreview` readings and the
+three `isConnected` writers out FOUR times. They live once now, in `screen-pane-contract.test.ts`'s
+`SP2-04` block, which re-reads every offset against the pinned bundle on each run; each site carries
+the sentence its maintainer needs and points there. That is this repository's own rule — *moving an
+explanation to the code it explains is the extraction itself* — applied to a decode rather than markup.
+
+## Two gates caught bookkeeping, and one caught a real defect in a new test
+
+`emoji-screen-citation-contract` refused seven byte offsets no case re-read. Correcting them found
+that every offset I had cited was the position of the bare NAME rather than the start of the needle —
+five characters off in three places. All seven are pinned now.
+
+`slice-anchor-contract` refused two inline `indexOf` bounds. `indexOf` answers -1 and `slice(-1)` is
+the last character, so a renamed method would have quietly reduced a case to asserting that one
+character contains a whole statement.
+
+And the ordering case in `SP2-04` was **wrong when first written**: it compared
+`status.indexOf('offerLargePreview')`, which finds the PROP DECLARATION in the script block, against
+markup positions — 189 > 739, measuring the interface instead of the order. It matches `{#if
+offerLargePreview}` now.
+
+## Verification
+
+Five negative controls, each seen RED then restored: attach eagerly again; drop the `screenRemoved`
+cleanup; make `largePreview` non-idempotent (caught by the three-clicks-one-removal case); a fifth
+residual added to `app-room`'s partition; `Object.assign(this` injected into the searched class body.
+
+Svelte MCP: `list-sections`, `get-documentation` for `{@attach ...}` and `$derived`, then
+`svelte-autofixer` on both changed components. The `{@attach}` docs are what the withheld `srcObject`
+rests on — *"attachments run in an effect … or when state read inside the function updates"* — which
+is why `localPreview` is read in the attachment BODY and the click attaches the stream. Autofixer
+clean; the only suggestions are the standing `{' … '}` exception at `AGENTS.md:106`, and those spaces
+are the reference's own `Ne(" (You are sharing your screen as ", …, " click here for larger preview) ")`.
+
+Room gate exit 0: `svelte-check` 1,599 files / 0 errors / 0 warnings. **Not opened in a browser** —
+and for this row that gap is worth naming: what a presenter sees when they share a screen changed, and
+nothing here has watched it change.
+
 ### 2026-09-01 12:18 UTC — fourteen "gaps" that were never gaps, and the instrument now says so itself
 
 **Runtime impact: NO** — one contract case, and three records corrected. No source file changed.

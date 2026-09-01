@@ -338,7 +338,24 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'https://www.gravatar.com/avatar/your_email_address?d=mm',
     'Setup Avatar',
     'setup-avatar',
-    'larger',
+    /*
+      `larger` LEFT this list on 2026-09-01, and NOT because it was built. It is a `font-size` VALUE
+      — `[2,"text-decoration","underline","font-size","larger"]` at byte 1,208,985 — and the sweep
+      asks one question of every value: does our source contain this string? On 2026-09-01 it started
+      to, in `ScreenPaneStatus.svelte`'s ` click here for larger preview) `, which is the reference's
+      own `W0e` text and has nothing to do with a login link's underline.
+
+      A COLLISION, then, not a closure. It is the same shape as three others this repository has
+      already paid for — `js` matching inside `json`, `pmToolbar` inside `pmToolbarZZ`, and a
+      declaration assertion passing on the comment above it — and it is the one direction the
+      limitation note further down does NOT cover: that note bounds the EXAMINED side, and this moves
+      a residual to zero.
+
+      It is left out of the list because the list is what the sweep measures and the sweep cannot
+      measure this any more; `no residual left this list by prose collision` below is what replaces
+      it, and it fails if we ever DO ship `font-size: larger` under a false name, or if the
+      invitation text goes.
+    */
     'non-presenter',
     'addon-forgot-email'
   ],
@@ -464,7 +481,9 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
 
     - the Intercom help link is `RNB-01` in `room-surface-audit-batch3-contract.test.ts` — a control
       whose gate nothing can turn on. `hasSTHelpLink` occurs three times in the whole bundle, and the
-      only occurrence inside `app-room` sets it FALSE and never writes it again;
+      only occurrence inside `app-room` sets it FALSE and never writes it again. Re-measured
+      2026-09-01 and reclassified: since the gate is dead upstream too, **the reference's own room
+      never renders this link**, so the DOMs agree and this is a FALSE GAP rather than a refusal;
     - **`nolevelsImg` and `/assets/images/notalking.png` are GONE from this list, and the refusal
       that held them here was WRONG.** It read: *"refused because `presenterTalking` is a live
       audio-activity signal from a server this room does not have; building the branch means an image
@@ -567,19 +586,26 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     server-supplied `recPreviewLocation`, there is no such URL here, and the window shows the local
     recording instead. No card, so no element to carry either name.
   */
-  'app-rec-preview': ['recScreenLocalPreview', 'recPreviewScreen'],
+  'app-rec-preview': ['recScreenLocalPreview', 'recPreviewScreen']
   /*
     `fullScreen()` is the value of `data-ng-dblclick` — an ANGULARJS 1 attribute left in an Angular 17
     template. No runtime in the reference reads it and the browser does not either, because the
     attribute is not `ondblclick`. Dead in the original; correctly dead here.
   */
   /*
-    `#ffcc00` is the inline colour on `W0e`, the local-preview invitation — node 3 of the pane's
-    status stack, and `SP2-04` in `docs/decoded/room-surface-audit-2026-08-30.md` records the
-    measurement that it cannot be reached in this application. `ScreenPaneStatus.svelte` renders the
-    other three headings and names its absence.
+    `app-screenshare-view` used to sit here with `['#ffcc00']` and is FULLY COVERED since 2026-09-01.
+
+    That colour is the inline style on `W0e`, the local-preview invitation, and this entry read:
+    *"`SP2-04` records the measurement that it cannot be reached in this application"*. The
+    measurement was of a choice this room had made — `#addLocalScreen` attached our own capture
+    eagerly, which is what made `isPresentingThisScreen && !localpreview` unreachable — and then read
+    that choice back as a property of the reference. Upstream's default is the invitation.
+
+    Node 3 is built; `screen-pane-contract.test.ts`'s `SP2-04` block holds the five readings of
+    `localpreview` and the three writers of `isConnected` that decide it. Left as a comment with no
+    entry beneath it, deliberately: a closed gap whose argument is deleted is a gap that gets
+    reopened by the next reader of the const table.
   */
-  'app-screenshare-view': ['#ffcc00']
 };
 
 describe('the sweep is reading the bundle it claims to read', () => {
@@ -617,15 +643,15 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-six components fully covered, one hundred and twenty-three values not', () => {
+  it('holds the ratchet: thirty-seven components fully covered, one hundred and twenty-one values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
       edits the table without knowing which way they moved it.
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
-    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(36);
-    expect(residuals).toBe(123);
+    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(37);
+    expect(residuals).toBe(121);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -734,32 +760,113 @@ describe('how much of the gap has already been written about', () => {
     LIMITATION, stated because it bounds every number below: this is a substring search over the whole
     repository, so a short generic value (`spinner-border`, `visually-hidden`) can be counted as
     examined because it occurs incidentally in unrelated prose. It over-counts the examined side. It
-    cannot over-count the UNEXAMINED side, which is the side that means work, so the 91 below is a
+    cannot over-count the UNEXAMINED side, which is the side that means work, so the 90 below is a
     floor.
   */
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
-  it('splits the 123 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(123);
-    expect(all.filter(mentioned)).toHaveLength(32);
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(91);
+  it('splits the 121 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(121);
+    expect(all.filter(mentioned)).toHaveLength(31);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(90);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {
     /*
-      The claim the group-four note makes, asserted rather than written down: every one of the six is
-      a recorded refusal — `RNB-01`, `G08`, and the two SoundCloud const decisions. A sweep that
-      produced false alarms would produce them here first, on the surface that has been read hardest.
+      The claim the group-four note makes, asserted rather than written down. A sweep that produced
+      false alarms would produce them here first, on the surface that has been read hardest.
+
+      SIX until 2026-09-01 and four now: `nolevelsImg` and `/assets/images/notalking.png` left when
+      `G08` was BUILT rather than refused, which is the correction that started the re-reading of
+      every entry in this file.
     */
     const room = ROWS.find((row) => row.component === 'app-room');
-    /*
-      SIX until 2026-09-01, four now: `nolevelsImg` and `/assets/images/notalking.png` left when
-      `G08` was built rather than refused. The four that remain are still all recorded refusals, which
-      is what this case is about.
-    */
     expect(room?.residuals).toHaveLength(4);
     expect(room?.residuals.filter((value) => !mentioned(value))).toEqual([]);
+  });
+
+  it('and none of app-room s four is a DIVERGENCE — three are false gaps, one is a missing asset', () => {
+    /*
+      THE STRONGER STATEMENT, and the one the owner's "match the dump exactly" asks for. "Recorded
+      refusal" was the old framing and it was too weak in three of four cases: a refusal says *we
+      chose differently from the reference*. Re-measured on 2026-09-01, three of these four are
+      cases where the reference's own rendered DOM and ours AGREE, and the value exists only in a
+      const table this room has no equivalent of.
+
+      - `https://intercom.help/simpler-trading/en/` and `helpLink` — `RNB-01`. The gate is
+        `O(9, e.hasSTHelpLink ? 9 : -1)`, and `hasSTHelpLink` occurs three times in 2,891,205 bytes:
+        `!0` in the LOGIN component's constructor, `!1` in `app-room`'s, and this read. `app-room`'s
+        class body contains no `Object.assign(this`, no `for…in`, no computed `this[x] =`, and its
+        only three `Object.keys` calls are webcam bookkeeping — all four checked by search on
+        2026-09-01. So the field is initialised false and never written, and **upstream's own room
+        never renders this link either**. `room-surface-audit-batch3-contract.test.ts` holds the
+        measurement and its passing control (`isTipEnabled`, same constructor, IS assigned).
+      - `cssSoundCloudIcon` — const 176 declares `id` twice and Angular keeps the second, so both
+        DOMs carry `id="soundcloudDropdown"`. `navbar-decoded-rows-contract.test.ts`.
+      - `/assets/images/playing.gif` — the ONE that is genuinely absent here, and it is an ASSET
+        rather than a decision: it is not in `static/assets/images/` and the capture cannot supply
+        it, because `docs/source-v4-2026-08-15/` is four files — JS, CSS, HTML, checksums — and no
+        images. Unblocking needs the file, not a judgement.
+
+      Asserted as a PARTITION rather than as prose, so a fifth residual arriving on this surface
+      cannot be waved through by a paragraph written about four others.
+    */
+    const room = ROWS.find((row) => row.component === 'app-room');
+    const FALSE_GAPS = [
+      'https://intercom.help/simpler-trading/en/',
+      'helpLink',
+      'cssSoundCloudIcon'
+    ];
+    const ASSET_BLOCKED = ['/assets/images/playing.gif'];
+    expect([...(room?.residuals ?? [])].sort()).toEqual([...FALSE_GAPS, ...ASSET_BLOCKED].sort());
+
+    /* And the asset really is absent, read rather than assumed — both halves of the claim. */
+    const images = globSync('static/assets/images/*');
+    expect(
+      images.length,
+      'the directory must exist for its emptiness to mean anything'
+    ).toBeGreaterThan(0);
+    expect(images.some((path) => path.endsWith('playing.gif'))).toBe(false);
+    expect(globSync('docs/source-v4-2026-08-15/*.{gif,png,jpg,jpeg,svg,webp}')).toEqual([]);
+  });
+});
+
+describe('a residual that leaves this table must leave it for a reason', () => {
+  it('no residual left by prose collision — `larger` is the one that did, and it is guarded', () => {
+    /*
+      THE CASE THAT REPLACES A ROW, and it exists because the sweep's rule is `ours.includes(value)`,
+      which cannot tell a rendered value from an English word.
+
+      `larger` is a `font-size` value on `app-session-login`
+      (`[2,"text-decoration","underline","font-size","larger"]`, byte 1,208,985). It stopped being a
+      residual on 2026-09-01 because `ScreenPaneStatus.svelte` started saying ` click here for larger
+      preview) ` — the reference's own `W0e` text, about a different surface entirely.
+
+      Both halves are asserted, because either one going alone would make the record wrong:
+
+        the collision is REAL          our source says `larger`, in the invitation and nowhere else
+        the feature is still MISSING   we do not ship `font-size: larger` anywhere
+
+      If the invitation text is ever reworded, the collision ends and `larger` returns to the table
+      above — and this case failing is how anyone finds that out.
+    */
+    const status = readFileSync(
+      new URL('./components/ScreenPaneStatus.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(status).toContain("{' click here for larger preview) '}");
+
+    /* And nothing here actually renders the declaration the const table is about. */
+    const declaration = /font-size\s*:\s*larger/;
+    const offenders = globSync('src/**/*.{svelte,ts,css}')
+      .filter((path) => !path.includes('reference-const-coverage'))
+      .filter((path) => declaration.test(readFileSync(path, 'utf8')));
+    expect(
+      offenders,
+      'if this room ever ships `font-size: larger`, the residual is genuinely closed and the note ' +
+        'above is what needs deleting — not this case'
+    ).toEqual([]);
   });
 });
 
@@ -776,6 +883,6 @@ describe('the comment stripping is load-bearing', () => {
     const raw = RAW_ROWS.reduce((total, row) => total + row.residuals.length, 0);
     const stripped = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(raw).toBeLessThan(stripped);
-    expect(stripped - raw).toBe(22);
+    expect(stripped - raw).toBe(21);
   });
 });

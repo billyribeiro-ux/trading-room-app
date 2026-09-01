@@ -287,3 +287,79 @@ describe('every public getter is reactive', () => {
     expect(seen, 'the showZoomCtrl getter is not reactive').toEqual([false, true]);
   });
 });
+
+describe('SP2-04 — the local-preview opt-in', () => {
+  /*
+    BEHAVIOURAL, where `screen-pane-contract` is textual. That file reads the source and the bundle;
+    this one drives the class, because the two things that can actually go wrong here are a
+    non-idempotent setter and a leak across a producer id — and neither is visible in a string match.
+  */
+
+  it('starts false for every screen, which is upstream s own default', () => {
+    /* `this.localpreview = !1` at byte 1,494,577. A default nobody asserts is a default nobody has. */
+    const { screens } = make();
+    expect(screens.isLocalPreviewing('a')).toBe(false);
+    expect(screens.isLocalPreviewing('b')).toBe(false);
+  });
+
+  it('opts in ONE screen, and leaves its siblings alone', () => {
+    /*
+      Per screen, not per room: a presenter sharing three screens who asks to preview one has not
+      asked for the other two, and each costs its own decode. Upstream's flag is per component
+      instance, which is per screen.
+    */
+    const { screens } = make();
+    screens.largePreview('a');
+    expect(screens.isLocalPreviewing('a')).toBe(true);
+    expect(screens.isLocalPreviewing('b')).toBe(false);
+  });
+
+  it('is idempotent, as `= !0` is', () => {
+    /*
+      A second click must not grow the list. Asserted through the public reader plus a third screen,
+      because the list itself is private — if a duplicate ever slipped in, `isLocalPreviewing` would
+      still answer true and only a leak would show it.
+    */
+    const { screens } = make();
+    screens.largePreview('a');
+    screens.largePreview('a');
+    screens.largePreview('a');
+    expect(screens.isLocalPreviewing('a')).toBe(true);
+    screens.screenRemoved('a', null);
+    /* One removal clears it — which it cannot do if three copies went in. */
+    expect(screens.isLocalPreviewing('a')).toBe(false);
+  });
+
+  it('forgets the opt-in with the screen, so a reissued producer id starts closed', () => {
+    /*
+      THE ONE THIS ROOM NEEDS AND THE REFERENCE DOES NOT. Upstream's flag dies with the component;
+      ours is room-lived, and `restartLocalScreens` re-produces the same capture onto a NEW producer
+      id and drops the old through `screenRemoved`. Without the cleanup the list grows a dead entry
+      per reconnect, and the day the SFU reissues an id the presenter's screen attaches itself.
+    */
+    const { screens } = make();
+    screens.largePreview('a');
+    screens.screenRemoved('a', 'b');
+    expect(screens.isLocalPreviewing('a')).toBe(false);
+
+    /* And the same id, arriving again, is a NEW screen that has not been asked for. */
+    screens.screenRemoved('b', null);
+    expect(screens.isLocalPreviewing('a')).toBe(false);
+    screens.largePreview('a');
+    expect(screens.isLocalPreviewing('a')).toBe(true);
+  });
+
+  it('does not disturb the three ids it now sits beside', () => {
+    /*
+      `screenRemoved` gained a fourth line. The three that were there decide which tab is showing,
+      what a presenter forced and what they locked, and a mistake in the new line is most likely to
+      be a mistake in one of theirs.
+    */
+    const { screens } = make();
+    screens.selectedTab = 'a';
+    screens.largePreview('a');
+    screens.screenRemoved('a', 'b');
+    expect(screens.selectedTab).toBe('b');
+    expect(screens.isLocalPreviewing('a')).toBe(false);
+  });
+});

@@ -139,8 +139,22 @@
      * spinner waiting for a producer that is not coming.
      */
     ownScreen?: boolean;
+    /**
+     * `o.localpreview` — has the presenter asked to see THIS screen of their own here?
+     *
+     * `SP2-04`. False until they click `W0e`'s invitation, which is upstream's own default:
+     * `this.localpreview = !1` at byte 1,494,561, and `largePreview()` at 1,499,849 is its only
+     * writer. It gates two things and both are the reference's: the invitation is drawn while it is
+     * false, and the `<video>` may not take a `srcObject` until it is true.
+     *
+     * Meaningless unless `ownScreen`, exactly as upstream's term is — every read below is
+     * `ownScreen && …`, so a remote screen is unaffected whatever this says.
+     */
+    localPreview?: boolean;
     /** `reAttachScren()` — the click on the blanked pane. */
     onreattach?: () => void;
+    /** `largePreview()` — the click on `W0e`. `SP2-04`. */
+    onlargepreview?: () => void;
     /** `SV-SP-04` — this consumer came up with no picture; ask for the producer again. */
     ontoosmall?: () => void;
     /** `i.tooSmallRetries = 0` — a real picture arrived, so the retry budget resets. */
@@ -161,7 +175,9 @@
     presenterName = '',
     screenName = '',
     ownScreen = false,
+    localPreview = false,
     onreattach,
+    onlargepreview,
     ontoosmall,
     onsettled,
     showZoomCtrl,
@@ -181,11 +197,19 @@
   /**
    * `o.isConnected` — the reference's own name for "the picture has arrived".
    *
-   * A screen this browser is SHARING is connected by construction: those render from the local
-   * capture rather than from a consumer, so `ownScreen` short-circuits the wait. Without that term a
-   * presenter would watch a spinner over their own screen forever.
+   * ## `SP2-04` corrected the own-screen half of this on 2026-09-01
+   *
+   * It read `stream !== null || ownScreen`, on the reasoning that a screen this browser is sharing
+   * *"is connected by construction"*. Upstream disagrees: `isConnected` has three writers in
+   * `app-screenshare-view` and exactly one — `largePreview()` — is reachable for a screen you share
+   * yourself, so it is NOT connected to its own screen until the presenter asks. `ownScreen` alone
+   * was this room deciding the answer and reading its own decision back as the reference's. The
+   * three writers are pinned by byte in `screen-pane-contract.test.ts`'s `SP2-04` block.
+   *
+   * The spinner still must not show over your own screen, and that reasoning was sound — but it
+   * belongs to `connecting` below, whose gate has `isPresentingThisScreen` as its own term upstream.
    */
-  const connected = $derived(stream !== null || ownScreen);
+  const connected = $derived(stream !== null && (!ownScreen || localPreview));
 
   /**
    * `O(4, o.isConnected || o.isPresentingThisScreen || o.isDetached ? -1 : 4)` — byte 1,501,699.
@@ -194,7 +218,7 @@
    * detached term matters — a blanked pane already says what is happening and must not also claim to
    * be connecting.
    */
-  const connecting = $derived(!connected && !detachedHere);
+  const connecting = $derived(!connected && !ownScreen && !detachedHere);
 
   /**
    * `SP2-01` — the `<video>`'s own hide condition, which is NOT the cluster's.
@@ -212,9 +236,11 @@
    * drew the captured `Screen Detached..` heading over a live-looking empty `<video>` instead of
    * over nothing.
    *
-   * `isPresentingThisScreen && !localpreview` is false by construction here and is not modelled;
-   * the note at the `<video>` records why, and `SP2-04` records the control it gates upstream —
-   * `W0e`, the invitation to attach the local stream that this application never needs.
+   * `isPresentingThisScreen && !localpreview` IS modelled now, and it is folded into `connected`
+   * above rather than repeated here — that derived is `stream !== null && (!ownScreen ||
+   * localPreview)`, so `!connected` already carries the term. Written this way and not as a third
+   * conjunct because two copies of one condition drift, and the entry it used to carry said this
+   * term was unreachable, which is exactly the sentence a second copy would have preserved.
    */
   const pictureHidden = $derived(!connected || saveData);
 
@@ -337,14 +363,28 @@
     // re-runs when state it reads changes; the function it RETURNS is the teardown, not an update.
     // Putting this work in the returned function meant it only ever ran on destroy - the element
     // never got a srcObject, the tab appeared with `hasSrc: false`, and nothing threw.
-    if (node.srcObject !== stream) node.srcObject = stream;
+    /*
+      `SP2-04` — YOUR OWN screen gets no `srcObject` until you ask for it.
+
+      `largePreview(){ … i.srcObject = e.localStream; try{i.play()}catch{} … }` at byte 1,499,849 is
+      where upstream attaches a local capture, and nothing else does. Before that click the element
+      has no source and carries the hidden class, so the presenter is not paying for a second live
+      decode of a picture already on their own monitor.
+
+      Reading `localPreview` HERE and not only in the markup is what makes the flip work: an
+      attachment runs inside an effect, so this body re-runs when the flag changes and the stream
+      attaches on the click — the same reason the whole assignment sits in the body rather than the
+      returned teardown, which is the bug the paragraph below records.
+    */
+    const source = ownScreen && !localPreview ? null : stream;
+    if (node.srcObject !== source) node.srcObject = source;
     /*
       `SV-SP-10` — NO volume and NO muted assignment. `muted` is a static attribute on the element,
       as it is in const 8, and this used to write the room's master volume onto a screenshare. See
       the note at the `<video>`.
     */
 
-    if (stream) {
+    if (source) {
       node.play().catch((error: unknown) => {
         // Not fatal: the element keeps the stream and plays on the next gesture. Worth recording,
         // because "no picture" and "picture paused by policy" look identical on screen.
@@ -434,7 +474,9 @@
     {connecting}
     {presenterName}
     {screenName}
+    offerLargePreview={ownScreen && !localPreview}
     {onreattach}
+    {onlargepreview}
   />
   <!--
     `SP2-02` — `overflow-hidden`, the clip the zoom needs.

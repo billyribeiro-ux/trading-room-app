@@ -20,9 +20,12 @@
    * transcribes why: the capture broadcasts it by value to every view), so a reader zoomed into one
    * screen saw every other screen's status line at that zoom.
    *
-   * Node 3 — `W0e`, the local-preview invitation — is deliberately absent; `SP2-04` in
-   * `docs/decoded/room-surface-audit-2026-08-30.md` records the measurement that it cannot be
-   * reached in this application.
+   * **Node 3 — `W0e`, the local-preview invitation — is BUILT since 2026-09-01**, and this sentence
+   * used to say it was *"deliberately absent"* because `SP2-04` had *"the measurement that it cannot
+   * be reached in this application"*. That measurement was of a choice this room had made, not of
+   * the reference: we attached our own capture eagerly in `#addLocalScreen`, which is what made
+   * `isPresentingThisScreen && !localpreview` unreachable. Upstream's default is the opposite. The
+   * five readings of `localpreview` that establish it are on `RoomScreens.#localPreviews`.
    */
   type Props = {
     /** `o.isDetached` — THIS window has popped this screen out into its own window. */
@@ -33,12 +36,28 @@
     connecting: boolean;
     presenterName: string;
     screenName: string;
+    /**
+     * `SP2-04` — draw `W0e`? True when this is MY screen and I have not asked to preview it yet,
+     * which is `o.mediaService.isScreenSharing && o.mediaService.localSharingStreams[o.muser._id]
+     * && !o.localpreview` decided by the pane, exactly as `connecting` above is.
+     */
+    offerLargePreview?: boolean;
     /** `reAttachScren()` — the click on the blanked pane. */
     onreattach?: () => void;
+    /** `largePreview()` — the click on the invitation. */
+    onlargepreview?: () => void;
   };
 
-  let { detachedHere, saveData, connecting, presenterName, screenName, onreattach }: Props =
-    $props();
+  let {
+    detachedHere,
+    saveData,
+    connecting,
+    presenterName,
+    screenName,
+    offerLargePreview = false,
+    onreattach,
+    onlargepreview
+  }: Props = $props();
 </script>
 
 {#if detachedHere}
@@ -76,6 +95,37 @@
   <h3 class="mt-4 text-center">Video Disabled</h3>
 {/if}
 <!--
+  `SP2-04` — `W0e`, node 3, the invitation to preview your own screen.
+
+  ```js
+  function W0e(t,n){ … d(0,"p",11), x("click", () => largePreview()), v(1) …
+    Ne(" (You are sharing your screen as ", e.muser.mediaValue.screenName,
+       " click here for larger preview) ") }                                   // byte 1,492,944
+  11 [1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]                    // byte 1,500,900
+  ```
+
+  It sits BETWEEN `Video Disabled` and `Connecting To Screen of` because that is where the create
+  block puts it — `H(1,z0e,…)(2,G0e,…)(3,W0e,…)(4,q0e,…)`, byte 1,501,269 — and the order of a flat
+  sibling list is not decoration. `screen-pane-contract.test.ts`'s `SP2-04` block asserts that order,
+  the gate, and the five readings of `localpreview` behind the whole row.
+
+  The inline `color: #ffcc00` is const 11's own `2,"color","#ffcc00"` pair, transcribed rather than
+  moved into the scoped sheet for the reason the `#fff` heading below is inline too: these are the
+  reference's style bindings, and a class would be this room inventing a name for one.
+
+  ONE DIVERGENCE, the same one `SV-SP-02` takes above: upstream hangs the click on the `<p>`, which
+  is not focusable, not keyboard operable, and announced as a paragraph. A real `<button>` inside the
+  captured element keeps the class, the colour, the text and the position, and makes the control a
+  control. The scoped rule strips the chrome so nothing about the rendering changes.
+-->
+{#if offerLargePreview}
+  <p class="text-center mt-4" style="color: #ffcc00;">
+    <button type="button" class="large-preview" onclick={() => onlargepreview?.()}
+      >{' (You are sharing your screen as '}{screenName}{' click here for larger preview) '}</button
+    >
+  </p>
+{/if}
+<!--
   `SV-SP-03` — `q0e` at byte 1,493,190: const 3 is
   `[1,"text-center","mt-4","animated","fadeIn",2,"color","#fff"]` and const 12 the
   `fas fa-spinner fa-pulse` glyph.
@@ -100,7 +150,13 @@
     the two Bootstrap classes on it; this button exists only so the control is focusable and
     announced correctly, so it inherits everything and adds nothing.
   */
-  .reattach {
+  .reattach,
+  /*
+    `SP2-04`'s invitation, for the same reason and on the same terms: the capture's element is a
+    `<p>` carrying an inline colour, and this button exists only so the control is reachable by
+    keyboard and announced as one. `color: inherit` is what keeps the `#ffcc00` the paragraph's.
+  */
+  .large-preview {
     padding: 0;
     border: 0;
     background: none;

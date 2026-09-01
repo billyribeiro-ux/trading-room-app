@@ -2840,7 +2840,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       decided, and passed by NAME rather than through a spread — `unfed-props-contract` can only see
       a supplier it can find spelled out.
     */
-    max: 1106,
+    /*
+      1,106 -> 1,109, 2026-09-01. Two prop lines and their blank: `localPreview` and
+      `onlargepreview` for `SP2-04`. The call site is where a screen's per-screen state is handed to
+      its pane, and there is nothing here to extract that is not that.
+    */
+    max: 1109,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -4343,7 +4348,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       component tree, which is why the row sits on this surface and its trigger is on the microphone
       one.
     */
-    max: 478,
+    /*
+      RAISED 478 -> 535 on 2026-09-01, for `SP2-04` — and it is a RAISE rather than an extraction,
+      argued here as this entry's own history requires.
+
+      The row is the local-preview invitation, `W0e`, and it was recorded as *"it cannot be reached
+      in this application"*. That was a measurement of a CHOICE this room had made — `#addLocalScreen`
+      attached our own capture eagerly, which is what made `isPresentingThisScreen && !localpreview`
+      unreachable — read back as a property of the reference. Upstream's default is the invitation and
+      the `<video>` stays empty until the presenter clicks. Same shape of error as `G08`'s refusal,
+      found the same way: by reading every occurrence instead of trusting the note.
+
+      ## Why not extract
+
+      The feature is about forty lines spread over four files that are already the right four: the flag
+      belongs with the other per-screen ids, the invitation belongs with the other status headings,
+      the gate belongs with the other gates, and the wiring belongs at the call site. There is no
+      slice here that is not one of those four things.
+
+      What WAS extracted is the reasoning. The five readings of `localpreview`, the three writers of
+      `isConnected` and every byte offset now live once, in `screen-pane-contract.test.ts`'s `SP2-04`
+      block, which re-reads them against the pinned bundle on every run. They were written out four
+      times in the first draft of this change; each site now carries the sentence its maintainer needs
+      and points at the file that proves it. That is this entry's own rule — *moving an explanation to
+      the code it explains is the extraction itself* — applied to a decode rather than to markup.
+    */
+    max: 535,
     why: 'the screen viewer; the transport keeps the list, this keeps the three ids that point into it'
   },
   {
@@ -7166,7 +7196,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       with the note that it is an AngularJS 1 attribute in an Angular 17 template — dead upstream and
       dead here, which is what makes the exact transcription safe.
     */
-    max: 685,
+    /*
+      RAISED 685 -> 727 on 2026-09-01, for `SP2-04` — and it is a RAISE rather than an extraction,
+      argued here as this entry's own history requires.
+
+      The row is the local-preview invitation, `W0e`, and it was recorded as *"it cannot be reached
+      in this application"*. That was a measurement of a CHOICE this room had made — `#addLocalScreen`
+      attached our own capture eagerly, which is what made `isPresentingThisScreen && !localpreview`
+      unreachable — read back as a property of the reference. Upstream's default is the invitation and
+      the `<video>` stays empty until the presenter clicks. Same shape of error as `G08`'s refusal,
+      found the same way: by reading every occurrence instead of trusting the note.
+
+      ## Why not extract
+
+      The feature is about forty lines spread over four files that are already the right four: the flag
+      belongs with the other per-screen ids, the invitation belongs with the other status headings,
+      the gate belongs with the other gates, and the wiring belongs at the call site. There is no
+      slice here that is not one of those four things.
+
+      What WAS extracted is the reasoning. The five readings of `localpreview`, the three writers of
+      `isConnected` and every byte offset now live once, in `screen-pane-contract.test.ts`'s `SP2-04`
+      block, which re-reads them against the pinned bundle on every run. They were written out four
+      times in the first draft of this change; each site now carries the sentence its maintainer needs
+      and points at the file that proves it. That is this entry's own rule — *moving an explanation to
+      the code it explains is the extraction itself* — applied to a decode rather than to markup.
+    */
+    max: 727,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
@@ -7320,7 +7375,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       container. Moving them meant they became one thing, and one thing with a shared reason is a
       component. The prose moved with them, which is why this is 112 lines for three `{#if}` blocks.
     */
-    max: 112,
+    /*
+      RAISED 112 -> 168 on 2026-09-01, for `SP2-04` — and it is a RAISE rather than an extraction,
+      argued here as this entry's own history requires.
+
+      The row is the local-preview invitation, `W0e`, and it was recorded as *"it cannot be reached
+      in this application"*. That was a measurement of a CHOICE this room had made — `#addLocalScreen`
+      attached our own capture eagerly, which is what made `isPresentingThisScreen && !localpreview`
+      unreachable — read back as a property of the reference. Upstream's default is the invitation and
+      the `<video>` stays empty until the presenter clicks. Same shape of error as `G08`'s refusal,
+      found the same way: by reading every occurrence instead of trusting the note.
+
+      ## Why not extract
+
+      The feature is about forty lines spread over four files that are already the right four: the flag
+      belongs with the other per-screen ids, the invitation belongs with the other status headings,
+      the gate belongs with the other gates, and the wiring belongs at the call site. There is no
+      slice here that is not one of those four things.
+
+      What WAS extracted is the reasoning. The five readings of `localpreview`, the three writers of
+      `isConnected` and every byte offset now live once, in `screen-pane-contract.test.ts`'s `SP2-04`
+      block, which re-reads them against the pinned bundle on every run. They were written out four
+      times in the first draft of this change; each site now carries the sentence its maintainer needs
+      and points at the file that proves it. That is this entry's own rule — *moving an explanation to
+      the code it explains is the extraction itself* — applied to a decode rather than to markup.
+    */
+    max: 168,
     why: 'what a screen pane says when it is not showing a picture — the three captured headings'
   },
   {

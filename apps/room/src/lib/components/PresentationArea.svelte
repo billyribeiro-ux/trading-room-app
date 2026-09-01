@@ -672,6 +672,8 @@
                   presenterName={screen.name}
                   screenName={screen.screenName}
                   ownScreen={screen.ownerId === null}
+                  localPreview={screens.isLocalPreviewing(screen.id)}
+                  onlargepreview={() => screens.largePreview(screen.id)}
                   detached={screens.detachedScreenId !== null}
                   saveData={mediaTransport.saveData}
                   {userIdWatermark}

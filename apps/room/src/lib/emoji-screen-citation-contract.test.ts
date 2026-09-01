@@ -173,6 +173,19 @@ const AT_BYTE: ReadonlyArray<readonly [number, string]> = [
   [1_493_088, ' (You are sharing your screen as '],
   [1_499_849, 'largePreview(){this.localpreview=!0'],
   [1_501_588, 'O(3,o.mediaService.isScreenSharing&&o.mediaService.localSharingStreams'],
+  /*
+    `SP2-04`'s three `isConnected` writers, pinned when the row was BUILT on 2026-09-01. The whole
+    feature rests on exactly one of them being reachable for a screen you share yourself, so each is
+    read here rather than counted: a fourth writer, or one of these moving, changes the answer and
+    nothing else in this repository would notice.
+  */
+  [1_497_433, 'this.isConnected=!0,P("newScreenStream playing vid for '],
+  [1_498_827, 'addEventListener("playing",()=>{i.isConnected=!0'],
+  [1_500_073, 'i.srcObject=e.localStream;try{i.play()}catch{}this.isConnected=!0'],
+  /* The create block's sibling ORDER, which is what puts `W0e` between nodes 2 and 4. */
+  [1_501_269, 'H(1,z0e,2,0,"h3",1)(2,G0e,2,0,"h3",1)(3,W0e,2,1,"p",2)(4,q0e,3,2,"h3",3)'],
+  /* Const 11 — the invitation's classes and its inline `#ffcc00`. */
+  [1_500_900, '[1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]'],
   /* SP2-05 — the unreachable `controls` binding. */
   [1_494_561, 'showControls=!1,this.localpreview=!1,this.showZoomCtrl=!1'],
   [1_501_442, 'o.showControls=!o.showControls'],
