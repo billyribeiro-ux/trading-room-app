@@ -36,7 +36,7 @@ import { chatMutedMessage } from '#lib/message-formatters.js';
  * and they are two strings on two screens.
  */
 
-/** The two commands, injected so this module needs no route import. */
+/** The three commands, injected so this module needs no route import. */
 export interface ChatMuteCommands {
   /** *" Mute Chat for 24hrs "* — presenter-gated on the server, like its opposite. */
   muteChat: (payload: { targetUserId: number }) => Promise<unknown>;
@@ -74,16 +74,16 @@ export class RoomChatMute {
   readonly #announceThenSend: (alert: string, send: () => Promise<unknown>) => void;
 
   /*
-    ── THE PRESENTER'S TWO BUTTONS ────────────────────────────────────────────────────────────────
+    ── THE PRESENTER'S THREE BUTTONS ──────────────────────────────────────────────────────────────
 
-    Both end in `#reload`, and that call runs by hand because it has to: single-flight mutations
+    All three end in `#reload`, and that call runs by hand because it has to: single-flight mutations
     refresh remote QUERIES, and the presenter's roster is not one — it comes from the route's `load`.
     Converting it is its own change, and doing it here would be claiming a refresh that never happens.
 
-    Neither is awaited by its caller — `RoomUserActions.handle` is synchronous — but both ARE caught,
-    by `#announceThenSend`. A remote command REJECTS where the old `fetch('?/unmuteChat')` returned
-    `response.ok === false` for anyone who bothered to look, and nobody did; that is the same silent
-    success this whole path was built to end.
+    None is awaited by its caller — `RoomUserActions.handle` is synchronous — but all three ARE
+    caught, by `#announceThenSend`. A remote command REJECTS where the old `fetch('?/unmuteChat')`
+    returned `response.ok === false` for anyone who bothered to look, and nobody did; that is the same
+    silent success this whole path was built to end.
   */
 
   /**
@@ -111,11 +111,11 @@ export class RoomChatMute {
   }
 
   /**
-   * The two modal buttons. `false` means "not mine", never "nothing happened" — the same contract
+   * The three modal buttons. `false` means "not mine", never "nothing happened" — the same contract
    * `RoomSessionControl.handle` and `RoomKicks.handle` carry, and the reason `ModalHost` keeps ONE
    * `onUserAction` door rather than making the caller decide which class owns a string.
    *
-   * Both announce BEFORE they send, which is the order every sibling uses and the order the
+   * All three announce BEFORE they send, which is the order every sibling uses and the order the
    * reference's own `muteChat` has: `sendServerAdminCommand(…), bootbox.alert(…)` in one comma
    * expression, neither awaiting the other. The failure path belongs to the send.
    */

@@ -45,6 +45,71 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 21:30 UTC — "no amount of tooling removes that" was wrong, and the difference is the price
+
+**Runtime impact: NONE.** Two documents corrected and two comments made true.
+
+## Row R said rows 6 and 8 need a human. They need a display.
+
+`MEASURE-SHARE-QUALITY.md` has said since 2026-08-11:
+
+> `getDisplayMedia` requires a real user gesture and an operating-system screen-picker dialog.
+> Browser automation can drive a page; it cannot click an OS dialog. So this needs a human for the
+> thirty seconds it takes, and **no amount of tooling removes that**.
+
+**The picker is not what stops it.** Chromium ships `--auto-select-desktop-capture-source=<title>`
+for exactly this, and driven under `xvfb-run` with headed Chromium 1194 it works: no picker appears
+and the call never returns `NotAllowedError`. Permission is granted and the source is selected.
+
+What it returns on six attempts is `NotReadableError: Could not start video source` — this
+container's Xvfb display has no surface the X11 capturer can open. Also tried and still failing:
+`preferCurrentTab` with `--auto-accept-this-tab-capture`, `--enable-usermedia-screen-capturing`,
+`--use-gl=swiftshader`, and `+extension COMPOSITE +extension DAMAGE +extension RANDR` on the server.
+
+**The distinction is the whole value of the re-measurement.** A picker needing a human is a
+permanent per-run cost no CI can pay. A display with no capturable surface is an environment fixed
+once. Rows 6 and 8 are blocked on a CAPTURABLE DISPLAY, not on a PERSON, and those have very
+different prices.
+
+One more correction in the same pass: the "headless returns Chrome's synthetic gradient" claim is
+about `--use-fake-device-for-media-stream`, a DIFFERENT flag that applies to `getUserMedia` cameras
+rather than desktop capture. It was not used in any of the six attempts, so it is not what failed
+and it is not evidence that automation cannot work.
+
+**What is unchanged:** the measurement still needs a real viewer attached, because an encoder with
+nobody receiving has no reason to spend bits. The human procedure is not deleted — until a
+capturable display exists it is still the only way this gets measured.
+
+## Two comments that no longer matched the line under them
+
+Both found by the whole-project audit and both verified here against the code before being kept:
+
+* `chat-mute.ts` said "THE PRESENTER'S TWO BUTTONS" and "the two commands" four times over.
+  `ChatMuteCommands` declares THREE — `muteChat`, `muteChatIndefinitely`, `unmuteChat` — since
+  `mute-chat-indefinitely` was built. Comment-only.
+* `carousel.ts`'s `numericRange` was documented as *"Clamps an untrusted value into a range"*. It
+  does not clamp; it REJECTS. `note-carousel.test.ts:103` pins `numericRange(61, 1, 60, 5) === 5`,
+  so the code and its test never disagreed and the docblock was the only thing saying otherwise —
+  which is exactly the drift that gets "simplified" into a clamp by the next reader. Rejecting is
+  also what `sanitizedCarouselConfig` does with the same two ranges, and it has to.
+
+## And one finding held back deliberately
+
+`modalTargetFromRosterRow` gives EVERY roster row `permissions: 'a'`: the test is
+`user.role === 'user' ? 'r' : 'a'` and `RoomRole` is `'admin' | 'staff' | 'member'` — there is no
+`'user'`, so the true arm is unreachable. Four consequences measured, including
+`roster-private-chat.ts:36`, where `(permissions === 'a' || hasAdminChat === true)` means
+`hasAdminChat` is never consulted and UIM-04's gate is short-circuited.
+
+**Severity MEDIUM, not an escalation, and that is measured rather than assumed:**
+`canShowRosterPrivateChat` is a client-side VISIBILITY helper; server-side delivery has its own
+independent rules and `media-grant.test.ts:296` asserts a grant "does not admit on hasAdminChat".
+
+Not fixed in this commit **because the file is inside a running workflow's shard** and a concurrent
+edit would corrupt its work. Recorded so it cannot be lost to a dropped agent report.
+
+---
+
 ### 2026-09-01 21:05 UTC — the Svelte MCP came back, and the first thing through it was the card
 
 **Runtime impact: NONE.** One expression changed form; the rendered output is identical.
