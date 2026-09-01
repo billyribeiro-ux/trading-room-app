@@ -171,6 +171,24 @@ const html = (overrides: Stub = {}) =>
 /*
   ── TWO CORRECTIONS, IN ORDER, BOTH FROM THE BYTES ──────────────────────────────────────────
 
+  ## And it is a FALSE GAP rather than a divergence, re-measured 2026-09-01
+
+  `reference-const-coverage-contract.test.ts` lists `cssSoundCloudIcon` as a residual — a value the
+  reference's const table carries and this room's source does not. That is true of the SOURCE and
+  false of the PAGE: because the second `id` wins, the reference's rendered DOM carries
+  `id="soundcloudDropdown"`, and so does ours, character for character. The value exists only in a
+  const table, which this room has no equivalent of. Same family as the fourteen runtime-composed
+  `data-bs-target`s that sweep also lists.
+
+  It is unwritable in any case, and the Svelte compiler is the evidence rather than an assumption —
+  the exact refusal, run against this element's markup with both `id`s present:
+
+      ERROR "Attributes need to be unique"
+      https://svelte.dev/e/attribute_duplicate
+
+  `id` twice on one element is ONE attribute to Svelte and two slots to Angular. The same limit, for
+  the same reason, as the four `value` + `bind:value` colour inputs in `FollowChatStylePane.svelte`.
+
   This was `cssSoundCloudIcon`. Const 176 declares `id` twice and Angular's `setUpAttributes` (`H0`,
   bundle byte 16,054) calls `setAttribute` once per string pair with no de-duplication, so the
   SECOND wins and the first never reaches the document — "a browser keeps the first" is the HTML

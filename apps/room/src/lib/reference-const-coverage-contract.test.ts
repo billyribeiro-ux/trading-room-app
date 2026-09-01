@@ -344,16 +344,39 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   ],
 
   /*
-    THREE — BOOTSTRAP'S DATA API, WHICH THIS ROOM REPLACED WITH STATE.
+    THREE — BOOTSTRAP'S DATA API, AND FOURTEEN OF THESE ARE FALSE GAPS.
 
-    Every `#`-prefixed value here is a `data-bs-target`: the reference asks Bootstrap's JavaScript to
-    find an element by id and toggle it. This room decides which pane is showing in Svelte state, so
-    the SELECTOR has no counterpart even where the pane it names is fully built. `#reset-session`,
-    `#close-session` and `#lock-session` all name panes that exist here.
+    Every `#`-prefixed value here is a `data-bs-target` or an `href`: the reference asks Bootstrap's
+    JavaScript to find an element by id and toggle it.
 
-    They stay listed rather than excluded for the same reason as group two, and because the id itself
-    sometimes IS still needed — `app-closed-session-page` shows both halves, the target and the bare
-    `navbarsExampleDefault` the reference also writes into `aria-controls`.
+    ## The correction, 2026-09-01: this note said these had "no counterpart" and that was WRONG
+
+    It read *"the SELECTOR has no counterpart even where the pane it names is fully built"*. Fourteen
+    of them have an exact counterpart in the rendered DOM, and the sweep cannot see it because the
+    attribute is **composed at runtime**:
+
+        data-bs-target="#{tabId}"    ModalHost.svelte, the session-control tab strip   (7 values)
+        href="#{tabId}"              ModalHost.svelte, the streaming sub-tab strip     (3 values)
+        href="#nav-{tabId}"          ModalHost.svelte, the user-info tab strip         (4 values)
+
+    Each `{#each}` iterates a literal list of bare ids — `'reset-session'`, `'obs-streaming'`,
+    `'info'` — so the browser receives `data-bs-target="#reset-session"` character for character. A
+    SUBSTRING search over source cannot find a string the source never contains, and that is a
+    limitation of the instrument, not a gap in the room.
+
+    This matters beyond bookkeeping: read the old way, fourteen rows looked like work. They are not
+    work, and `every #-prefixed residual with a composing site is emitted at runtime` below asserts
+    the composing site for each of the fourteen rather than leaving this paragraph to be believed.
+
+    ## What is genuinely absent, measured the same day
+
+    `#recordings`, `#discord-settings` and `#navbarsExampleDefault` — three, not fourteen. Those name
+    panes or bars this room does not build, and they are the only members of this group that are a
+    statement about the room rather than about the sweep.
+
+    The composed fourteen stay LISTED rather than excluded, because the sweep's rule is that it
+    reports what it can and cannot see, and quietly dropping a row it cannot measure is how a
+    coverage number stops meaning anything. The case below is what carries the truth.
   */
   /*
     Ten `data-bs-target`s, and three values that are not:
@@ -383,10 +406,14 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'videoID'
   ],
   /*
-    Four tab targets and one modal target. The PANES all exist — `ModalHost.svelte` carries
-    `id="nav-info"`, `id="nav-system"`, `id="nav-options"` and `id="nav-notes"` — and only the
-    `#`-prefixed selectors Bootstrap's JavaScript would look them up by are absent, because this room
-    decides which pane is showing in Svelte state. The clearest instance of group three there is.
+    Four tab targets, and all four are the FALSE GAP group three now describes. The panes exist —
+    `ModalHost.svelte` carries `id="nav-info"`, `id="nav-system"`, `id="nav-options"` and
+    `id="nav-notes"` — and so do the selectors: `href="#nav-{tabId}"` over
+    `[['info', …], ['system', …], ['options', …], ['notes', …]]` emits all four verbatim. The sweep
+    reads source, the browser reads output, and here they disagree in the room's favour.
+
+    (The fifth entry, `#all-user-pm-modal`, LEFT this list on 2026-09-01: consts 52 and 90 both carry
+    it and the opener now does too.)
   */
   'app-user-info-modal': [
     '#nav-info',
@@ -431,22 +458,38 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     docblock or a contract test, and the sweep rediscovered them rather than finding them. The case
     below measures that split rather than leaving it as a claim in a comment.
 
-    `app-room` is the clearest instance, and it is the surface with the most audit behind it. All SIX
-    of its residuals are recorded refusals, each with its own argument at the code:
+    `app-room` is the clearest instance, and it is the surface with the most audit behind it. It had
+    SIX residuals when this was written and has FOUR, and the two that left are the reason this
+    paragraph is worth re-reading rather than trusting:
 
     - the Intercom help link is `RNB-01` in `room-surface-audit-batch3-contract.test.ts` — a control
       whose gate nothing can turn on. `hasSTHelpLink` occurs three times in the whole bundle, and the
       only occurrence inside `app-room` sets it FALSE and never writes it again;
-    - `nolevelsImg` and `/assets/images/notalking.png` are `G08` in `RoomNavbar.svelte` — the idle
-      waveform, refused because `presenterTalking` is a live audio-activity signal from a server this
-      room does not have. Building the branch means an image that can never show or one that always
-      shows, and neither is the reference;
-    - `cssSoundCloudIcon` and `/assets/images/playing.gif` are argued in `NavbarSoundCloud.svelte` —
-      the const carries `id` TWICE and Angular keeps the second, and the gif is not in this
-      repository, so a faithful transcription would render a broken image on every play.
+    - **`nolevelsImg` and `/assets/images/notalking.png` are GONE from this list, and the refusal
+      that held them here was WRONG.** It read: *"refused because `presenterTalking` is a live
+      audio-activity signal from a server this room does not have; building the branch means an image
+      that can never show or one that always shows."* Both halves were false. All ten occurrences of
+      `presenterTalking` were read on 2026-09-01: it is initialised `!1` at bytes 1,114,654 and
+      1,129,852 — so the reference's own default is the FLAT LINE this room was never drawing — and
+      it is flipped by two payload-free room commands from the server's own switch at byte 1,014,971.
+      `G08` is built; `NavbarTalkingIndicator.svelte` carries both arms.
+    - `cssSoundCloudIcon` is a **FALSE GAP of the same family as group three**, re-measured
+      2026-09-01. Const 176 declares `id` twice — `cssSoundCloudIcon` then `soundcloudDropdown` —
+      and Angular's `setUpAttributes` keeps the SECOND, so the reference's rendered DOM carries
+      `id="soundcloudDropdown"`, which is exactly what `NavbarSoundCloud.svelte` renders. Nothing is
+      missing from the page; the value exists only in a const table this room has no equivalent of.
+      It is doubly settled: Svelte refuses the duplicate outright —
+      `ERROR "Attributes need to be unique" https://svelte.dev/e/attribute_duplicate` — the same
+      compiler limit as `FollowChatStylePane`'s four colour inputs.
+    - `/assets/images/playing.gif` is the one genuine blocker of the four, and it is an ASSET rather
+      than a decision. The gif is not in this repository (`static/assets/images/` holds six files and
+      that is not one of them) and it is not obtainable from the capture either — `docs/source-v4-
+      2026-08-15/` is four files, JS + CSS + HTML, no images. Transcribing the path would render a
+      broken image in the navbar on every play. Same case and same resolution as `benzinga-logo.png`.
+      Unblocking it needs the asset, not a judgement.
 
-    **Zero false alarms on the most-audited surface in the room** is the strongest thing this sweep
-    has to say about itself.
+    So the honest summary is not "zero false alarms" — it is that this surface's residuals have now
+    survived a second reading, one refusal was overturned, and one was reclassified.
   */
   'app-room': [
     'https://intercom.help/simpler-trading/en/',
@@ -583,6 +626,88 @@ describe('coverage of the reference const tables', () => {
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(36);
     expect(residuals).toBe(123);
+  });
+
+  it('every #-prefixed residual with a composing site is emitted at runtime', () => {
+    /*
+      THE CASE THAT MAKES GROUP THREE'S CORRECTION CHECKABLE RATHER THAN BELIEVED.
+
+      Fourteen `#`-prefixed residuals are FALSE GAPS: the room emits the exact string, built at
+      runtime from a bare id in an `{#each}` list. A substring sweep over source cannot see a string
+      the source never contains. That was recorded as prose until 2026-09-01, and prose is what goes
+      stale — group three's previous paragraph asserted the opposite for two weeks.
+
+      So each one is proved from the source rather than asserted: find the composing ATTRIBUTE, find
+      the `{#each}` list that feeds it, and require the bare id to be in that list. Both halves are
+      needed. The attribute alone would pass on a strip iterating something else entirely; the list
+      alone would pass on a list that no longer drives any `href` or `data-bs-target`.
+    */
+    const MODAL_HOST = readFileSync(
+      new URL('./components/ModalHost.svelte', import.meta.url),
+      'utf8'
+    );
+
+    /** The `{#each [...] as [tabId, label] (tabId)}` list nearest ABOVE a composing attribute. */
+    const listDriving = (attribute: string): string => {
+      const at = MODAL_HOST.indexOf(attribute);
+      expect(at, `\`${attribute}\` is not in ModalHost.svelte`).toBeGreaterThan(-1);
+      const opened = MODAL_HOST.lastIndexOf('{#each [', at);
+      expect(opened, `no {#each} above \`${attribute}\``).toBeGreaterThan(-1);
+      return MODAL_HOST.slice(opened, at);
+    };
+
+    const COMPOSED: readonly { attribute: string; ids: readonly string[] }[] = [
+      {
+        attribute: 'data-bs-target="#{tabId}"',
+        ids: [
+          'reset-session',
+          'close-session',
+          'lock-session',
+          'av-device-selection',
+          'streaming-selection',
+          'session-history',
+          'webinar-tools'
+        ]
+      },
+      { attribute: 'href="#{tabId}"', ids: ['obs-streaming', 'restream', 'stream-player'] },
+      { attribute: 'href="#nav-{tabId}"', ids: ['info', 'system', 'options', 'notes'] }
+    ];
+
+    /* Fourteen, and the count is asserted so a deleted entry cannot quietly weaken the claim. */
+    expect(COMPOSED.reduce((total, entry) => total + entry.ids.length, 0)).toBe(14);
+
+    for (const { attribute, ids } of COMPOSED) {
+      const list = listDriving(attribute);
+      for (const id of ids)
+        expect(list, `\`${id}\` must be in the {#each} that drives \`${attribute}\``).toContain(
+          `'${id}'`
+        );
+    }
+
+    /*
+      And the other half of the correction: exactly THREE `#`-prefixed residuals are real. Derived
+      from the table rather than listed twice, so closing one of them fails here until this is
+      updated — which is the point, because these three ARE work and the fourteen are not.
+    */
+    /*
+      SELECTOR-shaped, which is not the same as `#`-prefixed — and writing this check is what found
+      the difference. The first version filtered on `startsWith('#')` and caught `#ffcc00`, the
+      inline colour on `W0e` recorded four entries below. A hex colour is not a Bootstrap target and
+      has nothing to do with this correction, so the shape is required rather than the prefix.
+    */
+    const hashResiduals = ROWS.flatMap((row) => row.residuals).filter(
+      (value) => /^#[a-z][\w-]*$/i.test(value) && !/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(value)
+    );
+    const composedValues = new Set([
+      ...COMPOSED[0].ids.map((id) => `#${id}`),
+      ...COMPOSED[1].ids.map((id) => `#${id}`),
+      ...COMPOSED[2].ids.map((id) => `#nav-${id}`)
+    ]);
+    expect(hashResiduals.filter((value) => !composedValues.has(value)).sort()).toEqual([
+      '#discord-settings',
+      '#navbarsExampleDefault',
+      '#recordings'
+    ]);
   });
 
   it('and the surfaces audited by hand this week are among the covered', () => {

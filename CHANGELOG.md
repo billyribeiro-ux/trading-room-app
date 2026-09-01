@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 12:18 UTC — fourteen "gaps" that were never gaps, and the instrument now says so itself
+
+**Runtime impact: NO** — one contract case, and three records corrected. No source file changed.
+
+The const sweep's group three claimed *"the SELECTOR has no counterpart even where the pane it names
+is fully built"*. **That was wrong for fourteen of its rows, and it had been wrong for two weeks.**
+Those attributes are composed at runtime:
+
+    data-bs-target="#{tabId}"   the session-control tab strip     7 values
+    href="#{tabId}"             the streaming sub-tab strip       3 values
+    href="#nav-{tabId}"         the user-info tab strip           4 values
+
+Each `{#each}` iterates a literal list of bare ids, so the browser receives
+`data-bs-target="#reset-session"` character for character. A substring search over SOURCE cannot find
+a string the source never contains — a limitation of the instrument, not a gap in the room. Read the
+old way, fourteen rows looked like work; they are not work.
+
+`every #-prefixed residual with a composing site is emitted at runtime` replaces that prose with a
+check, and it needs both halves to pass: the composing ATTRIBUTE must exist, and the `{#each}` list
+nearest above it must contain the bare id. The attribute alone would pass on a strip iterating
+something else; the list alone would pass on a list that no longer drives anything. It also derives
+the genuinely-absent three — `#recordings`, `#discord-settings`, `#navbarsExampleDefault` — from the
+table rather than listing them twice, so closing one fails the case until it is updated.
+
+**Writing the check found a defect in the check.** The first version filtered residuals on
+`startsWith('#')` and caught `#ffcc00`, the inline colour on `W0e`. A hex colour is not a Bootstrap
+target; the filter requires selector SHAPE now, with the finding recorded at the regex.
+
+## Two stale records in the same file, corrected
+
+- The `app-room` note still argued `G08`'s overturned refusal in the present tense — *"an image that
+  can never show or one that always shows"* — for a feature built the previous day. Replaced with
+  what the ten readings of `presenterTalking` actually established.
+- `cssSoundCloudIcon` is reclassified from a refusal to a **false gap**. Const 176 declares `id`
+  twice and Angular keeps the second, so the reference's rendered DOM carries
+  `id="soundcloudDropdown"` — which is exactly what `NavbarSoundCloud.svelte` renders. Nothing is
+  missing from the page. It is also unwritable: the Svelte compiler was run against the markup with
+  both ids and returned `"Attributes need to be unique"` (`svelte/e/attribute_duplicate`), the same
+  limit as `FollowChatStylePane`'s four colour inputs. Both facts went into
+  `navbar-decoded-rows-contract.test.ts`, beside the `setUpAttributes` reading they belong with.
+
+  **The component was left untouched, deliberately.** `NavbarSoundCloud.svelte` sits exactly on its
+  201-line ceiling and already points at that contract; spending a ceiling line to repeat a record
+  the pointer already reaches is the churn the ratchet exists to prevent, and shortening the existing
+  prose to make room is what this repository's standard forbids by name.
+
+- `/assets/images/playing.gif` is the one genuine blocker left on that surface, and it is an ASSET,
+  not a decision: `static/assets/images/` holds six files and that is not one of them, and the
+  capture cannot supply it either — `docs/source-v4-2026-08-15/` is four files, JS + CSS + HTML, no
+  images. Transcribing the path renders a broken image on every play. **Unblocking needs the asset.**
+
+## Verification
+
+Two negative controls on the new case, each seen RED and restored: the composing attribute broken
+(`data-bs-target="#{tabId}"` → a literal), and one id removed from the `{#each}` list. They fail
+independently, which is what proves both halves carry weight.
+
+Room gate exit 0: `svelte-check` 1,599 files / 0 errors / 0 warnings; 316 test files / 5,679 passed /
+1 skipped. **Not opened in a browser.**
+
 ### 2026-09-01 11:31 UTC — two more `data-bs-*` pairs transcribed, and the extraction the ratchet had named twice
 
 **Runtime impact: NO** — three inert attributes and two component moves. No behaviour changed; the
