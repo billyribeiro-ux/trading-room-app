@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { parse } from 'svelte/compiler';
 import { describe, expect, it } from 'vitest';
@@ -48,6 +48,26 @@ import { describe, expect, it } from 'vitest';
 */
 
 const tracked = execSync("git ls-files 'src/**'", { encoding: 'utf8' }).trim().split('\n');
+
+/**
+ * Is this tracked path actually on disk?
+ *
+ * **THE SECOND TIME `git ls-files` HAS BITTEN THIS FILE IN ONE DAY, and the two bites are opposite
+ * halves of the same fact: the INDEX is not the FILESYSTEM.**
+ *
+ *   * A file that is new and uncommitted is on disk and NOT listed — which is what made the corpus
+ *     pin below wrong within the hour of being written.
+ *   * A file that is deleted and uncommitted is listed and NOT on disk — which threw `ENOENT` out
+ *     of `readFileSync` and took the whole room gate down, over a scratch file an agent removed.
+ *
+ * Neither is unusual. Both happen during any ordinary edit, rebase or stash, so any sweep built on
+ * `git ls-files` needs this guard; `reference-component-inventory-contract.test.ts` carries the
+ * same one after the same crash.
+ *
+ * `existsSync` rather than a `try`/`catch`, so a permissions error or a truncated read still fails
+ * loudly instead of being quietly counted as "not present".
+ */
+const onDisk = (file: string) => existsSync(file);
 const components = tracked.filter((file) => file.endsWith('.svelte'));
 
 /** Every STATIC class attribute value in a component, with its line. */
@@ -86,7 +106,9 @@ const staticClassValues = (file: string, source: string) => {
 };
 
 describe('no class name carries the fingerprint of a mechanical rename', () => {
-  const all = components.flatMap((file) => staticClassValues(file, readFileSync(file, 'utf8')));
+  const all = components
+    .filter(onDisk)
+    .flatMap((file) => staticClassValues(file, readFileSync(file, 'utf8')));
 
   it('found class attributes to inspect', () => {
     // Every assertion below is `toEqual([])`, which an empty corpus satisfies while proving nothing.
@@ -164,6 +186,7 @@ describe('and no sentence carries it either — the sweep the class rule could n
     const withComments = tracked.filter(
       (file) =>
         (file.endsWith('.ts') || file.endsWith('.svelte')) &&
+        onDisk(file) &&
         readFileSync(file, 'utf8').includes('media.recording')
     );
     /*
@@ -199,6 +222,7 @@ describe('and no sentence carries it either — the sweep the class rule could n
     for (const file of tracked) {
       if (EXEMPT.has(file)) continue;
       if (!file.endsWith('.ts') && !file.endsWith('.svelte')) continue;
+      if (!onDisk(file)) continue;
       const source = readFileSync(file, 'utf8');
       source.split('\n').forEach((line, index) => {
         if (PROSE.test(line)) offenders.push(`${file}:${index + 1} — ${line.trim().slice(0, 110)}`);

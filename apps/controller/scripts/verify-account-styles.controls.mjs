@@ -26,6 +26,28 @@ const scratch = mkdtempSync(join(tmpdir(), 'account-css-controls-'));
 
 const original = readFileSync(SOURCE, 'utf8');
 
+/**
+ * Proof that the verifier actually REACHED its comparison, printed by
+ * `verify-account-styles.mjs` immediately after the last declaration is judged and before any
+ * divergence, advisory or paintless report — so it is on stdout on the passing path and on the
+ * failing path alike.
+ *
+ * ## Why a marker is needed at all, and what it cost not to have one
+ *
+ * `run()` below cannot distinguish a verifier that ran and stayed silent from a verifier that never
+ * ran, because both hand back a string with no `expect` substring in it. For the `absent: true`
+ * controls that difference is the entire result: "the gate correctly declined to judge this" and
+ * "the gate died before it judged anything" both score QUIET (correct).
+ *
+ * That is not hypothetical. `verify-account-styles.mjs:39` pins its capture at an absolute path on
+ * the machine that took it, so on any other checkout it throws ENOENT during module evaluation and
+ * every probe gets an empty report. This harness then printed five QUIET (correct) lines — five
+ * controls reported as having behaved as designed by a verifier that had not executed a single
+ * assertion. A control harness exists precisely to refuse that kind of credit, so it now refuses it
+ * for itself: no marker, no verdict.
+ */
+const RAN_MARKER = 'account.css vs capture:';
+
 function run(css) {
   const file = join(scratch, `probe-${Math.random().toString(36).slice(2)}.css`);
   writeFileSync(file, css);
@@ -35,6 +57,27 @@ function run(css) {
     // exit 1 is the gate failing, which is the whole point; its report is on both streams
     return `${error.stdout ?? ''}${error.stderr ?? ''}`;
   }
+}
+
+/**
+ * The line of a crashed verifier's output that says WHY, so a failure is diagnosed rather than
+ * merely counted.
+ *
+ * Node prints the offending source frame first (`node:fs:440`, then the source line, then a blank
+ * line) and the actual message several lines down, so the first non-empty line is the least useful
+ * one on the page. The error line is preferred and the first non-empty line is the fallback, which
+ * covers a verifier that fails without throwing.
+ */
+function firstMeaningfulLine(report) {
+  const lines = report
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return (
+    lines.find((line) => /^(?:[A-Za-z]*Error|Uncaught)\b|\bError:/.test(line)) ??
+    lines[0] ??
+    '(the verifier produced no output at all)'
+  );
 }
 
 const results = [];
@@ -57,6 +100,14 @@ function control({ name, from, to, expect, absent = false, why }) {
     return;
   }
   const report = run(mutated);
+  /*
+    Checked BEFORE `expect`, and it is the only ordering that is honest: an empty report satisfies
+    every `absent: true` control for free. See `RAN_MARKER` above for the run this actually caught.
+  */
+  if (!report.includes(RAN_MARKER)) {
+    results.push({ name, status: 'VERIFIER DID NOT RUN', detail: firstMeaningfulLine(report) });
+    return;
+  }
   const hit = report.includes(expect);
   const passed = absent ? !hit : hit;
   results.push({
@@ -205,10 +256,11 @@ for (const result of results) {
     result.status === 'MISSED' ||
     result.status === 'FIRED (wrong)' ||
     result.status === 'ANCHOR LOST' ||
-    result.status === 'PROBE INERT'
+    result.status === 'PROBE INERT' ||
+    result.status === 'VERIFIER DID NOT RUN'
   )
     bad += 1;
-  console.log(`${result.status.padEnd(15)} ${result.name.padEnd(width)}  ${result.detail ?? ''}`);
+  console.log(`${result.status.padEnd(20)} ${result.name.padEnd(width)}  ${result.detail ?? ''}`);
 }
 console.log(`\n${results.length - bad}/${results.length} controls behaved as designed`);
 process.exit(bad === 0 ? 0 : 1);

@@ -43,14 +43,35 @@ const SERVICES_DIRECTORY = path.join(REPOSITORY_ROOT, 'services');
  *
  * Not reachable from here, and not remediable here either:
  *
- *   * `cargo tree --invert lru@0.8.1` is `lru -> mediasoup 0.24.3 -> tradingroom-media`. Nothing in
- *     this workspace constructs an `LruCache`; the caches are mediasoup's own internals, keyed on
- *     its identifiers. `EXPECTED_MEDIA_TRANSITIVES` below re-proves that confinement on every run,
- *     so this exception dies the moment anything else starts depending on `lru`.
- *   * The patch is `>=0.18.2` against a pin of `0.8.x` held by `mediasoup 0.24.3`. Only a mediasoup
- *     release can move it.
- *   * `services/**` is a MIRROR in this repository — a `Cargo.lock` edited here is lost on the next
- *     sync — so even the version bump has to be made at the source rather than in this tree.
+ *   * `cargo tree --invert lru@0.8.1` is `lru -> mediasoup -> tradingroom-media`. Nothing in this
+ *     workspace constructs an `LruCache`; the caches are mediasoup's own internals, keyed on its
+ *     identifiers. `EXPECTED_MEDIA_TRANSITIVES` below re-proves that confinement on every run, so
+ *     this exception dies the moment anything else starts depending on `lru`.
+ *   * The patch is `>=0.18.2` against a pin of `0.8.x` held by mediasoup. Only a mediasoup release
+ *     can move it.
+ *
+ *     THE MEDIASOUP VERSION IS DELIBERATELY NOT WRITTEN OUT in either bullet above, and the reason
+ *     is that it already went stale once here. Both said `mediasoup 0.24.3`, which stopped being
+ *     true on 2026-08-30 when the dependency-currency update took `services/media/Cargo.toml` from
+ *     `mediasoup = "0.24"` to `"0.27"`; the lockfile resolves 0.27.0 and it still pulls `lru 0.8.1`,
+ *     so every tuple pinned below was and remains correct while the prose beside them was not.
+ *     A version named in prose is a claim nothing checks — the same lesson
+ *     `verify-backend-provenance.mjs` records about counts duplicated into documents. The versions
+ *     that MUST be exact are the ones in `EXPECTED_WARNINGS` and `EXPECTED_VULNERABILITIES`, and
+ *     those are compared as an exact set in both directions on every run.
+ *   * THE THIRD REASON THIS LIST USED TO GIVE WAS FALSE, and it is corrected here rather than
+ *     quietly dropped, because the claim has already cost real time and a deleted sentence teaches
+ *     nobody. It read: "`services/**` is a MIRROR in this repository — a `Cargo.lock` edited here
+ *     is lost on the next sync — so even the version bump has to be made at the source rather than
+ *     in this tree." There is no sync, in either direction.
+ *     `apps/controller/scripts/verify-backend-provenance.mjs` searched for one, found none, and
+ *     records the owner confirming on 2026-08-12 that the sibling repositories are reference only;
+ *     the root `CLAUDE.md` now states that `services/**` is AUTHORED here and that this repository
+ *     is its authority. `services/Cargo.lock` is in fact one of the files that verifier pins
+ *     individually in `DIVERGED_FROM_IMPORT`, precisely because it HAS been edited here and the
+ *     edit persisted. So a bump is governed rather than impossible — it needs a re-pin and a
+ *     CHANGELOG entry, not a trip to another repository. What still blocks this particular one is
+ *     the bullet above: mediasoup has to move its own pin first.
  */
 const EXPECTED_WARNINGS = Object.freeze(
   [

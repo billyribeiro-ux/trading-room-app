@@ -87,9 +87,33 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
   const email = url.searchParams.get('email')?.trim().toLowerCase();
   if (!email) error(400, 'A member is required.');
 
+  /*
+    THE PROJECTION IS NAMED, and `select({ user: users })` was not the read it looked like.
+
+    Selecting the whole `users` row pulled `password_hash` — along with `account_id`,
+    `email_verified_at` and `created_at` — for EVERY member of the room, in order to answer a
+    question about ONE member's device. Nothing below reads any of those four: the match needs
+    `users.email`, the trial gate needs `room_users.is_free_trial`, and `sendTestPushToMember`
+    needs `room_users.id`.
+
+    A credential column nothing reads is a credential column that should never leave the database.
+    This handler answers the room application, and the docblock above already argues that the
+    per-registration detail must not travel because a member triggers this about themselves; a
+    password hash for every OTHER member of the room, materialised in the same function, is the
+    same argument one step further back.
+
+    WHAT IS DELIBERATELY UNCHANGED: the full-roster scan, and the JS `.find`. The comparison
+    normalises with `.trim().toLowerCase()` because `users.email` is NOT guaranteed normalised —
+    `0001_baseline.sql` is byte-identical to the captured legacy schema and its rows came with it —
+    so moving the predicate into SQL as `eq(users.email, email)` would silently stop matching rows
+    that match today. Reported rather than half-fixed here.
+  */
   const membership = (
     await getDb()
-      .select({ roomUser: roomUsers, user: users })
+      .select({
+        roomUser: { id: roomUsers.id, isFreeTrial: roomUsers.isFreeTrial },
+        user: { email: users.email }
+      })
       .from(roomUsers)
       .innerJoin(users, eq(roomUsers.userId, users.id))
       .where(eq(roomUsers.roomId, room.id))

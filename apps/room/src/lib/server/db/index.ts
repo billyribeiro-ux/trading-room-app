@@ -769,15 +769,39 @@ export function ensureDatabase() {
       (sqlite.pragma(`table_info(${table})`) as Array<{ name: string }>).map((c) => c.name)
     );
     if (existing.size === 0 || existing.has('room_short_code')) continue;
-    sqlite.exec(create);
-    sqlite
-      .prepare(
-        `INSERT INTO ${table}_scoped (${columns}, room_short_code)
-         SELECT ${columns}, ? FROM ${table}`
-      )
-      .run(REFERENCE_ROOM);
-    sqlite.exec(`DROP TABLE ${table}`);
-    sqlite.exec(`ALTER TABLE ${table}_scoped RENAME TO ${table}`);
+    /*
+      ALL FOUR STEPS OR NONE OF THEM.
+
+      The four ran unwrapped until 2026-09-01, and a crash — a deploy, an OOM, a `docker stop` —
+      between `DROP TABLE` and `RENAME TO` did not lose data so much as BRICK THE DATABASE. Trace
+      the next boot: the opening `CREATE TABLE IF NOT EXISTS` recreates the unscoped
+      `hidden_room_items`, the guard above sees a table with no `room_short_code` and enters this
+      block again, and `CREATE TABLE hidden_room_items_scoped` throws *table already exists*
+      because the orphan from the interrupted run is still there. `ensureDatabase` then throws on
+      every request, forever, and no later boot can clear it — the same permanent, forward-only
+      migration failure `CLAUDE.md` records having already happened once to a database here.
+
+      This is not a hypothetical branch, either: a FRESH database takes it. The `CREATE TABLE IF
+      NOT EXISTS` block above still declares both tables in their original unscoped shape, so
+      every new database is created unscoped and immediately rebuilt here.
+
+      SQLite runs DDL inside a transaction like anything else, so wrapping the four makes the
+      rebuild atomic: either the renamed table is there or the original still is, and the guard
+      above reads a consistent answer in both cases. Verified against this exact sequence —
+      CREATE, INSERT…SELECT, DROP, RENAME — under better-sqlite3, including that a throw partway
+      leaves the ORIGINAL table in place and no `_scoped` orphan behind.
+    */
+    sqlite.transaction(() => {
+      sqlite.exec(create);
+      sqlite
+        .prepare(
+          `INSERT INTO ${table}_scoped (${columns}, room_short_code)
+           SELECT ${columns}, ? FROM ${table}`
+        )
+        .run(REFERENCE_ROOM);
+      sqlite.exec(`DROP TABLE ${table}`);
+      sqlite.exec(`ALTER TABLE ${table}_scoped RENAME TO ${table}`);
+    })();
   }
 
   bootstrapped = true;

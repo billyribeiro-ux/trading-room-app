@@ -45,7 +45,293 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
-### 2026-09-01 21:05 UTC — the Svelte MCP came back, and the first thing through it was the card
+### 2026-09-01 22:12 UTC — a stored-XSS fix that had no test, and I committed an agent's scratch file
+
+**Runtime impact: NONE from this entry.** The fix it guards already shipped; what lands here is the
+test, and two sweeps that could crash a gate.
+
+## An upload could become a document in the room's own origin
+
+`shared_files.content_type` is `file.type` straight from the uploader's browser, written unvalidated.
+`uploadComposerImage` narrows it to `image/`, which still admits `image/svg+xml`, and it is reachable
+by an ORDINARY PARTICIPANT whenever `userUploads` is on. Served back as `Content-Disposition: inline`,
+a member could upload `<svg><script>…</script></svg>`, post the link in chat, and have every reader
+who followed it run the uploader's script as a document in the room's origin, with the room session
+cookie. `nosniff` does not help: nothing is being sniffed — the type is being ASSERTED by the
+attacker.
+
+The fix — a deny-by-default allow-list of types a browser renders and cannot execute, everything else
+`attachment` plus `default-src 'none'; sandbox` — came from the whole-project audit and is right. The
+controller already refuses SVG on badge upload in as many words.
+
+**Its only test was a scratch file called `zz-tmp-upload-disposition.test.ts`, and the agent deleted
+it.** A stored-XSS control with no test is one refactor from gone. `upload-disposition-contract.test.ts`
+drives the REAL handler over REAL rows across ten content types — including `text/xsl`, the one a
+deny-list always forgets — and asserts the sandbox CSP, `nosniff` on both branches, the deliberate
+ABSENCE of a CSP on the inline branch, and the 404 for another room's file. **Six negative controls,
+six seen red**, the first admitting SVG to the allow-list again.
+
+## I committed that scratch file
+
+`768e713` carries 69 lines of an agent's temp probe, because I used `git add -A` without reading a
+NEW file. I had been reviewing agent EDITS line by line and let an added file through unread. Its
+deletion lands here.
+
+## `git ls-files` bit me twice in one day, in opposite directions
+
+The index is not the filesystem:
+
+* A file that is **new and uncommitted** is on disk and NOT listed — which made
+  `mechanical-rename-contract`'s corpus pin wrong within the hour of being written.
+* A file that is **deleted and uncommitted** is listed and NOT on disk — which threw `ENOENT` out of
+  `readFileSync` and **took the whole room gate down**, in two files, over that scratch file.
+
+Neither state is unusual; both happen during any ordinary edit, rebase or stash. Both sweeps now
+carry an `existsSync` guard — `existsSync` and not a `try`/`catch`, so a permissions error or a
+truncated read still fails loudly rather than being quietly counted as "not present". The lesson is
+written at the guard, because the next sweep built on `git ls-files` will need it too.
+
+## One more from the audit, kept for its calibration as much as its fix
+
+`internal/room-setting` called `request.json()` and then read `.name` off the result. `JSON.parse`
+accepts every JSON value: `null` parses fine and then throws a TypeError, which SvelteKit turns into
+a 500 for what is plainly a malformed request. The comment states the severity honestly — *"Nothing
+was unsafe about that: the write never happened, and only a holder of a valid `config-write`
+capability can reach this line. But a 500 is this application saying 'I broke', and it must not be
+the answer to input."* The 400 already existed; it was unreachable for that one body.
+
+---
+
+### 2026-09-01 22:00 UTC — a client-supplied field was ordered ahead of the authenticated session
+
+**Runtime impact: YES.** The email that decides who enters a room, which room rules apply to them,
+and which identity the room is handed, is now taken from the authenticated controller session before
+anything the client sent.
+
+## The defect, and the file that already forbade it
+
+`(public)/session/[code]/+page.server.ts` resolved the entering member as:
+
+```ts
+const email = String(form.get('email') ?? locals.user?.email ?? storedIdentity?.email ?? '')
+```
+
+A CLIENT-SUPPLIED FIELD, ahead of the authenticated session. The same file's `load` states the
+opposite rule in as many words — *"The authenticated controller session is the identity authority. A
+remembered room guest is only a fallback; it must never replace the account that just launched the
+room from the controller"* — so the comment and the line under it disagreed, and the line is what
+runs. That is the 2026-08-07 privilege escalation's shape, which CLAUDE.md names and forbids.
+
+**A second defect in the same expression.** `??` falls through only on `null`/`undefined`. A
+submitted-but-BLANK field is `''`, a real value, so `email=` alone stopped the chain and handed an
+EMPTY identity to `decideRoomEntry` for a signed-in account. `||` falls through the empty string too.
+
+Found by the whole-project audit; the fix is the audit's, the verification and the test are mine.
+
+## The test, which the fix did not have
+
+Nothing enforced the precedence. A fix with no guard gets re-broken, and CLAUDE.md's unit of work is
+*"the reason and the test that enforces it"*. `identity-precedence-contract.test.ts` asserts the
+ORDER inside the expression, the `||`, that an anonymous guest's typed email still admits them, and
+that the decision is still delegated to `decideRoomEntry` rather than re-made locally.
+
+**Four negative controls, four seen RED** — the first of them restores the original defect exactly.
+
+It reads STRIPPED source, and that is load-bearing for the reason eight other files here record: this
+test's own docblock quotes the defective expression verbatim, and an unstripped read would match the
+prose describing the bug instead of the code. Its line-finder is anchored on `locals.user` rather
+than on `const email =`, because a `parseStoredIdentity` helper forty lines above declares
+`const email` too — the first draft found that one and reported `-1` for everything.
+
+## Two more from the same audit, verified before being kept
+
+* **`stream-read` and `mobile-restore` selected the whole `users` row** — `password_hash`,
+  `account_id`, `email_verified_at`, `created_at` — for EVERY member of the room, to answer a
+  question about one. Nothing downstream reads any of the four; verified by reading the only two
+  field accesses that follow (`user.email` at :103 and `roomUser.role` at :115) and confirming the
+  response carries no member data at all. A credential column nothing reads is one that should never
+  leave the database.
+* **`register` hashed the password inside the transaction.** `hashPassword` is `scryptSync` —
+  deliberately slow AND synchronous — so every signup pinned a pooled PostgreSQL connection and
+  blocked the event loop for its duration, for no benefit: the hash depends on nothing the
+  transaction reads. `setPasswordFromReset` already hoists its own for exactly this reason; the two
+  password writers now agree.
+
+Room gate 338, controller gate 110 — both exit 0.
+
+---
+
+### 2026-09-01 21:15 UTC — the 100% was true of a list that could not contain the gap
+
+**Runtime impact: NONE.** One new gate, one vacuous gate repaired, two warnings answered.
+
+## `todo-next.md` says 93 of 93 surfaces, 100.0%. It counts our files.
+
+That number is true of what it measures, and what it measures is a table with **one row per file in
+`apps/room/src`**. A reference component this room never built has no file, so it can never appear
+in that table. **100% of a list that cannot contain the gap says nothing about the gap.**
+
+The bundle's own selector list had never been enumerated. Doing it — every `selectors:[["…"]]` in
+the pinned v4 bundle, minus the seventeen vendor ones — gives **fifty components this application
+answers for**. Forty-nine are built. One was in no tracker anywhere:
+
+**`app-session-transcript`.** Zero occurrences of the name in `apps/room/src`. It is not a fragment:
+it is a ROUTE (`{path:"session-transcript"}`, byte 2,606,654) and `app-root` swaps the whole outlet
+for it (`O(1, o.isTranscriptRoute ? -1 : 1)`, byte 2,603,128). A date picker, a search box, 300-row
+pagination, a loading spinner and an error state, opened by the speech-reco overlay's "Full
+Transcript History" button (`openTranscriptPage()`, byte 1,952,652).
+
+`reference-component-inventory-contract.test.ts` is that count now — the only check here that can
+see a surface nobody started. Five negative controls, five seen red.
+
+## Why the transcript page is a recorded refusal and not a build
+
+The controls that open it are already built and already refuse honestly. What was recorded at them
+was *"nothing in this repo produces a transcript. `currentCaption` is never assigned"*, and **that
+detail is wrong**: this room runs speech recognition and RELAYS every line — `recording.ts:456`
+requests `sendSpeechReco` on the media signalling socket.
+
+The conclusion survives for a different reason. Nothing PERSISTS them: there is no caption or
+transcript table in `server/db/schema.ts`, and the reference fills its page from
+`POST ${apiROOT}/sessions/v2/getSessionTranscript`, a server endpoint we do not have. The PAGE is
+transcribable; the DATA is not, and inventing a store is what this repository forbids by name.
+Unblocked by caption persistence — a schema decision, not a transcription.
+
+## A gate that could not fail, and the control that took two goes
+
+`verify-breakpoints.mjs` sliced a media query's "block" from its header to the NEXT `@media`, or to
+END OF FILE when there was none. For the last query in a stylesheet that is the entire rest of the
+file. `manage.css` has exactly one media query, so `.mg-root [class*='col-sm-'] { float: left }`
+satisfied its *"inside min-width: 768px"* assertion **from any line of the file** — 49,074 bytes of
+unconditional stylesheet read as though it sat inside the query.
+
+The fix counts braces from the query's own `{`. What is worth recording is the control:
+
+* **Deleting the whole `@media` and inlining its rules is NOT the control.** I ran that first and
+  both spellings went red — `indexOf(header)` returns -1 and the loop never runs. It proves nothing
+  about the slice, and I had reported it as the control before checking.
+* **Moving the guarded rule OUT of the block while keeping the header IS.** That is the real
+  regression — responsive gate lost, rule still present. **Old slice: exit 0, green. Fixed: exit 1.**
+
+A control that fails for the wrong reason looks like proof and is not. Both halves are now written
+at the function.
+
+## A second vacuous gate, in the tenancy artifacts
+
+`verify-postgres-schema-artifacts.mjs` asserted that `__drizzle_migrations` carries RLS. It checked
+`recreateForceRls` and `recreateEnableRls`, both built from regexes anchored on
+`^ALTER TABLE(?: ONLY)? public\.([a-z_]+)` (lines 249, 254) — and the tables inventory twenty lines
+above pins that table as `drizzle.__drizzle_migrations` (line 238). **The two `includes` could never
+be true**, so the assertion was green by construction rather than by evidence.
+
+Verified by reading both anchors. The fix scans the `drizzle` schema explicitly and KEEPS the two
+original clauses, on the argument that a `public.__drizzle_migrations` would be a different defect —
+the table changing schema — and dropping that check to add the missing one would trade one blind
+spot for another.
+
+## I RE-DATED SIX HEADINGS, BECAUSE I MADE THE EXACT MISTAKE THIS FILE DOCUMENTS
+
+This file's own header describes 54 timestamps corrected on 2026-09-01, *"each one written as 'a bit
+after the last'"*, eleven of them naming a day the work did not happen on. I then wrote six more the
+same way — and two of them were **in the future** when `changelog-ledger-contract` ran, which is the
+check that exists for precisely this and which caught it.
+
+Four others were dated after the commit that carried them: `63da9bc` landed at 20:07 and its entries
+claimed 20:14 and 20:38. They passed the "not in the future" test only because real time had moved
+past them by the time it ran.
+
+All six now carry the committer timestamp of the commit that carries them, read with
+`git show -s --format=%cI` — which is what the header prescribes and what I should have done rather
+than estimating forward. Several entries share a time as a result. That is correct: it is the
+measured fact, where a spread would be a guess dressed as precision.
+
+## And one failure that is NOT a defect, stated rather than waved away
+
+The controller gate also failed `money.test.ts` — *"is exact for every cent from $0.00 to
+$20,000.00"*. It is a **timeout at 5,000 ms on an exhaustive 2,000,001-iteration loop**, not a wrong
+answer, and it happened with five workflows and two gates running on one box. Re-run alone: **20
+tests, all passing.** `money.ts` has not been touched in this session — its last commit is `4bd9931`.
+Recorded because "a money test failed" is exactly the sentence that must never be left ambiguous.
+
+## Two `state_referenced_locally` warnings, answered rather than suppressed
+
+`create-room.svelte.ts` reads `data.sessData?.autoSwitchToOfftopics` eagerly. The note at
+`new RoomPrefs` demands such a read be ANSWERED — is it a seed, or has the room stopped following
+the server? — and it is answered from the RECEIVING end: `RoomChat` declares the prop as *"a VALUE,
+not a thunk, and that is the difference between a seed and a lock"* (`chat.svelte.ts:154-158`), and
+its whole use is choosing the column's opening channel. A thunk would be a lock.
+
+The second suppression is not a duplicate: `svelte-ignore` covers the single statement that follows
+it, so the one above `swingAlerts` stops at that `const`.
+
+---
+
+### 2026-09-01 20:59 UTC — "no amount of tooling removes that" was wrong, and the difference is the price
+
+**Runtime impact: NONE.** Two documents corrected and two comments made true.
+
+## Row R said rows 6 and 8 need a human. They need a display.
+
+`MEASURE-SHARE-QUALITY.md` has said since 2026-08-11:
+
+> `getDisplayMedia` requires a real user gesture and an operating-system screen-picker dialog.
+> Browser automation can drive a page; it cannot click an OS dialog. So this needs a human for the
+> thirty seconds it takes, and **no amount of tooling removes that**.
+
+**The picker is not what stops it.** Chromium ships `--auto-select-desktop-capture-source=<title>`
+for exactly this, and driven under `xvfb-run` with headed Chromium 1194 it works: no picker appears
+and the call never returns `NotAllowedError`. Permission is granted and the source is selected.
+
+What it returns on six attempts is `NotReadableError: Could not start video source` — this
+container's Xvfb display has no surface the X11 capturer can open. Also tried and still failing:
+`preferCurrentTab` with `--auto-accept-this-tab-capture`, `--enable-usermedia-screen-capturing`,
+`--use-gl=swiftshader`, and `+extension COMPOSITE +extension DAMAGE +extension RANDR` on the server.
+
+**The distinction is the whole value of the re-measurement.** A picker needing a human is a
+permanent per-run cost no CI can pay. A display with no capturable surface is an environment fixed
+once. Rows 6 and 8 are blocked on a CAPTURABLE DISPLAY, not on a PERSON, and those have very
+different prices.
+
+One more correction in the same pass: the "headless returns Chrome's synthetic gradient" claim is
+about `--use-fake-device-for-media-stream`, a DIFFERENT flag that applies to `getUserMedia` cameras
+rather than desktop capture. It was not used in any of the six attempts, so it is not what failed
+and it is not evidence that automation cannot work.
+
+**What is unchanged:** the measurement still needs a real viewer attached, because an encoder with
+nobody receiving has no reason to spend bits. The human procedure is not deleted — until a
+capturable display exists it is still the only way this gets measured.
+
+## Two comments that no longer matched the line under them
+
+Both found by the whole-project audit and both verified here against the code before being kept:
+
+* `chat-mute.ts` said "THE PRESENTER'S TWO BUTTONS" and "the two commands" four times over.
+  `ChatMuteCommands` declares THREE — `muteChat`, `muteChatIndefinitely`, `unmuteChat` — since
+  `mute-chat-indefinitely` was built. Comment-only.
+* `carousel.ts`'s `numericRange` was documented as *"Clamps an untrusted value into a range"*. It
+  does not clamp; it REJECTS. `note-carousel.test.ts:103` pins `numericRange(61, 1, 60, 5) === 5`,
+  so the code and its test never disagreed and the docblock was the only thing saying otherwise —
+  which is exactly the drift that gets "simplified" into a clamp by the next reader. Rejecting is
+  also what `sanitizedCarouselConfig` does with the same two ranges, and it has to.
+
+## And one finding held back deliberately
+
+`modalTargetFromRosterRow` gives EVERY roster row `permissions: 'a'`: the test is
+`user.role === 'user' ? 'r' : 'a'` and `RoomRole` is `'admin' | 'staff' | 'member'` — there is no
+`'user'`, so the true arm is unreachable. Four consequences measured, including
+`roster-private-chat.ts:36`, where `(permissions === 'a' || hasAdminChat === true)` means
+`hasAdminChat` is never consulted and UIM-04's gate is short-circuited.
+
+**Severity MEDIUM, not an escalation, and that is measured rather than assumed:**
+`canShowRosterPrivateChat` is a client-side VISIBILITY helper; server-side delivery has its own
+independent rules and `media-grant.test.ts:296` asserts a grant "does not admit on hasAdminChat".
+
+Not fixed in this commit **because the file is inside a running workflow's shard** and a concurrent
+edit would corrupt its work. Recorded so it cannot be lost to a dropped agent report.
+
+---
+
+### 2026-09-01 20:28 UTC — the Svelte MCP came back, and the first thing through it was the card
 
 **Runtime impact: NONE.** One expression changed form; the rendered output is identical.
 
@@ -111,7 +397,7 @@ crates are named `tradingroom-api` and `tradingroom-media`, NOT their directory 
 
 ---
 
-### 2026-09-01 20:38 UTC — the fifteenth casualty of a rename, found by reading my own diff
+### 2026-09-01 20:07 UTC — the fifteenth casualty of a rename, found by reading my own diff
 
 **Runtime impact: YES, one sentence.** A member whose browser blocks the recording preview window was
 told to *"open the downloaded **media.recording** from your Downloads folder"*.
@@ -166,7 +452,7 @@ guards against with a count, and a floor of five would sit green through four fi
 
 ---
 
-### 2026-09-01 20:14 UTC — `softResetDone` had four subscribers and this room knew about one
+### 2026-09-01 20:07 UTC — `softResetDone` had four subscribers and this room knew about one
 
 **Runtime impact: YES.** A soft reset now clears the recording flag and the reminder banner, and cuts
 the PRESENTER's own microphone and camera — the last of which was a recorded divergence until today.
@@ -246,7 +532,7 @@ down" is supposed to look like when a file grows for a good reason.
 
 ---
 
-### 2026-09-01 19:52 UTC — `stopRecMsg`, and the sentence that was holding two rows
+### 2026-09-01 20:07 UTC — `stopRecMsg`, and the sentence that was holding two rows
 
 **Runtime impact: YES.** When a room's server sends `stopRecMsg`, every browser in it now raises the
 toast the reference raises — an error one when the server's wording contains "Stopped", an info one
@@ -328,7 +614,7 @@ so it cannot execute what it decodes.
 
 ---
 
-### 2026-09-01 19:30 UTC — `app-rec-preview` was never blocked; the blocker was a command nobody had transcribed
+### 2026-09-01 20:07 UTC — `app-rec-preview` was never blocked; the blocker was a command nobody had transcribed
 
 **Runtime impact: YES.** A presenter in a room whose server sends `setRecPreview` now gets the
 reference's recording preview card: it shows on `startRec`, refreshes its frame once a second,

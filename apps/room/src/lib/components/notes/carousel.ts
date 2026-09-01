@@ -35,7 +35,20 @@ export type CarouselSlide = {
 export const CAROUSEL_NODE = 'ptrCarousel';
 
 /**
- * Clamps an untrusted value into a range, falling back when it is not a finite number at all.
+ * VALIDATES an untrusted value against a range. In range it is returned unchanged; everything else
+ * — a value that is not a finite number at all, and equally a finite one the range refuses —
+ * becomes the fallback.
+ *
+ * **It does not clamp, and this summary line said "Clamps ... into a range" until 2026-09-01.** That
+ * is the reading a caller acts on: a clamp would make `numericRange(200, 10, 100, 90)` answer 100,
+ * and it answers 90. The code and its test never disagreed — `note-carousel.test.ts` names its case
+ * *"accepts a number inside the range and rejects everything else"* and pins
+ * `numericRange(61, 1, 60, 5) === 5` — so the docblock was the only thing saying otherwise, which is
+ * precisely the drift that gets "simplified" into a clamp by the next reader.
+ *
+ * Rejecting rather than clamping is also what `sanitizedCarouselConfig` in `safe-html.ts` does with
+ * these same two ranges, and it has to: the sanitiser sees the same `data-ptr-carousel` attribute on
+ * the way to the DOM. A clamp here would silently accept a config that one refuses outright.
  *
  * Stored notes carry whatever the reference wrote, and a hand-edited `data-ptr-carousel` carries
  * whatever somebody typed, so every number out of that attribute goes through this.

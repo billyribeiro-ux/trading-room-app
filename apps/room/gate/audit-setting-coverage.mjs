@@ -6,17 +6,36 @@
 
   `audit-feature-coverage.mjs` next door asks the bundle what COMMANDS the reference has. Nothing
   asked it what SETTINGS it reads. The two are different surfaces and the second is larger: the
-  controller's `room-settings-schema.ts` carries 269 settings, and **202 of them are marked
-  `wired: false`** — meaning nothing in this room reads them.
+  controller's `room-settings-schema.ts` declares every room setting and marks most of them
+  `wired: false` — meaning nothing in this room reads them.
 
-  That number on its own says nothing. Most of those 202 are manage-page concerns that were never
-  meant to reach a room. The question worth asking is narrower and answerable: **which of them does
-  the reference's own room client read?** Each one of those is a room-facing behaviour the reference
-  has and this room does not.
+  That total on its own says nothing. Most of the unwired ones are manage-page concerns that were
+  never meant to reach a room. The question worth asking is narrower and answerable: **which of them
+  does the reference's own room client read?** Each one of those is a room-facing behaviour the
+  reference has and this room does not.
 
-  Measured 2026-08-28 against the pinned v4 bundle: **58 of the 202**.
+  Run this file for the answer. It prints the declared total, how many this room reads, and the
+  names of the unwired ones the reference reads — measured against the pinned bundle on the day you
+  ask, which is the only form of that number worth quoting.
 
-  ## ⚠️ FIFTY-EIGHT QUESTIONS, NOT FIFTY-EIGHT GAPS ⚠️
+  ## ⚠️ THE NUMBERS THAT USED TO BE IN THIS PARAGRAPH, and why they are gone ⚠️
+
+  It read *"carries 269 settings, and **202 of them are marked `wired: false`**"*, then *"Most of
+  those 202"*, then *"Measured 2026-08-28 against the pinned v4 bundle: **58 of the 202**"*, under a
+  heading that said FIFTY-EIGHT twice. Every one of those was stale by the time it was audited: the
+  schema still declares 269, but 105 are wired and **164** are not, and the reference reads **26**
+  of those 164 — not 58. Thirty-eight settings were wired after the sentence was written and the
+  sentence did not move with them.
+
+  `setting-coverage-contract.test.ts` had already learned this and said so in as many words —
+  *"NO COUNTS IN THIS PARAGRAPH ANY MORE, corrected 2026-08-28. It said '202' twice and
+  'fifty-eight' once, in the present tense, and all three were stale within a day"* — and removed
+  them from ITS head. The identical three numbers were left standing here, in the file that
+  produces them, which is the copy somebody quotes. So the same correction is applied to the same
+  prose: the LIST is the fact, the measurement is what this script prints, and a number typed beside
+  either is the copy nobody updates. The pinned-by-name list lives in that contract test.
+
+  ## ⚠️ QUESTIONS, NOT GAPS ⚠️
 
   The same warning the command audit carries, and it bites harder here, because there are three
   distinct reasons a name on this list is not work:
@@ -24,7 +43,14 @@
   1. **It is a CREDENTIAL, and the reference reading it in the browser is the defect this room
      deliberately does not reproduce.** `deleteAlertPW`, `banIPList`, `obsStreamKey`, `twillioApiSID`
      and `modAdminLoginList` are all on the list because upstream ships them to every member's
-     browser. `room-config-boundary.test.ts` refuses exactly that, and `internal/room-entry` is the
+     browser — and so are `allRoomsWelcomeMatPW` and `needPasswordForUserNotes`, which joined on
+     2026-08-28 when the bundle was read entry by entry for the triage document. **SEVEN, not five.**
+     This sentence named five for as long as the other two were on the list, and it is the sentence
+     a person reads while choosing what to wire next; `setting-coverage-contract.test.ts` carries
+     the authoritative seven in `CREDENTIALS_THE_REFERENCE_LEAKS` and asserts none of them ever
+     leaves the list. Neither of the two added ends in a credential-shaped suffix — the second does
+     not contain one at all — which is exactly why they are written out rather than matched.
+     `room-config-boundary.test.ts` refuses exactly that, and `internal/room-entry` is the
      shape this room uses instead: the credential stays on the controller and the QUESTION travels.
      Wiring one of these would be a regression wearing an enumeration's clothes.
   2. **It is built under another mechanism.** A setting can be honoured without this room ever

@@ -59,6 +59,53 @@ const refIcons = all
   .filter((n) => n.tag === 'i' && n.rect.x >= refUl.rect.x && n.rect.x < refUl.rect.x + refUl.rect.w)
   .sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
 
+/*
+  THE VACUITY FLOOR — every selection above had to be able to come back EMPTY and say so.
+
+  The three lists are built by ARITHMETIC on rects, not by a selector: a row belongs to the menu
+  when its `rect.x` is exactly `refUl.rect.x + 1`, an exact float comparison against a number that
+  comes out of a re-capture. Nothing downstream noticed when that matched nothing. `refLis.forEach`
+  and `refIcons.forEach` simply pushed no CHECKS, the six static ones survived, and the run printed
+  `Actions With Selected menu  6/6 exact` and exited 0 — a PASS, from a file whose own first
+  paragraph says it compares *"the toggle pair, the caret, the `<ul>`, all ten `<li>`, the element
+  inside each one, and every `<i>` glyph"*. A green headline over twenty-odd comparisons that were
+  never made is worse than no check, because it is the line somebody quotes.
+
+  MEASURED, not argued: run against a capture holding the wrapper, the span, both toggles, the caret
+  and the `<ul>` but no rows at all, this script walked past the emptiness without a word and got as
+  far as launching Chrome. That is the exact shape a re-capture with a shifted `<ul>` origin takes.
+
+  Floors rather than counts, deliberately. The ten is this file's own reading of the capture and
+  cannot be re-measured from a checkout that does not hold the dump, so pinning `=== 10` here would
+  be typing a number nobody verified — the failure this repository keeps meeting. What IS checkable
+  without the evidence is that each list is non-empty and that the rows and their contents came back
+  in equal number, which is what makes the CHECKS below cover the menu rather than its frame.
+*/
+for (const [what, node] of [
+  ['the .users-many-actions wrapper', refWrap],
+  ['the open .dropdown span', refSpan],
+  ['the .caret', refCaret],
+  ['the ul.dropdown-menu', refUl]
+]) {
+  if (!node) throw new Error(`${capture}: ${what} is not in the capture — nothing below can be compared to it`);
+}
+if (refToggles.length !== 2) {
+  throw new Error(`${capture}: expected the two dropdown toggles, found ${refToggles.length}`);
+}
+if (refLis.length === 0 || refAnchors.length === 0 || refIcons.length === 0) {
+  throw new Error(
+    `${capture}: the open menu's contents did not match at x === ul.x + 1 (${refUl.rect.x} + 1) — ` +
+      `li=${refLis.length}, a=${refAnchors.length}, i=${refIcons.length}. ` +
+      'Re-derive the row origin from the capture; do not run with an empty comparison set.'
+  );
+}
+if (refAnchors.length !== refLis.length) {
+  throw new Error(
+    `${capture}: ${refLis.length} menu row(s) but ${refAnchors.length} row element(s); ` +
+      'the two are indexed together below, so a mismatch pairs a row with somebody else’s anchor.'
+  );
+}
+
 /** [label, our selector, reference rect, axes] */
 const CHECKS = [
   ['wrapper', '.mg-root .users-many-actions', refWrap.rect, 'xywh'],

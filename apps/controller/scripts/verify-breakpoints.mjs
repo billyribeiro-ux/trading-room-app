@@ -18,13 +18,55 @@ function widthThresholds(source) {
   return [...values].sort((a, b) => a - b);
 }
 
+/*
+  A QUERY'S BLOCK ENDS AT ITS OWN CLOSING BRACE, NOT AT THE NEXT `@media`.
+
+  The first spelling of `mediaBlock` sliced from the header to the next `@media ` in the file, and to
+  END OF FILE when there was none. That slice is not the block. Everything written after the query
+  closes and before the next one opens — which, for the last media query in a stylesheet, is the
+  entire rest of the file — was read as though it sat inside the query.
+
+  Measured on this tree, 2026-09-01, as bytes of unconditional stylesheet that the old slice handed
+  to each assertion: `manage.css` 49,074, `auth.css` 9,164, `account.css` 5,545, `public.css` 4,207.
+  `manage.css` has exactly one media query, so `.mg-root [class*='col-sm-'] { float: left }`
+  satisfied its "inside min-width: 768px" assertion from ANY line of the file.
+
+  THE CONTROL, and it took two goes to state precisely — re-run 2026-09-01:
+
+    * **Deleting the whole `@media` and inlining its rules is NOT the control.** Both spellings go
+      red on it, because `indexOf(header)` then returns -1 and the loop never runs. Reported as the
+      control at first; it proves nothing about the slice.
+    * **Moving the guarded rule OUT of the block while KEEPING the header and the block IS.** That
+      is the real regression — the responsive gate lost, the rule still in the file — and it is
+      exactly what the old slice could not see: **old exit 0 (green), fixed exit 1 (red).**
+
+  The distinction matters beyond this file: a control that fails for the wrong reason looks like
+  proof and is not.
+
+  Braces are counted from the query's own `{`, so a nested `@media`/`@supports` is included and a
+  sibling one is not. A header whose block never closes is a truncated stylesheet: `blockOf` returns
+  null, the candidate is skipped, and the assertion fails rather than reading on to end of file.
+*/
+function blockOf(source, at, headerLength) {
+  const open = source.indexOf('{', at + headerLength);
+  if (open === -1) return null;
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    else if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(at, index + 1);
+    }
+  }
+  return null;
+}
+
 function mediaBlock(source, query, selector, declaration) {
   const header = `@media (${query})`;
   let queryAt = source.indexOf(header);
   while (queryAt !== -1) {
-    const nextMedia = source.indexOf('@media ', queryAt + header.length);
-    const block = source.slice(queryAt, nextMedia === -1 ? source.length : nextMedia);
-    if (selector.test(block) && (!declaration || declaration.test(block))) return;
+    const block = blockOf(source, queryAt, header.length);
+    if (block && selector.test(block) && (!declaration || declaration.test(block))) return;
     queryAt = source.indexOf(header, queryAt + header.length);
   }
   assert.fail(`${query} is missing ${selector} with ${declaration}`);

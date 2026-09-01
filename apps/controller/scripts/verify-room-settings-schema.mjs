@@ -596,8 +596,25 @@ try {
       every one of the five real claims uses it, and a missed claim is a stale sentence while a false
       one is a broken build.
     */
+    /*
+      `Math.max(0, …)` AND NOT A BARE SUBTRACTION, because `String.prototype.slice` counts a negative
+      start FROM THE END.
+
+      A claim in the first 120 characters of a document — a title line, a lead sentence, a summary
+      block someone moves to the top — gives `match.index - 120 < 0`, and `slice` then reads a window
+      out of the document's TAIL. For every file in `COUNT_CLAIMS` today that tail window is shorter
+      than the end offset, so the slice is the empty string, `/wired/` does not match it, and the
+      claim is dropped from `claims` without a word. The gate would go green over a stale number
+      because of where the sentence sits on the page.
+
+      Nothing is in that window right now — all six documents were measured on 2026-09-01 and none
+      has a `<n> of 269` inside its first 120 characters — so this is a hole rather than a live
+      failure, and it is the kind that opens the day somebody reorganises a README. The control was
+      run both ways: a stale `33 of 269 wired` inserted at the top of `apps/controller/README.md`
+      passed under the bare subtraction and fails under this.
+    */
     const claims = [...text.matchAll(/(\d+)(?: of| \/) 269/g)]
-      .filter((match) => /wired|have a consumer/i.test(text.slice(match.index - 120, match.index + 160)))
+      .filter((match) => /wired|have a consumer/i.test(text.slice(Math.max(0, match.index - 120), match.index + 160)))
       .map((match) => Number(match[1]));
     const wrong = claims.filter((claimed) => claimed !== wired.length);
     if (wrong.length > 0) {

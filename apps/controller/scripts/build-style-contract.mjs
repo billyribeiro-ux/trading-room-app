@@ -254,6 +254,48 @@ const payload = {
   contract
 };
 
+/*
+  NOTHING INGESTED IS A REFUSAL. IT IS NOT AN EMPTY CONTRACT.
+
+  Both source sets are owner-local: `ptr1.json` under ~/Desktop and the `collect-*.json` runs beside
+  it. On any other machine — every CI checkout, every fresh clone — the ptr1 read raises ENOENT and
+  both `readdirSync` calls take their `continue`, so `perSource` stays empty and `payload` is
+  `{"classes":0,"pinnedFacts":0,"contract":{}}`.
+
+  That used to be WRITTEN, and the consequence was measured on 2026-09-01 rather than argued:
+  running this script anywhere but the owner's laptop replaced the 682,298 committed bytes of
+  `docs/generated/style-contract.json` with 183, printed `pinned 0 facts across 0 classes`, and
+  exited 0. With that file in place `verify-manage-styles.mjs` — which is `manage:styles`, a step of
+  `test:gates` and therefore of `pnpm run gate` — reports `0 declarations compared against 0 pinned
+  facts from 0 nodes`, finds no divergence because it holds nothing to diverge from, and exits 0.
+  The gate that exists to catch a colour our stylesheet declares against the colour the capture
+  measured had been disarmed by its own generator, and the only trace was three zeroes in a log
+  line.
+
+  So an absent capture set refuses: the committed artifact is left byte-for-byte as it is, the
+  message names both locations that were searched, and the exit code is non-zero. A builder that
+  cannot see its evidence has produced nothing, and writing that nothing over the evidence is the
+  one outcome that turns a missing input into a green gate downstream.
+
+  A capture set that is PRESENT but yields FEWER facts is deliberately not this branch and is not
+  refused. That is a real measurement of a reference that changed, and suppressing it would be the
+  mirror of the mistake above — the same distinction `gate/verify-postgres-schema-artifacts.mjs`
+  draws between an absent capture and a damaged one.
+*/
+if (perSource.size === 0) {
+  console.error(
+    [
+      'style contract: REFUSING TO WRITE — no capture source was readable, so NOTHING WAS MEASURED.',
+      `- ${OUT.pathname} is unchanged.`,
+      `- ptr1 forensic capture: ${PTR1}`,
+      `- live collector runs:   ${SEARCH.join(', ')}`,
+      '- An empty contract here disarms verify-manage-styles.mjs (pnpm manage:styles): it reports no',
+      '  divergence whenever it has no pinned facts to compare manage.css against.'
+    ].join('\n')
+  );
+  process.exit(1);
+}
+
 writeFileSync(OUT, `${JSON.stringify(payload, null, 2)}\n`);
 
 console.log(`sources:`);
