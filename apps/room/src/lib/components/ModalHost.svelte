@@ -4707,35 +4707,35 @@
                 <span style:color="red">false</span>
               </p>
               <!--
-              ── THESE TWO BUTTONS ARE INERT, AND SAYING SO IS THE FIX ────────────────────────────
+                ── THESE TWO BUTTONS ARE INERT, AND SAYING SO IS THE FIX ────────────────────────────
 
-              They used to flip a local `streamPlayerEnabled` and write
-              `onPreferenceChange('streamingPlayerEnabled', true | false)` — a key in THIS
-              presenter's own settings blob, read by nothing anywhere in the repository. A
-              room-level presenter act modelled as a per-user preference, which is the same defect
-              `chat-mode.ts` and `presenter-colors.ts` each record; the label went green and
-              nothing else in the world changed.
+                They used to flip a local `streamPlayerEnabled` and write
+                `onPreferenceChange('streamingPlayerEnabled', true | false)` — a key in THIS
+                presenter's own settings blob, read by nothing anywhere in the repository. A
+                room-level presenter act modelled as a per-user preference, which is the same defect
+                `chat-mode.ts` and `presenter-colors.ts` each record; the label went green and
+                nothing else in the world changed.
 
-              Wiring them was measured and REFUSED rather than attempted, because what the
-              reference does cannot be reproduced from anything held here:
+                Wiring them was measured and REFUSED rather than attempted, because what the
+                reference does cannot be reproduced from anything held here:
 
-                getPlayerLink() { let i = yield invokeAdminCmd("streamStatus");
-                                  this.streamingPlayerEnabled = i.rc.enablePlayer;
-                                  this.streamingLinkPlayer = i.rc.playerURL }   (byte 2,170,505)
+                  getPlayerLink() { let i = yield invokeAdminCmd("streamStatus");
+                                    this.streamingPlayerEnabled = i.rc.enablePlayer;
+                                    this.streamingLinkPlayer = i.rc.playerURL }   (byte 2,170,505)
 
-              `playerURL` arrives FROM THE SERVER. The client composes nothing, and that server is
-              not in the capture. So the feature is a public, unauthenticated page that renders one
-              room's screenshares to whoever holds a link — which needs an anonymous media grant,
-              and minting one is an authorization decision this repository's own standard forbids
-              inventing: every authority decision is made on the server from data the server owns,
-              and there is no such data here yet.
+                `playerURL` arrives FROM THE SERVER. The client composes nothing, and that server is
+                not in the capture. So the feature is a public, unauthenticated page that renders one
+                room's screenshares to whoever holds a link — which needs an anonymous media grant,
+                and minting one is an authorization decision this repository's own standard forbids
+                inventing: every authority decision is made on the server from data the server owns,
+                and there is no such data here yet.
 
-              Disabled with the reason on screen, rather than removed: the reference draws this
-              pane, and a presenter who has been told the tool is unavailable is better served than
-              one who cannot find where it went. The blocker is recorded in `TODO.md` and against
-              `SC-04` / `SC-05` in the surface audit. `streamingPlayerEnabled` joins
-              `dead-preference-keys.ts` so the copies already written are pruned.
-            -->
+                Disabled with the reason on screen, rather than removed: the reference draws this
+                pane, and a presenter who has been told the tool is unavailable is better served than
+                one who cannot find where it went. The blocker is recorded in `TODO.md` and against
+                `SC-04` / `SC-05` in the surface audit. `streamingPlayerEnabled` joins
+                `dead-preference-keys.ts` so the copies already written are pruned.
+              -->
               <div class="mt-4">
                 <button class="btn btn-outline-primary btn-sm m-1" disabled>
                   <i class="fas fa-desktop"></i> Enable Stream Player
@@ -4796,11 +4796,11 @@
                 </div>
               </div>
               <!--
-              The RTMP half — the reference's `_De`, which renders only when `streamingType` is
-              RTMP (`O(153, "RTMP" === e.streamingType ? 153 : -1)`, byte 2152300). The intro
-              sentence lives INSIDE that conditional upstream, typo `streraming` and all, so it
-              moves here with it.
-            -->
+                The RTMP half — the reference's `_De`, which renders only when `streamingType` is
+                RTMP (`O(153, "RTMP" === e.streamingType ? 153 : -1)`, byte 2152300). The intro
+                sentence lives INSIDE that conditional upstream, typo `streraming` and all, so it
+                moves here with it.
+              -->
               {#if streamingProtocol === 'RTMP'}
                 <p>
                   If you want to stream directly from OBS into this room, you can use the following
@@ -4842,18 +4842,18 @@
                       Note: you can re-stream this incoming stream to another rtmp destination,
                       click
                       <!--
-                      The reference makes this a clickable `<strong>` (consts index 112:
-                      `[1,"text-primary","fw-bold","restream-link",3,"click"]`). A `<button>`
-                      carries the SAME three classes instead, which is a deliberate and visually
-                      identical substitution: `fw-bold` already supplies the weight `<strong>` gave
-                      it, `text-primary` the colour, and the captured `.restream-link:hover` rule
-                      the underline and pointer. What changes is that a control which was
-                      mouse-only becomes focusable, announced, and operable by keyboard — Svelte
-                      refuses `role="button"` on a `<strong>`, and it is right to.
+                        The reference makes this a clickable `<strong>` (consts index 112:
+                        `[1,"text-primary","fw-bold","restream-link",3,"click"]`). A `<button>`
+                        carries the SAME three classes instead, which is a deliberate and visually
+                        identical substitution: `fw-bold` already supplies the weight `<strong>` gave
+                        it, `text-primary` the colour, and the captured `.restream-link:hover` rule
+                        the underline and pointer. What changes is that a control which was
+                        mouse-only becomes focusable, announced, and operable by keyboard — Svelte
+                        refuses `role="button"` on a `<strong>`, and it is right to.
 
-                      The button chrome is stripped by `#session-control-modal button.restream-link`
-                      in `app.css`, beside the captured hover rule it belongs with.
-                    -->
+                        The button chrome is stripped by `#session-control-modal button.restream-link`
+                        in `app.css`, beside the captured hover rule it belongs with.
+                      -->
                       <button
                         type="button"
                         class="text-primary fw-bold restream-link"
@@ -4866,14 +4866,14 @@
               {/if}
 
               <!--
-              The WHIP half — the reference's `vDe`, `O(154, "WHIP" === e.streamingType ? 154 : -1)`.
+                The WHIP half — the reference's `vDe`, `O(154, "WHIP" === e.streamingType ? 154 : -1)`.
 
-              Its `bDe` child (Start/Stop WHIP Streaming) is deliberately NOT reproduced. Upstream it
-              renders only when `useMTX` is FALSE — it belongs to a browser-publishes-WHIP path that
-              exists when MediaMTX is switched off. This deployment's OBS design IS MediaMTX, so
-              those buttons never render in the reference for this configuration either; building
-              them here would be two controls calling nothing.
-            -->
+                Its `bDe` child (Start/Stop WHIP Streaming) is deliberately NOT reproduced. Upstream it
+                renders only when `useMTX` is FALSE — it belongs to a browser-publishes-WHIP path that
+                exists when MediaMTX is switched off. This deployment's OBS design IS MediaMTX, so
+                those buttons never render in the reference for this configuration either; building
+                them here would be two controls calling nothing.
+              -->
               {#if streamingProtocol === 'WHIP'}
                 <div class="mt-1">
                   <div class="m-2">
@@ -4918,18 +4918,18 @@
                       Note: you can re-stream this incoming stream to another rtmp destination,
                       click
                       <!--
-                      The reference makes this a clickable `<strong>` (consts index 112:
-                      `[1,"text-primary","fw-bold","restream-link",3,"click"]`). A `<button>`
-                      carries the SAME three classes instead, which is a deliberate and visually
-                      identical substitution: `fw-bold` already supplies the weight `<strong>` gave
-                      it, `text-primary` the colour, and the captured `.restream-link:hover` rule
-                      the underline and pointer. What changes is that a control which was
-                      mouse-only becomes focusable, announced, and operable by keyboard — Svelte
-                      refuses `role="button"` on a `<strong>`, and it is right to.
+                        The reference makes this a clickable `<strong>` (consts index 112:
+                        `[1,"text-primary","fw-bold","restream-link",3,"click"]`). A `<button>`
+                        carries the SAME three classes instead, which is a deliberate and visually
+                        identical substitution: `fw-bold` already supplies the weight `<strong>` gave
+                        it, `text-primary` the colour, and the captured `.restream-link:hover` rule
+                        the underline and pointer. What changes is that a control which was
+                        mouse-only becomes focusable, announced, and operable by keyboard — Svelte
+                        refuses `role="button"` on a `<strong>`, and it is right to.
 
-                      The button chrome is stripped by `#session-control-modal button.restream-link`
-                      in `app.css`, beside the captured hover rule it belongs with.
-                    -->
+                        The button chrome is stripped by `#session-control-modal button.restream-link`
+                        in `app.css`, beside the captured hover rule it belongs with.
+                      -->
                       <button
                         type="button"
                         class="text-primary fw-bold restream-link"
@@ -4945,12 +4945,12 @@
               {/if}
 
               <!--
-              Not in the reference, and deliberately added: it has no state in which the ingest
-              server is missing, because its `streamServerMTX` is always populated. Ours can be
-              unset, and the repository's rule is that an absent value is REPORTED rather than
-              filled in — the alternative is a panel that composes `http://:8889/…` and looks like
-              a working link.
-            -->
+                Not in the reference, and deliberately added: it has no state in which the ingest
+                server is missing, because its `streamServerMTX` is always populated. Ours can be
+                unset, and the repository's rule is that an absent value is REPORTED rather than
+                filled in — the alternative is a panel that composes `http://:8889/…` and looks like
+                a working link.
+              -->
               {#if ingestError}
                 <div class="alert alert-danger m-2">{ingestError}</div>
               {:else if ingest && !ingest.configured}

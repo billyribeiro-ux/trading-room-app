@@ -186,16 +186,16 @@
     <div class="flex-fill mb-1">
       <div class="input-group st-searchbar">
         <!--
-                            No `id` and no `name`. Const 39 - the search input's own attribute
-                            table - is
-                            `["type","text","placeholder","Search files...","aria-label","search",
-                             "aria-describedby","addon-wrapping",1,"form-control",3,"ngModelChange","ngModel"]`
-                            and carries neither. We had invented `id="files-search"` and
-                            `name="filesSearch"`; nothing in this repo targeted either, and no
-                            `<label for=...>` points at it - `aria-label="search"` is what names it.
-                            (`filesSearch` is the reference's COMPONENT FIELD, bound through
-                            `ngModel`, not an attribute that reaches the DOM.)
-                          -->
+          No `id` and no `name`. Const 39 - the search input's own attribute
+          table - is
+          `["type","text","placeholder","Search files...","aria-label","search",
+           "aria-describedby","addon-wrapping",1,"form-control",3,"ngModelChange","ngModel"]`
+          and carries neither. We had invented `id="files-search"` and
+          `name="filesSearch"`; nothing in this repo targeted either, and no
+          `<label for=...>` points at it - `aria-label="search"` is what names it.
+          (`filesSearch` is the reference's COMPONENT FIELD, bound through
+          `ngModel`, not an attribute that reaches the DOM.)
+        -->
         <input
           class="form-control ng-untouched ng-pristine ng-valid"
           type="text"
@@ -214,22 +214,22 @@
     </div>
     <div class="d-flex flex-wrap justify-content-center align-items-center ml-2">
       <!--
-                          Delete Selected and Upload File are gated on `isP` in the capture -
-                          `O(77, o.isP ? 77 : -1)` and `O(81, o.isP ? 81 : -1)` - while Refresh
-                          (node 78) is unconditional. A member seeing only the list and Refresh is
-                          the captured behaviour, not a bug; showing these two to everyone was.
+        Delete Selected and Upload File are gated on `isP` in the capture -
+        `O(77, o.isP ? 77 : -1)` and `O(81, o.isP ? 81 : -1)` - while Refresh
+        (node 78) is unconditional. A member seeing only the list and Refresh is
+        the captured behaviour, not a bug; showing these two to everyone was.
 
-                          The bare-space expressions in this pane are the capture's own text nodes:
-                          `v(2, 'Delete Selected ')`, `v(79, ' Refresh')`, `v(2, ' Upload File ')`,
-                          `v(2, 'Stop Playing For All ')`, `v(18, 'Download ')`, `v(2, 'Delete ')`,
-                          `v(2, 'Play ')` / `v(2, 'Stop ')` and `v(2, 'Play For All ')` — every one
-                          of them padded (full.js:1778-1888, and `Download ` at 1937). Svelte trims
-                          whitespace at the edges of an element's children, so written as plain
-                          source text those spaces are dropped and the DOM text node stops matching
-                          the capture - checked against the compiler, not assumed. They collapse at
-                          the edge of the line box and change no pixel; the expressions are here so
-                          a byte-for-byte comparison of the two DOMs comes back clean.
-                        -->
+        The bare-space expressions in this pane are the capture's own text nodes:
+        `v(2, 'Delete Selected ')`, `v(79, ' Refresh')`, `v(2, ' Upload File ')`,
+        `v(2, 'Stop Playing For All ')`, `v(18, 'Download ')`, `v(2, 'Delete ')`,
+        `v(2, 'Play ')` / `v(2, 'Stop ')` and `v(2, 'Play For All ')` — every one
+        of them padded (full.js:1778-1888, and `Download ` at 1937). Svelte trims
+        whitespace at the edges of an element's children, so written as plain
+        source text those spaces are dropped and the DOM text node stops matching
+        the capture - checked against the compiler, not assumed. They collapse at
+        the edge of the line box and change no pixel; the expressions are here so
+        a byte-for-byte comparison of the two DOMs comes back clean.
+      -->
       {#if isPresenter}
         <button
           class="btn m-2 st-fileDeleteSelected"
@@ -240,24 +240,24 @@
         </button>
       {/if}
       <!--
-                          Refresh re-runs THIS page's load, not every loader on the page.
+        Refresh re-runs THIS page's load, not every loader on the page.
 
-                          The reference's handler is `getSessionFiles()`, which posts one
-                          `getSessionFiles` command and replaces `sessionFiles` alone
-                          (app-presentationarea.full.js:2967-2978). Ours called `invalidateAll()`,
-                          which re-runs every load function belonging to the active page.
+        The reference's handler is `getSessionFiles()`, which posts one
+        `getSessionFiles` command and replaces `sessionFiles` alone
+        (app-presentationarea.full.js:2967-2978). Ours called `invalidateAll()`,
+        which re-runs every load function belonging to the active page.
 
-                          `invalidate('room:data')` is the narrowest refetch SvelteKit offers here:
-                          the load registers `depends('room:data')` (+page.server.ts:122) and the
-                          five-second poll already uses this identifier. It is not a files-only
-                          refetch and cannot be - this route has a single `+page.server.ts` load that
-                          builds messages, alerts, polls, notes and files together, so the two calls
-                          re-run exactly the same work today. What changes is the blast radius: a
-                          layout load added later would be re-run by `invalidateAll()` and is not by
-                          this. A genuinely files-only refetch would need its own endpoint and a
-                          second, client-owned source of truth for `data.files`, which no other
-                          control in this file has.
-                        -->
+        `invalidate('room:data')` is the narrowest refetch SvelteKit offers here:
+        the load registers `depends('room:data')` (+page.server.ts:122) and the
+        five-second poll already uses this identifier. It is not a files-only
+        refetch and cannot be - this route has a single `+page.server.ts` load that
+        builds messages, alerts, polls, notes and files together, so the two calls
+        re-run exactly the same work today. What changes is the blast radius: a
+        layout load added later would be re-run by `invalidateAll()` and is not by
+        this. A genuinely files-only refetch would need its own endpoint and a
+        second, client-owned source of truth for `data.files`, which no other
+        control in this file has.
+      -->
       <button
         class="btn mt-2 mr-2 mb-2 st-fileSeeMore"
         title="Reload list"
@@ -276,25 +276,25 @@
       {/if}
     </div>
     <!--
-                        "Stop Playing For All" belongs HERE, once, not in every row.
+      "Stop Playing For All" belongs HERE, once, not in every row.
 
-                        The reference puts it in this otherwise-empty div after the upload row —
-                        node 82 in the capture holds node 83, gated `O(83, o.isP && o.mp3Playing)`.
-                        Ours rendered it inside each row's action cell, so a room with ten sounds
-                        showed ten identical Stop buttons, all stopping the same single playback.
+      The reference puts it in this otherwise-empty div after the upload row —
+      node 82 in the capture holds node 83, gated `O(83, o.isP && o.mp3Playing)`.
+      Ours rendered it inside each row's action cell, so a room with ten sounds
+      showed ten identical Stop buttons, all stopping the same single playback.
 
-                        Label and icon are the reference's too: "Stop Playing For All " with
-                        `fa fa-play-circle mr-2` — the play glyph, not a stop glyph; transcribed, not
-                        corrected. Ours read "Stop For All" with `fa-stop-circle`.
+      Label and icon are the reference's too: "Stop Playing For All " with
+      `fa fa-play-circle mr-2` — the play glyph, not a stop glyph; transcribed, not
+      corrected. Ours read "Stop For All" with `fa-stop-circle`.
 
-                        `FP-12` — the index was cited as 158 and is **157** in the pinned v4 bundle:
-                        `d(0,"button",241) … T(1,"i",157), v(2,"Stop Playing For All ")` at byte
-                        1,946,166, with const 157 decoding to `[1,"fa","fa-play-circle","mr-2"]` at
-                        2,004,368. The VALUE was right and the index was one out, because the comment
-                        was written against `app-presentationarea.full.js`, a capture that is not in
-                        this repository. An index nobody can check is worse than no index: it reads
-                        as verified. Every citation below now names the v4 bundle and its offset.
-                      -->
+      `FP-12` — the index was cited as 158 and is **157** in the pinned v4 bundle:
+      `d(0,"button",241) … T(1,"i",157), v(2,"Stop Playing For All ")` at byte
+      1,946,166, with const 157 decoding to `[1,"fa","fa-play-circle","mr-2"]` at
+      2,004,368. The VALUE was right and the index was one out, because the comment
+      was written against `app-presentationarea.full.js`, a capture that is not in
+      this repository. An index nobody can check is worse than no index: it reads
+      as verified. Every citation below now names the v4 bundle and its offset.
+    -->
     <div>
       {#if isPresenter && mp3Playing}
         <button
@@ -309,71 +309,71 @@
     </div>
   </div>
   <!--
-                      An EMPTY room renders no heading, no SORT BAR and no table.
+    An EMPTY room renders no heading, no SORT BAR and no table.
 
-                      The two gates are `O(84, o.sessionFiles ? -1 : 84)` for the `<h4>` and
-                      `O(85, o.sessionFiles && o.sessionFiles.length > 0 ? 85 : -1)` for node 85.
-                      They are not complements: the heading needs `sessionFiles` to be FALSY, and an
-                      empty array is truthy, so a room with zero files shows nothing at all. Both
-                      rendered captures confirm it — the badges read 0 and after the toolbar there
-                      are two collapsed anchors and no `h4`, no table.
+    The two gates are `O(84, o.sessionFiles ? -1 : 84)` for the `<h4>` and
+    `O(85, o.sessionFiles && o.sessionFiles.length > 0 ? 85 : -1)` for node 85.
+    They are not complements: the heading needs `sessionFiles` to be FALSY, and an
+    empty array is truthy, so a room with zero files shows nothing at all. Both
+    rendered captures confirm it — the badges read 0 and after the toolbar there
+    are two collapsed anchors and no `h4`, no table.
 
-                      So "No room files found." is not the empty-list message it looks like; it is
-                      the never-fetched message. Our loader ends in `.all()`, which always returns an
-                      array, so that state cannot arise here and the heading is not rendered at all
-                      rather than kept as a branch nothing can reach. Ours previously showed it
-                      whenever the list was empty, which is the one case the reference stays silent.
+    So "No room files found." is not the empty-list message it looks like; it is
+    the never-fetched message. Our loader ends in `.all()`, which always returns an
+    array, so that state cannot arise here and the heading is not rendered at all
+    rather than kept as a branch nothing can reach. Ours previously showed it
+    whenever the list was empty, which is the one case the reference stays silent.
 
-                      THE SORT BAR IS INSIDE THIS GATE, and that was read rather than assumed. Node
-                      85 is the view `t2e` (byte 2,016,231, `H(84,Bwe,2,0,"h4",48)(85,t2e,17,17)`),
-                      and `t2e` opens with the sort bar div and closes with the files table — one
-                      view holding both, read at byte 1,950,099. Its gate is the one quoted above,
-                      read at byte 2,018,251. So the two elements share a single condition, and a
-                      room with no files shows no "Sorting by:" strip either. Ours rendered the bar
-                      unconditionally, which put a sort control above an absent table.
-                    -->
+    THE SORT BAR IS INSIDE THIS GATE, and that was read rather than assumed. Node
+    85 is the view `t2e` (byte 2,016,231, `H(84,Bwe,2,0,"h4",48)(85,t2e,17,17)`),
+    and `t2e` opens with the sort bar div and closes with the files table — one
+    view holding both, read at byte 1,950,099. Its gate is the one quoted above,
+    read at byte 2,018,251. So the two elements share a single condition, and a
+    room with no files shows no "Sorting by:" strip either. Ours rendered the bar
+    unconditionally, which put a sort control above an absent table.
+  -->
   {#if data.files.length > 0}
     <!--
-                        The sort bar. Every class comes from the const table read at bytes
-                        2,011,253-2,011,600:
+      The sort bar. Every class comes from the const table read at bytes
+      2,011,253-2,011,600:
 
-                          242 [1,"d-flex","flex-wrap","justify-content-center","align-items-center","mt-2","st-fileSortBar"]
-                          243 [1,"mr-2"]
-                          244 [1,"btn","btn-sm","m-1","st-fileSortName",3,"click","ngClass","title"]
-                          245 [1,"fas","ml-2",3,"ngClass"]
-                          246 [1,"btn","btn-sm","m-1","st-fileSortDate",3,"click","ngClass","title"]
-                          249 [1,"fas","fa-sort","ml-2"]
+        242 [1,"d-flex","flex-wrap","justify-content-center","align-items-center","mt-2","st-fileSortBar"]
+        243 [1,"mr-2"]
+        244 [1,"btn","btn-sm","m-1","st-fileSortName",3,"click","ngClass","title"]
+        245 [1,"fas","ml-2",3,"ngClass"]
+        246 [1,"btn","btn-sm","m-1","st-fileSortDate",3,"click","ngClass","title"]
+        249 [1,"fas","fa-sort","ml-2"]
 
-                        Both labels keep their LEADING AND TRAILING space - `v(4," Name ")` at byte
-                        1,950,263 and `v(8," Date ")` at 1,950,396. Svelte trims whitespace at the
-                        edges of an element's children, so each pad has to be an expression to
-                        survive into the DOM text node, exactly as the other padded labels in this
-                        pane already are.
+      Both labels keep their LEADING AND TRAILING space - `v(4," Name ")` at byte
+      1,950,263 and `v(8," Date ")` at 1,950,396. Svelte trims whitespace at the
+      edges of an element's children, so each pad has to be an expression to
+      survive into the DOM text node, exactly as the other padded labels in this
+      pane already are.
 
-                        The icon class ORDER differs by state and is not a typo. Const 245 is static
-                        `fas ml-2` with the glyph appended by ngClass, so the active icon renders
-                        `fas ml-2 fa-sort-alpha-down`; const 249 is entirely static, so the inactive
-                        one renders `fas fa-sort ml-2`. Both variants key off the SAME direction.
-                      -->
+      The icon class ORDER differs by state and is not a typo. Const 245 is static
+      `fas ml-2` with the glyph appended by ngClass, so the active icon renders
+      `fas ml-2 fa-sort-alpha-down`; const 249 is entirely static, so the inactive
+      one renders `fas fa-sort ml-2`. Both variants key off the SAME direction.
+    -->
     <div class="d-flex flex-wrap justify-content-center align-items-center mt-2 st-fileSortBar">
       <span class="mr-2">Sorting by:</span>
       <!--
-                          `.active` is CAPTURED, not derived. The binding is
-                          `z("ngClass",ct(13,mo,"name"===e.fileSortField))` at byte 1,950,577, and
-                          `mo` is the shared pure function read at byte 1,916,345 — it takes one
-                          argument and returns an object whose only key is `active`, set to that
-                          argument. So the class is present exactly when this button's field is the
-                          governing field, and it depends on the field alone, never on the
-                          direction. `docs/decoded/files-sort-bar.md` listed this expression as an
-                          honest gap; it was opened and the gap is closed.
+        `.active` is CAPTURED, not derived. The binding is
+        `z("ngClass",ct(13,mo,"name"===e.fileSortField))` at byte 1,950,577, and
+        `mo` is the shared pure function read at byte 1,916,345 — it takes one
+        argument and returns an object whose only key is `active`, set to that
+        argument. So the class is present exactly when this button's field is the
+        governing field, and it depends on the field alone, never on the
+        direction. `docs/decoded/files-sort-bar.md` listed this expression as an
+        honest gap; it was opened and the gap is closed.
 
-                          `mo` is quoted verbatim in `#lib/file-sort.js`, and asserted verbatim against
-                          the bundle in `files-pane-contract.test.ts`. It is written out in words
-                          HERE because its body is brace-delimited, and a brace-delimited construct
-                          inside a Svelte comment is prose to a human and a mustache to a parser.
-                          That exact shape has already turned a contract test red in this repository
-                          while `svelte-check` stayed green.
-                        -->
+        `mo` is quoted verbatim in `#lib/file-sort.js`, and asserted verbatim against
+        the bundle in `files-pane-contract.test.ts`. It is written out in words
+        HERE because its body is brace-delimited, and a brace-delimited construct
+        inside a Svelte comment is prose to a human and a mustache to a parser.
+        That exact shape has already turned a contract test red in this repository
+        while `svelte-check` stayed green.
+      -->
       <button
         class={['btn btn-sm m-1 st-fileSortName', { active: files.fileSort.field === 'name' }]}
         title={fileSortTitle('name', files.fileSort)}
@@ -413,15 +413,15 @@
           <tr>
             {#if !files.matchesFileTab(item)}
               <!--
-                                  Deliberately empty. The capture emits this row for every file in
-                                  the room and collapses its cells when the file belongs to another
-                                  tab; the row still counts for `nth-of-type` striping.
-                                -->
+                Deliberately empty. The capture emits this row for every file in
+                the room and collapses its cells when the file belongs to another
+                tab; the row still counts for `nth-of-type` striping.
+              -->
             {:else}
               <!--
-                                  Resolved ONCE per row. The two alert-sound buttons are complements
-                                  of one another, so asking twice invites the two answers to drift.
-                                -->
+                Resolved ONCE per row. The two alert-sound buttons are complements
+                of one another, so asking twice invites the two answers to drift.
+              -->
               {const alertSoundButton = $derived(
                 alertSoundButtonFor({ isPresenter }, data.sessData ?? {}, item)
               )}
@@ -520,41 +520,41 @@
                     </button>
                   {/if}
                   <!--
-                                    Nodes 22 and 23 of the row, both
-                                    `btn ml-2 btn-info set-alert-sound-btn` — the class whose rule
-                                    already ships at
-                                    `src/lib/styles/captured-runtime-components.css:6972`
-                                    (`font-size: 12px`).
+                    Nodes 22 and 23 of the row, both
+                    `btn ml-2 btn-info set-alert-sound-btn` — the class whose rule
+                    already ships at
+                    `src/lib/styles/captured-runtime-components.css:6972`
+                    (`font-size: 12px`).
 
-                                    `FP-12` — these were cited as consts 261/262/263 against a
-                                    capture this repository does not hold. In the pinned v4 bundle
-                                    they are **267** (Overwrite, with the click) and **269** (Remove,
-                                    with the click), read at bytes 1,947,897 and 1,948,105; **268**
-                                    is the `fa fa-bell mr-2` glyph and the Remove button's is **144**,
-                                    `fa fa-trash mr-2`. **260** and **261** are the same two entries
-                                    WITHOUT a click — Angular's placeholder attrs for the same nodes
-                                    — which is why a reader counting entries finds four buttons where
-                                    there are two.
+                    `FP-12` — these were cited as consts 261/262/263 against a
+                    capture this repository does not hold. In the pinned v4 bundle
+                    they are **267** (Overwrite, with the click) and **269** (Remove,
+                    with the click), read at bytes 1,947,897 and 1,948,105; **268**
+                    is the `fa fa-bell mr-2` glyph and the Remove button's is **144**,
+                    `fa fa-trash mr-2`. **260** and **261** are the same two entries
+                    WITHOUT a click — Angular's placeholder attrs for the same nodes
+                    — which is why a reader counting entries finds four buttons where
+                    there are two.
 
-                                    ONE `{#if}` with an `{:else if}`, not two independent blocks.
-                                    The two gates at full.js:1972-1991 are complements over the same
-                                    three terms, and written separately a room that never received
-                                    `overwriteCashRegisterSound` would render both at once.
-                                    `alertSoundButtonFor` in `#lib/files-gates.js` resolves them to one
-                                    answer and is tested there.
+                    ONE `{#if}` with an `{:else if}`, not two independent blocks.
+                    The two gates at full.js:1972-1991 are complements over the same
+                    three terms, and written separately a room that never received
+                    `overwriteCashRegisterSound` would render both at once.
+                    `alertSoundButtonFor` in `#lib/files-gates.js` resolves them to one
+                    answer and is tested there.
 
-                                    TRANSCRIPTION NOTE: consts **261 and 269** spell the type
-                                    attribute `pe="button"` — `["pe","button","title","Remove
-                                    Overwrited Cash Register Sound",...]` — where every sibling row
-                                    button spells it `type`. (Cited as 263 before `FP-12`; the typo
-                                    is real and it is on the Remove button's pair, both the
-                                    placeholder and the live one.) That is a typo in the original. It is harmless where it
-                                    stands, because the files table sits in no `form` and the
-                                    implicit `submit` a missing type gives a button has nothing to
-                                    submit; copied forward it would plant a latent bug for anyone
-                                    who later wraps this pane in one. So `type="button"` is written
-                                    here. The TITLE is verbatim, misspelling included.
-                                  -->
+                    TRANSCRIPTION NOTE: consts **261 and 269** spell the type
+                    attribute `pe="button"` — `["pe","button","title","Remove
+                    Overwrited Cash Register Sound",...]` — where every sibling row
+                    button spells it `type`. (Cited as 263 before `FP-12`; the typo
+                    is real and it is on the Remove button's pair, both the
+                    placeholder and the live one.) That is a typo in the original. It is harmless where it
+                    stands, because the files table sits in no `form` and the
+                    implicit `submit` a missing type gives a button has nothing to
+                    submit; copied forward it would plant a latent bug for anyone
+                    who later wraps this pane in one. So `type="button"` is written
+                    here. The TITLE is verbatim, misspelling included.
+                  -->
                   {#if alertSoundButton === 'set'}
                     <button
                       type="button"

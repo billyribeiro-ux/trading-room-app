@@ -72,29 +72,29 @@
   class={['tab-pane fade', { show: active, active }]}
 >
   <!--
-  ── THE BUTTON HAD NO HANDLER AT ALL ─────────────────────────────────────────────────────
+    ── THE BUTTON HAD NO HANDLER AT ALL ─────────────────────────────────────────────────────
 
-  Not a handler that did nothing — no `onclick`. `No session history.` was rendered
-  unconditionally above it, so the pane said the same thing whatever the room had done.
-  `SC-01`, and the exact shape `CLAUDE.md` names: a control whose only effect is nothing.
+    Not a handler that did nothing — no `onclick`. `No session history.` was rendered
+    unconditionally above it, so the pane said the same thing whatever the room had done.
+    `SC-01`, and the exact shape `CLAUDE.md` names: a control whose only effect is nothing.
 
-  Both of upstream's branches now, decoded with `app-session-control-modal`'s own consts
-  table (119 = `[1,"list-group","text-dark"]`, 120 = `[1,"p-4","text-center"]`,
-  121 = the `btn btn-primary`, 122 = `[1,"fas","fa","fa-sync"]`, 123 = the list-group item,
-  124 = `[1,"d-flex","w-100","justify-content-between"]`, 125 = `[1,"mb-1"]`):
+    Both of upstream's branches now, decoded with `app-session-control-modal`'s own consts
+    table (119 = `[1,"list-group","text-dark"]`, 120 = `[1,"p-4","text-center"]`,
+    121 = the `btn btn-primary`, 122 = `[1,"fas","fa","fa-sync"]`, 123 = the list-group item,
+    124 = `[1,"d-flex","w-100","justify-content-between"]`, 125 = `[1,"mb-1"]`):
 
-    EDe (empty)  "No session history." + a `Load History` button
-    DDe (loaded) a `Refresh` button, then one `<a>` per entry: `<h5>` eventName,
-                 `<small>` created through `date:'medium'`, `<p>` eventValue
+      EDe (empty)  "No session history." + a `Load History` button
+      DDe (loaded) a `Refresh` button, then one `<a>` per entry: `<h5>` eventName,
+                   `<small>` created through `date:'medium'`, `<p>` eventValue
 
-  The `<a>` carries no `href` upstream and none here: it is a styled row, not a link, which
-  is why it has no click of its own either. `aria-current="true"` is the capture's, on every
-  row rather than on one — reproduced rather than corrected, because these strings are what a
-  DOM diff compares.
+    The `<a>` carries no `href` upstream and none here: it is a styled row, not a link, which
+    is why it has no click of its own either. `aria-current="true"` is the capture's, on every
+    row rather than on one — reproduced rather than corrected, because these strings are what a
+    DOM diff compares.
 
-  `mediumDateFormatter` already existed for the Files pane's uploaded-at column; Angular's
-  `date:'medium'` is one format and this room resolves it in one place.
--->
+    `mediumDateFormatter` already existed for the Files pane's uploaded-at column; Angular's
+    `date:'medium'` is one format and this room resolves it in one place.
+  -->
   {#if sessionHistoryError}
     <div class="alert alert-danger m-4">{sessionHistoryError}</div>
   {/if}
@@ -116,18 +116,18 @@
       </div>
       {#each sessionHistoryEntries as entry (entry.id)}
         <!--
-        `<a>` with no `href`, which is the capture's own element and is why the warning is
-        suppressed rather than fixed. The three alternatives are all worse:
+          `<a>` with no `href`, which is the capture's own element and is why the warning is
+          suppressed rather than fixed. The three alternatives are all worse:
 
-          a `<div>`   changes the rendered DOM these class strings are diffed against, for
-                      no behavioural gain — the element is inert upstream too;
-          an `href`   invents a link that goes nowhere, which is the defect this repository
-                      removes rather than adds;
-          a `<button>` announces an action to a screen reader that does not exist.
+            a `<div>`   changes the rendered DOM these class strings are diffed against, for
+                        no behavioural gain — the element is inert upstream too;
+            an `href`   invents a link that goes nowhere, which is the defect this repository
+                        removes rather than adds;
+            a `<button>` announces an action to a screen reader that does not exist.
 
-        `list-group-item-action` is Bootstrap's hover/focus styling and the capture applies
-        it here despite there being no action. Reproduced with the rest of the string.
-      -->
+          `list-group-item-action` is Bootstrap's hover/focus styling and the capture applies
+          it here despite there being no action. Reproduced with the rest of the string.
+        -->
         <!-- svelte-ignore a11y_missing_attribute -->
         <a
           aria-current="true"

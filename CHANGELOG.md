@@ -33,6 +33,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 03:04 UTC — FilesPane read end to end, and 100 comment bodies stranded by extraction
+
+**Runtime impact: NONE.** Comment indentation and a new gate; no shipped markup, style or behaviour
+changed. The audit itself found nothing to build, which is the result.
+
+## `FilesPane.svelte`, `todo-next.md` row 19 — clean
+
+Read end to end against `app-presentationarea`'s `#files` region — consts 17, 18, 29, 30, 32, 33, 39,
+44 and 238–269 from the table at byte **1,994,257**, and the fifteen embedded views from `Owe` to
+`t2e`. **Zero absent const values.**
+
+One text literal is absent, deliberately, and the gates were read rather than inferred:
+`O(84, sessionFiles ? -1 : 84)` for the heading and
+`O(85, sessionFiles && sessionFiles.length > 0 ? 85 : -1)` for the sort bar and table. They are **not
+complements** — an empty array is truthy — so "No room files found." is the NEVER-FETCHED message
+rather than the empty-list one, and a reference room with zero files shows nothing at all. Our
+loader ends in `.all()`, which always returns an array, so that state cannot arise here. Already
+argued at the code, with both rendered captures cited; the audit confirmed it rather than finding it.
+
+The reference's own `["pe","button",…]` typo in consts 261 and 269 — an attribute literally named
+`pe`, leaving the button at its `submit` default — is pinned in `files-pane-rows-contract.test.ts` and
+not reproduced.
+
+## The finding: one hundred comment bodies at the wrong indent, across fourteen files
+
+A component extracted from a deeper one takes its comments with it. `prettier` re-indents the markup
+and treats the inside of an HTML comment as **opaque text** — correctly, and that is exactly why
+nothing here could see it. `FilesPane.svelte`, cut out of `PresentationArea.svelte`, carried ten
+blocks whose prose sat twenty columns right of the `<!--` that opened them; `AlertChatArea.svelte` had
+thirteen, `PresentationArea.svelte` fifteen, `CarouselDialog.svelte` eleven.
+
+In a repository whose standard says *"the comments are a deliberate practice"*, that is not cosmetic:
+a paragraph indented off the right edge is one nobody reads at review time, and the first thing
+somebody does with an unreadable comment is shorten it.
+
+All hundred are re-indented — bodies to opener + 2, closers to the opener column, relative structure
+inside each block untouched — and `comment-indent-contract.test.ts` now fails if one recurs.
+
+## What the negative controls found in the gate itself
+
+**Two of the first three controls stayed green**, and both were real.
+
+The first pushed ONE line right and passed. That one is not a defect: the check reads the MINIMUM
+interior indent because a single deeper line is a nested list or a quoted const table, and flagging it
+would make this an opinion about prose. The control was wrong, not the gate — rewritten to shift the
+whole body, which is what an extraction does, it is red.
+
+The third moved the `-->` back to the old depth and passed, and that WAS a gap. `prettier` leaves the
+closer where it finds it, so a hand-fixed body can be committed with its closer stranded — the half of
+this defect that survives a careful manual repair. The gate checks the closer now, and the control is
+red with a message naming both columns.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 327 files, 5,907 passed, 1 skipped; `svelte-check` 1,616
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.** `prettier --check`
+clean across every `.svelte` file, which is the point: the formatter was already green on all hundred.
+
+`todo-next.md` row 19 audited — 55 of 91 surfaces, 22,642 of 38,807 lines (58.3%).
+
 ### 2026-09-02 02:19 UTC — PostAlertModal read end to end: seven classes the const sweep cannot see
 
 **Runtime impact: YES, visible.** The send-later Repeat select had no classes at all and rendered as

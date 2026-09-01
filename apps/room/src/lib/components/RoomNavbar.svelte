@@ -347,13 +347,13 @@
     </span>
   {/if}
   <!--
-      `Ne(" ", globals.rosterCount + e.simUserCount, " ")`.
+    `Ne(" ", globals.rosterCount + e.simUserCount, " ")`.
 
-      This read `data.connectedUsers.length`, and the load returns `[connectedUser]` - one
-      entry, always yourself. So the navbar said "1" in a room of any size, and never
-      changed as people came and went. It is the same number as the sidebar badge and is
-      now computed the same way.
-    -->
+    This read `data.connectedUsers.length`, and the load returns `[connectedUser]` - one
+    entry, always yourself. So the navbar said "1" in a room of any size, and never
+    changed as people came and went. It is the same number as the sidebar badge and is
+    now computed the same way.
+  -->
   <!--
     ── G12 and G13 — THE USERS COUNTER HAS TWO HANDLERS AND ONE GATE, and it had none of them ────
 
@@ -399,13 +399,13 @@
       >{/if}
   </span>
   <!--
-      `FPe`, const 137: the same action as the sidebar button, reachable without opening
-      the sidebar. Its navbar gate is broader than the sidebar's -
-      `O(6, !(ptrMobileAppEnabled || customMobileAppEnabled || alwaysShowRoster)
-            || user.isFT && !freeTrialsGetApp ? -1 : 6)` - because `alwaysShowRoster` keeps
-      the icon's slot occupied even when no app is configured. That flag is not built here,
-      so this is the app half of the same condition.
-    -->
+    `FPe`, const 137: the same action as the sidebar button, reachable without opening
+    the sidebar. Its navbar gate is broader than the sidebar's -
+    `O(6, !(ptrMobileAppEnabled || customMobileAppEnabled || alwaysShowRoster)
+          || user.isFT && !freeTrialsGetApp ? -1 : 6)` - because `alwaysShowRoster` keeps
+    the icon's slot occupied even when no app is configured. That flag is not built here,
+    so this is the app half of the same condition.
+  -->
   {#if mobileAppAvailable}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -521,19 +521,19 @@
         {onmutetalkinguser}
       />
       <!--
-          The room's recording badge, for EVERYONE - this reports state, it does not change it, so
-          it is deliberately outside the presenter block below. Slots 18, 19 and 20 of `U4e`, whose
-          three consts, three gates and one recorded divergence moved WITH the markup into
-          `NavbarRecIndicator.svelte` on 2026-08-31 rather than being left behind as a comment about
-          something no longer in this file.
-        -->
+        The room's recording badge, for EVERYONE - this reports state, it does not change it, so
+        it is deliberately outside the presenter block below. Slots 18, 19 and 20 of `U4e`, whose
+        three consts, three gates and one recorded divergence moved WITH the markup into
+        `NavbarRecIndicator.svelte` on 2026-08-31 rather than being left behind as a comment about
+        something no longer in this file.
+      -->
       <NavbarRecIndicator {media} {recordingTooltip} />
       <!--
-          Broadcast controls - media.recording, SoundCloud, microphone, screen sharing, webcam and
-          session control - drive what the room sends to everyone, so they are presenter-only.
-          A reader keeps the Volume dropdown and Reload below, plus the talking and REC
-          indicators above, which report state rather than change it.
-        -->
+        Broadcast controls - media.recording, SoundCloud, microphone, screen sharing, webcam and
+        session control - drive what the room sends to everyone, so they are presenter-only.
+        A reader keeps the Volume dropdown and Reload below, plus the talking and REC
+        indicators above, which report state rather than change it.
+      -->
       {#if isPresenter}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -643,11 +643,11 @@
                 {/if}
               {/if}
               <!--
-                  Outside the media.recording branch on purpose. `media.recordedUrl` is set by the
-                  recorder's `stop` handler, which also clears `media.recording` - so while this
-                  sat inside `{#if media.recording}` it appeared and vanished in the same tick and
-                  could never be clicked.
-                -->
+                Outside the media.recording branch on purpose. `media.recordedUrl` is set by the
+                recorder's `stop` handler, which also clears `media.recording` - so while this
+                sat inside `{#if media.recording}` it appeared and vanished in the same tick and
+                could never be clicked.
+              -->
               {#if media.recordedUrl}
                 <li><hr class="dropdown-divider" /></li>
                 <li class="nav-item">
@@ -827,20 +827,20 @@
         </li>
       {/if}
       <!--
-          `a4e` — `app-room.render-helpers.js:960-973`, gated at `:1417-1422`:
-          `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`.
+        `a4e` — `app-room.render-helpers.js:960-973`, gated at `:1417-1422`:
+        `O(30, isPresenter && sessData.tawkPresenterSupport ? 30 : -1)`.
 
-          Markup from the const table: 195 is
-          `['title','TAWK Support',1,'nav-item',3,'click']`, 193 is
-          `[1,'nav-link','d-flex','align-items-center']`, 196 is
-          `[1,'fas','fa-2x','fa-question-circle']` and 108 is `[1,'ml-2','mainNavItem']`
-          (`app-room.compiled.js:2050-2051, 2048, 1697`).
+        Markup from the const table: 195 is
+        `['title','TAWK Support',1,'nav-item',3,'click']`, 193 is
+        `[1,'nav-link','d-flex','align-items-center']`, 196 is
+        `[1,'fas','fa-2x','fa-question-circle']` and 108 is `[1,'ml-2','mainNavItem']`
+        (`app-room.compiled.js:2050-2051, 2048, 1697`).
 
-          `tawkAvailable` carries a THIRD term the reference does not have: a configured
-          property id. See `#lib/tawk-support` — the reference's id is its own company's,
-          and a room with none configured shows no control rather than a control that opens
-          somebody else's support inbox.
-        -->
+        `tawkAvailable` carries a THIRD term the reference does not have: a configured
+        property id. See `#lib/tawk-support` — the reference's id is its own company's,
+        and a room with none configured shows no control rather than a control that opens
+        somebody else's support inbox.
+      -->
       {#if tawkAvailable}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -864,14 +864,14 @@
           onclick={() => menus.toggle('volume')}
         >
           <!--
-              Consts 105/106/107 of `app-room` — `['fas','fa-2x','fa-volume-up']`,
-              `…fa-volume-down`, `…fa-volume-off` (`app-room.compiled.js:1694-1696`) — and
-              the same three strict inequalities the overlay uses
-              (`app-room.render-helpers.js:1424-1428`).
+            Consts 105/106/107 of `app-room` — `['fas','fa-2x','fa-volume-up']`,
+            `…fa-volume-down`, `…fa-volume-off` (`app-room.compiled.js:1694-1696`) — and
+            the same three strict inequalities the overlay uses
+            (`app-room.render-helpers.js:1424-1428`).
 
-              The third one read `fa-volume-mute` here, which is in neither const table. One
-              word, and it is the icon a muted listener looks at.
-            -->
+            The third one read `fa-volume-mute` here, which is in neither const table. One
+            word, and it is the icon a muted listener looks at.
+          -->
           {#if volume > 50}
             <i class="fas fa-2x fa-volume-up"></i>
           {:else if volume < 50 && volume > 4}
@@ -923,23 +923,23 @@
           </button>
           <hr />
           <!--
-              TWO defects, both from `app-room.render-helpers.js:1005-1028` (`p4e`) and its
-              gate at `:1434`.
+            TWO defects, both from `app-room.render-helpers.js:1005-1028` (`p4e`) and its
+            gate at `:1434`.
 
-              THE GATE was `media.soundCloudPlaying` alone. The reference is
-              `O(48, e.scPlaying || e.mp3Playing || e.appService.globals.roomState.ytURL ? 48 : -1)`
-              — three sources, of which this room already models all three: `media.soundCloudPlaying`,
-              `mp3Playing` (set from the `playMP3ForAll` command) and `youtubeForAllUrl`
-              (the room-wide YouTube overlay, this app's `roomState.ytURL`). So the slider was
-              dead for two of the three things it controls: `onsetbackgroundvolume` reaches
-              `#mp3player` and the YouTube overlay as well as SoundCloud, and neither could be
-              turned down.
+            THE GATE was `media.soundCloudPlaying` alone. The reference is
+            `O(48, e.scPlaying || e.mp3Playing || e.appService.globals.roomState.ytURL ? 48 : -1)`
+            — three sources, of which this room already models all three: `media.soundCloudPlaying`,
+            `mp3Playing` (set from the `playMP3ForAll` command) and `youtubeForAllUrl`
+            (the room-wide YouTube overlay, this app's `roomState.ytURL`). So the slider was
+            dead for two of the three things it controls: `onsetbackgroundvolume` reaches
+            `#mp3player` and the YouTube overlay as well as SoundCloud, and neither could be
+            turned down.
 
-              THE CONTAINER is const 114, `[2, 'text-align', 'center']`
-              (`app-room.compiled.js:1723`). A `2` marker is STYLES, not classes — so it is a
-              `div` with `style="text-align: center"` and no class at all. `m-0` belongs to the
-              `<p>` inside it (const 199, `[1,'m-0']`), which already has it.
-            -->
+            THE CONTAINER is const 114, `[2, 'text-align', 'center']`
+            (`app-room.compiled.js:1723`). A `2` marker is STYLES, not classes — so it is a
+            `div` with `style="text-align: center"` and no class at all. `m-0` belongs to the
+            `<p>` inside it (const 199, `[1,'m-0']`), which already has it.
+          -->
           {#if media.soundCloudPlaying || mp3Playing || youtubeForAllUrl}
             <div style="text-align: center;">
               <hr />
@@ -962,19 +962,19 @@
           <div class="dropdown-divider"></div>
           <div class="room-sound-options">
             <!--
-                THE ROWS COME FIRST, and this dropdown did not have them.
+              THE ROWS COME FIRST, and this dropdown did not have them.
 
-                `app-room.render-helpers.js:1224-1225` puts `H(51, b4e, 3, 0, 'hr')` at the
-                head of `div.room-sound-options` (const 116), gated on
-                `media.talking && media.talking.length > 0` (`:1436`), and `b4e` is
-                `ht(0, _4e, 7, 14, null, null, qAe), T(2, 'hr')` — the same per-presenter
-                row the screen overlay renders, plus a trailing rule, and only THEN the six
-                sound checkboxes below.
+              `app-room.render-helpers.js:1224-1225` puts `H(51, b4e, 3, 0, 'hr')` at the
+              head of `div.room-sound-options` (const 116), gated on
+              `media.talking && media.talking.length > 0` (`:1436`), and `b4e` is
+              `ht(0, _4e, 7, 14, null, null, qAe), T(2, 'hr')` — the same per-presenter
+              row the screen overlay renders, plus a trailing rule, and only THEN the six
+              sound checkboxes below.
 
-                Without them a member could mute the room but not one presenter, which is
-                the entire point of the control. Shared with the overlay so the two cannot
-                drift; the `hr` is this copy's, not the overlay's.
-              -->
+              Without them a member could mute the room but not one presenter, which is
+              the entire point of the control. Shared with the overlay so the two cannot
+              drift; the `hr` is this copy's, not the overlay's.
+            -->
             <PresenterMuteRows
               talkingUsers={media.talking}
               preferences={presenterAudio}

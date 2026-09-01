@@ -644,20 +644,20 @@
               <a class="navbar-brand ml-1"
                 ><i class="fas fa-bell me-1"></i> Alerts
                 <!--
-                            `M2e`, const 21 — the Alert Filter's own entry point, and the reason
-                            the toolbar button below could be left out for as long as it was.
+                  `M2e`, const 21 — the Alert Filter's own entry point, and the reason
+                  the toolbar button below could be left out for as long as it was.
 
-                            Order matters and is the capture's: `H(6, M2e, …, "span", 8)` then
-                            `H(7, A2e, …, "span", 9)`, so "filtered" precedes "DND" inside the
-                            brand. Gate at byte 2,056,460 is the conjunction
-                            `modAlertFilterList && doFilteredAlerts`.
+                  Order matters and is the capture's: `H(6, M2e, …, "span", 8)` then
+                  `H(7, A2e, …, "span", 9)`, so "filtered" precedes "DND" inside the
+                  brand. Gate at byte 2,056,460 is the conjunction
+                  `modAlertFilterList && doFilteredAlerts`.
 
-                            Const 8 is the same span WITHOUT the click binding — Angular's
-                            placeholder attrs for the same node — so there is one badge here, not
-                            two. `.filtered-text` is a captured rule in
-                            `captured-runtime-components.css` (font-size 12px, vertical-align
-                            middle, and a hover state), which until now had no element to style.
-                          -->
+                  Const 8 is the same span WITHOUT the click binding — Angular's
+                  placeholder attrs for the same node — so there is one badge here, not
+                  two. `.filtered-text` is a captured rule in
+                  `captured-runtime-components.css` (font-size 12px, vertical-align
+                  middle, and a hover state), which until now had no element to style.
+                -->
                 {#if alertFilterActive}
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -752,17 +752,17 @@
           </div>
           {#if alerts.toolbarOpen}
             <!--
-                        Ported node for node from alert-section/datach-alerts-1. The empty right
-                        div is a conditional slot in the capture (an Angular comment anchor pair),
-                        so it is kept rather than collapsed - removing it changes the flex layout.
-                        The button's title is "Detach Chat" while its label reads "Detach Alerts";
-                        that mismatch is capture-accurate and deliberate.
-                      -->
+              Ported node for node from alert-section/datach-alerts-1. The empty right
+              div is a conditional slot in the capture (an Angular comment anchor pair),
+              so it is kept rather than collapsed - removing it changes the flex layout.
+              The button's title is "Detach Chat" while its label reads "Detach Alerts";
+              that mismatch is capture-accurate and deliberate.
+            -->
             <div class="shadow p-2 w-100 alertsToolbar" style="margin-top: 0px;">
               <!--
-                          `R2e` (const 28), gated on `showAlertsToolbarExtended`. The magnifier
-                          collapses this away and leaves only the form below.
-                        -->
+                `R2e` (const 28), gated on `showAlertsToolbarExtended`. The magnifier
+                collapses this away and leaves only the form below.
+              -->
               {#if alerts.toolbarExtended}
                 <div class="d-flex align-items-center justify-content-between flex-wrap">
                   <div class="d-flex align-items-center">
@@ -783,11 +783,11 @@
                       </div>
                     {/if}
                     <!--
-                                `O(3, chatOnlyMode ? -1 : 3)` - const 37/42. Hidden in a detached
-                                chat window, which is already the chat in its own window.
-                                The title is "Detach Chat" while the label reads "Detach Alerts";
-                                that mismatch is capture-accurate and deliberate.
-                              -->
+                      `O(3, chatOnlyMode ? -1 : 3)` - const 37/42. Hidden in a detached
+                      chat window, which is already the chat in its own window.
+                      The title is "Detach Chat" while the label reads "Detach Alerts";
+                      that mismatch is capture-accurate and deliberate.
+                    -->
                     {#if !chatOnlyMode}
                       <button
                         title="Detach Chat"
@@ -799,47 +799,47 @@
                     {/if}
                   </div>
                   <!--
-                              The right-hand div, which this room rendered empty. The capture
-                              declares TWO buttons for it, and each is gated:
+                    The right-hand div, which this room rendered empty. The capture
+                    declares TWO buttons for it, and each is gated:
 
-                                const 38/44  data-bs-target="#alert-filter-modal"
-                                             gated on `sessData.modAlertFilterList`
-                                const 39     data-bs-target="#alerts-advanced-search-modal"
-                                             gated on `sessData.advancedSearchAlerts &&
-                                             ownerdID == '56ba547185ae93560d186ea8'`
+                      const 38/44  data-bs-target="#alert-filter-modal"
+                                   gated on `sessData.modAlertFilterList`
+                      const 39     data-bs-target="#alerts-advanced-search-modal"
+                                   gated on `sessData.advancedSearchAlerts &&
+                                   ownerdID == '56ba547185ae93560d186ea8'`
 
-                              This slot held Advanced Search alone until the Alert Filter's gate
-                              was built, and the reason was sound at the time: across BOTH DOM
-                              captures of this toolbar the Alert Filter button never appears - one
-                              shows the slot holding nothing but its two Angular comment anchors,
-                              the other shows Advanced Search alone - so rendering it
-                              UNCONDITIONALLY put two buttons on a wrapped second row, a layout
-                              the capture never produces.
+                    This slot held Advanced Search alone until the Alert Filter's gate
+                    was built, and the reason was sound at the time: across BOTH DOM
+                    captures of this toolbar the Alert Filter button never appears - one
+                    shows the slot holding nothing but its two Angular comment anchors,
+                    the other shows Advanced Search alone - so rendering it
+                    UNCONDITIONALLY put two buttons on a wrapped second row, a layout
+                    the capture never produces.
 
-                              That objection was about the missing gate, not about the button. The
-                              captured rooms simply had no `modAlertFilterList`, which is exactly
-                              the case `alertFilterConfigured` is false in, so both captures still
-                              render precisely what they show. Omitting it now would be the
-                              divergence.
+                    That objection was about the missing gate, not about the button. The
+                    captured rooms simply had no `modAlertFilterList`, which is exactly
+                    the case `alertFilterConfigured` is false in, so both captures still
+                    render precisely what they show. Omitting it now would be the
+                    divergence.
 
-                              Order is the capture's: `H(5, N2e, …, "button", 38)` before
-                              `H(6, L2e, …, "button", 39)`, so Filter alerts precedes Advanced
-                              Search.
+                    Order is the capture's: `H(5, N2e, …, "button", 38)` before
+                    `H(6, L2e, …, "button", 39)`, so Filter alerts precedes Advanced
+                    Search.
 
-                              Advanced Search's own gate is not reproducible - the second half is
-                              a hardcoded owner id from the original deployment
-                              (`ownerdID == '56ba547185ae93560d186ea8'`) - so it renders
-                              unconditionally.
-                            -->
+                    Advanced Search's own gate is not reproducible - the second half is
+                    a hardcoded owner id from the original deployment
+                    (`ownerdID == '56ba547185ae93560d186ea8'`) - so it renders
+                    unconditionally.
+                  -->
                   <div>
                     {#if alertFilterConfigured}
                       <!--
-                                  Const 44 carries no `type`, where const 39 beside it opens with
-                                  `"type","button"`. Reproduced as-is. It is inert either way -
-                                  this row is a SIBLING of `#alert-settings` rather than a child
-                                  (`H(1, B2e, …)` precedes `d(2, "form", 29)`), so there is no
-                                  form for a default-type button to submit.
-                                -->
+                        Const 44 carries no `type`, where const 39 beside it opens with
+                        `"type","button"`. Reproduced as-is. It is inert either way -
+                        this row is a SIBLING of `#alert-settings` rather than a child
+                        (`H(1, B2e, …)` precedes `d(2, "form", 29)`), so there is no
+                        form for a default-type button to submit.
+                      -->
                       <button
                         data-bs-toggle="modal"
                         data-bs-target="#alert-filter-modal"
@@ -866,23 +866,23 @@
                   <div class="form-group m-0">
                     <div class="input-group">
                       <!--
-                                  `name` is ours, not the capture's. Const 32 of `app-alerts`
-                                  carries only class/type/placeholder/aria-label/aria-describedby/
-                                  title, so the original ships this field with neither an `id` nor
-                                  a `name` and Chrome reports "A form field element should have an
-                                  id or name attribute" against it too.
+                        `name` is ours, not the capture's. Const 32 of `app-alerts`
+                        carries only class/type/placeholder/aria-label/aria-describedby/
+                        title, so the original ships this field with neither an `id` nor
+                        a `name` and Chrome reports "A form field element should have an
+                        id or name attribute" against it too.
 
-                                  A `name` is added rather than an `id` because `id` is the half of
-                                  that pair the capture DOES use elsewhere and would be a new
-                                  document-unique hook; `name` satisfies the same requirement,
-                                  scopes to the enclosing `form#alert-settings`, and renders
-                                  nothing. No captured attribute is changed or removed.
+                        A `name` is added rather than an `id` because `id` is the half of
+                        that pair the capture DOES use elsewhere and would be a new
+                        document-unique hook; `name` satisfies the same requirement,
+                        scopes to the enclosing `form#alert-settings`, and renders
+                        nothing. No captured attribute is changed or removed.
 
-                                  Note also that the captured `aria-describedby="addon-search"`
-                                  points at an id nothing in the component defines - the clear
-                                  button is `addon-chat-clear`. That dangling reference is
-                                  reproduced as-is rather than silently repaired.
-                                -->
+                        Note also that the captured `aria-describedby="addon-search"`
+                        points at an id nothing in the component defines - the clear
+                        button is `addon-chat-clear`. That dangling reference is
+                        reproduced as-is rather than silently repaired.
+                      -->
                       <input
                         type="text"
                         name="alert-search-term"
@@ -904,11 +904,11 @@
                         onclick={() => (alerts.search = '')}><i class="fas fa-times"></i></span
                       >
                       <!--
-                                  `O2e`, gated on `showAlertsToolbarExtended`: the save button,
-                                  and inside it the archive control gated again on
-                                  `isPresenter && !media.limitedPresenter`. Search-only shows neither -
-                                  this room showed both in every state.
-                                -->
+                        `O2e`, gated on `showAlertsToolbarExtended`: the save button,
+                        and inside it the archive control gated again on
+                        `isPresenter && !media.limitedPresenter`. Search-only shows neither -
+                        this room showed both in every state.
+                      -->
                       {#if alerts.toolbarExtended}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1178,13 +1178,13 @@
           </app-roomscroller>
 
           <!--
-                      `O(21, o.webinarMode ? 21 : -1)` —
-                      `<div class="px-1 webinarMode"> Webinar Mode <span …><i …></i></span><i></i></div>`,
-                      with the tooltip verbatim from const 56.
+            `O(21, o.webinarMode ? 21 : -1)` —
+            `<div class="px-1 webinarMode"> Webinar Mode <span …><i …></i></span><i></i></div>`,
+            with the tooltip verbatim from const 56.
 
-                      `ACA-04` — the fourth node here is REFUSED, not missed:
-                      `WEBINAR_MODE_TRAILING_ICON_REFUSED` in `#lib/alert-chat-nav.js`.
-                    -->
+            `ACA-04` — the fourth node here is REFUSED, not missed:
+            `WEBINAR_MODE_TRAILING_ICON_REFUSED` in `#lib/alert-chat-nav.js`.
+          -->
           {#if webinarMode}
             <div class="px-1 webinarMode">
               Webinar Mode
@@ -1234,23 +1234,23 @@
             </div>
           {/if}
           <!--
-                      `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the composer, or the
-                      captured Chat Disabled block. Two reasons reach the same block: the room is in
-                      mode `d`, which applies to everyone, and this viewer is muted, which does not.
+            `O(23, o.isConnected && o.chatEnabled ? 23 : 24)` — the composer, or the
+            captured Chat Disabled block. Two reasons reach the same block: the room is in
+            mode `d`, which applies to everyone, and this viewer is muted, which does not.
 
-                      The mute half was ENFORCED here long before it was ever shown — `sendMessage`
-                      refuses while a live row exists — so a muted member typed, pressed send, and
-                      watched nothing happen with no explanation anywhere.
-                    -->
+            The mute half was ENFORCED here long before it was ever shown — `sendMessage`
+            refuses while a live row exists — so a muted member typed, pressed send, and
+            watched nothing happen with no explanation anywhere.
+          -->
           {#if !chatEnabled || !chatChannelUp}
             <div class="chatDisabled d-flex align-items-center">
               <h5 class="pl-3">
                 <i class="fas fa-lock"></i> Chat Disabled
                 <!--
-                            `H(4, u0e, 3, 4, 'span')` under `O(4, e.chatMutedTill ? 4 : -1)` — the
-                            span appears only when the viewer is muted, which is what distinguishes
-                            "the room turned chat off" from "you personally cannot post".
-                          -->
+                  `H(4, u0e, 3, 4, 'span')` under `O(4, e.chatMutedTill ? 4 : -1)` — the
+                  span appears only when the viewer is muted, which is what distinguishes
+                  "the room turned chat off" from "you personally cannot post".
+                -->
                 {#if selfMutedUntil}
                   <span> till {formatChatMutedTill(selfMutedUntil)}</span>
                 {/if}
@@ -1283,13 +1283,13 @@
                     onkeydown={handleComposerKey}></textarea>
                 </div>
                 <!--
-                          Which set of composer buttons applies is a pure width question, so it is
-                          answered by a container query in app.css rather than by measuring after
-                          hydration. Measuring meant the server rendered the collapsed "+" and the
-                          ResizeObserver swapped in the four buttons once hydration ran, which is
-                          the flicker. `showMessageOptions` stays as the explicit override the "+"
-                          button sets, exactly as the captured app's toggleMessageOptions() does.
-                        -->
+                  Which set of composer buttons applies is a pure width question, so it is
+                  answered by a container query in app.css rather than by measuring after
+                  hydration. Measuring meant the server rendered the collapsed "+" and the
+                  ResizeObserver swapped in the four buttons once hydration ran, which is
+                  the flicker. `showMessageOptions` stays as the explicit override the "+"
+                  button sets, exactly as the captured app's toggleMessageOptions() does.
+                -->
                 <div
                   class={[
                     'justify-content-center d-flex flex-row align-items-center justify-content-center p-0 m-0 text-center textAreaBtnsCol',
@@ -1384,18 +1384,18 @@
                       {/if}
                     {/if}
                     <!--
-                              The fifth and last button in this group, and it is fifth in the
-                              capture too: the const block resolves them in order as
-                              `O(2, canPostImages …)`, `O(3, isPresenter …)`, `O(4, canPostImages …)`,
-                              then `O(5, …enableRTE && …enableRTE && …isPresenter ? 5 : -1)`.
-                              Its own two consts are `class="textAreaBtns"` with a click, and
-                              `ngbTooltip="Rich Text Editor" placement="left" class="fas fa-font"`.
+                      The fifth and last button in this group, and it is fifth in the
+                      capture too: the const block resolves them in order as
+                      `O(2, canPostImages …)`, `O(3, isPresenter …)`, `O(4, canPostImages …)`,
+                      then `O(5, …enableRTE && …enableRTE && …isPresenter ? 5 : -1)`.
+                      Its own two consts are `class="textAreaBtns"` with a click, and
+                      `ngbTooltip="Rich Text Editor" placement="left" class="fas fa-font"`.
 
-                              Only this composer has it. The reference puts `openRTEModal()` on
-                              exactly two components — this one and the extra chat column, which
-                              this room does not have yet — and none on private chat, so the PM
-                              composer deliberately goes without.
-                            -->
+                      Only this composer has it. The reference puts `openRTEModal()` on
+                      exactly two components — this one and the extra chat column, which
+                      this room does not have yet — and none on private chat, so the PM
+                      composer deliberately goes without.
+                    -->
                     {#if canUseRTE}
                       <!-- svelte-ignore a11y_click_events_have_key_events -->
                       <!-- svelte-ignore a11y_no_static_element_interactions -->

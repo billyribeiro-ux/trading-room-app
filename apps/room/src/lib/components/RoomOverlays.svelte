@@ -893,19 +893,19 @@
   targetMessage={messageActions.selected}
 />
 <!--
-    `onImagePaste(event)` on the CHAT composer — byte 1,427,208, whose handler is at 1,445,719.
+  `onImagePaste(event)` on the CHAT composer — byte 1,427,208, whose handler is at 1,445,719.
 
-    The reference's confirmation is a `bootbox.confirm` carrying a preview `<img>` and a textarea
-    seeded with whatever was already in the composer, and the message that textarea holds is what
-    travels with the image. The two alert forms below already have this shape for their own pastes;
-    chat — the surface a member actually uses — had no `paste` binding at all until 2026-08-30
-    (`acA-02`).
+  The reference's confirmation is a `bootbox.confirm` carrying a preview `<img>` and a textarea
+  seeded with whatever was already in the composer, and the message that textarea holds is what
+  travels with the image. The two alert forms below already have this shape for their own pastes;
+  chat — the surface a member actually uses — had no `paste` binding at all until 2026-08-30
+  (`acA-02`).
 
-    `ImagePasteConfirm` and not `ImageUploadDialog`, deliberately: the file is already chosen, and a
-    dialog whose top half is a drop zone would invite a viewer to replace the thing they just pasted.
-    The dialog itself was three transcriptions of one control here until 2026-08-31; that file
-    carries the argument, and the textarea below is the only thing that differs between them.
-  -->
+  `ImagePasteConfirm` and not `ImageUploadDialog`, deliberately: the file is already chosen, and a
+  dialog whose top half is a drop zone would invite a viewer to replace the thing they just pasted.
+  The dialog itself was three transcriptions of one control here until 2026-08-31; that file
+  carries the argument, and the textarea below is the only thing that differs between them.
+-->
 {#if composer.pastedImage}
   {const chatPastePreviewUrl = $derived(composer.pastedImage.previewUrl)}
   <ImagePasteConfirm
@@ -1036,13 +1036,13 @@
   </ImagePasteConfirm>
 {/if}
 <!--
-    `imgUpload('swing')` — the swing form's own upload dialog.
+  `imgUpload('swing')` — the swing form's own upload dialog.
 
-    A SECOND instance rather than a share of the composer's `modal === 'image-upload'`: the
-    reference's `imgUpload` takes the feature name as an argument and opens a dialog whose
-    completion belongs to that feature, and routing the swing upload through the composer's
-    handler would post the image into chat instead of putting its URL in the form.
-  -->
+  A SECOND instance rather than a share of the composer's `modal === 'image-upload'`: the
+  reference's `imgUpload` takes the feature name as an argument and opens a dialog whose
+  completion belongs to that feature, and routing the swing upload through the composer's
+  handler would post the image into chat instead of putting its URL in the form.
+-->
 {#if swingAlerts.imageUpload}
   <ImageUploadDialog
     onclose={() => swingAlerts.cancelImageUpload()}
@@ -1050,9 +1050,9 @@
   />
 {/if}
 <!--
-    `onImagePaste(event, 'swing')` puts the pasted image in a `bootbox.confirm` before uploading,
-    so a stray paste cannot silently push bytes to the upload server.
-  -->
+  `onImagePaste(event, 'swing')` puts the pasted image in a `bootbox.confirm` before uploading,
+  so a stray paste cannot silently push bytes to the upload server.
+-->
 {#if swingAlerts.imagePaste}
   {const pastePreviewUrl = $derived(swingAlerts.imagePaste.previewUrl)}
   <ImagePasteConfirm
@@ -1062,14 +1062,14 @@
   />
 {/if}
 <!--
-    `imgUpload('dayTrade')` — the day trade form's own upload dialog.
+  `imgUpload('dayTrade')` — the day trade form's own upload dialog.
 
-    A THIRD instance rather than a share of the composer's or the swing form's: `imgUpload` takes
-    the feature name as an argument and `doImggurUpload` dispatches on it deny-by-default —
-    `"swing" === i ? swingAlert.image = F : "dayTrade" === i && (dayTradeAlert.image = F)` at byte
-    1,992,037 — so the completion belongs to exactly one feature. Routing this through either of
-    the others would put the URL in the wrong box or post the image into chat.
-  -->
+  A THIRD instance rather than a share of the composer's or the swing form's: `imgUpload` takes
+  the feature name as an argument and `doImggurUpload` dispatches on it deny-by-default —
+  `"swing" === i ? swingAlert.image = F : "dayTrade" === i && (dayTradeAlert.image = F)` at byte
+  1,992,037 — so the completion belongs to exactly one feature. Routing this through either of
+  the others would put the URL in the wrong box or post the image into chat.
+-->
 {#if dayTradeAlerts.imageUpload}
   <ImageUploadDialog
     onclose={() => dayTradeAlerts.cancelImageUpload()}
@@ -1077,9 +1077,9 @@
   />
 {/if}
 <!--
-    `onImagePaste(event, 'dayTrade')` puts the pasted image in a `bootbox.confirm` before
-    uploading, so a stray paste cannot silently push bytes to the upload server.
-  -->
+  `onImagePaste(event, 'dayTrade')` puts the pasted image in a `bootbox.confirm` before
+  uploading, so a stray paste cannot silently push bytes to the upload server.
+-->
 {#if dayTradeAlerts.imagePaste}
   {const dayTradePastePreviewUrl = $derived(dayTradeAlerts.imagePaste.previewUrl)}
   <ImagePasteConfirm
@@ -1113,14 +1113,14 @@
   />
 {/if}
 <!--
-    `randomUser()`'s dialog. Two phases, because the delay IS the feature: the giphy spinner
-    shows for three seconds with "User Info" hidden, then the body is replaced by
-    `<h2 class="text-center flash animated">` carrying the name and the button appears
-    (`$(".btn-random-user").css("display", "inline-block")`).
+  `randomUser()`'s dialog. Two phases, because the delay IS the feature: the giphy spinner
+  shows for three seconds with "User Info" hidden, then the body is replaced by
+  `<h2 class="text-center flash animated">` carrying the name and the button appears
+  (`$(".btn-random-user").css("display", "inline-block")`).
 
-    `alt=""` and `class="random-user-modal"` are the capture's own. The image is fixed 480x270 so
-    the dialog does not resize around it as it loads.
-  -->
+  `alt=""` and `class="random-user-modal"` are the capture's own. The image is fixed 480x270 so
+  the dialog does not resize around it as it loads.
+-->
 {#if roster.pick}
   <BootboxDialog
     mode="alert"
@@ -1143,9 +1143,9 @@
     {/if}
     {#snippet footer()}
       <!--
-          The User Info handler ends in `!0` inverted - it returns `false`, which is bootbox's
-          "do not dismiss". So the dialog stays open behind the user-info modal.
-        -->
+        The User Info handler ends in `!0` inverted - it returns `false`, which is bootbox's
+        "do not dismiss". So the dialog stays open behind the user-info modal.
+      -->
       {#if roster.pick?.revealed}
         <button
           type="button"

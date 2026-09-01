@@ -122,17 +122,17 @@
     <div class="dropdown-divider"></div>
     {@render entry(virtualCamText, 'OBS', () => onpromptforscreenname('camera'))}
     <!--
-        `e4e` in the capture, verbatim - TWO dividers, then a bare `li > a` with no
-        icon, bound to `mediaService.stopSharingAll()`:
+      `e4e` in the capture, verbatim - TWO dividers, then a bare `li > a` with no
+      icon, bound to `mediaService.stopSharingAll()`:
 
-          T(0,"div",115)(1,"div",115),
-          d(2,"li")(3,"a",163), x("click", () => onstopsharingall()),
-          v(4," Stop Sharing All Screens"), u()()
+        T(0,"div",115)(1,"div",115),
+        d(2,"li")(3,"a",163), x("click", () => onstopsharingall()),
+        v(4," Stop Sharing All Screens"), u()()
 
-        The nav item is labelled "Start/Stop Screen Sharing" but there was no stop
-        anywhere in the menu; `onstopscreensharing()` existed and was only ever
-        reachable through a remote `mutescreens` command from a presenter.
-      -->
+      The nav item is labelled "Start/Stop Screen Sharing" but there was no stop
+      anywhere in the menu; `onstopscreensharing()` existed and was only ever
+      reachable through a remote `mutescreens` command from a presenter.
+    -->
     <!--
       G05 — ` OBS / RTMP / Stream / Restream `, `a4e` at byte 2,479,414, gated
       `O(13, sessData.useMediaMTX ? 13 : -1)`.

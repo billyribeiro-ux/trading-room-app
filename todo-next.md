@@ -92,7 +92,7 @@ guessed.
 | 16 | `lib/components/ExtraChatPane.svelte` | 770 | §XCP — 9 rows against `app-extra-chat` read whole: 3 built, 3 fixed, 1 measured refusal, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 638 | `## DayTradeAlertsPane.svelte` in the v4 register — **5 rows. |
 | 18 | `lib/components/StreamingView.svelte` | 688 | `## StreamingView.svelte` in the v4 register — **10 rows, from one end-to-end reading of class `xCe` — bytes 1,901,122 to 1,914,468 of the pinned |
-| 19 | `lib/components/FilesPane.svelte` | 585 | no |
+| 19 | `lib/components/FilesPane.svelte` | 585 | `files-pane-contract.test.ts`, `files-pane-rows-contract.test.ts`, `files-gates.test.ts` — READ END TO END 2026-09-01 against `app-presentationarea`'s `#files` region (consts 17, 18, 29, 30, 32, 33, 39, 44, 238-269 in the table at byte 1,994,257) and the fifteen embedded views from `Owe` to `t2e`. **Zero absent const values.** One text literal is absent deliberately and the gates were read to prove it: `O(84, sessionFiles ? -1 : 84)` and `O(85, sessionFiles && sessionFiles.length > 0 ? 85 : -1)` are not complements, so "No room files found." is the NEVER-FETCHED message rather than the empty-list one, and our loader's `.all()` cannot produce that state. The reference's own `["pe","button",…]` typo in consts 261 and 269 — an attribute named `pe`, leaving the button at its `submit` default — is pinned in `files-pane-rows-contract.test.ts` and not reproduced. Ten mis-indented comment blocks fixed and gated. |
 | 20 | `lib/components/swing-alerts/SwingAlertsPane.svelte` | 589 | `## SwingAlertsPane.svelte` in the v4 register — **6 rows. |
 | 21 | `lib/components/notes/NotesPane.svelte` | 524 | `## NotesPane.svelte` in the v4 register — 4 rows, read against `zSe` (byte 1,930,173) — the notes pane inside `app-presentationarea` — and its |
 | 22 | `lib/components/PrivateChatPanel.svelte` | 524 | `private-chat-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-privchat` (byte 2,214,520), all 79 consts decoded BY VALUE and swept app-wide. 75 values ship; the 4 absent are Angular template REFS the reference itself never reads, by name or through `It(n)`. All seven update-block gates built. |
@@ -166,7 +166,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 114 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**54 of 91 surfaces audited · 22,057 of 38,807 lines · 56.8%.**
+**55 of 91 surfaces audited · 22,642 of 38,807 lines · 58.3%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
