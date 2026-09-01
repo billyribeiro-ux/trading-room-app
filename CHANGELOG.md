@@ -33,6 +33,97 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 18:20 UTC — a browser answered the last evidence gap, and it had been costing four declarations
+
+**Runtime impact: YES** — every carousel saved through the note editor was losing its black backing,
+its slide animation, its track width above nine slides, and `flex-shrink` on every unlinked slide.
+All four are fixed.
+
+`TODO.md`'s evidence-gap section is now **EMPTY**. Its one row asked whether a real browser
+normalises `background:#111` to `rgb(17, 17, 17)` the way jsdom does, and said:
+
+> I do not believe it does: `setAttribute('style', …)` preserves the attribute verbatim in Chrome …
+> this is most likely a jsdom artefact and **nothing has been changed on the strength of it**.
+
+**It does.** Declining to widen a sanitiser against an unobserved behaviour was the right call — that
+restraint is why this was a row and not a speculative patch. The reasoning under it was wrong, and
+one look at the library says why: **ProseMirror does not use `setAttribute` for `style`.**
+`prosemirror-model/dist/index.js:3441`:
+
+    else if (name == "style" && dom.style) dom.style.cssText = attrs[name];
+    else                                   dom.setAttribute(name, attrs[name]);
+
+`cssText` goes through the CSSOM. The jsdom output was never an artefact; it was the answer.
+
+## What headless Chromium 141 actually prints
+
+    dom.style.cssText = '…background:#111;…'          →  background: rgb(17, 17, 17)
+    dom.style.cssText = 'width:50.000000%…'           →  width: 50%
+    dom.style.cssText = '…transition:transform 0.5s ease…'
+                                                      →  transition: transform 0.5s
+    el.setAttribute('style', '…background:#111;…')    →  background:#111   (verbatim, as believed)
+
+**Four defects, all shipping.** Three from the CSSOM and one that had nothing to do with it:
+
+- **`background`** — the black backing, on every carousel.
+- **`transition`** — the slide animation. `ease` is `transition-timing-function`'s INITIAL value, so
+  the CSSOM deletes it. The value is not reformatted, part of it is removed — the case the original
+  reasoning could not have predicted, because it was looking for reformatting.
+- **`width` at ten or more slides** — `1000%` has four digits and the percent pattern allowed three,
+  so the track collapsed and every slide stacked on the first.
+- **`flex-shrink` on an UNLINKED slide.** Found by writing the round-trip test, not by the browser.
+  `renderHTML` emits a linked slide as `<a>` and an unlinked one as `<div>`, with the same style
+  string; the `a` rules admitted `flex-shrink` and the `div` rules did not. That is the whole
+  carousel rather than a detail — the track is `display:flex` and each slide is exactly one viewport,
+  so without it the flex algorithm compresses them all into one screen and
+  `translateX(-n * (100/count))` lands nowhere near slide `n`.
+
+## Two halves, and neither is allowed to be the source of the other
+
+`e2e/note-carousel-cssom.spec.ts` asks a real Chromium and checks the result against patterns
+**restated** in the spec. `src/lib/note-carousel-cssom.test.ts` puts that browser's own output through
+the real `sanitizeNoteHtml`. Each alone is useless: the spec cannot catch the two files drifting
+apart, and the unit test cannot reach a browser. Together they close the loop — a browser said these
+are the bytes, and the sanitiser says these bytes survive.
+
+That split is what found `flex-shrink`: the spec passed, because its restated rules were what the
+rules SHOULD be; the round-trip failed, because the source did not match them.
+
+## A third serialiser in the chain, found while writing the assertions
+
+They first read `background: rgb(17, 17, 17)` and failed on a declaration that had survived.
+`sanitize-html` REBUILDS the style attribute from what it kept, in its own spelling — no space after
+the colon, no trailing semicolon:
+
+    renderHTML writes    background:#111;
+    the CSSOM prints     background: rgb(17, 17, 17);
+    sanitize-html emits  background:rgb(17, 17, 17)
+
+Three spellings of one declaration. Recorded because anything asserting on STORED note HTML is
+asserting on the third, and the first two are the ones a reader reaches for.
+
+## The widening is a second spelling, not a hole
+
+Three values gained an alternate form and the width bound gained one digit. No new property, no new
+shape, and the allow-lists are still deny-by-default — asserted directly: a different colour, a
+`url()`, a different duration, a different transitioned property, `position: fixed`, `z-index`, and
+a five-digit width are each still refused, on the carousel's own root element.
+
+## Verification
+
+Two negative controls, each seen RED then restored. The browser spec re-run against the SHIPPED
+patterns fails with the production symptom in its own message — *"the browser prints `background:
+rgb(17, 17, 17)` and the allow-list refuses it, so this declaration is stripped from every carousel
+saved through the editor"*. And `flex-shrink` removed from the `div` rules fails the geometry case.
+
+The browser ran with `PLAYWRIGHT_CHROMIUM_PATH` at the container's installed Chromium — the config's
+existing escape hatch, unchanged, because the pinned Playwright wants a build this container does not
+have. That is an environment mismatch, not a repository defect, and hard-coding a path into
+`playwright.config.ts` would have broken CI.
+
+Room gate exit 0: 319 test files / 5,782 passed / 1 skipped; `svelte-check` 0 errors, 0 warnings.
+**And this one WAS opened in a browser** — which is the entire point of the row.
+
 ### 2026-09-01 16:40 UTC — the scheduled play moved to the server, and the evidence-gap row is deleted
 
 **Runtime impact: YES** — a video armed for later now fires whether or not the presenter's tab is

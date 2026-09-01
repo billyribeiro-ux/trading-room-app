@@ -169,25 +169,29 @@ does not, so batching backend pushes is worth real money and docs pushes are eff
 
 ## Evidence gaps
 
-**Whether a real browser serialises `background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it
-matters.** Writing the jsdom test surfaced that Tiptap's `getHTML()` returns CSSOM-normalised style
-attributes there: `width:50.000000%` comes back `width: 50%`, and `background:#111` comes back
-`background: rgb(17, 17, 17)`. Both sanitiser allow-lists — `safe-html.ts` client-side and
-`server/notes.ts` line 123 — accept `background` only as `/^#111$/i`, so **if** a browser normalises
-the same way, every carousel saved through our editor loses its black backing.
+**EMPTY as of 2026-09-01.** The one row here was *"whether a real browser serialises
+`background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it matters"*, and it is answered: **it
+does**, and the reasoning that expected otherwise was wrong in a way worth keeping.
 
-I do not believe it does: `setAttribute('style', …)` preserves the attribute verbatim in Chrome, and
-the server sanitiser is `sanitize-html` over `htmlparser2`, a string parser with no CSSOM at all. So
-this is most likely a jsdom artefact and **nothing has been changed on the strength of it** —
-widening a sanitiser allow-list to defend against a behaviour I have not observed is exactly the
-speculative change this file exists to prevent.
+The row said *"`setAttribute('style', …)` preserves the attribute verbatim in Chrome … this is most
+likely a jsdom artefact"*. Both halves are true and neither applies, because **ProseMirror does not
+use `setAttribute` for `style`** — `prosemirror-model/dist/index.js:3441` assigns
+`dom.style.cssText`, which goes through the CSSOM. Headless Chromium 141 then agrees with jsdom
+declaration for declaration.
 
-- **What is missing:** one look at `editor.getHTML()` in a real browser after inserting a carousel.
-- **Where I looked:** `carousel.ts` `renderHTML`, `TAG_STYLE_RULES.div.background` in
-  `apps/room/src/lib/components/notes/safe-html.ts` (**not** `lib/safe-html.ts` — the file moved and
-  this row used to cite it by bare name), `server/notes.ts:123`, and the jsdom output pinned in
-  `note-carousel.test.ts`.
-- **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
+Declining to widen a sanitiser against an unobserved behaviour was the right call and this file is
+the reason it was recorded rather than acted on. What it cost was five weeks of a real defect: four
+declarations were being stripped from every carousel saved through the editor — the black backing,
+the slide animation (`ease` is `transition-timing-function`'s initial value, so the CSSOM deletes
+it), the track width at ten or more slides, and `flex-shrink` on every UNLINKED slide, which is a
+plain gap between two rule sets rather than a CSSOM effect and which broke the translate arithmetic
+outright.
+
+The measurement is `apps/room/e2e/note-carousel-cssom.spec.ts`, in a real browser, plus
+`apps/room/src/lib/note-carousel-cssom.test.ts`, which puts that browser's own output through the
+real `sanitizeNoteHtml`. Neither half is the source of the other, deliberately: the spec can reach a
+browser but must restate the rules, and the unit test can call the sanitiser but cannot reach a
+browser.
 
 ---
 
