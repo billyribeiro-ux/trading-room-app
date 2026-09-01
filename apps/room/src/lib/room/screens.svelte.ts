@@ -59,6 +59,7 @@ export class RoomScreens {
 
   #selectedScreenTab: string | null;
   #detachedHere: readonly string[];
+  #localPreviews: readonly string[];
   #forcedScreenId: string | null;
   #lockedScreenId: string | null;
   #isFullScreenshare: boolean;
@@ -112,6 +113,28 @@ export class RoomScreens {
       handle to close, the other is what the pane draws.
     */
     this.#detachedHere = $state.raw<readonly string[]>([]);
+
+    /*
+      `SP2-04` — which of MY OWN shared screens I have asked to preview here.
+
+      Upstream does not attach your own capture to a `<video>` until you ask: `localpreview` starts
+      `!1` and `largePreview()` is its only writer, which is also the only path to `isConnected` for
+      a screen you are sharing yourself. Until then the tile shows `W0e`'s invitation. The five
+      readings of `localpreview`, the three writers of `isConnected` and the byte offsets for all of
+      them are in `screen-pane-contract.test.ts`'s `SP2-04` block, which asserts every one against
+      the pinned bundle — one place, re-read on every run, rather than four copies that drift.
+
+      **The refusal this replaces was wrong the way `G08`'s was.** It said the gate *"cannot be
+      reached in this application"*; it could not be reached because `#addLocalScreen` attached
+      eagerly, which is a choice this room made and then read back as the reference's.
+
+      Why upstream bothers: decoding your own capture is a second live decode of a picture already on
+      your monitor, on the machine that is also encoding and uploading it.
+
+      `$state.raw` keyed by producer id, exactly like `#detachedHere` above and for the same reason:
+      per-screen, replaced wholesale, no member ever mutated.
+    */
+    this.#localPreviews = $state.raw<readonly string[]>([]);
 
     /** The screen every viewer is taken to; renders the eye badge on that tab. */
     this.#forcedScreenId = $state<string | null>(null);
@@ -186,6 +209,32 @@ export class RoomScreens {
     this.#selectTabOfId(screenId);
   }
 
+  /**
+   * `SP2-04` — `o.localpreview`, for one screen.
+   *
+   * False until the presenter clicks the invitation, which is upstream's own default and the reason
+   * the field exists at all. Read by `ScreenPane` to decide both halves: whether to draw `W0e`, and
+   * whether the `<video>` may take a `srcObject`.
+   */
+  isLocalPreviewing(screenId: string): boolean {
+    return this.#localPreviews.includes(screenId);
+  }
+
+  /**
+   * `largePreview()` — attach my own capture to this pane, on request.
+   *
+   * Upstream's method also does the attaching by hand (`i.srcObject = e.localStream; i.play()`).
+   * Here the flag is the whole job: the pane's `{@attach}` already owns `srcObject` and `play()` for
+   * every screen and re-runs when this flips, because it reads it. One writer to the element, which
+   * is what stops a second racing the first over the same `srcObject`.
+   *
+   * Idempotent, as upstream's `= !0` is: clicking twice must not grow the list.
+   */
+  largePreview(screenId: string): void {
+    if (this.#localPreviews.includes(screenId)) return;
+    this.#localPreviews = [...this.#localPreviews, screenId];
+  }
+
   /** The detached window selects its own screen on open; nothing else writes this directly. */
   set selectedTab(next: string | null) {
     this.#selectedScreenTab = next;
@@ -252,6 +301,14 @@ export class RoomScreens {
     if (this.#selectedScreenTab === screenId) this.#selectedScreenTab = fallbackTab;
     if (this.#forcedScreenId === screenId) this.#forcedScreenId = null;
     if (this.#lockedScreenId === screenId) this.#lockedScreenId = null;
+    /*
+      `SP2-04` — the opt-in dies with the screen, cleaned HERE rather than by a call each caller has
+      to remember. `restartLocalScreens` re-produces the same capture onto a NEW producer id and
+      drops the old one through this method, so without the line the list grows a dead entry per
+      reconnect and a reissued id arrives already opted in — a screen attaching itself with no click.
+      Upstream cannot have that bug and gets no credit for it: its flag dies with the component.
+    */
+    this.#localPreviews = this.#localPreviews.filter((entry) => entry !== screenId);
   }
 
   /**

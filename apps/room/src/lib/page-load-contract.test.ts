@@ -183,6 +183,7 @@ describe('page load contract', () => {
         "presenterColors",
         "privateChats",
         "room",
+        "roomMedia",
         "savedPolls",
         "sessData",
         "sessionHandle",

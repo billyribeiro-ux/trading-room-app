@@ -9,6 +9,35 @@
    * govern.
    */
   let { style = $bindable(), onreset, onsave, ontestsound }: FollowChatStylePaneProps = $props();
+
+  /*
+    ── THE FOUR STATIC `value` ATTRIBUTES CANNOT BE TRANSCRIBED, AND THE COMPILER IS THE EVIDENCE ───
+
+    Each of the four colour inputs carries one in the reference, between `name` and `id`:
+
+    ```js
+    ["type","color","name","follow-chat-text-color","value","followChatStyle.color",
+     "id","follow-chat-text-color",1,"form-check-input",3,"ngModelChange","ngModel"]   // 2,093,187
+    ```
+
+    They are a DEFECT upstream — a static attribute where a binding was meant, so every one of those
+    inputs is served with the literal text of an expression as its value until Angular's `ngModel`
+    overwrites it. The four in `#user-settings-modal` (`chatStyle.*`, byte 2,261,183) are the same
+    mistake again.
+
+    **Transcribing them was attempted on 2026-09-01 and Svelte refuses it:**
+
+        ERROR FollowChatStylePane.svelte 28:11 "Attributes need to be unique"
+        https://svelte.dev/e/attribute_duplicate
+
+    `value` and `bind:value` are the same attribute to the Svelte compiler, so the pair Angular
+    accepts is unwritable here — not undesirable, unwritable. Angular treats `value="…"` and
+    `[(ngModel)]` as two separate things and lets the second win; Svelte has one slot.
+
+    The binding is the half that does something, so the binding is what stays. This is a limit of the
+    target language rather than a judgement about the reference, and it is recorded with the error
+    that establishes it so nobody re-attempts it from the const table alone.
+  */
 </script>
 
 <div class="py-2">

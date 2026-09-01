@@ -1165,9 +1165,10 @@
 {#if dialogs.prompt}
   <BootboxDialog
     mode="prompt"
-    message=""
     title={dialogs.prompt.title}
     value={dialogs.prompt.value}
+    options={dialogs.prompt.options}
+    message={dialogs.prompt.message ?? ''}
     onclose={() => (dialogs.prompt = null)}
     onconfirm={(value) => dialogs.prompt?.onconfirm(value ?? '')}
   />

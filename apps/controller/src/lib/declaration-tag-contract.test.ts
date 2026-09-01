@@ -22,8 +22,11 @@ import { describe, expect, it } from 'vitest';
  * ## The measurement, reproduced rather than quoted
  *
  * Svelte's own `{@const ...}` page opens with *"`{@const x = y}` is legacy syntax — use
- * `{const x = $derived(y)}` instead"*, and declaration tags are available since Svelte 5.56;
- * `package.json` pins **5.56.10**.
+ * `{const x = $derived(y)}` instead"*, and declaration tags are available since Svelte 5.56. This
+ * app pins a version at or above that, READ from `package.json` by the case below rather than
+ * quoted here — until 2026-08-31 this sentence named the patch version `5.56.10` as the pin, by
+ * which time the pin was `5.57.0`, and the room's twin carried the identical stale literal. A number
+ * in prose beside the thing it counts is the copy nobody updates.
  *
  * The migration is `$derived(...)` and not a plain `{const x = y}`, and that was settled by
  * compiling the same block three ways rather than by reading the sentence twice:
@@ -68,6 +71,21 @@ function codeOnly(source: string): string {
 }
 
 const FILES = svelteFiles(SOURCE).filter((path) => !path.includes('.test.'));
+
+const SVELTE_PIN: string = (
+  JSON.parse(readFileSync('package.json', 'utf8')) as { devDependencies: Record<string, string> }
+).devDependencies.svelte;
+
+describe('the syntax this file migrates to is actually available here', () => {
+  it('pins Svelte at or above 5.56, where declaration tags arrived', () => {
+    /* The FLOOR, not today's patch number: a floor survives every upgrade that a quoted version does not. */
+    const [major, minor] = SVELTE_PIN.replace(/^[^\d]*/, '')
+      .split('.')
+      .map(Number);
+    expect(major, `svelte is pinned at ${SVELTE_PIN}`).toBeGreaterThanOrEqual(5);
+    if (major === 5) expect(minor).toBeGreaterThanOrEqual(56);
+  });
+});
 
 describe('the compiler decides which form is reactive', () => {
   const block = (tag: string) => `<script>let { n = 0 } = $props();</script>{#if true}${tag}<p>{d}</p>{/if}`;

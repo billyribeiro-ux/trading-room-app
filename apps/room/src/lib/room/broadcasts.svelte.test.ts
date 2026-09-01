@@ -94,8 +94,24 @@ describe('the × is NOT Stop For All, and that distinction is the whole point', 
 });
 
 describe('the receivers keep the invariants a setter would let a caller break', () => {
-  it('videoStopped clears the picture, the schedule AND the armed timer', () => {
-    const { broadcasts, sent } = make();
+  it('videoStopped clears the picture and the pending line', () => {
+    /*
+      ── THIS CASE LOST ITS THIRD CLAUSE ON 2026-09-01, AND THE FEATURE GOT STRONGER ─────────────
+
+      It was *"clears the picture, the schedule AND the armed timer"*, and it proved the last clause
+      by advancing fake time two minutes and asserting nothing was sent. That timer is gone: an
+      armed play is a ROW now, posted at Send and fired by `sweepDueVideos`, which is what the
+      capture does and what makes a play survive the presenter closing their tab.
+
+      The behaviour the deleted clause protected is not lost, it MOVED and improved — a stop nulls
+      `video_play_time` server-side, so it cancels an armed play for everyone, including presenters
+      whose browsers are closed, which a local timer could never do. It is asserted where it now
+      lives: `a STOP cancels an armed play, for everyone, including a closed browser` in
+      `room-media-state.test.ts`.
+
+      What stays here is what this object still owns: the picture and the pending line.
+    */
+    const { broadcasts } = make();
     broadcasts.scheduleVideoForAll(
       'https://example.test/a.mp4',
       new Date(Date.now() + 60_000).toISOString()
@@ -107,31 +123,44 @@ describe('the receivers keep the invariants a setter would let a caller break', 
     expect(broadcasts.videoPlayerUrl).toBe('');
     expect(broadcasts.hideVideoPlayer).toBe(false);
     expect(broadcasts.scheduledVideoForAll).toEqual({ videoURL: '', videoPlayTime: null });
-
-    // The point of the whole reshape: a stop from ANOTHER presenter must cancel this browser's
-    // pending play, or the video arrives minutes after the room was told it was removed.
-    vi.advanceTimersByTime(120_000);
-    expect(sent, 'an armed play fired after the room was told to stop').toEqual([]);
   });
 
-  it('an armed play DOES fire when nothing stops it', () => {
-    // The negative half: without this the test above would pass against a scheduler that never works.
+  it('an armed play POSTS the moment, once, and arms no local timer', () => {
+    /*
+      `sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: i})` — byte 1,981,560,
+      posted the instant Send is pressed. Three things asserted and each is a way this could regress:
+      the command goes out NOW (not on a timer), it carries the moment, and advancing time sends
+      nothing further — a leftover `setTimeout` would post a duplicate the server has already fired.
+    */
     const { broadcasts, sent } = make();
-    broadcasts.scheduleVideoForAll(
-      'https://example.test/a.mp4',
-      new Date(Date.now() + 60_000).toISOString()
-    );
-    vi.advanceTimersByTime(60_001);
-    expect(sent.map((s) => (s.payload as { cmd: string }).cmd)).toEqual(['playVideoForAll']);
+    const at = Date.now() + 60_000;
+    broadcasts.scheduleVideoForAll('https://example.test/a.mp4', new Date(at).toISOString());
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].payload).toMatchObject({
+      cmd: 'playVideoForAll',
+      url: 'https://example.test/a.mp4',
+      videoPlayTime: at
+    });
+
+    vi.advanceTimersByTime(120_000);
+    expect(sent, 'nothing local may fire a second copy').toHaveLength(1);
   });
 
-  it('a time already past plays immediately rather than never', () => {
+  it('a time already past plays NOW, with no moment attached', () => {
+    /*
+      The previous local scheduler did this on `delay <= 0` and the server does it too, so a
+      presenter who picks a minute ago gets a video rather than an error. `videoPlayTime` must be
+      absent rather than a past moment: sending one would have the server arm a play it then fires
+      on its next sweep, up to fifteen seconds later, for no reason.
+    */
     const { broadcasts, sent } = make();
     broadcasts.scheduleVideoForAll(
       'https://example.test/a.mp4',
       new Date(Date.now() - 1_000).toISOString()
     );
     expect(sent.map((s) => (s.payload as { cmd: string }).cmd)).toEqual(['playVideoForAll']);
+    expect((sent[0].payload as { videoPlayTime?: number | null }).videoPlayTime ?? null).toBeNull();
   });
 
   it('an unparseable time arms nothing and plays nothing, loudly', () => {

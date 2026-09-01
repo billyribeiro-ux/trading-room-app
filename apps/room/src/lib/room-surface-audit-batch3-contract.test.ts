@@ -201,6 +201,51 @@ describe('RNB-01 — the help link, refused because its gate is never written', 
     expect(BUNDLE.indexOf('this.hasSTHelpLink=!0', 2_400_000)).toBe(-1);
   });
 
+  it('rules out a BULK write, which a name search alone cannot', () => {
+    /*
+      THE HOLE IN "IT OCCURS THREE TIMES", CLOSED 2026-09-01.
+
+      Counting a field's NAME proves nothing about a framework that can write fields without naming
+      them. `Object.assign(this, sessData)`, a `for…in` copy, or a computed `this[key] = value` would
+      each set `hasSTHelpLink` while leaving the occurrence count at three — and the whole refusal
+      rests on that count.
+
+      So the class body is searched for all four shapes. `app-room`'s constructor is at 2,497,849 and
+      its class runs past 2,527,000; the window below covers it with room either side.
+
+      The three `Object.keys` calls that DO exist are webcam bookkeeping — `addPresenterdWebcam`
+      counting `this.webcams`, and `resetWebcamPositions`/`resetWebcamPositionsAlt` iterating it.
+      Named here because "three hits, all harmless" is a claim somebody should be able to re-check
+      without re-deriving which three.
+    */
+    const classBody = BUNDLE.slice(2_490_000, 2_530_000);
+    expect(classBody, 'app-room does not bulk-copy onto itself').not.toContain(
+      'Object.assign(this'
+    );
+    expect(classBody).not.toMatch(/for\s*\(\s*(?:const|let|var)\s+\w+\s+in\s/);
+    expect(classBody, 'no computed self-assignment').not.toMatch(/this\[\w+\]\s*=/);
+    const objectKeys = classBody.split('Object.keys(').length - 1;
+    expect(objectKeys).toBe(3);
+    /* All three read `this.webcams`, so none of them can reach a boolean gate. */
+    expect(classBody.split('Object.keys(this.webcams)').length - 1).toBe(3);
+  });
+
+  it('so the reference s OWN room never renders it, which makes the DOMs agree', () => {
+    /*
+      The conclusion the earlier cases support but none of them stated, and it is the one that
+      matters under "match the dump exactly": this is not a divergence.
+
+      A refusal says *we chose differently from the reference*. Here the gate is dead upstream, so
+      upstream's rendered navbar has no help link and neither does ours. The const-table value is a
+      residual of the SWEEP — which reads source — not of the page. Recorded as a case because the
+      distinction is the difference between four rows of open work and none.
+    */
+    expect(BUNDLE).toContain('O(9,e.hasSTHelpLink?9:-1)');
+    expect(BUNDLE.split('this.hasSTHelpLink=').length - 1).toBe(2);
+    expect(BUNDLE.indexOf('this.hasSTHelpLink=!1')).toBe(2_497_849);
+    expect(NAVBAR).not.toContain('intercom.help');
+  });
+
   it('has a control that proves an assignment WOULD have been found', () => {
     expect(BUNDLE.split('isTipEnabled').length - 1).toBe(4);
     expect(

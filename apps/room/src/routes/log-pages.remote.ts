@@ -4,7 +4,13 @@ import { z } from 'zod';
 import { MAX_CHAT_TAB_NAME } from '#lib/chat-tabs.js';
 import { requireRoomShortCode, requireUser } from '#lib/server/auth.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
-import { MAX_CHAT_LOG_PAGE, loadChatPage, searchChatChannel } from '#lib/server/chat-log.js';
+import {
+  CHAT_DOWNLOAD_RANGES,
+  MAX_CHAT_LOG_PAGE,
+  chatLogForDownload,
+  loadChatPage,
+  searchChatChannel
+} from '#lib/server/chat-log.js';
 import { isMemberChatChannel, memberChatChannels } from '#lib/server/chat-channels.js';
 import { loadAlertPage } from '#lib/server/alert-log.js';
 
@@ -183,3 +189,58 @@ export const loadOlderAlerts = query(pageNumber, async (page) => {
 
   return loadAlertPage(requireRoomShortCode(locals), page);
 });
+
+/**
+ * `downloadLog("chat")` — the whole channel within a range, for the file the browser writes.
+ *
+ * ```js
+ * const f = (yield invokeServerCommand("getAllLog", {type: s, channel: this.channel, limit: a},
+ *                                      {ackTimeoutMs: 6e4})).data                // byte 1,416,126
+ * ```
+ *
+ * `limit` is the reference's own name for the RANGE — `'all'`, `'24hrs'` or `'7days'` — which is why
+ * the field here is called `range` instead: a parameter named `limit` that carries a duration is the
+ * kind of name a reader trusts and is wrong about.
+ *
+ * ## A `query` and not a `command`, by the test this file already states
+ *
+ * *"`query` is for reads that are pure, and these are."* This is one SELECT with a predicate and a
+ * LIMIT; it mints nothing and writes nothing.
+ *
+ * The cache is safe for a narrower reason than the pagination above, and it is worth saying which:
+ * the key is the serialised argument, so a download of `24hrs` and one of `all` are separate
+ * entries — but two `24hrs` downloads a minute apart WOULD share one, and the second would miss any
+ * message posted in between. That is acceptable and not a defect: a query's cache lives only as long
+ * as something holds the resource, which here is the duration of one click, and a transcript that is
+ * one click old is what "download the log" means. What would NOT be acceptable is a page holding it
+ * across a session, and nothing does.
+ *
+ * ## The room and the channel are both authority decisions and both are made here
+ *
+ * The room comes from the SESSION, never the request — the 2026-08-07 escalation in a new place. The
+ * channel is checked against `memberChatChannels`, exactly as the page read above checks it, because
+ * "download" must not be a way to read a channel this member cannot open.
+ */
+export const downloadChatLog = query(
+  z.strictObject({
+    channel: z.string().min(1).max(MAX_CHAT_TAB_NAME),
+    /*
+      An ENUM built from the exported list rather than three literals here, so the UI, the server and
+      the contract all read one declaration. A fourth range would otherwise be a value this schema
+      accepts and `chatLogForDownload` silently treats as `'all'`.
+    */
+    range: z.enum(CHAT_DOWNLOAD_RANGES as unknown as [string, ...string[]])
+  }),
+  async ({ channel, range }) => {
+    ensureDatabase();
+
+    const { locals, request } = getRequestEvent();
+    const user = requireUser(locals);
+    const shortCode = requireRoomShortCode(locals);
+
+    const channels = await memberChatChannels(request, shortCode, user);
+    if (!isMemberChatChannel(channels, channel)) error(403, 'No such channel.');
+
+    return chatLogForDownload(shortCode, channel, range as 'all' | '24hrs' | '7days');
+  }
+);

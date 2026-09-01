@@ -333,6 +333,25 @@ export class RoomMedia {
     this.#talking = this.#talking.filter((user) => user.userID !== userID);
   }
 
+  /**
+   * `mediaService.presenterTalking` — the server's audio-activity flag, and NOT `talkingUsers`.
+   *
+   * FALSE by default, which is the reference's own initialiser at bytes 1,114,654 and 1,129,852, and
+   * the fact that retired this room's earlier refusal to build the branch at all. Flipped by two
+   * payload-free room commands, `presenterTalking` / `presenterNotTalking`, relayed by the server
+   * command switch at byte 1,014,971. The whole argument is at `NavbarTalkingIndicator.svelte`.
+   */
+  #presenterTalking = $state(false);
+
+  get presenterTalking(): boolean {
+    return this.#presenterTalking;
+  }
+
+  /** Both directions, one setter, because the two commands are one flag. */
+  setPresenterTalking(talking: boolean): void {
+    this.#presenterTalking = talking;
+  }
+
   /*
     The ROOM's recording, as the command channel reports it — four transitions, matching the
     capture's four subscriptions rather than one bundled setter:

@@ -10,6 +10,26 @@
     title?: string;
     value?: string;
     /**
+     * `bootbox.prompt({inputType: "radio", inputOptions: [...]})` — a prompt that CHOOSES rather than
+     * types.
+     *
+     * ```js
+     * bootbox.prompt({ title: "Chat Log", message: "<p>Please select an option below:</p>",
+     *   inputType: "radio", inputOptions: [
+     *     { text: "Entire chat history", value: "all" },
+     *     { text: "Last 24 hours",       value: "24hrs" },
+     *     { text: "Last 7 days",         value: "7days" }], … })     // byte 1,415,703
+     * ```
+     *
+     * Modelled as a field on the existing prompt rather than a fourth `mode`, because that is bootbox's
+     * own shape: ONE `prompt` whose `inputType` selects the control. A `mode: 'radio'` would make the
+     * two look like different dialogs to every call site and to `RoomDialogs`, when upstream treats
+     * them as one with a different input.
+     *
+     * Absent means the text input, which is what every existing call site gets and must keep getting.
+     */
+    options?: readonly { readonly text: string; readonly value: string }[];
+    /**
      * RS-07 — `buttons: {confirm: {label, className}, cancel: {label, className}}`.
      *
      * Defaulted to what a `bootbox.confirm` with no `buttons` block renders, because that is what
@@ -38,6 +58,7 @@
     className = '',
     title = '',
     value = '',
+    options,
     confirmLabel = 'OK',
     confirmClassName = 'btn-primary',
     cancelLabel = 'Cancel',
@@ -95,7 +116,53 @@
       </div>
       <div class="modal-body">
         <div class="bootbox-body">
-          {#if mode === 'prompt'}
+          {#if mode === 'prompt' && options}
+            <!--
+              `inputType: "radio"` — bootbox renders `.bootbox-input-radio` inside the same
+              `.bootbox-form`, one `.form-check` per option, and the class names are its own.
+
+              The MESSAGE is shown above the group here and is not for the prompt's text variant:
+              upstream's radio call passes one (`"<p>Please select an option below:</p>"`) and its
+              text calls generally do not, because a labelled field needs no sentence. Rendered as
+              text rather than through `{@html}` — the capture's own value is a `<p>` wrapper around a
+              plain sentence, and admitting HTML into a dialog body for a `<p>` nobody sees is the
+              trade this repository does not make.
+
+              NO PRESELECTION, which is the capture's behaviour and worth stating because a default
+              looks friendlier: `bootbox.prompt`'s callback receives `null` when nothing is chosen and
+              its own guard is `o && …`, so a presenter who confirms without choosing gets nothing —
+              not "all". Preselecting one would turn a mis-click into a download of the entire
+              history.
+            -->
+            <form
+              class="bootbox-form"
+              onsubmit={(event) => {
+                event.preventDefault();
+                accept();
+              }}
+            >
+              <p class="bootbox-prompt-message">{message}</p>
+              {#each options as option (option.value)}
+                <div class="form-check">
+                  <input
+                    class="bootbox-input bootbox-input-radio form-check-input"
+                    type="radio"
+                    name="bootboxPrompt"
+                    id="bootbox-prompt-{option.value}"
+                    value={option.value}
+                    checked={promptResult() === option.value}
+                    onchange={() => {
+                      promptTouched = true;
+                      promptValue = option.value;
+                    }}
+                  />
+                  <label class="form-check-label" for="bootbox-prompt-{option.value}">
+                    {option.text}
+                  </label>
+                </div>
+              {/each}
+            </form>
+          {:else if mode === 'prompt'}
             <form
               class="bootbox-form"
               onsubmit={(event) => {

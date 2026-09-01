@@ -118,15 +118,31 @@ describe('SV-SP-03 — an un-arrived screen says so', () => {
     expect(BUNDLE.slice(1_501_699, 1_501_699 + 200)).toContain(
       'O(4,o.isConnected||o.isPresentingThisScreen||o.isDetached?-1:4)'
     );
-    expect(pane).toContain('const connecting = $derived(!connected && !detachedHere);');
+    /*
+      `!ownScreen` became an EXPLICIT term on 2026-09-01 and used to ride on `connected`. `SP2-04`
+      corrected `connected` to follow the reference's `isConnected`, which is false for your own
+      screen until you click; the spinner still must not show over it, and upstream's own gate says
+      why — `isPresentingThisScreen` is its own term in the three above. One term of the capture's
+      expression, written out, rather than a derived quietly doing two jobs.
+    */
+    expect(pane).toContain(
+      'const connecting = $derived(!connected && !ownScreen && !detachedHere);'
+    );
   });
 
-  it('counts a screen this browser shares as connected, or a presenter waits forever', () => {
+  it('never spins over a screen this browser shares, whatever isConnected says', () => {
     /*
       `isPresentingThisScreen`. Our own screens render from the local capture rather than from a
-      consumer, so they are connected the moment they exist and no producer is coming.
+      consumer, so no producer is coming and a spinner would never end.
+
+      This case read `stream !== null || ownScreen` until 2026-09-01 and the second term was wrong —
+      not for the spinner, which is what this case is about, but as a claim about `isConnected`.
+      `SP2-04` has the three writers and the measurement; the assertion moved there and this one now
+      asserts only what it is actually testing.
     */
-    expect(pane).toContain('const connected = $derived(stream !== null || ownScreen);');
+    expect(pane).toContain(
+      'const connected = $derived(stream !== null && (!ownScreen || localPreview));'
+    );
     expect(area).toContain('ownScreen={screen.ownerId === null}');
   });
 
@@ -361,5 +377,185 @@ describe('SV-SP-14 — the detached zoom cluster hides with the picture', () => 
       "class={['zoom-controls-container-detached', { hidden: detachedClusterHidden }]}"
     );
     expect(pane).toContain("{ hidden: pictureHidden, 'viewer-only-screen-video': viewerOnlyMode }");
+  });
+});
+
+describe('SP2-04 — the local-preview invitation, BUILT, and the refusal was about our own choice', () => {
+  /*
+    ── WHAT THE REFERENCE DOES WITH YOUR OWN SCREEN ────────────────────────────────────────────────
+
+    ```js
+    this.localpreview = !1                                                    // byte 1,494,561
+    function W0e(t,n){
+      if(1&t){ const e=Y(); d(0,"p",11), x("click", () => largePreview()), v(1), u() }
+      if(2&t){ const e=g(); m();
+        Ne(" (You are sharing your screen as ", e.muser.mediaValue.screenName,
+           " click here for larger preview) ") }                              // byte 1,492,944
+    }
+    largePreview(){ this.localpreview=!0;
+      let e=this.mediaSoupService.screenProducers.get(this.muser.producerID);
+      if(!e) return void P("screenshare comp screenProducer not found..");
+      const i=$("#webcamScreen-"+this.muser._id).get(0);
+      i.srcObject=e.localStream; try{i.play()}catch{}
+      this.isConnected=!0 }                                                   // byte 1,499,849
+    O(3, o.mediaService.isScreenSharing
+         && o.mediaService.localSharingStreams[o.muser._id]
+         && !o.localpreview ? 3 : -1)                                         // byte 1,501,588
+    11 [1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]
+    ```
+
+    A presenter sharing a screen gets a yellow line inviting them to click, and the `<video>` stays
+    hidden — `isPresentingThisScreen && !localpreview` is one of its three hide terms. Clicking
+    attaches the local capture and sets `isConnected`. There is a reason worth having: decoding your
+    own capture into a `<video>` is a second live decode of a picture already on your monitor, paid
+    for on the machine that is also encoding and uploading it.
+
+    ## The refusal this replaces, and why it was wrong in the same way `G08`'s was
+
+    `SP2-04` was recorded as *"it cannot be reached in this application"*, and `ScreenPane.svelte`
+    said the term is *"FALSE by construction here: our own screens render from the local capture,
+    i.e. we always local-preview"*. Both sentences describe a CHOICE this room made — attach eagerly
+    in `#addLocalScreen` — and then read that choice back as a property of the reference. The gate
+    was unreachable only because we had already decided its answer.
+
+    ## What is asserted, and why the bundle is re-read rather than quoted
+
+    Every offset is read at assert time. The load-bearing measurement is the THREE writers of
+    `isConnected`, because the whole build rests on exactly one of them being reachable for a screen
+    you share yourself — a fourth writer would change the answer and nothing else here would notice.
+  */
+
+  it('reads the reference: localpreview starts false and largePreview is its only writer', () => {
+    expect(BUNDLE.split('localpreview').length - 1).toBe(5);
+    expect(BUNDLE.indexOf('showControls=!1,this.localpreview=!1')).toBe(1_494_561);
+    /* `= !0` exactly once, and inside `largePreview`. */
+    expect(BUNDLE.split('this.localpreview=!0').length - 1).toBe(1);
+    expect(BUNDLE).toContain('largePreview(){this.localpreview=!0');
+  });
+
+  it('and that largePreview is the ONLY path to isConnected for a screen you share', () => {
+    /*
+      The three writers, by offset. Two are the remote paths; the third is the click. If a fourth
+      ever appears this fails, which is the point: "only one is reachable" is the premise of the
+      whole feature and it is not re-derivable from the source we ship.
+    */
+    expect(BUNDLE.indexOf('this.isConnected=!0,P("newScreenStream playing vid for ')).toBe(
+      1_497_433
+    );
+    expect(BUNDLE).toContain('addEventListener("playing",()=>{i.isConnected=!0');
+    expect(BUNDLE).toContain('i.srcObject=e.localStream;try{i.play()}catch{}this.isConnected=!0');
+    /* And the gate, with all three of its terms, so a one-term paraphrase cannot pass. */
+    expect(BUNDLE).toContain(
+      'O(3,o.mediaService.isScreenSharing&&o.mediaService.localSharingStreams[o.muser._id]&&!o.localpreview?3:-1)'
+    );
+  });
+
+  it('renders W0e with the const s own colour, classes and text', () => {
+    /* Const 11 of `app-screenshare-view`, transcribed: class run, then the `2,"color","#ffcc00"` pair. */
+    expect(BUNDLE).toContain('[1,"text-center","mt-4",2,"color","#ffcc00",3,"click"]');
+    expect(status).toContain('<p class="text-center mt-4" style="color: #ffcc00;">');
+    /*
+      The spaces are the reference's own — `Ne(" (You are sharing your screen as ", …, " click here
+      for larger preview) ")` — so they are asserted with them, and the braces that preserve them are
+      the idiom `AGENTS.md` records at line 106.
+    */
+    expect(status).toContain("{' (You are sharing your screen as '}");
+    expect(status).toContain("{' click here for larger preview) '}");
+  });
+
+  it('places it between Video Disabled and Connecting, which is where the create block puts it', () => {
+    /*
+      `H(1,z0e,…)(2,G0e,…)(3,W0e,…)(4,q0e,…)` — a flat sibling list, and the order of one is not
+      decoration. Asserted by position because that is the only thing that can regress: all four
+      gates would still pass their own cases in any order.
+    */
+    expect(BUNDLE).toContain(
+      'H(1,z0e,2,0,"h3",1)(2,G0e,2,0,"h3",1)(3,W0e,2,1,"p",2)(4,q0e,3,2,"h3",3)'
+    );
+    /*
+      The `{#if}` and not the prop name: `offerLargePreview` is DECLARED in the script block, which
+      is above all three headings, so a plain `indexOf` would compare a declaration against markup
+      and pass no matter where the paragraph ended up. The first version of this case did exactly
+      that and reported 189 > 739 — it was measuring the interface, not the order.
+    */
+    const videoDisabled = status.indexOf('>Video Disabled<');
+    const invitation = status.indexOf('{#if offerLargePreview}');
+    const connecting = status.indexOf('Connecting To Screen of');
+    expect(videoDisabled).toBeGreaterThan(-1);
+    expect(invitation).toBeGreaterThan(videoDisabled);
+    expect(connecting).toBeGreaterThan(invitation);
+  });
+
+  it('withholds the srcObject until the click, which is the half that costs a decode', () => {
+    /*
+      THE BEHAVIOURAL HALF. Drawing the invitation while still attaching the stream would reproduce
+      the reference's markup and none of its point — the presenter would pay for the decode and be
+      invited to ask for it.
+
+      Read inside the attachment BODY rather than the returned teardown, because an attachment runs
+      in an effect and re-runs when state it reads changes (Svelte docs, `{@attach ...}`): that is
+      what makes the click attach the stream, and putting it in the teardown is the bug this file's
+      neighbouring comment records having shipped once.
+    */
+    expect(pane).toContain('const source = ownScreen && !localPreview ? null : stream;');
+    expect(pane).toContain('if (node.srcObject !== source) node.srcObject = source;');
+    /* And `play()` follows the SOURCE, not the raw stream, or an own screen would try to play null. */
+    expect(pane).toContain('if (source) {');
+  });
+
+  it('and connected follows the reference rather than short-circuiting on ownScreen', () => {
+    expect(pane).toContain(
+      'const connected = $derived(stream !== null && (!ownScreen || localPreview));'
+    );
+    /*
+      The spinner still must not show over your own screen — upstream's gate has
+      `isPresentingThisScreen` as its own term, `O(4, isConnected || isPresentingThisScreen ||
+      isDetached ? -1 : 4)` — so that term is now explicit here instead of riding on `connected`.
+    */
+    expect(BUNDLE).toContain('O(4,o.isConnected||o.isPresentingThisScreen||o.isDetached?-1:4)');
+    expect(pane).toContain(
+      'const connecting = $derived(!connected && !ownScreen && !detachedHere);'
+    );
+  });
+
+  it('keeps the opt-in per screen, and forgets it with the screen', () => {
+    /*
+      `$state.raw`, keyed by producer id, exactly like `#detachedHere`: per-screen, replaced whole,
+      no member ever mutated.
+
+      The cleanup is in `screenRemoved` and not at the call sites, and that is the one place this
+      room needs a line the reference does not: upstream's flag lives on the component instance and
+      dies with the tab, while ours is room-lived. `restartLocalScreens` re-produces the same capture
+      onto a NEW producer id, so without it the list grows a dead entry per reconnect and a reissued
+      id arrives already opted in — a screen attaching itself with no click.
+    */
+    expect(screens).toContain('this.#localPreviews = $state.raw<readonly string[]>([]);');
+    expect(screens).toContain('isLocalPreviewing(screenId: string): boolean {');
+    expect(screens).toContain('largePreview(screenId: string): void {');
+    /*
+      Both bounds are BOUND and asserted before the slice, which `slice-anchor-contract` requires and
+      which is not ceremony: `indexOf` answers -1 when it misses, and `slice(-1)` is the LAST
+      CHARACTER rather than an error — so a renamed method would silently reduce this case to
+      asserting that one character contains a whole statement, and it would fail for the wrong
+      reason on a day somebody wanted the right one.
+    */
+    const methodAt = screens.indexOf('screenRemoved(screenId: string');
+    expect(methodAt, 'screenRemoved must exist for this slice to mean anything').toBeGreaterThan(
+      -1
+    );
+    const removed = screens.slice(methodAt);
+    const endsAt = removed.indexOf('\n  }');
+    expect(endsAt, 'the method must close').toBeGreaterThan(-1);
+    expect(removed.slice(0, endsAt)).toContain(
+      'this.#localPreviews = this.#localPreviews.filter((entry) => entry !== screenId);'
+    );
+    /* Idempotent, as `= !0` is: a second click must not grow the list. */
+    expect(screens).toContain('if (this.#localPreviews.includes(screenId)) return;');
+  });
+
+  it('is wired end to end, so neither half can ship without the other', () => {
+    expect(area).toContain('localPreview={screens.isLocalPreviewing(screen.id)}');
+    expect(area).toContain('onlargepreview={() => screens.largePreview(screen.id)}');
+    expect(pane).toContain('offerLargePreview={ownScreen && !localPreview}');
   });
 });

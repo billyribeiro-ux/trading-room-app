@@ -41,17 +41,23 @@ import { svelteCodeOf } from './source-comments.js';
  * control, which `CLAUDE.md` names as the one reason not to match the reference. `note-icon-close`
  * is what the four sibling dialogs in this room already draw, and it is what is drawn here.
  *
- * ## `role="dialog"` and `aria-label` are ours, and they replace something real
+ * ## `role="dialog"` is ours; the LABEL is the capture's since 2026-09-01
  *
- * Upstream never writes either: `openFileBrowser` opens the template through
+ * Upstream writes neither directly: `openFileBrowser` opens the template through
  * `modalService.open(this.fileBrowserModal, {ariaLabelledBy:"file-browser-modal-title", size:"lg"})`
  * at byte 1,477,226, and NgbModal puts `role="dialog"` and `aria-labelledby` on a wrapper it owns.
  * Const 72 is `["id","file-browser-modal-title",1,"modal-title"]` — the id that binding points at.
  *
- * Ours says the same thing with `aria-label`, for a measured reason rather than a preference: a
+ * **This said `aria-label` was ours "for a measured reason", and the reason was wrong.** It read: *"a
  * literal document-unique id belongs to a component that is mounted once, and this one is mounted
- * inside `{#if dialog === 'carousel'}` in an editor that a room may hold more than one of. The
- * carousel modal beside it already names itself the same way.
+ * inside `{#if dialog === 'carousel'}` in an editor that a room may hold more than one of."*
+ * `NotesPane.svelte` says the opposite three levels up — *"`editingNoteId` is a single value — a
+ * second instance could never be reached"* — so the id IS document-unique here, exactly as upstream.
+ *
+ * Both the id and the binding are transcribed now, and `note-editor-modal-labelling-contract.test.ts`
+ * asserts the mount counts that make them safe rather than restating the claim. It also records the
+ * sharper answer the blanket reason was hiding: the Giphy modal's `modal-basic-title` genuinely
+ * cannot be a literal, because `GiphyPicker` is mounted at four sites.
  */
 
 const DIALOG = svelteCodeOf(
@@ -120,7 +126,8 @@ describe('what this room renders', () => {
       `modal-title` — Bootstrap's, not summernote's — which is a third spelling in a file that only
       ever needed one.
     */
-    expect(browser).toContain('<h4 class="note-modal-title">');
+    /* The class is still the carousel's; the id joined it in 2026-09-01's labelling change. */
+    expect(browser).toContain('class="note-modal-title"');
     expect(browser).not.toContain('<h4 class="modal-title">');
   });
 
@@ -140,13 +147,29 @@ describe('what this room renders', () => {
 
   it('CD-04 — the modal announces itself as a dialog with a name', () => {
     expect(browser).toContain('role="dialog"');
-    expect(browser).toContain('aria-label="Select Image"');
     /*
-      NOT an `aria-labelledby` at a literal id. The reference can afford `file-browser-modal-title`
-      because NgbModal mounts one instance at the document root; this component is re-created on
-      every open of an editor a room may hold several of, so a literal id is a duplicate waiting for
-      a second note to be edited.
+      `aria-labelledby` and the id since 2026-09-01 — see this file's header for the premise that
+      changed. The heading text is still asserted, on the element that now carries the id.
     */
-    expect(browser).not.toContain('file-browser-modal-title');
+    expect(browser).toContain('aria-labelledby="file-browser-modal-title"');
+    expect(browser).toContain('<h4 id="file-browser-modal-title"');
+    /*
+      This case asserted the OPPOSITE until 2026-09-01 — `not.toContain('file-browser-modal-title')`
+      — on the reasoning that *"this component is re-created on every open of an editor a room may
+      hold several of, so a literal id is a duplicate waiting for a second note to be edited."*
+
+      A room holds ONE editor: `NotesPane.svelte` gates it on `editingNoteId === note.id`, a single
+      value, and says in as many words that *"a second instance could never be reached"*. The
+      duplicate the case was defending against cannot occur, so the id is document-unique here for
+      the same reason it is upstream.
+
+      Inverted rather than deleted: the sentence it protected is exactly what changed.
+      `note-editor-modal-labelling-contract.test.ts` asserts the mount counts so the premise is
+      checked rather than re-argued.
+    */
+    expect(
+      browser,
+      'the label must not ALSO be an aria-label — one name, one source'
+    ).not.toContain('aria-label="Select Image"');
   });
 });

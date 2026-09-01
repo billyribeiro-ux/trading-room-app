@@ -8,6 +8,14 @@ export interface RoomBroadcastCommands {
   video: (payload: {
     cmd: 'playVideoForAll' | 'stopVideoForAll';
     url?: string;
+    /**
+     * `sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: i})` — byte 1,981,560.
+     *
+     * Epoch milliseconds for an armed play, `null` for the reference's "Play now". It never reaches
+     * another browser: the dispatch forwards only the url (byte 1,024,587), because holding the
+     * schedule is the SERVER's job and that is what makes it survive the presenter closing the tab.
+     */
+    videoPlayTime?: number | null;
   }) => Promise<unknown>;
   youtube: (payload: { cmd: 'playYTForAll' | 'stopYTForAll'; url?: string }) => Promise<unknown>;
   fileMedia: (payload: {
@@ -50,10 +58,10 @@ export class RoomBroadcasts {
   readonly #setSoundCloudPlaying: (playing: boolean) => void;
   readonly #commands: RoomBroadcastCommands;
   #youtubeForAllUrl;
+  #youtubeStartSeconds;
   #videoPlayerUrl;
   #hideVideoPlayer;
   #scheduledVideoForAll;
-  #scheduledVideoTimer: number | undefined;
   #mp3Playing;
   #mp3Url;
   #salesImageUrl;
@@ -82,6 +90,8 @@ export class RoomBroadcasts {
     this.#setSoundCloudPlaying = options.setSoundCloudPlaying;
 
     this.#youtubeForAllUrl = $state('');
+    /** `this.startTime = 0` in the overlay's constructor, byte 1,503,354. */
+    this.#youtubeStartSeconds = $state(0);
 
     /**
      * `videoPlayerUrl` / `hideVideoPlayer` / `scheduledVideo` — the VideoPlayer tab, for the ROOM.
@@ -120,18 +130,6 @@ export class RoomBroadcasts {
       videoPlayTime: null
     });
 
-    /*
-      The armed play, held in the presenter's OWN browser.
-
-      Upstream this timer is the server's: `playVideoForAll` is posted at the moment the presenter
-      presses Send, carrying `videoPlayTime`, and the session record holds the pair until it fires
-      (the late-join replay reads it back at byte 1,967,430). This room has no store for that and no
-      server-side scheduler, so the browser that armed it is the one that posts when it fires. The
-      consequences are real and recorded in `TODO.md`: closing the tab cancels the play, and a member
-      who joins after a video started does not see it.
-    */
-    this.#scheduledVideoTimer = undefined;
-
     /**
      * `mp3Playing` / `mp3Url` — the room-wide sound a presenter started.
      *
@@ -165,6 +163,11 @@ export class RoomBroadcasts {
 
   get youtubeForAllUrl() {
     return this.#youtubeForAllUrl;
+  }
+
+  /** `playYTURL(e, i = 0)`'s `i` — seconds into the video, non-zero only on a late-join replay. */
+  get youtubeStartSeconds() {
+    return this.#youtubeStartSeconds;
   }
 
   get videoPlayerUrl() {
@@ -210,20 +213,42 @@ export class RoomBroadcasts {
    * presenter's video arriving minutes after the room was told it had been removed.
    */
   videoStopped() {
-    this.clearScheduledVideoTimer();
     this.#videoPlayerUrl = '';
     this.#scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
     this.#hideVideoPlayer = false;
   }
 
-  /** `playYTForAll`. The seek offset is derived and never sent — see `playYoutubeForAll`. */
-  youtubeStarted(url: string) {
+  /**
+   * `playYTForAll` — and the SECOND argument is the late-join seek, in seconds.
+   *
+   * ```js
+   * subscribe("playYTForAll", e => { let i = 0;
+   *   if (e.startTime) { let o = Number(e.startTime), s = Date.now();
+   *     i = Math.round((s - o) / 1e3), this.startTime = i } else this.startTime = 0;
+   *   this.ytURL = e.url })                                                   // byte 1,964,799
+   * ```
+   *
+   * Zero for every live play, because the live command carries `url` alone (byte 1,024,137) and the
+   * `else` branch is what runs. It is non-zero only on the replay a member gets when they JOIN a
+   * room that is already playing, which is where `startTime` rides.
+   *
+   * The seconds are computed by the CALLER, not here, because the derivation reads `Date.now()` and
+   * a store that reads the clock is a store whose value depends on when you look at it.
+   */
+  youtubeStarted(url: string, startSeconds = 0) {
     this.#youtubeForAllUrl = url;
+    this.#youtubeStartSeconds = startSeconds;
   }
 
   /** `stopYTForAll`. No payload is read: the reference's own dispatch forwards none. */
   youtubeStopped() {
     this.#youtubeForAllUrl = '';
+    /*
+      The offset goes with the url. Leaving it behind would seek the NEXT video to wherever the last
+      one had reached — the overlay's setter rebuilds the embed from `_ytURL` and `startTime`
+      together (byte 1,503,095), so a stale offset is a real wrong position rather than dead state.
+    */
+    this.#youtubeStartSeconds = 0;
   }
 
   /** `playMP3ForAll` — room-wide, so unlike `giveMicScreen` there is no target to match on. */
@@ -281,9 +306,13 @@ export class RoomBroadcasts {
     }
   }
 
-  async #sendVideoForAllCommand(cmd: 'playVideoForAll' | 'stopVideoForAll', url?: string) {
+  async #sendVideoForAllCommand(
+    cmd: 'playVideoForAll' | 'stopVideoForAll',
+    url?: string,
+    videoPlayTime?: number | null
+  ) {
     try {
-      await this.#commands.video({ cmd, url });
+      await this.#commands.video({ cmd, url, videoPlayTime });
     } catch (cause) {
       this.#dialogs.alert = isHttpError(cause) ? cause.body.message : 'Command failed.';
     }
@@ -342,6 +371,8 @@ export class RoomBroadcasts {
    */
   closeYoutubeFrame() {
     this.#youtubeForAllUrl = '';
+    /* Same reason as `youtubeStopped`: the offset is part of the frame, not part of the room. */
+    this.#youtubeStartSeconds = 0;
   }
 
   /**
@@ -353,13 +384,13 @@ export class RoomBroadcasts {
    * its own message from the channel and nobody inserts optimistically.
    */
   async playVideoForAll(url: string) {
-    this.clearScheduledVideoTimer();
-    this.#scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
+    /* Playing now supersedes anything this presenter had armed, so the pending line goes with it. */
+    this.clearScheduledVideoLine();
     await this.#sendVideoForAllCommand('playVideoForAll', url);
   }
 
   /**
-   * "Choose time?" → "Send". Arms the play locally and shows the presenter what is pending.
+   * "Choose time?" → "Send". POSTS the moment to the server and shows the presenter what is pending.
    *
    * `whenLocal` is the raw `datetime-local` value, kept as the string the reference keeps
    * (`this.scheduledVideo.videoPlayTime = i` before it is converted) because that is what the
@@ -370,28 +401,43 @@ export class RoomBroadcasts {
    * nothing and plays nothing, loudly: the pending line simply does not appear.
    */
   scheduleVideoForAll(url: string, whenLocal: string) {
-    this.clearScheduledVideoTimer();
+    /*
+      ── THE SCHEDULE IS THE SERVER'S NOW, 2026-09-01 ────────────────────────────────────────────
+
+      This armed a `window.setTimeout` and posted when it fired, so closing the presenter's tab
+      cancelled the play. That was `TODO.md`'s consequence 2 and it is closed: the moment is POSTED,
+      the server holds it in `room_state.video_play_time`, and `sweepDueVideos` broadcasts when it
+      arrives — which is exactly what the capture does. `sendServerAdminCommand("playVideoForAll",
+      {url: e, videoPlayTime: i})` at byte 1,981,560 is posted the instant Send is pressed, and the
+      dispatch forwards only `{url: i.url}` (byte 1,024,587), so the server is the only thing that
+      could have been holding the time.
+
+      `svelte-autofixer` suggests `SvelteDate` here and the suggestion is declined, recorded so the
+      next run does not re-litigate it. `SvelteDate` exists to make date READS reactive; this one is
+      parsed once, converted to a number on the same line and thrown away. Nothing reads it at all,
+      let alone reactively.
+    */
+    const at = new Date(whenLocal).getTime();
+    if (!Number.isFinite(at)) return;
 
     /*
-      `svelte-autofixer` suggests `SvelteDate` here and the suggestion is declined, recorded so the
-      next run does not re-litigate it. `SvelteDate` exists to make date READS reactive — reading it
-      inside an effect or a derived re-runs when the date changes. This one is parsed once, converted
-      to a number on the same line, and thrown away; nothing reads it at all, let alone reactively.
-      Same trade as the timer map in `RoomToasts` and the room's eight copy-on-write `new Set()`
-      sites: a signal per instance, and no pixel changes.
+      A past or due moment plays NOW rather than arming, which is what the previous local scheduler
+      did (`delay <= 0`) and what the server does with one anyway. Kept on this side too so the
+      pending line below never shows a time that has already gone.
     */
-    const delay = new Date(whenLocal).getTime() - Date.now();
-    if (!Number.isFinite(delay)) return;
-    if (delay <= 0) {
+    if (at <= Date.now()) {
       void this.playVideoForAll(url);
       return;
     }
 
+    /*
+      The pending line is still LOCAL, and that is honest rather than lazy: it is what THIS presenter
+      just armed, shown back to them so they can see it took. It is not a claim about room state —
+      another presenter's armed play does not appear here, and upstream's does not either, because
+      the value it renders from is the one its own Send populated.
+    */
     this.#scheduledVideoForAll = { videoURL: url, videoPlayTime: whenLocal };
-    this.#scheduledVideoTimer = window.setTimeout(() => {
-      this.#scheduledVideoTimer = undefined;
-      void this.playVideoForAll(url);
-    }, delay);
+    void this.#sendVideoForAllCommand('playVideoForAll', url, at);
   }
 
   /**
@@ -404,9 +450,27 @@ export class RoomBroadcasts {
     await this.#sendVideoForAllCommand('stopVideoForAll');
   }
 
-  clearScheduledVideoTimer() {
-    if (this.#scheduledVideoTimer !== undefined) window.clearTimeout(this.#scheduledVideoTimer);
-    this.#scheduledVideoTimer = undefined;
+  /**
+   * Forget the pending line this presenter armed.
+   *
+   * ## It used to clear a TIMER, and there is no timer any more
+   *
+   * Until 2026-09-01 an armed play was a `window.setTimeout` in the presenter's own browser, and
+   * this cleared it. The schedule is the SERVER's now — posted at Send, held in
+   * `room_state.video_play_time`, broadcast by `sweepDueVideos` — which is what the capture does and
+   * what makes a play survive the presenter closing their tab.
+   *
+   * So what is left to clear is the LINE: the local record of what this presenter just armed, shown
+   * back to them so they can see it took. Renamed to what it does, because a method called
+   * `clearScheduledVideoTimer` that clears no timer is the comment-that-lies this repository hunts.
+   *
+   * **Cancelling the actual play is `stopVideoForAll`'s**, and it works because `clearVideoForAll`
+   * nulls both the url and the time — so a stop cancels an armed play server-side, for everyone,
+   * including a play armed by a presenter who has since closed their browser. That was not possible
+   * while the timer was local, and it is the second thing this change fixes.
+   */
+  clearScheduledVideoLine() {
+    this.#scheduledVideoForAll = { videoURL: '', videoPlayTime: null };
   }
   /*
     SOUNDCLOUD FOR ALL — arrived from `+page.svelte` on 2026-08-17.

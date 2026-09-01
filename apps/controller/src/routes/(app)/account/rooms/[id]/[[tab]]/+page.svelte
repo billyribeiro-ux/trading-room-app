@@ -67,7 +67,11 @@
    * `ng-show` disclosure one level up — is already rendered on this page.
    */
   let showAdServer = $state(false);
-  let selected = $state<number[]>([]);
+  /*
+    `$state.raw`: every write replaces the array — `[]`, `[...selectableIds]`, `[...selected, id]`,
+    `found.map(...)`. Nothing pushes or splices, so the deep proxy only ever cost reads.
+  */
+  let selected = $state.raw<number[]>([]);
 
   /**
    * "Apply to all rooms?" — `ng-model="applyToAllRooms"` in the reference.
@@ -163,7 +167,13 @@
   let bulkBadgeMode = $state<string | null>(null);
   let loadFromRoom = $state(false);
   /** the monthly roll-up, computed here from real logins — never invented */
-  let monthly = $state<{ month: string; logins: number }[]>([]);
+  /*
+    `$state.raw`, and this is the one where it matters most: a logins-per-month series built in one
+    `Object.entries(...).map(...)` and cleared with `[]`, never mutated. It is iterated in the
+    template and indexed for the export filename, so a deep proxy would wrap every row object and
+    charge a trap for each read of a list nobody edits.
+  */
+  let monthly = $state.raw<{ month: string; logins: number }[]>([]);
 
   /*
     `loadMontlyStats(...)` — the reference's spelling, "Montly", throughout its own scope.

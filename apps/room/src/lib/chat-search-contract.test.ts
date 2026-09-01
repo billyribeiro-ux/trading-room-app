@@ -429,3 +429,132 @@ describe('ACA-06 — the four unbuilt toolbar controls, named by VALUE', () => {
     );
   });
 });
+
+describe('ACA-06 — the SAVE control, BUILT 2026-09-01, and the blocker it had', () => {
+  /*
+    ── THE BLOCKER NAMED THE REFERENCE'S TRANSPORT, NOT THIS ROOM'S CAPABILITY ────────────────────
+
+    `ChatSearchBar.svelte` recorded the save button as *"the one of the four that is not blocked on
+    scope: `downloadLog("chat")` … hands the answer to `downloadLogType`, which awaits
+    `invokeServerCommand("getAllLog", {type, channel, limit})`. **There is no such command in this
+    repository** — so the button would open a dialog whose every option fails."*
+
+    Both sentences are true and the conclusion does not follow. `getAllLog` is how the REFERENCE asks
+    ITS server for history its page has never seen; this room keeps that history itself, in the table
+    `chat-log.ts` already reads four other ways. It needed a query, not a command.
+
+    Third blocker of this shape re-measured this week, after `G08`'s waveform and `SP2-04`'s local
+    preview: a note describing the mechanism upstream uses, read as a statement about what is
+    possible here.
+  */
+  const BUNDLE = readFileSync(
+    fileURLToPath(
+      new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url)
+    ),
+    'utf8'
+  );
+  const BAR = readFileSync(`${ROOT}lib/components/ChatSearchBar.svelte`, 'utf8');
+  const PAGE = readFileSync(`${ROOT}routes/+page.svelte`, 'utf8');
+  const FORMAT = readFileSync(`${ROOT}lib/chat-log-download.ts`, 'utf8');
+  /*
+    The flow left `+page.svelte` for `#lib/room/chat-log-save.ts` on the day it was written,
+    when that file went 125 lines past its ceiling. Asserted at the module rather than widened
+    to "either file": which file owns the flow is the fact, and the extraction is what gave it
+    seven cases without a mount or a network.
+  */
+  const SAVE = readFileSync(`${ROOT}lib/room/chat-log-save.ts`, 'utf8');
+
+  it('reads the const the button is drawn from, rather than restating it', () => {
+    expect(BUNDLE).toContain(
+      '["id","addon-chat-save","title","Save chat messages",1,"btn","btn-outline-secondary",' +
+        '"d-inline-flex","pl-2","pr-2","input-group-text",3,"click"]'
+    );
+    /* Its class run is in a DIFFERENT ORDER from the clear button's, and both are reproduced. */
+    expect(BUNDLE).toContain(
+      '["id","addon-chat-clear","title","Clear the search",1,"btn","btn-outline-secondary","pl-2",' +
+        '"pr-2","d-inline-flex","clear-chat-input","input-group-text",3,"click"]'
+    );
+    expect(BAR).toContain(
+      'class="btn btn-outline-secondary d-inline-flex pl-2 pr-2 input-group-text"'
+    );
+    expect(BAR).toContain('title="Save chat messages"');
+    expect(BAR).toContain('<i class="fas fa-save"></i>');
+  });
+
+  it('is a SPAN and it WRAPS the archive button, which is what puts the gate where it is', () => {
+    /*
+      `K_e` renders `span` const 38 and holds `q_e` as node 2, gated
+      `O(2, isPresenter && !isLimitedPresenter ? 2 : -1)`. So SAVE is ungated and ARCHIVE is not —
+      read the nesting the other way round and Save disappears for every member, which is a whole
+      control gone for everyone not running the room.
+    */
+    expect(BUNDLE.slice(1_421_929, 1_422_140)).toContain('d(0,"span",38)');
+    expect(BUNDLE.slice(1_421_929, 1_422_260)).toContain(
+      'isPresenter&&!e.appService.globals.isLimitedPresenter?2:-1'
+    );
+
+    const saveAt = BAR.indexOf('id={saveId}');
+    const archiveAt = BAR.indexOf('id={archiveId}', saveAt);
+    const saveCloses = BAR.indexOf('</span>', saveAt);
+    expect(saveAt, 'the save span must exist').toBeGreaterThan(-1);
+    expect(archiveAt, 'the archive button must follow it').toBeGreaterThan(saveAt);
+    expect(archiveAt, 'and must be INSIDE it').toBeLessThan(saveCloses);
+  });
+
+  it('stops the archive click reaching the save handler, which the nesting otherwise guarantees', () => {
+    /*
+      A click on the nested archive button bubbles to the span. Upstream has the same shape and the
+      same problem; here both handlers are ours and the fix is one line. Stopping propagation rather
+      than un-nesting, because the nesting is what carries the gate.
+    */
+    expect(BAR).toContain('event.stopPropagation();');
+  });
+
+  it('offers the capture s three ranges, with none preselected', () => {
+    expect(BUNDLE).toContain('{text:"Entire chat history",value:"all"}');
+    expect(BUNDLE).toContain('{text:"Last 24 hours",value:"24hrs"}');
+    expect(BUNDLE).toContain('{text:"Last 7 days",value:"7days"}');
+    expect(SAVE).toContain("{ text: 'Entire chat history', value: 'all' }");
+    expect(SAVE).toContain("{ text: 'Last 24 hours', value: '24hrs' }");
+    expect(SAVE).toContain("{ text: 'Last 7 days', value: '7days' }");
+    /*
+      `o && this.downloadLogType(...)` — bootbox hands the callback `null` when nothing is chosen, so
+      confirming without a choice is a no-op. Reproduced by an EMPTY initial value and a guard; a
+      preselected option would turn a mis-click into a download of the whole history.
+    */
+    expect(BUNDLE).toContain('callback:o=>{o&&i.downloadLogType(e,!1,o)}');
+    expect(SAVE).toContain('if (!range) return;');
+  });
+
+  it('downloads the column s OWN channel, which the first version got wrong', () => {
+    /*
+      Written `() => saveChatLog('main')` first, and both toolbars got it — the extra column
+      downloading the main one, with the right button, a real file, and nothing on screen to say so.
+      `searchChat` resolves a column the same way and is where the idiom comes from.
+    */
+    expect(PAGE).toContain("onchatsave: (column: 'main' | 'extra') =>");
+    expect(PAGE).toContain("column === 'main' ? chat.tab : chat.extraTab");
+    expect(PAGE).toContain("onchatsave={() => chatToolbarControls.onchatsave('main')}");
+    expect(PAGE).toContain("onchatsave={() => chatToolbarControls.onchatsave('extra')}");
+  });
+
+  it('says so when the read FAILS, which the capture does not', () => {
+    /*
+      `downloadLogType` has no error branch: a rejected `invokeServerCommand` leaves the click doing
+      nothing at all, which is indistinguishable from a button that is not wired.
+    */
+    expect(SAVE).toContain("'The chat log could not be read.'");
+  });
+
+  it('keeps the file FORMAT in a module, because three details of it are invisible', () => {
+    /* No space before the bracket, CRLF, and DATE fields on a time formatter. */
+    expect(BUNDLE).toContain(
+      '.toLocaleTimeString("en-us",c)+"["+B.n+"]: "+B.txt+"' + String.raw`\r\n` + '"'
+    );
+    expect(FORMAT).toContain('}[${message.n}]: ${message.txt}' + String.raw`\r\n` + '`');
+    expect(BUNDLE).toContain(
+      '("chat"==s?"ChatLog_":"AlertsLog_")+(new Date).toDateString()+".txt"'
+    );
+    expect(FORMAT).toContain('`ChatLog_${now.toDateString()}.txt`');
+  });
+});

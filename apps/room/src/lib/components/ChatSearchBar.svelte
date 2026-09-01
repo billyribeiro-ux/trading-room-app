@@ -137,6 +137,30 @@
      */
     onarchive?: () => void;
     /**
+     * `ACA-06` — "Save chat messages", `K_e` at byte 1,421,929, and it WRAPS the archive button.
+     *
+     * ```js
+     * function K_e(t,n){ if(1&t){ const e=Y();
+     *   d(0,"span",38), x("click", () => { D(e), g(2), E(It(18).downloadLog("chat")) }),
+     *   T(1,"i",39), u(), H(2, q_e, 2, 0, "div", 40) }
+     *   if(2&t){ … O(2, isPresenter && !isLimitedPresenter ? 2 : -1) } }
+     * 38 ["id","addon-chat-save","title","Save chat messages",1,"btn","btn-outline-secondary",
+     *     "d-inline-flex","pl-2","pr-2","input-group-text",3,"click"]
+     * 39 [1,"fas","fa-save"]
+     * ```
+     *
+     * A `<span>` and not a `<div>` like its neighbour, and the class run is in a DIFFERENT ORDER
+     * from the clear button's — `d-inline-flex` before `pl-2 pr-2` where the clear button has them
+     * after. Both are the capture's and both are reproduced; a tidy-up that made the three siblings
+     * agree would be this room editing the reference.
+     *
+     * UNGATED, which is the structural fact easiest to lose: the archive button is node 2 INSIDE
+     * this one and carries the presenter gate, so a member sees Save and not Archive. Reading the
+     * nesting the other way round hides Save from members, which is a whole control gone for
+     * everyone who is not running the room.
+     */
+    onsave?: () => void;
+    /**
      * `ACA-06` — the Group Chat Control dropdown, `Y_e` at byte 1,422,202.
      *
      * The room's current mode, which drives the tick: `ct(3|5|7, kw, "g"|"p"|"d" == chatMode)` with
@@ -178,6 +202,7 @@
     modOnly,
     onmodonly,
     onarchive,
+    onsave,
     chatMode,
     onchatmode,
     ondetach
@@ -207,6 +232,8 @@
   const archiveId = $derived(
     column === 'extra' ? 'addon-chat-archive-extra' : 'addon-chat-archive'
   );
+  /** Column-suffixed for the reason `archiveId` and `mod-only` are: two bars, one document. */
+  const saveId = $derived(column === 'extra' ? 'addon-chat-save-extra' : 'addon-chat-save');
 </script>
 
 <div class="shadow p-2 w-100 chatToolbar" style="margin-top: 0px;">
@@ -259,7 +286,57 @@
             alerts column's twin exports the rows the page already holds; this one asks the server
             for history the page has never seen, which is why one is built and the other is not.
           -->
-          {#if onarchive}
+          {#if onsave}
+            <!--
+              `K_e`, and the archive button is node 2 INSIDE it. Reproduced as the nesting the
+              capture has, because the nesting is what makes Save ungated and Archive presenter-only.
+
+              `role="button"` / `tabindex` / `onkeydown` are OURS, for the reason every other
+              transcribed click-on-a-span in this repository carries them: the capture hangs a click
+              on a `<span>`, which is neither focusable nor keyboard-operable nor announced as a
+              control. The same addition, for the same reason, as `NavbarTalkingIndicator`'s names
+              and `MessageBody`'s trade-order span.
+            -->
+            <span
+              id={saveId}
+              role="button"
+              tabindex="0"
+              title="Save chat messages"
+              class="btn btn-outline-secondary d-inline-flex pl-2 pr-2 input-group-text"
+              onclick={onsave}
+              onkeydown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                onsave?.();
+              }}
+            >
+              <i class="fas fa-save"></i>
+              {#if onarchive}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
+                  id={archiveId}
+                  title="Archive Chat Messages"
+                  class="btn btn-outline-secondary pl-2 pr-2 d-inline-flex archive-alert-input input-group-text"
+                  onclick={(event) => {
+                    /*
+                      The archive button is INSIDE the save button upstream, so a click on it bubbles
+                      to the save handler and would download the log as well as opening the archive
+                      dialog. Angular's own listener has the same shape and the same problem; what
+                      differs is that here the two handlers are ours and the fix is one line.
+
+                      Stopping propagation rather than un-nesting: the nesting is the capture's and is
+                      what makes the presenter gate sit where it does.
+                    */
+                    event.stopPropagation();
+                    onarchive?.();
+                  }}
+                >
+                  <i class="fas fa-trash"></i>
+                </div>
+              {/if}
+            </span>
+          {:else if onarchive}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div

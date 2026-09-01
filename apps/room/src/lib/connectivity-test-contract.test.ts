@@ -14,7 +14,23 @@ import { describe, expect, it } from 'vitest';
  * three DECISIONS inside it, each of which is invisible once made and easy to undo by accident.
  */
 
-const MODAL_HOST = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
+/*
+  THE MODAL LEFT `ModalHost.svelte` ON 2026-09-01, whole, for `ConnectivityModal.svelte`.
+
+  `source-size-contract` had NAMED that extraction twice and deferred it twice; the third time the
+  host went past its ceiling there was nothing smaller left to extract, so the 809 lines went. This
+  file reads the component that holds the markup now — repointed rather than widened to "either
+  file", because which component owns the troubleshooter is itself a fact worth failing on.
+*/
+const MODAL_HOST = readFileSync(
+  new URL('./components/ConnectivityModal.svelte', import.meta.url),
+  'utf8'
+);
+/** The host that forwards it — one hop, and a hop that can be dropped without a type error. */
+const MODAL_HOST_FORWARDER = readFileSync(
+  new URL('./components/ModalHost.svelte', import.meta.url),
+  'utf8'
+);
 const ROOM_PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 const ROOM_TRANSPORT = readFileSync(
   new URL('./room/media-transport.svelte.ts', import.meta.url),
@@ -26,12 +42,26 @@ const ROOM_OVERLAYS = readFileSync(
 );
 
 describe('the ICE servers the troubleshooter uses', () => {
-  it('takes them from this deployment, passed down as a prop', () => {
-    expect(MODAL_HOST).toContain('mediaIceServers?: RTCIceServer[]');
-    expect(MODAL_HOST).toContain('mediaIceServers = []');
-    // The modal host moved into `RoomOverlays.svelte` in Phase 5 slice 17; the room state it renders
-    // from is handed to that component whole, so the prop is assembled there now.
+  it('takes them from this deployment, passed down the whole chain', () => {
+    /*
+      THREE hops since 2026-09-01, and every one is asserted rather than the two ends alone. The
+      troubleshooter left `ModalHost.svelte` for `ConnectivityModal.svelte` that day, so the host is
+      now a forwarder — and a forwarder that silently stops forwarding is exactly the failure this
+      case exists to catch: the test would still run, against the public fallback, and report a green
+      tick about somebody else's servers.
+    */
+    // `RoomOverlays.svelte` assembles it — the room state it renders from is handed to it whole.
     expect(ROOM_OVERLAYS).toContain('mediaIceServers={media.iceServers}');
+    // `ModalHost.svelte` declares it, defaults it, and hands it on.
+    expect(MODAL_HOST_FORWARDER).toContain('mediaIceServers?: RTCIceServer[]');
+    expect(MODAL_HOST_FORWARDER).toContain('mediaIceServers = []');
+    expect(MODAL_HOST_FORWARDER).toContain('{mediaIceServers}');
+    /*
+      And the modal REQUIRES it — no `?`, no `= []`. The host always has a value to pass, so an
+      optional prop here would only buy the ability to forget, and forgetting looks like a pass.
+    */
+    expect(MODAL_HOST).toContain('mediaIceServers: RTCIceServer[]');
+    expect(MODAL_HOST).not.toContain('mediaIceServers?:');
   });
 
   /*

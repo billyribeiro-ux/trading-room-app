@@ -169,64 +169,29 @@ does not, so batching backend pushes is worth real money and docs pushes are eff
 
 ## Evidence gaps
 
-**Whether a real browser serialises `background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it
-matters.** Writing the jsdom test surfaced that Tiptap's `getHTML()` returns CSSOM-normalised style
-attributes there: `width:50.000000%` comes back `width: 50%`, and `background:#111` comes back
-`background: rgb(17, 17, 17)`. Both sanitiser allow-lists — `safe-html.ts` client-side and
-`server/notes.ts` line 123 — accept `background` only as `/^#111$/i`, so **if** a browser normalises
-the same way, every carousel saved through our editor loses its black backing.
+**EMPTY as of 2026-09-01.** The one row here was *"whether a real browser serialises
+`background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it matters"*, and it is answered: **it
+does**, and the reasoning that expected otherwise was wrong in a way worth keeping.
 
-I do not believe it does: `setAttribute('style', …)` preserves the attribute verbatim in Chrome, and
-the server sanitiser is `sanitize-html` over `htmlparser2`, a string parser with no CSSOM at all. So
-this is most likely a jsdom artefact and **nothing has been changed on the strength of it** —
-widening a sanitiser allow-list to defend against a behaviour I have not observed is exactly the
-speculative change this file exists to prevent.
+The row said *"`setAttribute('style', …)` preserves the attribute verbatim in Chrome … this is most
+likely a jsdom artefact"*. Both halves are true and neither applies, because **ProseMirror does not
+use `setAttribute` for `style`** — `prosemirror-model/dist/index.js:3441` assigns
+`dom.style.cssText`, which goes through the CSSOM. Headless Chromium 141 then agrees with jsdom
+declaration for declaration.
 
-- **What is missing:** one look at `editor.getHTML()` in a real browser after inserting a carousel.
-- **Where I looked:** `carousel.ts` `renderHTML`, `TAG_STYLE_RULES.div.background` in
-  `apps/room/src/lib/components/notes/safe-html.ts` (**not** `lib/safe-html.ts` — the file moved and
-  this row used to cite it by bare name), `server/notes.ts:123`, and the jsdom output pinned in
-  `note-carousel.test.ts`.
-- **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
+Declining to widen a sanitiser against an unobserved behaviour was the right call and this file is
+the reason it was recorded rather than acted on. What it cost was five weeks of a real defect: four
+declarations were being stripped from every carousel saved through the editor — the black backing,
+the slide animation (`ease` is `transition-timing-function`'s initial value, so the CSSOM deletes
+it), the track width at ten or more slides, and `flex-shrink` on every UNLINKED slide, which is a
+plain gap between two rule sets rather than a CSSOM effect and which broke the translate arithmetic
+outright.
 
-**No persisted room video/YouTube state, so the four "For All" commands have no LATE-JOIN REPLAY.**
-The commands themselves broadcast and are received — `videoForAll` and `youtubeForAll` are remote
-commands at `apps/room/src/routes/for-all-broadcast.remote.ts:81` and `:142` (they were form actions
-in `+page.server.ts` when this row was written; the contract test records the move), pinned by
-`apps/room/src/lib/for-all-broadcast-contract.test.ts`. What is absent is the reference's server side
-of them, and it is absent because this room has nowhere to put it — `room_state`
-(`apps/room/src/lib/server/db/schema.ts:854-863`) holds `roomShortCode`, `chatMode` and `updatedAt`,
-and no other table persists playing-media state.
-
-Three consequences, all real and none of them papered over in code:
-
-1. **A member who joins while a video is playing sees nothing.** The reference replays it from
-   session state on connect — `roomState.videoURL && !roomState.videoPlayTime && (hideVideoPlayer =
-   1, videoPlayerUrl = roomState.videoURL, onMainTabChange('presAreaTabs-videoplayer'))`, bundle
-   byte 1,967,430.
-2. **A scheduled play lives in the presenter's browser.** Upstream, `playVideoForAll` is posted the
-   moment Send is pressed and carries `videoPlayTime` (byte 1,981,613); the SERVER holds the pair
-   and broadcasts when it fires, which is why its dispatch forwards only `{url: i.url}` (byte
-   1,024,587). Here the presenter's own `setTimeout` is the scheduler and posts at fire time, so
-   closing that tab cancels the play. `videoPlayTime` is deliberately NOT on this room's wire — a
-   field no receiver reads is the dead scaffolding this repository forbids.
-3. **The YouTube seek offset is always 0, so no `start=` is ever appended.** The subscriber derives
-   it — `i = Math.round((Date.now() - Number(e.startTime)) / 1e3)`, byte 1,964,799 — and its ONLY
-   source is the replay, `emit('playYTForAll', {url: roomState.ytURL, startTime:
-   roomState.ytStartTime})` at byte 1,965,054. `ytStartTime` occurs exactly once in the whole
-   bundle, and that is it. A late joiner therefore starts a YouTube video from the beginning rather
-   than dropping into the middle. **Nothing invents a `startTime` onto the wire to hide this**; the
-   contract test asserts that no file puts one there.
-
-- **What is missing:** a decision, not evidence — whether this room persists playing-media state
-  (a `room_state` migration plus a replay in the page load and a server-side timer), or stays
-  process-local as the SSE hub itself already is.
-- **Where I looked:** bundle bytes 1,024,137–1,024,708 (the dispatch), 1,503,220 (the overlay),
-  1,964,799–1,967,430 (the four subscribers and both replays), 1,981,613–1,981,945 (the senders),
-  2,296,932 (the stop-then-play), 2,016,864 / 2,017,661 (the `hideVideoPlayer` gate); and
-  `apps/room/src/lib/server/db/schema.ts`, which has no column for any of it.
-- **What it blocks:** late joiners only. A member present when a presenter presses play gets the
-  video, the tab switch and the overlay today.
+The measurement is `apps/room/e2e/note-carousel-cssom.spec.ts`, in a real browser, plus
+`apps/room/src/lib/note-carousel-cssom.test.ts`, which puts that browser's own output through the
+real `sanitizeNoteHtml`. Neither half is the source of the other, deliberately: the spec can reach a
+browser but must restate the rules, and the unit test can call the sanitiser but cannot reach a
+browser.
 
 ---
 

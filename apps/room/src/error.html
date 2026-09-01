@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>%sveltekit.status% &mdash; %sveltekit.error.message%</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <style>
+      /*
+        Inline, and it has to be: this document is served when the app itself could not run, so it
+        cannot import app.css, cannot reach a font and cannot depend on a build artifact existing.
+        The three rules below are `app-kicked-page`'s own captured style, byte 2,561,780 —
+        `h2{color:#000;vertical-align:middle;text-align:center}` — matched to +error.svelte so the two
+        refusal pages look like the same product rather than like two different failures.
+      */
+      body {
+        margin: 0;
+        background: #fff;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .container {
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      h2 {
+        color: #000;
+        vertical-align: middle;
+        text-align: center;
+        font-weight: 500;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>%sveltekit.error.message%</h2>
+    </div>
+  </body>
+</html>

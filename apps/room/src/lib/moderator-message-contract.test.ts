@@ -125,4 +125,72 @@ describe('the document title', () => {
     expect(pageCode).not.toContain('messaged you -');
     expect(pageCode).not.toContain('transcriptWindow');
   });
+
+  it('and the TRIAGE still lists exactly the consumers that are still unbuilt', () => {
+    /*
+      ── THE HALF THAT WAS MISSING, AND IT COST A STALE ROW FOR TWO DAYS ─────────────────────────
+
+      The assertion above fires when a consumer is BUILT, and it did: the private-chat tab flasher
+      landed on 2026-08-30, this file went red, and its docblock was corrected the same day.
+      `missing-settings-triage.md` was not, and nothing noticed until 2026-09-01 — because a
+      tripwire that fires on the CODE says nothing about whether the DOCUMENT followed.
+
+      So the document is read here. `missing-command-census-contract.test.ts` does the same thing for
+      the commands triage and its header states the rule this file was missing: *"the triage cannot go
+      stale. This file could, and did."*
+
+      Two assertions, and both directions matter:
+
+        * the table lists ONE consumer — a second row means something was re-added, or the flasher's
+          row came back;
+        * the one it lists is still genuinely unbuilt, checked at the code rather than believed.
+    */
+    const triage = readFileSync(
+      new URL('../../../../docs/decoded/missing-settings-triage.md', import.meta.url),
+      'utf8'
+    );
+
+    const heading = '## Consumers still unbuilt behind an ANSWERED setting';
+    const at = triage.indexOf(heading);
+    expect(at, 'the section this file points at must exist').toBeGreaterThan(-1);
+    const section = triage.slice(at);
+    const end = section.indexOf('\n## ');
+    const body = end === -1 ? section : section.slice(0, end);
+
+    /* Rows of the markdown table: lines starting `| ` that are not the header or the separator. */
+    const rows = body
+      .split('\n')
+      .filter(
+        (line) =>
+          line.startsWith('| ') && !line.startsWith('| ---') && !line.startsWith('| consumer')
+      );
+    expect(
+      rows,
+      'the triage must list exactly the consumers that are still unbuilt — a row for something ' +
+        'that now exists is the drift this case was added to stop'
+    ).toHaveLength(1);
+    expect(rows[0]).toContain('transcript window title');
+
+    /*
+      And it IS still unbuilt: the room raises an unavailable dialog rather than opening a transcript
+      window, so there is no `&name=` to pass. Read at the code, because "still a gap" asserted from
+      the document alone would be the document checking itself.
+    */
+    const alertsPane = readFileSync(new URL('./room/alerts-pane.ts', import.meta.url), 'utf8');
+    expect(alertsPane).toContain('this.#dialogs.alert = TRANSCRIPT_UNAVAILABLE;');
+
+    /*
+      The flasher must not be listed as missing — asserted on the ROWS, not on the section body.
+
+      The first version read the body and went red on this file's own correction, which explains in
+      prose that the flasher was built. That is the self-reference trap this repository has now hit
+      four times: a check whose subject is a defect matching the text that records the defect. The
+      fix is at the assertion's target rather than by loosening the string — the rows are what the
+      table claims, and the prose around them is what explains the claim.
+    */
+    expect(
+      rows.filter((row) => row.includes('tab flasher')),
+      'the tab flasher was built on 2026-08-30 and must not be a row here'
+    ).toEqual([]);
+  });
 });

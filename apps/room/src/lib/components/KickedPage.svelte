@@ -36,9 +36,17 @@
 
     **Only two of those five are modelled in this room**, which is why the page holds one nullable
     field rather than a five-way enum: the other three states are not reachable here, and an enum
-    whose members nobody can get to invites somebody to try. The closed-session page is
-    `CloseSessionPane` inside the modal host, the detached screen is a popped-out window rather than
-    a page, and login is a separate SvelteKit route.
+    whose members nobody can get to invites somebody to try. The detached screen is a popped-out
+    window rather than a page, and login is a separate SvelteKit route.
+
+    CORRECTED 2026-09-01: this paragraph used to name the closed-session arm's counterpart as
+    *"`CloseSessionPane` inside the modal host"*, and that conflated two different surfaces.
+    `CloseSessionPane` is where a PRESENTER writes the close message; a member never sees it. The
+    member's side is `session/+page.server.ts:257` — `error(403, closedRoomMessage(shortCode))` — so
+    the closed room is an HTTP refusal here rather than a page state, and until the same day it landed
+    on SvelteKit's unstyled fallback because this app had no `+error.svelte` at all. It has one now,
+    and it borrows THIS component's three captured consts, because upstream's answer to "the room,
+    replaced by a sentence saying why" is the same shape for both arms.
 
     ## Why this exists at all — `TODO.md` row 6's one residual
 

@@ -32,11 +32,11 @@
    *
    * ## Three divergences, each deliberate
    *
-   * **Consts 24 and 25 carry the SAME `id`.** Two elements with `id="search-addon"` in one modal, and
-   * the input's `aria-describedby` names it — so upstream's own description resolves to whichever the
-   * browser found first. Only the search span keeps the id here; the cross is a `<button>` with a
-   * label. Same class of defect, and the same treatment, as `cssSoundCloudIcon` in
-   * `NavbarSoundCloud.svelte`.
+   * **Consts 24 and 25 carry the SAME `id`, and BOTH are transcribed.** Two elements with
+   * `id="search-addon"` in one modal is invalid HTML and is what the reference ships; the input's
+   * `aria-describedby` resolves to whichever the browser finds first. This said "only the search span
+   * keeps the id here" until 2026-09-01, which was a judgement about the reference rather than a fact
+   * about this application. The ELEMENT is still a `<button>` — see the note at it.
    *
    * **`btn-ligth` is upstream's typo for `btn-light` and it is transcribed anyway.** It matches no
    * rule in `app.css` or in the captured sheet, which means it matched nothing upstream either: those
@@ -119,8 +119,23 @@
           }}
         />
         {#if log.searching}
+          <!--
+            `id="search-addon"` ON BOTH, exactly as consts 24 and 25 carry it.
+
+            Two elements with one id is invalid HTML and it is what the reference ships, so
+            `aria-describedby` on the input resolves to whichever the browser finds first — the clear
+            control while it is showing, the search control otherwise. This file recorded a
+            divergence here until 2026-09-01 ("only the search span keeps the id"); the decision is
+            to match the dump, and an id is pure data with no accessibility cost either way.
+
+            The ELEMENT is still a `<button>` rather than the reference's `<span>`, and that is the
+            one carve-out this repository's own rule already names, in `ScreenTabs.svelte`: *a
+            captured value is reproduced unless reproducing it locks a real person out.* A span with
+            a click handler is reachable by mouse and by nothing else.
+          -->
           <button
             type="button"
+            id="search-addon"
             class="input-group-text btn btn-ligth"
             aria-label="Clear search"
             onclick={() => log.clearInput()}

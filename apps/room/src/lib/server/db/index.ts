@@ -268,6 +268,10 @@ export function ensureDatabase() {
       room_short_code TEXT PRIMARY KEY,
       chat_mode TEXT NOT NULL DEFAULT 'g',
       closed_message TEXT,
+      video_url TEXT,
+      video_play_time INTEGER,
+      yt_url TEXT,
+      yt_start_time INTEGER,
       updated_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS session_history (
@@ -392,6 +396,28 @@ export function ensureDatabase() {
   );
   if (!roomStateColumns.has('closed_message')) {
     sqlite.exec('ALTER TABLE room_state ADD COLUMN closed_message TEXT');
+  }
+  /*
+    The room's PLAYING-MEDIA state, added 2026-09-01 so a member joining mid-play gets what the room
+    is watching. Four columns, all nullable, all guarded by the same `table_info` read above — the
+    `CREATE TABLE IF NOT EXISTS` will not add a column to a table that already exists, which is the
+    trap this whole idiom is here for.
+
+    Each is checked on its own rather than behind one flag. A single guard would be right today and
+    wrong the first time somebody adds a fifth: the check would pass on the presence of the first
+    four and the fifth would never be created, on every database that had already run this once.
+  */
+  if (!roomStateColumns.has('video_url')) {
+    sqlite.exec('ALTER TABLE room_state ADD COLUMN video_url TEXT');
+  }
+  if (!roomStateColumns.has('video_play_time')) {
+    sqlite.exec('ALTER TABLE room_state ADD COLUMN video_play_time INTEGER');
+  }
+  if (!roomStateColumns.has('yt_url')) {
+    sqlite.exec('ALTER TABLE room_state ADD COLUMN yt_url TEXT');
+  }
+  if (!roomStateColumns.has('yt_start_time')) {
+    sqlite.exec('ALTER TABLE room_state ADD COLUMN yt_start_time INTEGER');
   }
 
   /*

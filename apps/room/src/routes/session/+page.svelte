@@ -27,6 +27,8 @@
    * in its bundle.
    */
   import { enhance } from '$app/forms';
+
+  import SessionLoadingView from '#lib/components/SessionLoadingView.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import type { ActionData, PageData } from './$types';
@@ -230,15 +232,26 @@
   <title>{data.roomTitle ? `${data.roomTitle} — sign in` : 'Sign in'}</title>
 </svelte:head>
 
-<!-- const 4 `login-wrapper`, 5 `container-fluid`, 7 `row login-row`. -->
-<div class="login-wrapper">
-  <div class="container-fluid">
-    <div class="row login-row">
-      {#if data.roomDescription}
-        <!-- const 33: the room's own side, hidden under 767px by the component's media query. -->
-        <div class="col-md-6 col-sm-6 d-xs-none animated fadeInLeft faster room-message">
-          {#if data.roomTitle}
-            <!--
+<!--
+  `app-session-login`'s root template is a two-way swap on the busy flag (byte 1,209,498): the login
+  form, or a centred "Loading..." that IS the page. This room had only the form arm.
+
+  The GATE lives here because that is where the root swap keeps it, and `SessionLoadingView` takes no
+  props because `gde` has no variables. The decode — both arms, and why the login button lost a busy
+  label it should never have had — is in that component and in `session-login-loading-contract.test.ts`.
+-->
+{#if submitting}
+  <SessionLoadingView />
+{:else}
+  <!-- const 4 `login-wrapper`, 5 `container-fluid`, 7 `row login-row`. -->
+  <div class="login-wrapper">
+    <div class="container-fluid">
+      <div class="row login-row">
+        {#if data.roomDescription}
+          <!-- const 33: the room's own side, hidden under 767px by the component's media query. -->
+          <div class="col-md-6 col-sm-6 d-xs-none animated fadeInLeft faster room-message">
+            {#if data.roomTitle}
+              <!--
               const 34 `room-title` — an h1 in the component's CSS (`h1.room-title`).
 
               The TEXT is not the room name on its own. `vde`, byte 1,182,4xx:
@@ -249,9 +262,9 @@
 
               We were rendering the bare name.
             -->
-            <h1 class="room-title">Welcome to the {data.roomTitle}</h1>
-          {/if}
-          <!--
+              <h1 class="room-title">Welcome to the {data.roomTitle}</h1>
+            {/if}
+            <!--
             const `[1,"room-description",2,"height","100%","overflow-x","hidden",3,"innerHtml"]` —
             the two inline styles and the `innerHtml` binding are all the reference's.
 
@@ -259,14 +272,14 @@
             load. Rendering `data.roomDescription` raw would put owner-authored markup on a route
             that needs no session.
           -->
-          <div class="room-description" style="height: 100%; overflow-x: hidden;">
-            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-            {@html data.roomDescription}
+            <div class="room-description" style="height: 100%; overflow-x: hidden;">
+              <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+              {@html data.roomDescription}
+            </div>
           </div>
-        </div>
-      {/if}
+        {/if}
 
-      <!--
+        <!--
         const 36 when there IS a description, and the offset variant when there is not.
 
         `yue`'s update block is `O(3, e.appService.globals.sessData.description ? 3 : 4)` — slot 3 is
@@ -275,16 +288,16 @@
         page empty, it centres the form. The `col-sm-6`/`col-sm-12` difference is the reference's
         too: the split view gives the form the full width at `sm`, the centred one keeps it halved.
       -->
-      <div
-        class={[
-          data.roomDescription
-            ? 'col-md-6 col-sm-12 col-xs-12'
-            : 'col-md-6 offset-md-3 col-sm-6 offset-sm-3 col-xs-12',
-          'login-form-container animated fadeInRight faster'
-        ]}
-      >
-        {#if !data.roomDescription && data.roomTitle}
-          <!--
+        <div
+          class={[
+            data.roomDescription
+              ? 'col-md-6 col-sm-12 col-xs-12'
+              : 'col-md-6 offset-md-3 col-sm-6 offset-sm-3 col-xs-12',
+            'login-form-container animated fadeInRight faster'
+          ]}
+        >
+          {#if !data.roomDescription && data.roomTitle}
+            <!--
             `bue` opens with `H(0,eue,2,1,"h1",34)` — const 34 is `room-title`, the SAME h1 as the
             left column's, rendered here instead. It is not duplicated: the two are the two arms of
             `sessData.description ? 3 : 4`, so exactly one of them exists at a time.
@@ -292,57 +305,57 @@
             `eue` and `vde` carry the identical interpolation, checked rather than assumed:
             `Ne(" Welcome to the ",e.appService.globals.sessData.name," ")`.
           -->
-          <h1 class="room-title">Welcome to the {data.roomTitle}</h1>
-        {/if}
+            <h1 class="room-title">Welcome to the {data.roomTitle}</h1>
+          {/if}
 
-        <!--
+          <!--
           const 63 `text-center authenticate-info`, and `bue` renders it unconditionally between the
           h1 and the form: `d(1,"p",63),v(2,"Please complete this form:")`. The component's own CSS
           gives it `p.authenticate-info { padding: 15px 0 }`.
         -->
-        <p class="text-center authenticate-info">Please complete this form:</p>
+          <p class="text-center authenticate-info">Please complete this form:</p>
 
-        <!-- const 64 `mb-3 login-form` with a submit binding. -->
-        <form
-          method="POST"
-          class="mb-3 login-form"
-          use:enhance={() => {
-            submitting = true;
-            return async ({ update }) => {
-              await update({ reset: false });
-              submitting = false;
-            };
-          }}
-          onsubmit={(event) => {
-            const refusal = clientRefusal();
-            if (refusal) {
-              event.preventDefault();
-              clientError = refusal;
-              return;
-            }
-            /*
+          <!-- const 64 `mb-3 login-form` with a submit binding. -->
+          <form
+            method="POST"
+            class="mb-3 login-form"
+            use:enhance={() => {
+              submitting = true;
+              return async ({ update }) => {
+                await update({ reset: false });
+                submitting = false;
+              };
+            }}
+            onsubmit={(event) => {
+              const refusal = clientRefusal();
+              if (refusal) {
+                event.preventDefault();
+                clientError = refusal;
+                return;
+              }
+              /*
               `customEnterDisclosure && !disclosureDone` — the reference opens its dialog INSTEAD of
               logging in, and only `loginToRoom()` on agreement. Same here: the first submit opens
               it, the agreement ticks the box, the second submit goes through.
             */
-            if (data.customEnterDisclosure && !agreed) {
-              event.preventDefault();
-              clientError = '';
-              showDisclosure = true;
-            }
-          }}
-        >
-          <!-- Carried through the POST because the action re-verifies it; it is the credential. -->
-          <input type="hidden" name="jwtSite" value={data.token} />
-          <input type="hidden" name="id" value={data.shortCode} />
-          <input type="hidden" name="disclosure" value={agreed ? 'on' : ''} />
+              if (data.customEnterDisclosure && !agreed) {
+                event.preventDefault();
+                clientError = '';
+                showDisclosure = true;
+              }
+            }}
+          >
+            <!-- Carried through the POST because the action re-verifies it; it is the credential. -->
+            <input type="hidden" name="jwtSite" value={data.token} />
+            <input type="hidden" name="id" value={data.shortCode} />
+            <input type="hidden" name="disclosure" value={agreed ? 'on' : ''} />
 
-          <!-- const 65 `loginGravatar` > 66 `text-center user-avatar` > 67 the gravatar img. -->
-          <div class="loginGravatar">
-            <div class="text-center user-avatar">
-              <img src={data.avatarUrl} alt="" width="80" height="80" />
-            </div>
-            <!--
+            <!-- const 65 `loginGravatar` > 66 `text-center user-avatar` > 67 the gravatar img. -->
+            <div class="loginGravatar">
+              <div class="text-center user-avatar">
+                <img src={data.avatarUrl} alt="" width="80" height="80" />
+              </div>
+              <!--
               const 70 is `[1,"user-nick"]` — ONE class. The `text-center` that used to be here was
               never in the reference: the component's own CSS is
               `.user-nick { font-style: italic; font-size: 15px; margin-left: 0 }`, with no
@@ -352,105 +365,105 @@
               when there is one, and the rendered capture reads `@[OWNER_NAME]`. The `@` is a
               literal in the template, not part of the value.
             -->
-            {#if name}
-              <div class="user-nick">@{name}</div>
-            {/if}
-          </div>
+              {#if name}
+                <div class="user-nick">@{name}</div>
+              {/if}
+            </div>
 
-          <!-- const 72 `for=login-nickname-new`, 73 the input, 74 `addon-admin`, 76 `nickHelpBlock`. -->
-          <label for="login-nickname-new">Name</label>
-          <div class="input-group mb-3">
-            <input
-              type="text"
-              id="login-nickname-new"
-              name="name"
-              placeholder="Name or Nickname"
-              aria-label="Name"
-              aria-describedby="nickHelpBlock"
-              class="form-control"
-              bind:value={() => name, (value) => (nameOverride = value)}
-              disabled={data.disableEditingUsername || data.disableLoginForm}
-            />
-            <span id="addon-admin" class="input-group-text pl-2 pr-2"
-              ><i class="fas fa-user"></i></span
-            >
-          </div>
-          {#if data.usernameInstructions}
-            <small id="nickHelpBlock" class="form-text">{data.usernameInstructions}</small>
-          {/if}
-
-          <!-- const 92/93 the email, 48/49 its addon. Read-only when the token supplied it. -->
-          <label for="login-email">Email</label>
-          <div class="input-group mb-3">
-            <input
-              type="email"
-              id="login-email"
-              name="email"
-              placeholder="Email"
-              aria-label="email"
-              aria-describedby="addon-email"
-              class="form-control"
-              value={data.email}
-              readonly={data.readOnlyEmail}
-            />
-            <span id="addon-email" class="input-group-text pl-2 pr-2"
-              ><i class="fas fa-envelope"></i></span
-            >
-          </div>
-
-          <!-- const 94/95/97/98 — only when `sessData.hasRequiredPhoneInLogin`. -->
-          {#if data.hasRequiredPhoneInLogin}
-            <label for="login-user-phone-number">Phone Number</label>
+            <!-- const 72 `for=login-nickname-new`, 73 the input, 74 `addon-admin`, 76 `nickHelpBlock`. -->
+            <label for="login-nickname-new">Name</label>
             <div class="input-group mb-3">
               <input
-                type="tel"
-                id="login-user-phone-number"
-                name="phone"
-                placeholder="123456789"
-                aria-label="Phone Number"
-                aria-describedby="addon-phone-number"
+                type="text"
+                id="login-nickname-new"
+                name="name"
+                placeholder="Name or Nickname"
+                aria-label="Name"
+                aria-describedby="nickHelpBlock"
                 class="form-control"
-                bind:value={phone}
+                bind:value={() => name, (value) => (nameOverride = value)}
+                disabled={data.disableEditingUsername || data.disableLoginForm}
               />
-              <span id="addon-phone-number" class="input-group-text pl-2 pr-2"
-                ><i class="fas fa-phone"></i></span
+              <span id="addon-admin" class="input-group-text pl-2 pr-2"
+                ><i class="fas fa-user"></i></span
               >
             </div>
-          {/if}
+            {#if data.usernameInstructions}
+              <small id="nickHelpBlock" class="form-text">{data.usernameInstructions}</small>
+            {/if}
 
-          <!--
+            <!-- const 92/93 the email, 48/49 its addon. Read-only when the token supplied it. -->
+            <label for="login-email">Email</label>
+            <div class="input-group mb-3">
+              <input
+                type="email"
+                id="login-email"
+                name="email"
+                placeholder="Email"
+                aria-label="email"
+                aria-describedby="addon-email"
+                class="form-control"
+                value={data.email}
+                readonly={data.readOnlyEmail}
+              />
+              <span id="addon-email" class="input-group-text pl-2 pr-2"
+                ><i class="fas fa-envelope"></i></span
+              >
+            </div>
+
+            <!-- const 94/95/97/98 — only when `sessData.hasRequiredPhoneInLogin`. -->
+            {#if data.hasRequiredPhoneInLogin}
+              <label for="login-user-phone-number">Phone Number</label>
+              <div class="input-group mb-3">
+                <input
+                  type="tel"
+                  id="login-user-phone-number"
+                  name="phone"
+                  placeholder="123456789"
+                  aria-label="Phone Number"
+                  aria-describedby="addon-phone-number"
+                  class="form-control"
+                  bind:value={phone}
+                />
+                <span id="addon-phone-number" class="input-group-text pl-2 pr-2"
+                  ><i class="fas fa-phone"></i></span
+                >
+              </div>
+            {/if}
+
+            <!--
             const 99/101/102 — shown on `showPresenter = sessData.showPasswordField`. Never
             REQUIRED on this path: `e.pw || 'pw' != authMode || passedToken`, and a token is always
             present here. The value is posted and the CONTROLLER compares it, because `webinarPW`
             may not cross to this application and does not cross in the reference either.
           -->
-          {#if showPresenter}
-            <label for="login-password">Password</label>
-            <div class="input-group mb-3">
-              <input
-                type="password"
-                id="login-password"
-                name="password"
-                placeholder="password"
-                aria-label="password"
-                aria-describedby="addon-password"
-                class="form-control"
-                bind:value={password}
-              />
-              <span id="addon-password" class="input-group-text pl-2 pr-2"
-                ><i class="fas fa-lock"></i></span
-              >
-            </div>
-          {/if}
+            {#if showPresenter}
+              <label for="login-password">Password</label>
+              <div class="input-group mb-3">
+                <input
+                  type="password"
+                  id="login-password"
+                  name="password"
+                  placeholder="password"
+                  aria-label="password"
+                  aria-describedby="addon-password"
+                  class="form-control"
+                  bind:value={password}
+                />
+                <span id="addon-password" class="input-group-text pl-2 pr-2"
+                  ><i class="fas fa-lock"></i></span
+                >
+              </div>
+            {/if}
 
-          {#if clientError || form?.message}
-            <!-- const 77 `error text-danger small`. -->
-            <p class="error text-danger small">{clientError || form?.message}</p>
-          {/if}
+            {#if clientError || form?.message}
+              <!-- const 77 `error text-danger small`. -->
+              <p class="error text-danger small">{clientError || form?.message}</p>
+            {/if}
 
-          <!-- const 80, and 82 the submit: `btn-login btn btn-primary buttonload text-center`. -->
-          <div class="d-flex p-2 justify-content-between mt-3 align-items-center">
-            <!--
+            <!-- const 80, and 82 the submit: `btn-login btn btn-primary buttonload text-center`. -->
+            <div class="d-flex p-2 justify-content-between mt-3 align-items-center">
+              <!--
               const 81 `form-check`, 107 the checkbox, 108 `for=remember-me form-check-label`, from
               `pue`. This is what used to be an empty `<span>` holding the space open — dead
               scaffolding standing where a real control belongs.
@@ -458,36 +471,31 @@
               `.login-form .form-check:hover { cursor: pointer }` and
               `.login-form .form-check-label { font-size: 12px }` are the component's own rules.
             -->
-            <div class="form-check">
-              <input
-                type="checkbox"
-                id="remember-me"
-                name="remember"
-                class="form-check-input"
-                bind:checked={rememberMe}
-              />
-              <label for="remember-me" class="form-check-label">Keep me logged in</label>
-            </div>
-            <button
-              type="submit"
-              class="btn-login btn btn-primary buttonload text-center pl-2 pr-2"
-              disabled={submitting}
-            >
-              {#if submitting}
-                <!--
-                  `mue` is `d(0,"span"),v(1," Connecting "),T(2,"i",110)` — the busy label is
-                  " Connecting ", NOT "Login". Slot 27/28 swap the two on
-                  `appService.globals.logginIn`, so the word changes as well as the spinner. const
-                  110 is `[1,"ml-2","fas","fa-spinner","fa-spin"]`.
-                -->
-                Connecting <i class="ml-2 fas fa-spinner fa-spin"></i>
-              {:else}
+              <div class="form-check">
+                <input
+                  type="checkbox"
+                  id="remember-me"
+                  name="remember"
+                  class="form-check-input"
+                  bind:checked={rememberMe}
+                />
+                <label for="remember-me" class="form-check-label">Keep me logged in</label>
+              </div>
+              <!--
+                ONE LABEL. `mue`'s " Connecting " and const 110's spinner were transcribed here from
+                a branch the root swap makes unreachable, and the `disabled` binding sat on the same
+                branch; the measurement is in `SessionLoadingView.svelte`. Nothing guards a second
+                press because the form is no longer on the page once `submitting` is true.
+              -->
+              <button
+                type="submit"
+                class="btn-login btn btn-primary buttonload text-center pl-2 pr-2"
+              >
                 Login
-              {/if}
-            </button>
-          </div>
+              </button>
+            </div>
 
-          <!--
+            <!--
             const 83 `mt-1 text-right` > 84 `session-login-link` with the click ON THE ANCHOR:
             `x("click", … doLoginFormClear())`, text "Not you? clear form".
 
@@ -496,14 +504,14 @@
             The class list is the reference's, so the CSS
             (`.session-login-link { font-size: 14px }`) still applies.
           -->
-          <div class="mt-1 text-right">
-            <button type="button" class="session-login-link btn btn-link p-0" onclick={clearForm}>
-              Not you? clear form
-            </button>
-          </div>
+            <div class="mt-1 text-right">
+              <button type="button" class="session-login-link btn btn-link p-0" onclick={clearForm}>
+                Not you? clear form
+              </button>
+            </div>
 
-          {#if !showPresenter}
-            <!--
+            {#if !showPresenter}
+              <!--
               `gue`: const 112 `mt-3 t text-center` carries the CLICK, const 113 the anchor. The
               stray single-letter class `t` is the reference's and is kept — it has no rule, which
               is a fact about the reference rather than something to tidy away.
@@ -511,30 +519,31 @@
               Guarded on `!showPresenter` because slot 32 renders this only while the password field
               is hidden: `O(32, e.showPresenter ? 33 : 32)`.
             -->
-            <div class="mt-3 t text-center">
-              <button
-                type="button"
-                class="session-login-link btn btn-link p-0"
-                onclick={() => (passwordRevealed = true)}
-              >
-                Have a password?<br />Click here
-              </button>
-            </div>
-          {/if}
-        </form>
+              <div class="mt-3 t text-center">
+                <button
+                  type="button"
+                  class="session-login-link btn btn-link p-0"
+                  onclick={() => (passwordRevealed = true)}
+                >
+                  Have a password?<br />Click here
+                </button>
+              </div>
+            {/if}
+          </form>
 
-        <!-- const 38 `login-footer` > 39 `text-center` > 40 the link. -->
-        <div class="login-footer">
-          <div class="text-center">
-            Powered by: <a href="https://protradingroom.com" target="_blank" rel="noreferrer"
-              >ProTradingRoom.com</a
-            >
+          <!-- const 38 `login-footer` > 39 `text-center` > 40 the link. -->
+          <div class="login-footer">
+            <div class="text-center">
+              Powered by: <a href="https://protradingroom.com" target="_blank" rel="noreferrer"
+                >ProTradingRoom.com</a
+              >
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
+{/if}
 
 {#if showDisclosure}
   <!--

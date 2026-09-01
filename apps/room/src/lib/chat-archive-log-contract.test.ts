@@ -116,13 +116,21 @@ describe('every value the sweep reported missing is now rendered', () => {
     expect(read('lib/styles/captured-runtime-components.css')).not.toContain('btn-ligth');
   });
 
-  it('does NOT reproduce the duplicate id, and the aria target is the one that survives', () => {
+  it('reproduces the duplicate id, because consts 24 and 25 both carry it', () => {
     /*
-      Consts 24 and 25 both carry `id="search-addon"`, and the input's `aria-describedby` names it —
-      so upstream's own description resolves to whichever the browser found first. One id here.
+      Two elements with one id is invalid HTML and is what the reference ships, so `aria-describedby`
+      resolves to whichever the browser finds first. This case asserted ONE id until 2026-09-01,
+      which was a judgement about the reference rather than a fact about this application; the
+      decision is to match the dump.
+
+      Both consts are re-read here rather than quoted, so the pair is evidence and not memory.
     */
+    expect(BUNDLE).toContain('["id","search-addon",1,"input-group-text","btn","btn-ligth"]');
+    expect(BUNDLE).toContain(
+      '["id","search-addon",1,"input-group-text","btn","btn-ligth",3,"click"]'
+    );
     const markup = markupOf('lib/components/ChatArchiveLogPane.svelte', PANE);
-    expect(markup.split('id="search-addon"')).toHaveLength(2);
+    expect(markup.split('id="search-addon"')).toHaveLength(3);
     expect(markup).toContain('aria-describedby="search-addon"');
   });
 

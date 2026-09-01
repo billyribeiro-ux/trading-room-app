@@ -11,6 +11,7 @@ import { building } from '$app/env';
 import { resolveConnectedIdentity } from '#lib/server/connection.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
 import { startAlertScheduler } from '#lib/server/scheduled-alerts.js';
+import { startVideoScheduler } from '#lib/server/room-media-state.js';
 
 /**
  * Routes reachable without a session. Everything else requires one.
@@ -60,6 +61,15 @@ const PUBLIC_PATHS = new Set(['/session', '/internal/media-hook']);
 if (!building) {
   ensureDatabase();
   startAlertScheduler();
+  /*
+    The VIDEO scheduler, added 2026-09-01, and it is here for exactly the reason the alert one is:
+    a play armed for later has to fire whether or not the presenter's tab is still open, and this
+    process is the only long-lived thing in the stack that can do it.
+
+    Both handles are dropped deliberately — the process ending is what stops them, and holding one
+    nothing calls would be the dead code this repository refuses.
+  */
+  startVideoScheduler();
 }
 
 export const handle: Handle = async ({ event, resolve }) => {

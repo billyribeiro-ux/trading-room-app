@@ -67,6 +67,9 @@
   } from '#lib/sound-effects.js';
   import type { FollowChatStyle, MainTab, Theme } from '#lib/types.js';
   import type { PageProps } from './$types';
+  import { mediaReplay } from '#lib/room/media-replay.js';
+  import { promptForChatLog } from '#lib/room/chat-log-save.js';
+  import { downloadChatLog } from './log-pages.remote';
 
   let { data }: PageProps = $props();
 
@@ -676,6 +679,26 @@
   const chatToolbarControls = $derived({
     onchatarchive:
       isPresenter && !media.limitedPresenter ? () => modals.open('chat-logs') : undefined,
+    /*
+      `ACA-06` — "Save chat messages", and it is UNGATED where its neighbour is presenter-only.
+
+      `K_e` at byte 1,421,929 wraps the archive button and carries no gate of its own; the gate is on
+      node 2 INSIDE it. So a member gets Save and not Archive, which is why this is a plain function
+      rather than a ternary — and why writing it as one would have been the easy mistake: every other
+      entry in this object is gated, so a gate here looks like consistency.
+
+      It takes the COLUMN, unlike its two neighbours here, and that difference is load-bearing.
+      `onchatarchive` opens one modal and `onchatmodechange` sets one room-wide mode, so neither
+      cares which bar was clicked; a download is OF a channel. Written `() => saveChatLog('main')`
+      first, which shipped the extra column downloading the main one — the same file, the right
+      button, and nothing on screen to say so. `searchChat` resolves a column the same way and is
+      where the idiom comes from.
+    */
+    onchatsave: (column: 'main' | 'extra') =>
+      promptForChatLog(
+        { dialogs, fetchLog: downloadChatLog },
+        column === 'main' ? chat.tab : chat.extraTab
+      ),
     chatMode,
     onchatmodechange:
       (!isPresenter && data.user.hasMic !== true) || media.limitedPresenter
@@ -1024,6 +1047,24 @@
       `connect` returns its own teardown, which is what makes the pairing checkable. The two halves
       used to sit 240 lines apart here, and the review of 2026-08-11 found the gap between them.
     */
+    /*
+      ── THE LATE-JOIN REPLAY — what the room is already playing ──────────────────────────────────
+
+      The DECISION is `#lib/room/media-replay.ts`, which reads the capture's three rules out of
+      server state and the clock; this is the acting half, because what it changes — the broadcast
+      model and the visible tab — is the page's to own.
+
+      In `onMount` for two different reasons. The video half MOVES THE TAB, which is a navigation
+      and must not happen during SSR. The YouTube half derives its offset from the clock, which on
+      the server would be the moment the HTML was rendered rather than the moment this member's
+      browser started playing — so every cached or prerendered response would seek to the wrong
+      place.
+    */
+    const replay = mediaReplay(data.roomMedia, { isPresenter, now: Date.now() });
+    if (replay.videoUrl) broadcasts.videoStarted(replay.videoUrl);
+    if (replay.showVideoTab) mainTab = 'videoplayer';
+    if (replay.ytUrl) broadcasts.youtubeStarted(replay.ytUrl, replay.ytStartSeconds);
+
     const stopMedia = mediaTransport.connect();
     if (!document.hidden) roomRefresh.start();
 
@@ -1043,8 +1084,16 @@
       if (previousOpenImageModal) imageModalWindow.openImageModal = previousOpenImageModal;
       else delete imageModalWindow.openImageModal;
       feedScroll.destroy();
-      // An armed "play at" that outlives the room would post a broadcast from a page nobody is on.
-      broadcasts.clearScheduledVideoTimer();
+      /*
+        This read *"an armed 'play at' that outlives the room would post a broadcast from a page
+        nobody is on"* and cleared a `window.setTimeout`. There is no timer here any more: the
+        schedule is the SERVER's since 2026-09-01, which is the whole point — a play armed at 17:55
+        fires at 18:00 whether or not this page is still open.
+
+        The call is deleted rather than re-pointed at `clearScheduledVideoLine`, because clearing the
+        line on unmount would clear state that dies with the component anyway. A teardown for state
+        that has already gone is the dead code this repository refuses.
+      */
       toasts.destroy();
       unloadSoundEffects();
       media.stopTalking(data.user.id);
@@ -1457,6 +1506,7 @@
                 onsavealerts={() => alertsPane.save()}
                 onarchivealerts={() => alertsPane.archive()}
                 onchatarchive={chatToolbarControls.onchatarchive}
+                onchatsave={() => chatToolbarControls.onchatsave('main')}
                 chatMode={chatToolbarControls.chatMode}
                 onchatmodechange={chatToolbarControls.onchatmodechange}
                 ondetachchat={chatOnlyMode ? undefined : () => alertsPane.detach()}
@@ -1619,6 +1669,7 @@
                   onmodonly={(next) => chat.setModOnly('extra', next)}
                   ontoggletoolbar={() => chat.search.toggleExtended('extra')}
                   onchatarchive={chatToolbarControls.onchatarchive}
+                  onchatsave={() => chatToolbarControls.onchatsave('extra')}
                   chatMode={chatToolbarControls.chatMode}
                   onchatmodechange={chatToolbarControls.onchatmodechange}
                   onimageupload={() => composer.openImageUpload()}

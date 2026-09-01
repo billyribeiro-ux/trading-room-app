@@ -133,6 +133,32 @@ export default defineConfig({
         change how a 13,000-line component compiles to buy nothing.
       */
       experimental: { remoteFunctions: true },
+      /*
+        RUNES MODE, FOR EVERY COMPONENT, ENFORCED BY THE COMPILER.
+
+        Svelte 5 decides mode per FILE: a component that uses a rune is in runes mode, and one that
+        does not is in legacy mode and compiles happily. So `export let`, `$:`, `on:click`, `<slot>`
+        and `$$props` are not errors in this project by default — they are a different dialect the
+        compiler still accepts, and nothing in `svelte-check` or eslint objects to a new component
+        written entirely in it.
+
+        Measured 2026-08-31 before setting this, because a flag that breaks the build is worse than
+        the drift it prevents: across 129 shipped `.svelte` / `.svelte.ts` files in this app and 48 in
+        the controller, with comments stripped, there are **zero** legacy constructs. The ~380 raw
+        matches are all inside comments, where this repository quotes the reference and the migration
+        guide constantly — the same false-coverage trap `reference-const-coverage-contract` measures
+        from the other direction.
+
+        The docs are explicit about what this buys: *"Once a component is in runes mode (which you
+        can opt into by using runes, or by explicitly setting the `runes: true` compiler option),
+        legacy mode features are no longer available"* (`svelte/legacy-overview`). A contract test
+        could sweep for the same constructs; the compiler refusing to emit them is strictly stronger
+        and costs nothing to maintain.
+
+        `compilerOptions` on the plugin is Kit 3's own documented shape — `@sveltejs/kit`'s types
+        carry the example at `types/index.d.ts:2122`, in the same object as `experimental`.
+      */
+      compilerOptions: { runes: true },
       preprocess: vitePreprocess(),
       adapter: target === 'node' ? node() : vercel()
     })

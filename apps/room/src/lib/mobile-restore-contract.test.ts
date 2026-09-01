@@ -54,7 +54,15 @@ import { describe, expect, it } from 'vitest';
 const ROOM = fileURLToPath(new URL('..', import.meta.url));
 const CONTROLLER = fileURLToPath(new URL('../../../controller/src/', import.meta.url));
 
-const MODAL = readFileSync(`${ROOM}lib/components/ModalHost.svelte`, 'utf8');
+/*
+  THE MODAL LEFT `ModalHost.svelte` ON 2026-09-01, whole, for `ConnectivityModal.svelte`.
+
+  `source-size-contract` had NAMED that extraction twice and deferred it twice; the third time the
+  host went past its ceiling there was nothing smaller left to extract, so the 809 lines went. This
+  file reads the component that holds the markup now — repointed rather than widened to "either
+  file", because which component owns the troubleshooter is itself a fact worth failing on.
+*/
+const MODAL = readFileSync(`${ROOM}lib/components/ConnectivityModal.svelte`, 'utf8');
 /*
   The pane is its own component, and the extraction bought more than a line count: the result message
   is the pane's state, so a tab change unmounts it and the "leaving the tab drops the result" rule is

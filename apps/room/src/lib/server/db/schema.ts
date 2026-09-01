@@ -1207,6 +1207,56 @@ export const roomState = sqliteTable('room_state', {
    * message the presenter has to rewrite on every close. Recorded as a decision, not a match.
    */
   closedMessage: text('closed_message'),
+  /**
+   * `roomState.videoURL` / `roomState.videoPlayTime` — the room's PLAYING-MEDIA state, so a member
+   * who joins mid-play gets what the room is watching.
+   *
+   * ## What the reference does, read at three sites
+   *
+   * ```js
+   * roomState.videoURL && !roomState.videoPlayTime &&
+   *   (hideVideoPlayer = !0, videoPlayerUrl = roomState.videoURL,
+   *    onMainTabChange("presAreaTabs-videoplayer"))                            // byte 1,967,330
+   * sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: i})      // byte 1,981,560
+   * case "playVideoForAll": guiEventBus.emit("playVideoForAll", {url: i.url})  // byte 1,024,587
+   * ```
+   *
+   * Three facts, each load-bearing and none of them guessable from one site alone:
+   *
+   * 1. the replay runs on CONNECT, from server state, not from a broadcast;
+   * 2. it is gated on `!videoPlayTime` — a SCHEDULED play that has not fired yet is not replayed,
+   *    because there is nothing playing to join;
+   * 3. the sender posts the pair the moment Send is pressed and the dispatch forwards only `url`,
+   *    so the SERVER holds the schedule and broadcasts when it fires.
+   *
+   * `videoPlayTime` is nullable and that is the whole of its meaning: NULL is "playing now", a
+   * timestamp is "armed for then". `null` is exactly what the reference's "Play now" button sends.
+   */
+  videoUrl: text('video_url'),
+  videoPlayTime: integer('video_play_time', { mode: 'timestamp' }),
+  /**
+   * `roomState.ytURL` / `roomState.ytStartTime` — the same question for the YouTube overlay, with
+   * one difference that decides the whole feature.
+   *
+   * ```js
+   * subscribe("playYTForAll", e => { let i = 0;
+   *   if (e.startTime) { let o = Number(e.startTime), s = Date.now();
+   *     i = Math.round((s - o) / 1e3), this.startTime = i } else this.startTime = 0;
+   *   this.ytURL = e.url })                                                    // byte 1,964,799
+   * roomState.ytURL && emit("playYTForAll",
+   *   {url: roomState.ytURL, startTime: roomState.ytStartTime})                // byte 1,965,054
+   * ```
+   *
+   * **The seek offset is DERIVED, never sent.** The subscriber turns a start TIMESTAMP into elapsed
+   * seconds itself, and `startTime` rides only on the replay — the live command carries `url` alone
+   * (byte 1,024,137). `ytStartTime` occurs exactly once in 2,891,205 bytes, in that replay.
+   *
+   * So this column is the room's answer to "when did this start", and a late joiner drops into the
+   * middle rather than at the beginning. Unlike `videoPlayTime` there is no scheduled case: the
+   * YouTube modal has no Play-later button, and `ytStartTime` is written when the play goes out.
+   */
+  ytUrl: text('yt_url'),
+  ytStartTime: integer('yt_start_time', { mode: 'timestamp' }),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 });
 

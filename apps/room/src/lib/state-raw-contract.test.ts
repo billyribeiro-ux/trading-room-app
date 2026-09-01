@@ -396,8 +396,9 @@ describe('replace-only objects use $state.raw', () => {
                                 match across the whole loaded log, bounded by nothing.
       * `uploadQueue`         — `= [...list]` or `= []`; the send loop only reads it, via `.entries()`.
       * `searchResults`       — `runSearch(value)` or `null`, over the full emoji set.
-      * `micDevices`, `audioDevices`, `videoDevices` — assigned whole from `enumerateDevices`; an
-                                option is never edited after it is built.
+      * `micDevices` (`ConnectivityModal` since 2026-09-01), `audioDevices`, `videoDevices` —
+                                assigned whole from `enumerateDevices`; an option is never edited
+                                after it is built.
 
       The three that are NOT here are the ones the first draft of that sweep got WRONG:
       `userPermissions`, `followChatStyle` and `chatStyle` are each mutated by `bind:` to a member,
@@ -410,7 +411,12 @@ describe('replace-only objects use $state.raw', () => {
     expect(rawByName('routes/+page.svelte', 'globalChatStyle')).toBe(true);
     expect(rawByName('ModalHost.svelte', 'advancedSearchResults')).toBe(true);
     expect(rawByName('ModalHost.svelte', 'uploadQueue')).toBe(true);
-    expect(rawByName('ModalHost.svelte', 'micDevices')).toBe(true);
+    /*
+      Moved to `ConnectivityModal.svelte` on 2026-09-01 with the whole troubleshooter, still raw.
+      Same shape as `audioDevices` below and the same reason: `enumerateDevices` hands back a new
+      array every call and an option is never edited after it is built.
+    */
+    expect(rawByName('ConnectivityModal.svelte', 'micDevices')).toBe(true);
     /* Moved to `AvDevicePane.svelte` on 2026-08-30 with the rest of the A/V pane, still raw. */
     expect(rawByName('AvDevicePane.svelte', 'audioDevices')).toBe(true);
     expect(rawByName('AvDevicePane.svelte', 'videoDevices')).toBe(true);
