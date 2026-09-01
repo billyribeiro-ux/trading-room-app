@@ -33,6 +33,81 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 02:19 UTC — PostAlertModal read end to end: seven classes the const sweep cannot see
+
+**Runtime impact: YES, visible.** The send-later Repeat select had no classes at all and rendered as
+the browser's default control between two Bootstrap-styled siblings. It now carries the reference's
+own `form-select form-select-sm`, and four more captured class lists landed with it.
+
+## The audit, and why it found what the sweep could not
+
+`todo-next.md` row 15 — `PostAlertModal.svelte`, the largest unaudited surface at 656 lines. Read end
+to end against `app-post-alert-modal`'s own const table (79 consts at byte **2,131,663**, `decls:73`
+`vars:24`) and all thirteen embedded views, across the four files that implement it.
+
+**Twelve const values and five text literals were absent.** Five are recorded refusals —
+`alert-text-label` / "Text this out?" on Twilio, `alert-dont-cross-post-label` on the linked-room
+fan-out, `sendLaterAsEmail` / `sendLaterAsNick` as `PAM-10`'s deliberate refusal to let a presenter
+post under someone else's name. **Seven were a real gap**, and `reference-const-coverage-contract`
+structurally cannot report them: it is a substring search over the WHOLE application, and
+`form-select`, `d-flex`, `m-0`, `mb-2` and `mt-1` all occur elsewhere in this room — so a value can be
+absent from one component while the sweep counts it present. That limitation is recorded in the sweep
+itself; this is what finding one looks like.
+
+`PAM-11`, built: const 65 gives the Repeat select `form-select form-select-sm`; const 63 gives its row
+`form-group d-flex align-items-center justify-content-between`; const 64 the caption `m-0 me-1`; const
+69 the weekends wrapper `form-check mb-2`; const 59 the note `mb-3 mt-1`; const 60 an inline
+`text-decoration: underline` rather than a class, because a `2,` entry in an Angular const array is a
+style binding.
+
+**Three local rules came out with them, on a reason that had never been checked and is false.** The
+note said the captured utilities were written as scoped rules because *"this sheet is scoped"*.
+Svelte's scoping ADDS a hash class; it does not strip global ones. `.tz-note`, `.tz-underline` and
+`.check` were hand-computed equivalents of consts 59, 60 and 69, and `.check` was not even equivalent
+— Bootstrap's `form-check` + `form-check-input` is a paired layout. The `<style>` block is smaller
+than it was.
+
+The wrap on the Repeat row survives and the classes moved onto it: upstream's label carries no `for`
+and its select no `id`, so upstream's caption is unassociated. Wrapping keeps the association without
+inventing an id the dump does not have — which is the constraint the same day's `PAM-08`/`PAM-09` work
+set when it transcribed two ids that DO exist.
+
+## `PAM-12` — a divergence that was correct and unrecorded
+
+Consts 8 and 9 BOTH hardcode `aria-selected="true"`, and nothing in the update block ever writes the
+attribute. So the reference announces two simultaneously selected tabs, and stops announcing either
+when the third is showing. This room derives it, which was right and was asserted as if it were the
+capture.
+
+It is `MTS-06` one component over — `main-tab-strip-gates.svelte.test.ts` records the same defect
+across eight anchors in `app-presentationarea`, five true at once. Finding it twice is what makes it
+worth a name: a hardcoded `aria-selected` beside an `ngClass`-driven `active` is a pattern in the
+reference, not an accident. Now recorded, because a correct divergence with no note is the one a later
+"match the dump" pass silently undoes.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 326 files, 5,904 passed, 1 skipped; `svelte-check` 1,615
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+**Measured in a browser, before and after, against the shipped stylesheet**: the styled select computes
+`padding: 4px 36px 4px 8px`, `border-radius: 4px`, `font-size: 14px` and Bootstrap's chevron
+`background-image`; the same markup without the classes computes `padding: 0`, `border-radius: 0`,
+`font-size: 12.8px`, `background-image: none`. Screenshotted side by side. All thirteen classes are
+now looked up in `css/complete-app-styles.css` by the contract rather than assumed to be "in
+Bootstrap".
+
+**Six negative controls, all seen red on the case they were aimed at**: the select stripped of its
+classes, a local rule reinstated in place of a captured one, the underline returned to a class, the
+Repeat row stripped of const 63, and two on `PAM-12` — `aria-selected` hardcoded the way the capture
+does it, and the attribute stopped from moving.
+
+The ceiling on `ScheduledAlertFields.svelte` moved 182 → 218, argued at the entry; `todo-next.md` row
+15 is audited (54 of 91 surfaces, 22,057 of 38,807 lines).
+
+**The Svelte MCP has been disconnected for the remainder of this session, so `svelte-autofixer` did not
+run on the two edited components.** That gate was not met.
+
 ### 2026-09-02 01:52 UTC — two const-sweep verdicts turned from prose into readings
 
 **Runtime impact: NONE.** Contract tests and comments only; no shipped behaviour changed.

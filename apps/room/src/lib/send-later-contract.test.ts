@@ -137,13 +137,23 @@ describe('PAM-08 and PAM-09 — the three strings that were ours', () => {
       to know whose 09:00 it is. `[2,"text-decoration","underline"]` is const 60.
     */
     expect(fields).toContain('NOTE: All times should be on');
-    expect(fields).toContain('class="tz-underline">your local time zone</span>');
-    expect(fields).toContain('text-decoration: underline;');
+    /*
+      An INLINE style, not a class, because that is what the const is: a `2,` entry in an Angular
+      const array is a style binding. This carried a scoped `.tz-underline` rule until 2026-09-01 —
+      equivalent output, and one more hand-computed equivalence between this room and the capture it
+      was derived from.
+    */
+    expect(fields).toContain(
+      '<span style="text-decoration: underline">your local time zone</span>'
+    );
+    expect(fields).not.toContain('tz-underline');
+    /* Const 59, `[1,"mb-3","mt-1"]`, on the note itself — likewise the values rather than a rule. */
+    expect(fields).toContain('<p class="mb-3 mt-1">');
   });
 
   it('labels both fields the way the reference labels them', () => {
     expect(fields).toContain('Send on this date &amp; time:');
-    expect(fields).toContain('<span>Repeat:</span>');
+    expect(fields).toContain('<span class="m-0 me-1">Repeat:</span>');
     /* The bare words they replaced would still match a looser assertion, so both are exact. */
     expect(fields).not.toContain('<span>Send on</span>');
   });
@@ -211,6 +221,63 @@ const labelIsOpenAt = (source: string, index: number) => {
   return before.lastIndexOf('<label') > before.lastIndexOf('</label>');
 };
 
+/**
+ * Const 63 — `[1,"form-group","d-flex","align-items-center","justify-content-between"]` — carried on
+ * the Repeat row's own element. It is a `<label>` here rather than upstream's `<div>`, which is the
+ * one deliberate difference: upstream's inner label has no `for` and its select no `id`, so its
+ * caption is unassociated; wrapping keeps the association without inventing an id the dump lacks.
+ */
+const REPEAT_ROW = '<label class="form-group d-flex align-items-center justify-content-between">';
+
+describe('PAM-11 — every class on this pane resolves in the shipped sheet', () => {
+  /*
+    The condition that makes transcribing a class list an improvement rather than decoration. This
+    repository does not ship a class no rule reads, and seven of these arrived on 2026-09-01 from
+    `app-post-alert-modal`'s consts 59, 63, 64, 65 and 69 — so each is looked up rather than assumed
+    to be "in Bootstrap", which is the kind of claim that stays true until a sheet is trimmed.
+  */
+  const SHEET = readFileSync(new URL('../../css/complete-app-styles.css', import.meta.url), 'utf8');
+
+  it.each([
+    'mb-3',
+    'mt-1',
+    'form-group',
+    'd-flex',
+    'align-items-center',
+    'justify-content-between',
+    'm-0',
+    'me-1',
+    'form-select',
+    'form-select-sm',
+    'form-check',
+    'form-check-input',
+    'mb-2'
+  ])('.%s has a rule', (utility) => {
+    expect(
+      SHEET.includes(`.${utility} {`) || SHEET.includes(`.${utility}{`),
+      `.${utility} is on the send-later pane but has no rule in the shipped stylesheet`
+    ).toBe(true);
+  });
+
+  it('and the pane no longer carries a local rule standing in for a captured one', () => {
+    /*
+      `.tz-note`, `.tz-underline` and `.check` were hand-written equivalents of consts 59, 60 and 69,
+      kept on a reason that was never checked and is false — *"this sheet is scoped, so they are
+      written as rules rather than as bootstrap utility classes"*. Svelte's scoping ADDS a hash
+      class; it does not strip global ones.
+
+      `.row` and `.field` stay and are asserted present, because they are this component's own: the
+      reference has no counterpart for either, its three controls being siblings inside the modal's
+      footer form rather than a row of their own.
+    */
+    expect(fields).not.toContain('.tz-note');
+    expect(fields).not.toContain('.tz-underline');
+    expect(fields).not.toContain('.check {');
+    expect(fields).toContain('.row {');
+    expect(fields).toContain('.field {');
+  });
+});
+
 describe('PAM-08 and PAM-09 — the two captured ids, TRANSCRIBED 2026-09-01', () => {
   /*
     ── A PREFERENCE IS NOT AN IMPOSSIBILITY ────────────────────────────────────────────────────────
@@ -263,7 +330,8 @@ describe('PAM-08 and PAM-09 — the two captured ids, TRANSCRIBED 2026-09-01', (
       A contract that refuses a construct everywhere is not evidence about the construct here.
     */
     expect(fields).toContain('<div class="field">');
-    expect(fields).toContain('<div class="check">');
+    /* Const 69, `[1,"form-check","mb-2"]` — the reference's own wrapper since 2026-09-01. */
+    expect(fields).toContain('<div class="form-check mb-2">');
     expect(labelIsOpenAt(fields, fields.indexOf('type="datetime-local"'))).toBe(false);
     expect(labelIsOpenAt(fields, fields.indexOf('type="checkbox"'))).toBe(false);
   });
@@ -296,9 +364,9 @@ describe('PAM-08 and PAM-09 — the two captured ids, TRANSCRIBED 2026-09-01', (
       re-wrapping the datetime field — a forward slice found THAT label and this case failed for a
       reason that had nothing to do with Repeat. A control must fail the case it is aimed at.
     */
-    const span = fields.indexOf('<span>Repeat:</span>');
+    const span = fields.indexOf('<span class="m-0 me-1">Repeat:</span>');
     expect(span, 'the Repeat caption must be findable').toBeGreaterThan(-1);
-    const opening = fields.lastIndexOf('<label class="field">', span);
+    const opening = fields.lastIndexOf(REPEAT_ROW, span);
     expect(opening, 'the Repeat label must be findable').toBeGreaterThan(-1);
     const closing = fields.indexOf('</label>', opening);
     expect(closing, 'the Repeat label must be closed').toBeGreaterThan(-1);
@@ -311,7 +379,18 @@ describe('PAM-08 and PAM-09 — the two captured ids, TRANSCRIBED 2026-09-01', (
       both.
     */
     expect(labelIsOpenAt(fields, fields.indexOf('aria-label="Repeat Scheduled Alert"'))).toBe(true);
-    expect(wrap).toContain('<span>Repeat:</span>');
+    expect(wrap).toContain('<span class="m-0 me-1">Repeat:</span>');
+    /*
+      PAM-11, 2026-09-01: the row's own consts, which the const sweep structurally cannot report.
+      It is a substring search over the WHOLE application, and `form-select`, `d-flex` and `m-0` all
+      occur elsewhere in this room — so a value can be absent from THIS component while the sweep
+      counts it present. Found by reading the component against its const table instead.
+    */
+    expect(wrap).toContain('class="form-select form-select-sm"');
+    expect(BUNDLE).toContain(
+      '[1,"form-group","d-flex","align-items-center","justify-content-between"]'
+    );
+    expect(BUNDLE).toContain('[1,"m-0","me-1"]');
     expect(wrap).toContain('aria-label="Repeat Scheduled Alert"');
     expect(wrap).not.toContain('for=');
   });

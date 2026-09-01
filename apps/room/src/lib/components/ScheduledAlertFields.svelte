@@ -62,8 +62,9 @@
   reference answers that before it is asked, and underlines the answer. The room stores an epoch
   and `scheduled-alert.ts` fires on it, so the note is TRUE here as well as transcribed.
 -->
-<p class="tz-note">
-  NOTE: All times should be on <span class="tz-underline">your local time zone</span>
+<p class="mb-3 mt-1">
+  NOTE: All times should be on
+  <span style="text-decoration: underline">your local time zone</span>
 </p>
 <div class="row">
   <div class="field">
@@ -95,9 +96,37 @@
     />
   </div>
 
-  <label class="field">
-    <!-- PAM-09 — `d(12,"label",64), v(13,"Repeat:")`, const 64 `[1,"m-0","me-1"]`. -->
-    <span>Repeat:</span>
+  <!--
+    PAM-11 — THE REPEAT ROW'S OWN CLASSES, TRANSCRIBED 2026-09-01, AND THE SWEEP COULD NOT SEE THEM.
+
+    ```js
+    d(11,"div",63)(12,"label",64), v(13,"Repeat:"), u(), d(14,"select",65)
+    63  [1,"form-group","d-flex","align-items-center","justify-content-between"]
+    64  [1,"m-0","me-1"]
+    65  ["aria-label","Repeat Scheduled Alert",1,"form-select","form-select-sm",3,"ngModelChange","ngModel"]
+    ```
+
+    The select shipped here with NO classes at all, so it rendered as the browser's default control
+    beside two Bootstrap-styled siblings. `reference-const-coverage-contract` cannot report this:
+    it is a substring search over the whole application, and `form-select`, `d-flex` and `m-0` all
+    occur elsewhere in this room, so a value can be missing from THIS component while the sweep
+    counts it present. That limitation is recorded in the sweep itself; this is what finding one
+    looks like — a per-component read, which is what `todo-next.md`'s surface audit is for.
+
+    Every one of the seven resolves in `css/complete-app-styles.css`, asserted rather than assumed.
+
+    ## The wrap survives, and the classes move onto it
+
+    Upstream's structure is `div > label + select` with the label carrying no `for` and the select no
+    `id`, so upstream's Repeat label is UNASSOCIATED — recorded, with its negative control, when
+    PAM-08 and PAM-09 took their captured ids earlier today. Keeping our `<label>` as the row and
+    putting const 64 on the inner `<span>` gives the identical box model (a label is display:flex
+    here either way), carries every captured class, keeps the association, and invents no `id` that
+    the reference does not have. That last clause is the constraint: a `for`/`id` pair here would be
+    transcribing something that is not in the dump.
+  -->
+  <label class="form-group d-flex align-items-center justify-content-between">
+    <span class="m-0 me-1">Repeat:</span>
     <!--
       PAM-07 — THE OPTIONS ARE LABELLED, and ours rendered the wire values.
 
@@ -112,7 +141,12 @@
       empty-string mode reading "off" in the manage table below is the reference's own labelling
       of the same value and stays as it is, because that table is a different node upstream too.
     -->
-    <select aria-label="Repeat Scheduled Alert" bind:value={repeat} disabled={busy}>
+    <select
+      aria-label="Repeat Scheduled Alert"
+      class="form-select form-select-sm"
+      bind:value={repeat}
+      disabled={busy}
+    >
       {#each REPEAT_MODES as mode (mode)}
         <option value={mode}>{REPEAT_MODE_LABEL[mode]}</option>
       {/each}
@@ -128,12 +162,14 @@
       ["for","ignoreWeekendsChk"]                                        // byte 2,136,186
       ```
 
-      Un-wrapped and given the captured id for the reason the date field above records. The
-      `form-check-input` class comes with the const and is carried; `.check` stays because it is
-      this component's own layout and the reference's own wrapper const is `[1,"form-check","mb-2"]`,
-      which this room's scoped sheet does not implement.
+      Un-wrapped and given the captured id for the reason the date field above records, and since
+      2026-09-01 the WRAPPER is the reference's own too: const 69 is `[1,"form-check","mb-2"]`, and
+      both rules are in `css/complete-app-styles.css`. This carried a local `.check` flex row until
+      that was measured — the note here said the sheet "does not implement" the captured pair, which
+      was never checked and is false. `form-check` + `form-check-input` is the pairing Bootstrap's
+      own float-and-negative-margin layout needs, so the local rule was not equivalent either.
     -->
-    <div class="check">
+    <div class="form-check mb-2">
       <input
         type="checkbox"
         id="ignoreWeekendsChk"
@@ -148,18 +184,24 @@
 
 <style>
   /*
-    PAM-09's note. `mb-3 mt-1` on the label and `text-decoration: underline` on the span are the
-    reference's own consts 59 and 60; this sheet is scoped, so they are written as rules rather than
-    as bootstrap utility classes the rest of this component does not use either.
+    THREE RULES LEFT THIS BLOCK ON 2026-09-01, AND THE REASON THEY WERE HERE WAS UNCHECKED.
+
+    It read: *"this sheet is scoped, so they are written as rules rather than as bootstrap utility
+    classes the rest of this component does not use either."* Both halves are false. Svelte's scoping
+    ADDS a hash class, it does not strip global ones, so `mb-3` still resolves from
+    `css/complete-app-styles.css` on a scoped element; and the component now uses seven of those
+    utilities, because the reference does.
+
+    So `.tz-note` (const 59, `mb-3 mt-1`), `.tz-underline` (const 60, an inline
+    `text-decoration:underline` — a `2,` entry is a STYLE, not a class) and `.check` (const 69,
+    `form-check mb-2`) are gone, replaced by the captured values themselves. Hand-computed
+    equivalents are how a sheet drifts from the capture it was derived from.
+
+    `.row` and `.field` STAY and are this component's own: the reference has no counterpart for
+    either — its three controls are siblings inside `app-post-alert-modal`'s footer form rather than
+    a row of their own — so these are the layout that makes an extracted component sit correctly, not
+    a substitute for something captured.
   */
-  .tz-note {
-    margin: 0.25rem 0 1rem;
-  }
-
-  .tz-underline {
-    text-decoration: underline;
-  }
-
   .row {
     display: flex;
     flex-wrap: wrap;
@@ -170,12 +212,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    font-size: 0.8rem;
-  }
-  .check {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
     font-size: 0.8rem;
   }
 </style>

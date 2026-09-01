@@ -7592,7 +7592,33 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       through a negative control on 2026-09-01 — a wrap re-added inside the surviving `<div>`, and the
       Repeat select moved out of its label — and each was seen red. A silent re-wrap is caught.
     */
-    max: 182,
+    /*
+      182 -> 218, LATER THE SAME DAY, for `PAM-11`, and the CSS is a net deletion.
+
+      The per-component audit `todo-next.md` asks for — reading this component against
+      `app-post-alert-modal`'s const table rather than against the const SWEEP — found seven captured
+      classes missing that the sweep structurally cannot report. It is a substring search over the
+      whole application, and `form-select`, `d-flex` and `m-0` all occur elsewhere in this room, so a
+      value can be absent from THIS component while the sweep counts it present.
+
+      The visible one: the Repeat select had no classes at all, so it rendered as the browser's
+      default control between two Bootstrap-styled siblings. Const 65 gives it `form-select
+      form-select-sm`; const 63 gives its row `form-group d-flex align-items-center
+      justify-content-between`; const 64 gives the caption `m-0 me-1`; const 69 gives the weekends
+      wrapper `form-check mb-2`; const 59 gives the note `mb-3 mt-1`; const 60 is an inline
+      `text-decoration: underline` rather than a class, because a `2,` entry is a style binding.
+
+      THREE LOCAL RULES CAME OUT with them — `.tz-note`, `.tz-underline` and `.check`, hand-written
+      equivalents kept on a reason that was never checked and is false: *"this sheet is scoped, so
+      they are written as rules rather than as bootstrap utility classes"*. Svelte's scoping ADDS a
+      hash class; it does not strip global ones. The `<style>` block is smaller than it was.
+
+      So the growth is decode again — the const citations, why the wrap survives on a row whose
+      upstream label is unassociated, and why the sweep could not see any of this. Every one of the
+      thirteen classes is now looked up in `css/complete-app-styles.css` by the contract rather than
+      assumed to be "in Bootstrap".
+    */
+    max: 218,
     why: 'the send-later date, repeat and weekend fields, decoded from app-post-alert-modal'
   },
   {
