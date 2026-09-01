@@ -43,13 +43,15 @@
 
     node gate/audit-surface.mjs --from 1449150 --to 1451150 --files src/lib/components/ChatSearchBar.svelte
 
+    node gate/audit-surface.mjs --all      # TRIAGE: every component against the whole application
+
   `--selector` finds `selectors:[["name"]]` and reads from its `consts:[` to its `,template:function`.
   `--from`/`--to` take a byte range instead, for a REGION of a large component — `#files` lives inside
   `app-presentationarea` and has no selector of its own.
 */
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -124,11 +126,22 @@ const FRAMEWORK = new Set([
   'keydown',
   'keypress',
   'keydown.enter',
+  'keyup.enter',
   'mouseenter',
   'mouseleave',
   'scroll',
   'load',
   'error',
+  /*
+    Added after the first whole-app sweep, which reported every one of these as a missing value. They
+    are Angular's own vocabulary and have no rendered form: `dblclick` and `ngSubmit` are event
+    bindings, `ngFor`/`ngForOf` and `appDoubleClick` are directives. Named individually rather than
+    filtered by an `ng` prefix, because a class called `ngsomething` would then vanish silently.
+  */
+  'dblclick',
+  'ngSubmit',
+  'ngFor',
+  'appDoubleClick',
   // attribute NAMES — their values are still measured
   'type',
   'id',
@@ -262,10 +275,53 @@ function splitTable(table) {
  */
 function readOurs(paths) {
   return paths
-    .map((path) => readFileSync(join(ROOM, path), 'utf8'))
-    .map((source) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, ''))
+    .map((path) => [path, readFileSync(join(ROOM, path), 'utf8')])
+    .map(([path, source]) => codeOf(String(path), String(source)))
     .map(decodeEntities)
     .join('\n');
+}
+
+/**
+ * Comments removed the way `src/lib/source-comments.ts` removes them, and NOT the obvious way.
+ *
+ * ## The bug this replaced, measured 2026-09-01
+ *
+ * A whole-file `/\* … *\/` regex over a `.svelte` file is wrong, because the TEMPLATE is not
+ * JavaScript and `/*` there is usually not a comment at all:
+ *
+ * ```svelte
+ * <input accept="image/*" ... />
+ * ```
+ *
+ * That `/` and `*` open a "comment" the regex closes at the next real one — in
+ * `CarouselDialog.svelte`, **13,024 characters later** — and the whole carousel markup between them
+ * is deleted. This script reported eight of that component's own strings as missing from the room,
+ * including ` Add slide ` and `No images found. Upload images via Files first.`, every one of which
+ * is on screen.
+ *
+ * It is the exact failure `source-comments.ts` was written for, and this file had the naive version
+ * anyway — a rule correct in one place and wrong in another, which is that module's own complaint.
+ * It cannot be imported here (that module is TypeScript, this is a `.mjs` gate script), so the RULE
+ * is restated with a pointer rather than the code being copied blind: JS comment syntax is in force
+ * only inside `<script>` and `<style>`; the template's comments are `<!-- -->` and nothing else.
+ *
+ * `orphan-component-contract.test.ts` carries the tripwire that fails when a third such file appears.
+ *
+ * @param {string} path
+ * @param {string} source
+ * @returns {string}
+ */
+function codeOf(path, source) {
+  /** @param {string} body */
+  const withoutJs = (body) =>
+    body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  if (!path.endsWith('.svelte')) return withoutJs(source);
+  return source
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(
+      /(<(script|style)\b[^>]*>)([\s\S]*?)(<\/\2>)/g,
+      (_match, open, _tag, body, close) => open + withoutJs(body) + close
+    );
 }
 
 /**
@@ -427,8 +483,85 @@ export function auditSurface(options) {
     return false;
   };
 
+  /*
+    ── ANGULAR TEMPLATE REFERENCE VARIABLES ARE NOT SURFACE ──────────────────────────────────────
+
+    `#carouselModal` in a template compiles to the const `["carouselModal",""]` — a two-element entry
+    whose second element is the empty string. It names a NODE for other code in the same component to
+    reach; it appears in no attribute and no class list, and this room reaches its own nodes with
+    `bind:this`. Reporting one as a missing value asks this repository to transcribe an identifier
+    that has no rendered form.
+
+    Six showed up in the first whole-app sweep — `carouselModal`, `fileBrowserModal`,
+    `giphySearchPopOver`, `emojiPanelDiv`, `scrollerref`, `chatWidth` — and each would cost a reader
+    the same two minutes to rule out. Recognised by SHAPE rather than by name, so the seventh is
+    filtered the day it is written.
+
+    @param {string} entry
+  */
+  /** @param {string} entry */
+  const isTemplateRef = (entry) => /^\s*\["[^"]+",""\]\s*$/.test(entry);
+
+  /*
+    ── ANGULAR'S CONST ENCODING, READ RATHER THAN PATTERN-MATCHED ────────────────────────────────
+
+    A const array is SECTIONED by bare numeric markers, and the sections are different kinds of
+    thing:
+
+      [ "type","checkbox","id","ignoreWeekendsChk",   // attributes: name, value, name, value …
+        1, "form-check-input",                        // 1 → class names
+        2, "max-width","200px",                       // 2 → style property, value, …
+        3, "ngModelChange","ngModel" ]                // 3 → BINDING names
+
+    Only the first three sections render. The `3,` section is the names of property and event
+    bindings — `ngModel`, `click`, `innerHTML`, and a child component's own inputs — and none of them
+    appears in any attribute or class list. `app-roomscroller`'s whole const table is
+    `[3,"msg","isP","logType","prevD"]`, four input names, and the first sweep reported two of them as
+    values this room fails to render.
+
+    Attribute NAMES are skipped for the same reason: `"type"` and `"aria-label"` are the vocabulary,
+    their VALUES are the surface. That is what the odd-index take below does, and it is why the
+    hand-kept `FRAMEWORK` list is now a backstop rather than the mechanism.
+
+    Verified against the pinned surfaces before it replaced the old whole-entry scan: every one gives
+    the identical answer, which is the only evidence that a smarter reader is still reading the same
+    thing.
+
+    @param {string} entry
+    @returns {string[]}
+  */
+  /**
+   * @param {string} entry
+   * @returns {string[]}
+   */
+  const surfaceValuesOf = (entry) => {
+    /* Tokens at the top level: quoted strings, and the bare numeric section markers. */
+    const tokens = [...entry.matchAll(/"((?:[^"\\]|\\.)*)"|(?<![\w"])([123])(?=\s*,)/g)];
+    const out = [];
+    let section = 0;
+    let attrIndex = 0;
+    for (const token of tokens) {
+      if (token[2] !== undefined) {
+        section = Number(token[2]);
+        continue;
+      }
+      const value = token[1];
+      if (section === 0) {
+        /* Attribute pairs: name, value, name, value — take the values. */
+        if (attrIndex % 2 === 1) out.push(value);
+        attrIndex += 1;
+      } else if (section === 1 || section === 2) {
+        out.push(value);
+      }
+      /* section 3 — binding names — deliberately dropped. */
+    }
+    return out;
+  };
+
   entries.forEach((entry, index) => {
-    for (const [, value] of entry.matchAll(/"([^"]{2,})"/g)) {
+    if (isTemplateRef(entry)) return;
+    for (const value of surfaceValuesOf(entry)) {
+      if (value.length < 2) continue;
       if (!isSurfaceValue(value) || FRAMEWORK.has(value) || rendered(value)) continue;
       /*
         `?? []` and a re-set rather than a non-null assertion on the line above. The `has`/`get` pair
@@ -519,13 +652,34 @@ export function auditSurface(options) {
   collectViews(template, 0);
   collectViews(region, 0);
 
+  /*
+    ── TEXT IS COMPARED WITH WHITESPACE COLLAPSED, AND THE REASON IS THE FORMATTER ───────────────
+
+    HTML collapses runs of whitespace, so ` Stop Screens ` in the capture and
+
+    ```svelte
+    <i class="icon fa fa-stop-circle"></i> Stop
+    Screens</button
+    ```
+
+    here are the same words on screen. `prettier` wraps our markup at 100 columns and the capture has
+    no wrapping at all, so a literal comparison reports every button whose label happens to straddle
+    a line — and it did: ` Stop Screens ` came back as a gap against a control that is fully built,
+    decoded, and carries forty lines about its own icons.
+
+    Const values are NOT normalised this way. A class attribute is one token and never wraps; letting
+    whitespace slide there would make `"btn btn-sm"` match `"btn   btn-sm"`, which is a difference
+    worth keeping.
+  */
+  const flat = ours.replace(/\s+/g, ' ');
   /** @type {Set<string>} */
   const textGaps = new Set();
   const unresolved = [...viewSources].filter(([, body]) => body === '').map(([view]) => view);
   for (const source of [template, ...viewSources.values()]) {
     for (const [, value] of source.matchAll(/\bv\(\d+,"([^"]{2,})"\)/g)) {
       const literal = unescapeJs(value);
-      if (!literal.trim() || rendered(literal.trim())) continue;
+      const wanted = literal.replace(/\s+/g, ' ').trim();
+      if (!wanted || flat.includes(wanted)) continue;
       textGaps.add(value);
     }
   }
@@ -543,7 +697,59 @@ export function auditSurface(options) {
   return report;
 }
 
+/**
+ * Every `app-*` component in the bundle, in byte order.
+ *
+ * @param {string} bundle
+ * @returns {string[]}
+ */
+function everySelector(bundle) {
+  return [...bundle.matchAll(/selectors:\[\["(app-[a-z0-9-]+)"\]\]/g)].map((match) => match[1]);
+}
+
+/**
+ * `--all` — every component at once, measured against the WHOLE application.
+ *
+ * A different question from the per-surface runs, and weaker on purpose: a value found anywhere in
+ * `src/` counts as rendered, so this cannot see a gap in one component that another component fills
+ * — which is exactly the blind spot `PAM-11` was hiding in. What it CAN do is answer, in one pass,
+ * which of the fifty-one reference components have anything left at all. Those are then read
+ * properly, with `--selector` and the files that implement them.
+ *
+ * Triage, in other words. The per-surface run is the audit.
+ */
+function runAll() {
+  const bundle = readVerifiedBundle();
+  const files = [...globSync('src/**/*.svelte'), ...globSync('src/**/*.ts')]
+    .filter((path) => !path.includes('.test.'))
+    .sort();
+  process.stdout.write(
+    `${everySelector(bundle).length} components against ${files.length} files\n\n`
+  );
+  for (const selector of everySelector(bundle)) {
+    const report = auditSurface({ selector, files });
+    const consts = report.constGaps.map((gap) => gap.value);
+    const line =
+      `${selector.padEnd(30)} consts=${String(report.region.consts).padStart(3)}` +
+      ` views=${String(report.views.resolved).padStart(3)}` +
+      ` gaps=${consts.length}/${report.textGaps.length}`;
+    process.stdout.write(
+      consts.length || report.textGaps.length
+        ? `${line}\n    ${JSON.stringify(consts)}\n    ${JSON.stringify(report.textGaps)}\n`
+        : `${line}\n`
+    );
+  }
+  process.stdout.write(
+    '\nWHOLE-APP scope: a value rendered by ANY component counts as present here. A surface with 0/0 ' +
+      'still needs a --selector run against its own files before it is audited.\n'
+  );
+}
+
 function main() {
+  if (process.argv.includes('--all')) {
+    runAll();
+    return;
+  }
   const args = parseArgs(process.argv.slice(2));
   const report = auditSurface({
     selector: args.selector,
