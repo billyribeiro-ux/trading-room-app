@@ -390,7 +390,6 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   */
   'app-user-info-modal': [
     '#nav-info',
-    '#all-user-pm-modal',
     '#nav-system',
     '#nav-options',
     '#nav-notes',
@@ -494,7 +493,6 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
       seven that had no reason on record anywhere before this note.
   */
   'app-post-alert-modal': [
-    '#scheduledAlertsModal',
     'alert-text-label',
     'alert-dont-cross-post-label',
     'alert-send-later-time',
@@ -576,7 +574,7 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-six components fully covered, one hundred and twenty-five values not', () => {
+  it('holds the ratchet: thirty-six components fully covered, one hundred and twenty-three values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
@@ -584,7 +582,7 @@ describe('coverage of the reference const tables', () => {
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(36);
-    expect(residuals).toBe(125);
+    expect(residuals).toBe(123);
   });
 
   it('and the surfaces audited by hand this week are among the covered', () => {
@@ -611,15 +609,16 @@ describe('how much of the gap has already been written about', () => {
     LIMITATION, stated because it bounds every number below: this is a substring search over the whole
     repository, so a short generic value (`spinner-border`, `visually-hidden`) can be counted as
     examined because it occurs incidentally in unrelated prose. It over-counts the examined side. It
-    cannot over-count the UNEXAMINED side, which is the side that means work, so the 108 is a floor.
+    cannot over-count the UNEXAMINED side, which is the side that means work, so the 91 below is a
+    floor.
   */
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
-  it('splits the 125 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(125);
-    expect(all.filter(mentioned)).toHaveLength(33);
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(92);
+  it('splits the 123 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(123);
+    expect(all.filter(mentioned)).toHaveLength(32);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(91);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

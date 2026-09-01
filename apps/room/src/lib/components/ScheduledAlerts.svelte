@@ -1,6 +1,7 @@
 <script lang="ts">
   import { removeScheduledAlertQuestion } from '#lib/scheduled-alert-table.js';
-  import { REPEAT_MODES, REPEAT_MODE_LABEL, type RepeatMode } from '#lib/scheduled-alert.js';
+  import { type RepeatMode } from '#lib/scheduled-alert.js';
+  import ScheduledAlertFields from './ScheduledAlertFields.svelte';
   import ScheduledAlertsTable from './ScheduledAlertsTable.svelte';
   import {
     listScheduledAlerts,
@@ -81,8 +82,6 @@
     fields, and `effect-not-derived-contract.test.ts` is the gate that keeps that true.
   */
   const canSchedule = $derived(body.trim().length > 0 && sendOnLocal !== '' && !busy);
-  /** `ignoreWeekends` is meaningless unless the series is daily — the composer's own rule. */
-  const weekendsApply = $derived(repeat === 'daily');
 
   async function refresh() {
     pending = await listScheduledAlerts();
@@ -183,68 +182,44 @@
 </script>
 
 <section class="scheduler">
-  <!--
-    ── PAM-09 — THE NOTE, and it answers the question the form otherwise raises ──────────────────
-
-    ```js
-    d(4,"label",59), v(5,"NOTE: All times should be on "),
-      d(6,"span",60), v(7,"your local time zone")
-    59  [1,"mb-3","mt-1"]      60  [2,"text-decoration","underline"]
-    ```
-    (byte 2,120,860.) A `datetime-local` input has no timezone in it, so a presenter scheduling an
-    alert for 09:00 has no way to know whose 09:00 it is — theirs, the server's, or the room's. The
-    reference answers that before it is asked, and underlines the answer. The room stores an epoch
-    and `scheduled-alert.ts` fires on it, so the note is TRUE here as well as transcribed.
-  -->
-  <p class="tz-note">
-    NOTE: All times should be on <span class="tz-underline">your local time zone</span>
-  </p>
-  <div class="row">
-    <label class="field">
-      <!-- PAM-09 — `d(8,"label",61), v(9,"Send on this date & time:")`, const 61 `[1,"me-1"]`. -->
-      <span>Send on this date &amp; time:</span>
-      <input type="datetime-local" bind:value={sendOnLocal} disabled={busy} />
-    </label>
-
-    <label class="field">
-      <!-- PAM-09 — `d(12,"label",64), v(13,"Repeat:")`, const 64 `[1,"m-0","me-1"]`. -->
-      <span>Repeat:</span>
-      <!--
-        PAM-07 — THE OPTIONS ARE LABELLED, and ours rendered the wire values.
-
-        ```js
-        d(15,"option",66), v(16,"Off"), d(17,"option",67), v(18,"Daily"),
-        d(19,"option",68), v(20,"Weekly")
-        66 ["selected","","value",""]   67 ["value","daily"]   68 ["value","weekly"]
-        ```
-        The VALUES stay `''` / `daily` / `weekly` — they are what crosses the wire and what
-        `isRepeatMode` refuses anything else against — and only the TEXT changes. A select whose
-        options read "off", "daily", "weekly" is a control showing its own storage format; the
-        empty-string mode reading "off" in the manage table below is the reference's own labelling
-        of the same value and stays as it is, because that table is a different node upstream too.
-      -->
-      <select aria-label="Repeat Scheduled Alert" bind:value={repeat} disabled={busy}>
-        {#each REPEAT_MODES as mode (mode)}
-          <option value={mode}>{REPEAT_MODE_LABEL[mode]}</option>
-        {/each}
-      </select>
-    </label>
-
-    {#if weekendsApply}
-      <label class="check">
-        <input type="checkbox" bind:checked={ignoreWeekends} disabled={busy} />
-        <!-- PAM-08 — `v(3,"Ignore weekends?")` at byte 2,120,631. Ours read "Skip weekends". -->
-        <span>Ignore weekends?</span>
-      </label>
-    {/if}
-  </div>
+  <ScheduledAlertFields bind:sendOnLocal bind:repeat bind:ignoreWeekends {busy} />
 
   <div class="row">
     <button type="button" onclick={schedule} disabled={!canSchedule}>
       {busy ? 'Scheduling…' : 'Schedule alert'}
     </button>
-    <button type="button" class="link" onclick={toggleManage}>
-      {managing ? 'Hide scheduled' : 'Manage scheduled'}
+    <!--
+      `XTe`, consts 74 and 75 — the reference's own control for this, transcribed 2026-09-01.
+
+      ```js
+      function XTe(t,n){ … d(0,"button",74), x("click", () => manageScheduledAlerts()),
+                         T(1,"i",75), v(2," See Scheduled Alerts ") … }
+      74 ["data-bs-toggle","modal","data-bs-target","#scheduledAlertsModal",1,"btn",
+          "btn-outline-success","mx-1",3,"click"]
+      75 [1,"fas","fa-calendar"]
+      ```
+
+      This read `Manage scheduled` / `Hide scheduled` on a `class="link"` button — the same function
+      under a label and a shape nobody had checked against the dump. The label, the classes and the
+      icon are the reference's now, spaces included, and the `.link` rule went with its only wearer:
+      `svelte-check` reported it unused within the minute, which is the orphan half of the same rule
+      that forbids a class with no CSS.
+
+      TWO things are still not the reference and both are structural rather than cosmetic. Its
+      control opens a MODAL (`#scheduledAlertsModal`) where this pane shows the table INLINE, so the
+      button toggles rather than opens; and the label does not flip, because a control that opens a
+      modal has nothing to say about closing one. The `data-bs-*` pair is carried anyway — inert,
+      since Bootstrap's JavaScript is not loaded in this application — so the attribute a reader
+      greps for is where the dump puts it.
+    -->
+    <button
+      type="button"
+      data-bs-toggle="modal"
+      data-bs-target="#scheduledAlertsModal"
+      class="btn btn-outline-success mx-1"
+      onclick={toggleManage}
+    >
+      <i class="fas fa-calendar"></i>{' See Scheduled Alerts '}
     </button>
   </div>
 
@@ -262,19 +237,6 @@
 </section>
 
 <style>
-  /*
-    PAM-09's note. `mb-3 mt-1` on the label and `text-decoration: underline` on the span are the
-    reference's own consts 59 and 60; this sheet is scoped, so they are written as rules rather than
-    as bootstrap utility classes the rest of this component does not use either.
-  */
-  .tz-note {
-    margin: 0.25rem 0 1rem;
-  }
-
-  .tz-underline {
-    text-decoration: underline;
-  }
-
   .scheduler {
     display: flex;
     flex-direction: column;
@@ -287,24 +249,6 @@
     flex-wrap: wrap;
     align-items: flex-end;
     gap: 0.5rem;
-  }
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    font-size: 0.8rem;
-  }
-  .check {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.8rem;
-  }
-  .link {
-    background: none;
-    border: 0;
-    text-decoration: underline;
-    cursor: pointer;
   }
   .problem {
     margin: 0;

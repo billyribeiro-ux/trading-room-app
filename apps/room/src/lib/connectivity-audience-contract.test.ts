@@ -34,7 +34,15 @@ import { codeOf } from './source-comments';
  */
 
 const read = (path: string) => readFileSync(path, 'utf8');
-const MODAL_PATH = 'src/lib/components/ModalHost.svelte';
+/*
+  THE MODAL LEFT `ModalHost.svelte` ON 2026-09-01, whole, for `ConnectivityModal.svelte`.
+
+  `source-size-contract` had NAMED that extraction twice and deferred it twice; the third time the
+  host went past its ceiling there was nothing smaller left to extract, so the 809 lines went. This
+  file reads the component that holds the markup now — repointed rather than widened to "either
+  file", because which component owns the troubleshooter is itself a fact worth failing on.
+*/
+const MODAL_PATH = 'src/lib/components/ConnectivityModal.svelte';
 
 /** Comments stripped: this file's prose quotes every gate it asserts. */
 const modal = () => codeOf(MODAL_PATH, read(MODAL_PATH));

@@ -33,6 +33,109 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 11:31 UTC — two more `data-bs-*` pairs transcribed, and the extraction the ratchet had named twice
+
+**Runtime impact: NO** — three inert attributes and two component moves. No behaviour changed; the
+DOM gains `data-bs-toggle` / `data-bs-target` pairs that nothing in this application reads, because
+Bootstrap's JavaScript is not loaded here (verified: `app.html` and `package.json` name it nowhere).
+
+Continuing the owner's decision to **match the dump files exactly**, two more openers were put
+against their const tables:
+
+- **`#all-user-pm-modal`** — consts 52 and 90 both carry `data-bs-toggle="modal"` and
+  `data-bs-target="#all-user-pm-modal"`. `ModalHost.svelte`'s "Show private messages" button carried
+  neither. The modal it names has existed here all along (`id="all-user-pm-modal"`); only the opener's
+  attributes were missing.
+- **`#scheduledAlertsModal`** — `XTe`, consts 74 and 75:
+  `["data-bs-toggle","modal","data-bs-target","#scheduledAlertsModal",1,"btn","btn-outline-success","mx-1",3,"click"]`
+  and `[1,"fas","fa-calendar"]`. `ScheduledAlerts.svelte` had a bare `class="link"` toggle reading
+  "Manage scheduled" / "Hide scheduled". It is the reference's label, classes and icon now —
+  `See Scheduled Alerts`, spaces included. Two structural differences remain and are recorded at the
+  code: upstream OPENS a modal where this pane shows the table inline, so the button toggles; and the
+  label does not flip, because a control that opens a modal has nothing to say about closing one.
+
+Both values leave the const-coverage table: **125 residuals to 123**, examined split 32 / 91.
+
+## The `.link` rule went with its only wearer
+
+Replacing that button orphaned `.link` in `ScheduledAlerts.svelte`'s scoped sheet, and `svelte-check`
+said so within the minute — *"Unused CSS selector"*. Deleted rather than re-pointed. It is the same
+rule as *"no `.flipped` class with no CSS"*, read from the other end, and it is the reason
+`svelte-check`'s warnings are treated as errors here.
+
+## The ratchet arbitrated, and it cost two extractions rather than two raises
+
+Both files went past their ceilings, and the answer that rule gives is **extract, do not raise**.
+
+- **`ScheduledAlerts.svelte` 342 → 263**, ceiling ratcheted DOWN 320 → 264. The three send-later
+  FIELDS are `ScheduledAlertFields.svelte` (141 lines): PAM-07's labelled options, PAM-08's weekend
+  checkbox, PAM-09's timezone note, with their decoded consts. It follows upstream's own seam — those
+  fields are the send-later block of `app-post-alert-modal`, not part of the manage table — and it is
+  NOT the pane-versus-table split `ScheduledAlerts.svelte` refuses, which is refused because both
+  halves ask one question. The fields ask nothing. Their three values are `$bindable`, which is the
+  case Svelte's docs name for it: *"custom input components"*, used *"sparingly and carefully"*.
+- **`ModalHost.svelte` 6,871 → 6,068**, ceiling ratcheted DOWN 6,857 → 6,069. `source-size-contract`
+  had NAMED the connectivity modal as the next extraction on 2026-08-30 and again in the commit after
+  it, deferring both times with the same stated reason — a large move with live media state, in a
+  commit already carrying several gates. The growth here was **fourteen lines**, which is exactly the
+  size at which raising by fourteen is tempting and is how a ratchet becomes advisory. So
+  `app-webrtc-troubleshooter` finally left, whole: **809 lines** into `ConnectivityModal.svelte` — the
+  tab strip, the WebRTC test with its ICE-source reasoning, the mic test, the recorder, its playback,
+  and the `$effect` that tears all of it down. The host keeps `open`, which is its one job.
+
+One line came out that was not part of the move: `onMount` returned `() => cleanupMicTest()`. That
+teardown is now the child's effect cleanup, which fires on close AND on unmount — strictly more than
+the line covered — so it was **deleted rather than forwarded**. A second teardown for state the file
+no longer holds is a call that can only ever be wrong.
+
+Six contracts followed the code rather than being widened to accept either file, because which
+component owns the troubleshooter is itself a fact worth failing on: `connectivity-audience`,
+`connectivity-test`, `connectivity-status-rows`, `troubleshooter-retained`, `mobile-restore`, and
+`state-raw` (`micDevices`). `send-later-contract` gained a second read for the same reason — the
+field literals are asserted against the fields file, not against a joined string that would stay green
+through a move putting the timezone note in the manage table.
+
+`connectivity-test-contract` got **stronger** on the way past. It asserted the two ends of the ICE
+chain; there are three hops now, and a forwarder that silently stops forwarding is precisely the
+failure it exists to catch — the test would still run, against the public fallback, and report a green
+tick about somebody else's servers. All three hops are asserted, and the child's prop is REQUIRED
+(no `?`, no `= []`) because the host always has a value and an optional prop would only buy the
+ability to forget.
+
+`todo-next.md`'s inventory is **51 of 89 surfaces · 20,919 of 38,094 lines · 54.9%** — two new rows,
+and `ModalHost`'s row corrected from 6,854 to 6,068.
+
+## Verification
+
+Three negative controls, each seen RED and then restored:
+
+- the timezone note renamed in `ScheduledAlertFields.svelte` → `send-later-contract` fails, proving
+  the repointed assertion reads the file it names;
+- two lines appended to `ConnectivityModal.svelte` → the ratchet fails at 896 against 894;
+- `{mediaIceServers}` deleted from the host's forwarding call → `connectivity-test-contract` fails.
+
+Svelte MCP run on both new components and on the `ModalHost` edit (`list-sections` →
+`get-documentation` for `$bindable` / `$props` / scoped styles → `svelte-autofixer`). The autofixer is
+clean on the `ModalHost` fragment and on `ScheduledAlertFields`; on `ConnectivityModal` it returns no
+issues and five suggestions, all the "an `$effect` assigning state — consider `$derived`" family.
+Refused with reason: that effect acquires and releases a `MediaStream`, an `AudioContext`, an
+`RTCPeerConnection` and two timers, which is what effects are FOR and which `$derived` cannot express.
+`effect-not-derived-contract.test.ts` — which flags the one shape that is never justified, an effect
+whose body is assignments and nothing else — passes on it. **Stated honestly: the autofixer was run
+on `ConnectivityModal`'s new scaffolding (imports, props, the reworked effect, the `{open}` gate),
+not on a retyped copy of all 894 lines; the 809 moved lines are byte-identical to code that had
+already passed it in `ModalHost.svelte`, and retyping them into a tool argument would have risked
+checking a file different from the one on disk.**
+
+`{' See Scheduled Alerts '}` draws the autofixer's *"Unexpected mustache interpolation with a string
+literal value"* — the standing exception `apps/room/AGENTS.md:106` already records for `{' Retry '}`
+and about forty siblings: those braces preserve the reference's own leading and trailing spaces,
+which Prettier and HTML whitespace folding both lose.
+
+Room gate exit 0: `svelte-check` 1,599 files / 0 errors / 0 warnings; 316 test files / 5,678 passed /
+1 skipped. **Not opened in a browser.** rust-analyzer MCP is unavailable in this session and no `.rs`
+file was touched.
+
 ### 2026-09-01 10:04 UTC — the dumps are the specification: four recorded divergences retired, and G08 built
 
 **Runtime impact: YES** — the idle waveform now renders, two server commands are received, and three

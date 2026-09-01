@@ -3514,7 +3514,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and 4 variables. It owns one composer and one picker and reads nothing this host reads, so the
       only thing that stayed is the call — which modal is showing is this file's one job.
     */
-    max: 6857,
+    /*
+      LOWERED 6857 -> 6069 on 2026-09-01, and THE EXTRACTION NAMED TWICE ABOVE IS THE ONE THAT DID IT.
+
+      The growth was fourteen lines: consts 52 and 90 both carry `data-bs-toggle="modal"` and
+      `data-bs-target="#all-user-pm-modal"`, and the "Show private messages" button carried neither.
+      Fourteen lines is exactly the size at which the tempting move is to raise the number by
+      fourteen, which is how a ratchet becomes advisory.
+
+      So the connectivity modal finally left, whole — 809 lines into
+      `lib/components/ConnectivityModal.svelte`: the tab strip, the WebRTC test, the mic test, the
+      recorder, its playback, and the `$effect` that tears all of it down. Two entries above say
+      "THE NEXT EXTRACTION FROM THIS FILE IS THE CONNECTIVITY MODAL" and both defer it with the same
+      reason — a large move with live media state, in a commit already carrying several gates. That
+      reason had been spent twice. Third time it was the only thing left to spend.
+
+      One line came out with it that was NOT part of the move and is worth naming: `onMount` returned
+      `() => cleanupMicTest()`. That teardown is now the child's effect cleanup, which fires on close
+      AND on unmount — strictly more than the line covered — so it was deleted rather than forwarded.
+      A second teardown for state this file no longer holds is a call that can only ever be wrong.
+    */
+    max: 6069,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -6209,6 +6229,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'app-st-compactmessage - one private-message row, shared by the panel and the modal'
   },
   {
+    file: 'lib/components/ConnectivityModal.svelte',
+    /*
+      Created 2026-09-01 and capped at what it landed at — `app-webrtc-troubleshooter`, extracted
+      from `ModalHost.svelte` when the `#all-user-pm-modal` transcription took that file 14 lines
+      past its ceiling. Named as the next extraction by that entry twice before, on 2026-08-30.
+
+      A clean seam rather than a slice cut to make a number: the host keeps `open` and nothing else,
+      and this component reads nothing the host reads. The four remaining props are pass-through.
+
+      It is a COMPONENT and not a snippet because of the `$effect`. Closing the modal must stop a
+      run — an abandoned `RTCPeerConnection` holds its TURN allocations for the page lifetime, and
+      an orphaned timer writes `failed` into a test that is no longer running — and the state that
+      teardown releases has to live beside the effect that releases it.
+
+      If this climbs, the question is whether it has started deciding something beyond its own two
+      tests. The ICE-server policy is the one to watch: `#lib/server/media-grant.ts` mints them and
+      this file must keep only the reporting of which set ran.
+    */
+    max: 894,
+    why: 'the Connectivity/Mic Troubleshooter: network test, mic test, recorder and playback'
+  },
+  {
     file: 'lib/components/EmojiPicker.svelte',
     /*
       703 -> 894, 2026-08-30, for six rows at once — `EMOJI-06` through `EMOJI-12` — and the ratio is
@@ -6515,8 +6557,9 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     /*
       RAISED 494 -> 522 on 2026-08-28, for `hasAlertScheduler`, and argued in place.
 
-      The send-later PANE is not here: `ScheduledAlerts.svelte` holds the date field, the repeat, the
-      weekend flag, the three command calls and the manage table, born capped in the same commit.
+      The send-later PANE is not here: `ScheduledAlerts.svelte` holds the three command calls and the
+      manage table, born capped in the same commit (and since 2026-09-01 the date field, the repeat
+      and the weekend flag are one level further out, in `ScheduledAlertFields.svelte`).
       What this file gained is one `{#if schedulerAvailable}` block, one prop with its docblock, and
       the paragraph saying why the gate is drawn here AND enforced on the server.
 
@@ -7127,6 +7170,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
+    file: 'lib/components/ScheduledAlertFields.svelte',
+    /*
+      Created 2026-09-01 and capped at what it landed at, extracted from `ScheduledAlerts.svelte`
+      when transcribing `XTe` took that file 22 lines past its ceiling.
+
+      PAM-07, PAM-08 and PAM-09 — the date, the repeat and the weekend flag — with the decoded
+      consts that argue every label. The three values are `$bindable`, which is the one case Svelte's
+      own guidance names for bindings: *"custom input components"*, used *"sparingly and carefully"*.
+      `weekendsApply` is derived HERE and not passed in, because it is a pure function of `repeat`
+      and this component owns that field now; a prop would be a second copy of a fact the child can
+      compute.
+
+      If this climbs, the question is whether SCHEDULING RULES have arrived in it. They must not:
+      `#lib/scheduled-alert.ts` owns the arithmetic and is pure.
+    */
+    max: 141,
+    why: 'the send-later date, repeat and weekend fields, decoded from app-post-alert-modal'
+  },
+  {
     file: 'lib/components/ScheduledAlerts.svelte',
     /*
       Born capped, 2026-08-28, in the commit that created it.
@@ -7176,7 +7238,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       landed. The split above is untouched by it — see that file's header for why drawing a row is not
       the question this component refuses to split.
     */
-    max: 320,
+    /*
+      LOWERED 320 -> 264 on 2026-09-01, and the ceiling is what forced it. Transcribing `XTe`'s
+      "See Scheduled Alerts" control took the file to 342, and this rule's answer at that point is
+      EXTRACT, not raise: the three send-later FIELDS are now
+      `lib/components/ScheduledAlertFields.svelte`.
+
+      Untouched by it, again, for the reason the table entry gives. The refused split is pane-versus-
+      table, and it is refused because both halves ask ONE question — what is already scheduled. The
+      fields ask nothing: they are three form controls whose values this component reads to build the
+      `alertMsgLater` payload, and upstream draws them in the send-later block of
+      `app-post-alert-modal` rather than in the table's component. Splitting there follows the
+      reference; splitting pane from table would cut across it.
+    */
+    max: 264,
     why: 'the send-later pane and the manage table; one question, one component'
   },
   {

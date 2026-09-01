@@ -17,7 +17,18 @@ import {
   coverage. That is the second reason the extraction was worth doing, after the line count.
 */
 
-const MODAL_HOST = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
+/*
+  THE MODAL LEFT `ModalHost.svelte` ON 2026-09-01, whole, for `ConnectivityModal.svelte`.
+
+  `source-size-contract` had NAMED that extraction twice and deferred it twice; the third time the
+  host went past its ceiling there was nothing smaller left to extract, so the 809 lines went. This
+  file reads the component that holds the markup now — repointed rather than widened to "either
+  file", because which component owns the troubleshooter is itself a fact worth failing on.
+*/
+const MODAL_HOST = readFileSync(
+  new URL('./components/ConnectivityModal.svelte', import.meta.url),
+  'utf8'
+);
 
 describe('the four rows', () => {
   it('are the captured four, in the captured order, with the captured labels', () => {

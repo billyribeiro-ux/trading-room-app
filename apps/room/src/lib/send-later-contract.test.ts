@@ -20,6 +20,20 @@ import { REPEAT_MODES, REPEAT_MODE_LABEL } from './scheduled-alert.js';
 
 const MODAL = readFileSync(new URL('./components/PostAlertModal.svelte', import.meta.url), 'utf8');
 const PANE = readFileSync(new URL('./components/ScheduledAlerts.svelte', import.meta.url), 'utf8');
+/*
+  PAM-07, PAM-08 and PAM-09 are all FIELDS, and on 2026-09-01 the fields left the pane for
+  `ScheduledAlertFields.svelte` — `source-size-contract` refused `ScheduledAlerts.svelte` the 22
+  lines that transcribing `XTe` cost it, and the answer that rule gives is extract, not raise.
+
+  Read as its own file rather than concatenated onto `pane`, because WHICH component holds a literal
+  is part of what these cases assert. A joined string would keep every case green through a move
+  that put the timezone note in the manage table, and the point of naming a component is that it is
+  the wrong place for some things.
+*/
+const FIELDS = readFileSync(
+  new URL('./components/ScheduledAlertFields.svelte', import.meta.url),
+  'utf8'
+);
 
 /** Comments stripped: this file's citations quote every literal it asserts on. */
 const code = (text: string) =>
@@ -27,6 +41,7 @@ const code = (text: string) =>
 
 const modal = code(MODAL);
 const pane = code(PANE);
+const fields = code(FIELDS);
 
 describe('PAM-05 — the two halves of one decision', () => {
   it('hides Post Alert while the scheduler is open', () => {
@@ -95,20 +110,20 @@ describe('PAM-07 — the select showed its own storage format', () => {
   });
 
   it('renders the LABEL and keeps the value on the wire', () => {
-    expect(pane).toContain('<option value={mode}>{REPEAT_MODE_LABEL[mode]}</option>');
+    expect(fields).toContain('<option value={mode}>{REPEAT_MODE_LABEL[mode]}</option>');
     /* The values are what `isRepeatMode` refuses anything else against, and are untouched. */
     expect(REPEAT_MODES).toEqual(['', 'daily', 'weekly']);
   });
 
   it('carries the select s captured aria-label', () => {
-    expect(pane).toContain('aria-label="Repeat Scheduled Alert"');
+    expect(fields).toContain('aria-label="Repeat Scheduled Alert"');
   });
 });
 
 describe('PAM-08 and PAM-09 — the three strings that were ours', () => {
   it('says "Ignore weekends?" where it said "Skip weekends"', () => {
-    expect(pane).toContain('Ignore weekends?');
-    expect(pane).not.toContain('Skip weekends');
+    expect(fields).toContain('Ignore weekends?');
+    expect(fields).not.toContain('Skip weekends');
   });
 
   it('carries the timezone NOTE, underlined as the reference underlines it', () => {
@@ -116,16 +131,16 @@ describe('PAM-08 and PAM-09 — the three strings that were ours', () => {
       A `datetime-local` input has no timezone in it, so a presenter scheduling for 09:00 had no way
       to know whose 09:00 it is. `[2,"text-decoration","underline"]` is const 60.
     */
-    expect(pane).toContain('NOTE: All times should be on');
-    expect(pane).toContain('class="tz-underline">your local time zone</span>');
-    expect(pane).toContain('text-decoration: underline;');
+    expect(fields).toContain('NOTE: All times should be on');
+    expect(fields).toContain('class="tz-underline">your local time zone</span>');
+    expect(fields).toContain('text-decoration: underline;');
   });
 
   it('labels both fields the way the reference labels them', () => {
-    expect(pane).toContain('Send on this date &amp; time:');
-    expect(pane).toContain('<span>Repeat:</span>');
+    expect(fields).toContain('Send on this date &amp; time:');
+    expect(fields).toContain('<span>Repeat:</span>');
     /* The bare words they replaced would still match a looser assertion, so both are exact. */
-    expect(pane).not.toContain('<span>Send on</span>');
+    expect(fields).not.toContain('<span>Send on</span>');
   });
 });
 

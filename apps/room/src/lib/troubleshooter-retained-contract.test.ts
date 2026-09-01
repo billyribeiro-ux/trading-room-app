@@ -45,7 +45,15 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const BUNDLE = readFileSync(`${ROOT}../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, 'utf8');
-const MODAL_HOST = readFileSync(`${ROOT}lib/components/ModalHost.svelte`, 'utf8');
+/*
+  THE MODAL LEFT `ModalHost.svelte` ON 2026-09-01, whole, for `ConnectivityModal.svelte`.
+
+  `source-size-contract` had NAMED that extraction twice and deferred it twice; the third time the
+  host went past its ceiling there was nothing smaller left to extract, so the 809 lines went. This
+  file reads the component that holds the markup now — repointed rather than widened to "either
+  file", because which component owns the troubleshooter is itself a fact worth failing on.
+*/
+const MODAL_HOST = readFileSync(`${ROOT}lib/components/ConnectivityModal.svelte`, 'utf8');
 
 /**
  * Occurrences of a literal, counted the only way that works on a one-line bundle.
