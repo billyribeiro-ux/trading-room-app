@@ -6425,7 +6425,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and which of `app-room` / `app-kicked-page` renders is decided one level above either of
       them. Nothing this file owns can make that choice.
     */
-    max: 1435,
+    /*
+      1,435 -> 1,457, 2026-09-01, and every one of the twenty-two lines is the ANSWER to a warning
+      rather than new wiring.
+
+      `svelte.compileModule` reports `state_referenced_locally` twice in this file: the `RoomChat`
+      construction reads `data.sessData?.autoSwitchToOfftopics` eagerly, and `dayTradeAlerts` reads
+      its seed the same way. The note at `new RoomPrefs` asks that such a read be ANSWERED rather
+      than waved through — *is its subject genuinely a seed, or has somebody just made the room stop
+      following the server?* — and both are now answered from the RECEIVING end rather than guessed
+      here: `RoomChat`'s constructor declares `autoSwitchToOffTopic?: boolean` as *"a VALUE, not a
+      thunk, and that is the difference between a seed and a lock"* (`chat.svelte.ts:154-158`), and
+      its whole use is choosing the column's OPENING channel. A thunk would be a lock — the reader
+      could never leave Off-Topic while the room's setting stayed on.
+
+      The second suppression is not a duplicate and the comment says why: `svelte-ignore` covers the
+      single statement that follows it, so the one above `swingAlerts` stops at that `const` and left
+      the identical read below warning on its own.
+
+      If this climbs again, the question is whether a FIFTH eager read arrived — each one owes the
+      same answer — or whether the file grew wiring, which is what the extractions are for.
+    */
+    max: 1457,
     /*
       1207 -> 1225, 2026-08-29. Eighteen lines, and seventeen of them are the paragraph explaining
       the other one.

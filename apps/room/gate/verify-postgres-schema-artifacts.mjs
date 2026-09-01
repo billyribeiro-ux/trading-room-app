@@ -273,8 +273,33 @@ assertExactSet(fullEnableRls, forceRlsTables, 'SCHEMA-FULL ENABLE RLS tables');
 for (const table of globalIdentityTables) {
   assert(!forceRlsTables.includes(table), `${table}: global identity table must not be under RLS`);
 }
+/*
+  THE MIGRATIONS TABLE IS IN THE `drizzle` SCHEMA, AND THIS ASSERTION USED TO LOOK ONLY IN `public`.
+
+  `recreateForceRls` and `recreateEnableRls` are built by regexes anchored on
+  `ALTER TABLE public.<name>`; the tables inventory twenty lines above pins this one as
+  `drizzle.__drizzle_migrations`. So the two `includes` below could never be true, whatever the
+  artifact said, and the assertion was green by construction rather than by evidence — the exact
+  shape this repository calls worse than no verifier, because it reports.
+
+  Measured 2026-09-01 by running this file against a RECREATE.sql carrying
+  `ALTER TABLE drizzle.__drizzle_migrations FORCE ROW LEVEL SECURITY;` and its ENABLE twin: the
+  message below did not appear once. With the scan added it appears on both statements. The two
+  original clauses are KEPT rather than replaced — a `public.__drizzle_migrations` would be a
+  different defect, the table moving schema, and dropping the check that catches it to add the one
+  that was missing would just trade one blind spot for another.
+
+  `assertExactSet` on the four RLS lists is not a substitute. It compares the `public` capture
+  against `forceRlsTables`, and a statement in another schema is invisible to it for the same reason
+  it was invisible here.
+*/
+const drizzleRlsStatements = matches(
+  recreate,
+  /^ALTER TABLE(?: ONLY)? drizzle\.__drizzle_migrations (?:FORCE|ENABLE) ROW LEVEL SECURITY;/gm
+);
 assert(
-  !recreateForceRls.includes('__drizzle_migrations') &&
+  drizzleRlsStatements.length === 0 &&
+    !recreateForceRls.includes('__drizzle_migrations') &&
     !recreateEnableRls.includes('__drizzle_migrations'),
   'drizzle.__drizzle_migrations must not be under RLS'
 );

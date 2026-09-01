@@ -175,6 +175,29 @@ const sandbox = {
     },
     querySelectorAll(sel) {
       if (sel === 'table') return [table];
+      /*
+        THE T2-20 SCOPE ANCHORS, and this branch is why the whole smoke test was dead.
+
+        `collect-rendered-states.js` used to anchor with a single
+        `document.querySelector('[ng-controller], .ng-scope')`, which is what the `querySelector`
+        stub directly above still answers. On 2026-08-14 it changed to "anchor deep, then walk up":
+        it now calls `document.querySelectorAll('tr[ng-repeat], tbody tr, table.table-striped,
+        [ng-controller], .ng-scope')` and collects EVERY distinct scope reachable from those
+        anchors, because the first `.ng-scope` in document order is the outermost one and walking
+        `$parent` from there climbs AWAY from the controller that defines the handlers.
+
+        This stub was never taught the new call, so the anchor list matched nothing, `scopes.length`
+        was 0, the phase recorded its honest gap and left `bootbox.handlers` empty — and the
+        assertion below then died on `undefined.found` rather than reporting anything about the
+        collector. It stayed that way because nothing invokes this file: it is in no `package.json`
+        script and no workflow, so its failure had no reader.
+
+        Any element serves as the anchor here: `angular.element(…).scope()` below returns `local`
+        whatever it is handed, and the collector dedupes anchors by `$id`, so this yields exactly
+        one scope to start the `$parent` walk from — which is what makes the depth-2 and depth-1
+        assertions below measure the walk rather than a lucky local hit.
+      */
+      if (sel.includes('.ng-scope') || sel.includes('[ng-controller]')) return [body];
       if (sel.includes('bootbox') || sel.includes('dialog')) return [];
       if (sel.includes('alert-danger')) return [];
       return [];

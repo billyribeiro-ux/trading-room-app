@@ -189,6 +189,15 @@ guessed.
 >    ours. Each row says which.
 > 4. **`ModalHost.svelte` is a set, not a surface.** It is audited as the two dozen selectors it
 >    implements, each measured separately; the file itself is never one const table.
+> 5. **THE TABLE IS BUILT FROM OUR FILE LIST, SO IT CANNOT SEE A COMPONENT WE NEVER BUILT** — added
+>    2026-09-01, and it was not a hypothetical. One row per file in `apps/room/src` means a
+>    reference component with no file of ours has no row, and 100% of a list that cannot contain the
+>    gap says nothing about the gap. Enumerating the BUNDLE's own `selectors:[["…"]]` for the first
+>    time found **fifty** components this application answers for, and **`app-session-transcript`
+>    was in no tracker at all**: a route (byte 2,606,654) with a date picker, search, 300-row
+>    pagination and a loading state, opened by the speech-reco overlay's "Full Transcript History"
+>    button. `reference-component-inventory-contract.test.ts` is that count now, and it is the only
+>    check in the repository that can see a surface we never started.
 >
 > The remaining work on these surfaces is in `TODO.md` and the register, not here. This table's job
 > was to say what had been READ, and it now says all of it.

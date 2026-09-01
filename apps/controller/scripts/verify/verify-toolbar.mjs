@@ -122,7 +122,34 @@ await send('Network.setCookie', { name, value, domain: 'localhost', path: '/' })
 await send('Page.enable');
 await send('Emulation.setScrollbarsHidden', { hidden: true });
 await send('Emulation.setDeviceMetricsOverride', { width: 1989, height: 1265, deviceScaleFactor: 2, mobile: false });
-await send('Page.navigate', { url: `http://localhost:5300/account/rooms/${roomId}?tab=branding` });
+/*
+  THE TAB IS A PATH SEGMENT. `?tab=branding` STOPPED SELECTING ANYTHING.
+
+  The room detail route moved to `rooms/[id]/[[tab]]/`, and its loader reads `params.tab ?? 'users'`
+  with no query fallback anywhere in `src` — the reasoning is written out at
+  `src/routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts:178-192`, and an unknown segment now
+  404s rather than falling back. So the old URL still resolved, and landed on USERS: the Branding
+  tab never rendered, `.mg-root .ta-toolbar .btn-group` matched nothing, and every group and every
+  button was reported MISSING against a toolbar that is built and correct.
+
+  This is the third time in this app a route migration left a verifier addressing the old shape —
+  `verify-account-contract.mjs:44-48` records the same `[[tab]]` move breaking its read, and
+  `verify-home-contract.mjs:168-174` records `ff948db` doing it to the `asset()` call shapes. Both
+  notes say the same thing this one does: the assertion failed against correct code, which is the
+  worst kind of failure because it sends the next reader to fix something that is not broken.
+
+  The sibling forensic scripts under this directory still carry `?tab=` and are NOT fixed here:
+  `verify-manage-tabs.mjs:178` iterates every tab id through the query form and is broken the same
+  way; `verify-behaviour.mjs:474` and `verify-bulk-menu.mjs:152` ask for `?tab=users`, which is the
+  default the loader falls back to, so those two still land where they meant to and are stale rather
+  than wrong.
+
+  NOT EXECUTED HERE. This script needs macOS Chrome at the hard-coded path, a dev server on :5300, a
+  session cookie at /tmp/cookie1.txt and the owner-local Branding capture under ~/Downloads/new-dumps
+  — none of which exist in the environment this correction was made in. The route shape is read from
+  the loader rather than assumed, but the run itself is unverified and is owed one.
+*/
+await send('Page.navigate', { url: `http://localhost:5300/account/rooms/${roomId}/branding` });
 await new Promise((r) => setTimeout(r, 3000));
 
 const { result } = await send('Runtime.evaluate', {

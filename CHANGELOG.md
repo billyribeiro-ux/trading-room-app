@@ -45,7 +45,112 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
-### 2026-09-01 21:30 UTC — "no amount of tooling removes that" was wrong, and the difference is the price
+### 2026-09-01 21:15 UTC — the 100% was true of a list that could not contain the gap
+
+**Runtime impact: NONE.** One new gate, one vacuous gate repaired, two warnings answered.
+
+## `todo-next.md` says 93 of 93 surfaces, 100.0%. It counts our files.
+
+That number is true of what it measures, and what it measures is a table with **one row per file in
+`apps/room/src`**. A reference component this room never built has no file, so it can never appear
+in that table. **100% of a list that cannot contain the gap says nothing about the gap.**
+
+The bundle's own selector list had never been enumerated. Doing it — every `selectors:[["…"]]` in
+the pinned v4 bundle, minus the seventeen vendor ones — gives **fifty components this application
+answers for**. Forty-nine are built. One was in no tracker anywhere:
+
+**`app-session-transcript`.** Zero occurrences of the name in `apps/room/src`. It is not a fragment:
+it is a ROUTE (`{path:"session-transcript"}`, byte 2,606,654) and `app-root` swaps the whole outlet
+for it (`O(1, o.isTranscriptRoute ? -1 : 1)`, byte 2,603,128). A date picker, a search box, 300-row
+pagination, a loading spinner and an error state, opened by the speech-reco overlay's "Full
+Transcript History" button (`openTranscriptPage()`, byte 1,952,652).
+
+`reference-component-inventory-contract.test.ts` is that count now — the only check here that can
+see a surface nobody started. Five negative controls, five seen red.
+
+## Why the transcript page is a recorded refusal and not a build
+
+The controls that open it are already built and already refuse honestly. What was recorded at them
+was *"nothing in this repo produces a transcript. `currentCaption` is never assigned"*, and **that
+detail is wrong**: this room runs speech recognition and RELAYS every line — `recording.ts:456`
+requests `sendSpeechReco` on the media signalling socket.
+
+The conclusion survives for a different reason. Nothing PERSISTS them: there is no caption or
+transcript table in `server/db/schema.ts`, and the reference fills its page from
+`POST ${apiROOT}/sessions/v2/getSessionTranscript`, a server endpoint we do not have. The PAGE is
+transcribable; the DATA is not, and inventing a store is what this repository forbids by name.
+Unblocked by caption persistence — a schema decision, not a transcription.
+
+## A gate that could not fail, and the control that took two goes
+
+`verify-breakpoints.mjs` sliced a media query's "block" from its header to the NEXT `@media`, or to
+END OF FILE when there was none. For the last query in a stylesheet that is the entire rest of the
+file. `manage.css` has exactly one media query, so `.mg-root [class*='col-sm-'] { float: left }`
+satisfied its *"inside min-width: 768px"* assertion **from any line of the file** — 49,074 bytes of
+unconditional stylesheet read as though it sat inside the query.
+
+The fix counts braces from the query's own `{`. What is worth recording is the control:
+
+* **Deleting the whole `@media` and inlining its rules is NOT the control.** I ran that first and
+  both spellings went red — `indexOf(header)` returns -1 and the loop never runs. It proves nothing
+  about the slice, and I had reported it as the control before checking.
+* **Moving the guarded rule OUT of the block while keeping the header IS.** That is the real
+  regression — responsive gate lost, rule still present. **Old slice: exit 0, green. Fixed: exit 1.**
+
+A control that fails for the wrong reason looks like proof and is not. Both halves are now written
+at the function.
+
+## A second vacuous gate, in the tenancy artifacts
+
+`verify-postgres-schema-artifacts.mjs` asserted that `__drizzle_migrations` carries RLS. It checked
+`recreateForceRls` and `recreateEnableRls`, both built from regexes anchored on
+`^ALTER TABLE(?: ONLY)? public\.([a-z_]+)` (lines 249, 254) — and the tables inventory twenty lines
+above pins that table as `drizzle.__drizzle_migrations` (line 238). **The two `includes` could never
+be true**, so the assertion was green by construction rather than by evidence.
+
+Verified by reading both anchors. The fix scans the `drizzle` schema explicitly and KEEPS the two
+original clauses, on the argument that a `public.__drizzle_migrations` would be a different defect —
+the table changing schema — and dropping that check to add the missing one would trade one blind
+spot for another.
+
+## I RE-DATED SIX HEADINGS, BECAUSE I MADE THE EXACT MISTAKE THIS FILE DOCUMENTS
+
+This file's own header describes 54 timestamps corrected on 2026-09-01, *"each one written as 'a bit
+after the last'"*, eleven of them naming a day the work did not happen on. I then wrote six more the
+same way — and two of them were **in the future** when `changelog-ledger-contract` ran, which is the
+check that exists for precisely this and which caught it.
+
+Four others were dated after the commit that carried them: `63da9bc` landed at 20:07 and its entries
+claimed 20:14 and 20:38. They passed the "not in the future" test only because real time had moved
+past them by the time it ran.
+
+All six now carry the committer timestamp of the commit that carries them, read with
+`git show -s --format=%cI` — which is what the header prescribes and what I should have done rather
+than estimating forward. Several entries share a time as a result. That is correct: it is the
+measured fact, where a spread would be a guess dressed as precision.
+
+## And one failure that is NOT a defect, stated rather than waved away
+
+The controller gate also failed `money.test.ts` — *"is exact for every cent from $0.00 to
+$20,000.00"*. It is a **timeout at 5,000 ms on an exhaustive 2,000,001-iteration loop**, not a wrong
+answer, and it happened with five workflows and two gates running on one box. Re-run alone: **20
+tests, all passing.** `money.ts` has not been touched in this session — its last commit is `4bd9931`.
+Recorded because "a money test failed" is exactly the sentence that must never be left ambiguous.
+
+## Two `state_referenced_locally` warnings, answered rather than suppressed
+
+`create-room.svelte.ts` reads `data.sessData?.autoSwitchToOfftopics` eagerly. The note at
+`new RoomPrefs` demands such a read be ANSWERED — is it a seed, or has the room stopped following
+the server? — and it is answered from the RECEIVING end: `RoomChat` declares the prop as *"a VALUE,
+not a thunk, and that is the difference between a seed and a lock"* (`chat.svelte.ts:154-158`), and
+its whole use is choosing the column's opening channel. A thunk would be a lock.
+
+The second suppression is not a duplicate: `svelte-ignore` covers the single statement that follows
+it, so the one above `swingAlerts` stops at that `const`.
+
+---
+
+### 2026-09-01 20:59 UTC — "no amount of tooling removes that" was wrong, and the difference is the price
 
 **Runtime impact: NONE.** Two documents corrected and two comments made true.
 
@@ -110,7 +215,7 @@ edit would corrupt its work. Recorded so it cannot be lost to a dropped agent re
 
 ---
 
-### 2026-09-01 21:05 UTC — the Svelte MCP came back, and the first thing through it was the card
+### 2026-09-01 20:28 UTC — the Svelte MCP came back, and the first thing through it was the card
 
 **Runtime impact: NONE.** One expression changed form; the rendered output is identical.
 
@@ -176,7 +281,7 @@ crates are named `tradingroom-api` and `tradingroom-media`, NOT their directory 
 
 ---
 
-### 2026-09-01 20:38 UTC — the fifteenth casualty of a rename, found by reading my own diff
+### 2026-09-01 20:07 UTC — the fifteenth casualty of a rename, found by reading my own diff
 
 **Runtime impact: YES, one sentence.** A member whose browser blocks the recording preview window was
 told to *"open the downloaded **media.recording** from your Downloads folder"*.
@@ -231,7 +336,7 @@ guards against with a count, and a floor of five would sit green through four fi
 
 ---
 
-### 2026-09-01 20:14 UTC — `softResetDone` had four subscribers and this room knew about one
+### 2026-09-01 20:07 UTC — `softResetDone` had four subscribers and this room knew about one
 
 **Runtime impact: YES.** A soft reset now clears the recording flag and the reminder banner, and cuts
 the PRESENTER's own microphone and camera — the last of which was a recorded divergence until today.
@@ -311,7 +416,7 @@ down" is supposed to look like when a file grows for a good reason.
 
 ---
 
-### 2026-09-01 19:52 UTC — `stopRecMsg`, and the sentence that was holding two rows
+### 2026-09-01 20:07 UTC — `stopRecMsg`, and the sentence that was holding two rows
 
 **Runtime impact: YES.** When a room's server sends `stopRecMsg`, every browser in it now raises the
 toast the reference raises — an error one when the server's wording contains "Stopped", an info one
@@ -393,7 +498,7 @@ so it cannot execute what it decodes.
 
 ---
 
-### 2026-09-01 19:30 UTC — `app-rec-preview` was never blocked; the blocker was a command nobody had transcribed
+### 2026-09-01 20:07 UTC — `app-rec-preview` was never blocked; the blocker was a command nobody had transcribed
 
 **Runtime impact: YES.** A presenter in a room whose server sends `setRecPreview` now gets the
 reference's recording preview card: it shows on `startRec`, refreshes its frame once a second,
