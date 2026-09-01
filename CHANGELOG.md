@@ -33,6 +33,47 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 08:15 UTC — the controller had no image-sizing gate, and the room's rule found six images it had never seen
+
+**Runtime impact: NO** — one contract, one devDependency. No image changed.
+
+`apps/room/src/lib/img-dimensions-contract.test.ts` has guarded 46 components for a week. The
+controller had **no such gate at all**. Running the room's rule against it found **six unsized
+`<img>`** — and all six turned out to be CORRECT, every one bounded by a stylesheet rule with its
+intent recorded beside it. **Nothing here is a fix; what was missing was the instrument.** An unsized
+image is a layout shift on every slow connection and a Core Web Vitals regression nobody can
+attribute afterwards, it costs one attribute to prevent, and it never fails loudly — which is exactly
+why it needs a gate rather than diligence.
+
+The exemptions name the DECLARATION, not the file, and are checked in both directions: the class's
+own rule must still declare it, and an `<img>` must still wear the class. A path-based allow-list
+would go stale the moment somebody deleted the rule; a rule with no wearer hides the next unsized
+image behind it.
+
+**Its own negative control came back GREEN and was investigated rather than repaired.** Deleting
+`max-height: 20px` from `.acc-badge-img` left the case passing, because `src/account.css` says
+`max-height: 20px` twice more in the comment above that rule — where it transcribes the reference's
+own declaration and argues the choice. A case written to assert a DECLARATION exists was passing on
+prose describing it. **That is the fourth instance of this shape found in one day**, after the const
+sweep's two and the citation sweep's one.
+
+**And the regex that fixed it was then replaced by the parser the room already used.** A
+comment-stripping brace walk closes the control and is still a regex reading CSS: it cannot see a
+nested rule, an `@media` wrapper or a multi-selector block, and would answer confidently about all
+three. `postcss` is a devDependency here now — already in the workspace store at the version the room
+pins, so the install was offline — because one technique in both apps beats a second weaker
+implementation of a rule that already exists.
+
+The parser immediately made an entry more honest: `.acc-brand-logo[hidden]` declares
+`display: none !important`, and postcss lifts `!important` onto the declaration's own flag, leaving
+the value `none`. Reading raw text would have accepted the string with the bang in it.
+
+**Verification.** Five negative controls, each seen RED and restored: a new unsized image; the rule an
+exemption names deleted from its class's block (with the two comment occurrences left in place, so
+the parser is what catches it); the `[hidden]` rule removed, turning a never-rendered image into a
+real one; an exemption nothing wears; and, before the parser landed, the whole-file check passing on
+prose. Controller gate exit 0: 105 test files / 1,109 passed.
+
 ### 2026-09-01 07:34 UTC — runes mode is now enforced by the compiler, in both apps
 
 **Runtime impact: NO for behaviour, YES for the build** — a compiler option, and legacy Svelte 4
