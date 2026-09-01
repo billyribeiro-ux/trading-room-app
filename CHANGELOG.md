@@ -33,6 +33,84 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 10:04 UTC — the dumps are the specification: four recorded divergences retired, and G08 built
+
+**Runtime impact: YES** — the idle waveform now renders, two server commands are received, and three
+transcriptions became literal.
+
+Owner decision: **match the dump files exactly.** Every divergence this repository had recorded
+against the v4 bundle was re-opened and put against the evidence rather than against the judgement
+that produced it. Four were wrong, one is impossible in Svelte, and saying which is which needed
+measurement in every case.
+
+## `G08` — the idle waveform, BUILT, and the refusal was wrong about the default
+
+`RoomNavbar.svelte` carried a long note headed *"THE IDLE WAVEFORM IS A MEASURED REFUSAL"*,
+concluding that building the branch meant *"an image nothing can ever show, or one that always
+shows"*. The room drew `talking.gif` unconditionally and `notalking.png` sat in
+`static/assets/images/` with no consumer.
+
+All **ten** occurrences of `presenterTalking` were then read, and two of them settle it:
+
+- **`this.presenterTalking=!1`** at bytes 1,114,654 and 1,129,852 — **the reference's own default is
+  the FLAT LINE**, so this room was showing the opposite of upstream in the resting state.
+- **`case "presenterTalking": guiEventBus.emit("presenterTalking")`** at byte 1,014,971 — a
+  payload-free ROOM COMMAND, one `case` each way, not a signal only a server can compute.
+
+So the feature is one flag, two receivers and a branch. `RoomMedia.presenterTalking` defaults false,
+`events.svelte.ts` receives both commands through one setter, and `NavbarTalkingIndicator.svelte`
+renders const 146 or const 148. Two of `app-room`'s six residuals closed with it, and
+`presenterTalking`/`presenterNotTalking` left `feature-coverage-contract`'s not-covered list — **the
+same two commands that once left that list by being EXPLAINED, and only the second departure is
+progress.**
+
+## Three transcriptions that are now literal
+
+- **The poll loader's path.** Const 49 is `../../assets/images/ajax-loader.gif` and this app served
+  `/assets/…` on the reasoning that a relative path *"would request a path that does not exist"*.
+  Measured with the platform's own `URL`: `..` cannot rise above the root, so both spellings issue
+  the identical request from `/`, `/room` and `/a/b`. The divergence was unnecessary, and
+  `app-poll-modal` is now fully covered.
+- **`data-ng-dblclick="fullScreen()"`** on the screen video. An AngularJS 1 attribute in an Angular
+  17 template — dead upstream and dead here, which is exactly what makes the literal transcription
+  safe. It was omitted as not worth carrying, which is a judgement about the reference.
+- **The duplicate `id="search-addon"`.** Consts 24 and 25 both carry it; the archived-log viewer now
+  does too. Two elements with one id is invalid HTML and is what the reference ships.
+
+## One that CANNOT be transcribed, with the compiler as the evidence
+
+The four follow-chat colour inputs carry a static `value="followChatStyle.color"` beside their
+binding upstream. Transcribing it fails:
+
+    ERROR FollowChatStylePane.svelte 28:11 "Attributes need to be unique"
+    https://svelte.dev/e/attribute_duplicate
+
+`value` and `bind:value` are one attribute to the Svelte compiler; Angular has two slots and lets the
+binding win. **Unwritable, not undesirable** — recorded at the code with the error, so nobody
+re-attempts it from the const table alone.
+
+The `<button>` that replaced a `<span>` in the log viewer stays a button. That is the one carve-out
+this repository's own rule already names, in `ScreenTabs.svelte`: *a captured value is reproduced
+unless reproducing it locks a real person out.*
+
+## The ratchet arbitrated again, and the navbar FELL
+
+All three files the feature touched sat one line under their ceilings. `NPe` and `LPe` left for
+`NavbarTalkingIndicator.svelte` — the third seam this bar has produced, after `NavbarRecIndicator`
+and `NavbarSoundCloud`, and upstream agrees with the split because those are two sibling
+sub-templates there too. **`RoomNavbar.svelte`: 1,171 → 1,093, and its ceiling ratchets DOWN to
+1,094.** The five raises that remain are argued at their entries.
+
+## Verification
+
+Four negative controls, each seen RED and restored: the second arm removed again; the default flipped
+to `true` (which is the one fact the whole feature rests on); a legacy `export let`; and the earlier
+`$:` control. The const sweep moved with the work — **129 residuals to 125, 35 fully-covered
+components to 36** — and `app-room` is pinned at four residuals rather than six.
+
+Room gate exit 0: svelte-check 1,597 files / 0 errors / 0 warnings; 316 test files / 5,696 passed / 1
+skipped. **Not opened in a browser.**
+
 ### 2026-09-01 09:21 UTC — three deep proxies over lists nobody mutates, and the gate that found them
 
 **Runtime impact: YES, and it is the good direction** — three `$state` became `$state.raw`. Same

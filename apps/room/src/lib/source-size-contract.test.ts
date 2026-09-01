@@ -905,7 +905,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this number climbs, the thing to check is whether a THIRD answer about this channel has
       appeared. Two are justified above; a third almost certainly is not.
     */
-    max: 1058,
+    /*
+      1058 -> 1069, 2026-09-01. `G08`'s two receivers: `presenterTalking` and `presenterNotTalking`,
+      one `if` and one setter call, plus the five lines citing the `case` labels at byte 1,014,971 and
+      the two subscribers at 1,117,020. There is nothing to extract — a router gaining a route is the
+      router doing its job, and the alternative is a module holding one boolean assignment.
+    */
+    max: 1069,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1434,7 +1440,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       whole measurement left for `#lib/follow-chat-style.js`, which is where the coercion they
       govern now lives. The file grew by the input's four lines and shrank by thirty-three.
     */
-    max: 154,
+    /*
+      154 -> 182, 2026-09-01, and every line is the record of a transcription that CANNOT be made.
+      The four colour inputs carry a static `value` attribute upstream beside their binding; Svelte
+      rejects the pair as `attribute_duplicate`, and the block quotes the compiler error so nobody
+      re-attempts it from the const table. Prose in place of an impossible four attributes.
+    */
+    max: 182,
     why: 'the follow-chat colour and size editor - five inputs, a live example, three callbacks'
   },
   {
@@ -1520,7 +1532,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and the compact row standing in for `app-st-message`. The component's own Angular `styles:[…]`
       travel with it too — without them every class name in the markup would be a class with no CSS.
     */
-    max: 228,
+    /*
+      228 -> 243, 2026-09-01. The duplicate `id="search-addon"` is transcribed now — consts 24 and 25
+      both carry it — and the lines are the note explaining that two elements with one id is what the
+      reference ships, and that the `<button>` element is the one carve-out the repository's own rule
+      already names.
+    */
+    max: 243,
     why: 'the archived-log viewer - a back button, a search, a download, and the reference styles that came with it'
   },
   {
@@ -3817,7 +3835,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `#lib/room/…` module, which is the form both of them took. Seven were adrift in the page when
       that half was switched on.
     */
-    max: 394,
+    /*
+      394 -> 413, 2026-09-01. `presenterTalking` — one `$state`, a getter, a setter, and the docblock
+      recording that FALSE is the reference's own initialiser (bytes 1,114,654 and 1,129,852), which
+      is the fact that retired this room's refusal to build the branch. It belongs beside
+      `talkingUsers` because the whole point of the measurement is that the two are different signals.
+    */
+    max: 413,
     why: 'every media flag the interface renders from; STATE, never transport'
   },
   {
@@ -6478,7 +6502,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the room that rolls its own pointer handling — shares the tolerance with the private chat and
       the webcam holders instead of carrying a second copy of 20.
     */
-    max: 884,
+    /*
+      884 -> 898, 2026-09-01. Const 49's loader path is transcribed literally now. The lines are the
+      measurement that made it possible: `..` cannot rise above the root, so the reference's
+      `../../assets/…` and this app's old `/assets/…` are the same request from every depth served.
+    */
+    max: 898,
     why: 'the poll UI - author, vote and results in one captured component'
   },
   {
@@ -6824,6 +6853,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {
+    file: 'lib/components/NavbarTalkingIndicator.svelte',
+    /*
+      `NPe` and `LPe` — the talking cluster and its "( No one is speaking )" sibling, with the image
+      that flips between `talking.gif` and `notalking.png` on the server's `presenterTalking` flag.
+      Came out of `RoomNavbar.svelte` on 2026-09-01, which fell 1,171 -> 1,093 with it.
+    */
+    max: 134,
+    why: 'the navbar talking indicator - both arms, and the flag that chooses between them'
+  },
+  {
     file: 'lib/components/NavbarRecIndicator.svelte',
     /*
       DECLARED IN THE COMMIT THAT CREATED THE FILE, which is what admits a component to this list.
@@ -7038,7 +7077,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       removed the badge's copy of `breathing-rec` and the prop that fed it, so the correction sits
       where the prop is declared rather than only in the register.
     */
-    max: 1172,
+    /*
+      1172 -> 1094, 2026-09-01, and this one FALLS. `NPe` and `LPe` left for
+      `NavbarTalkingIndicator.svelte` when `G08` needed a second image the ceiling would not admit —
+      the third seam this bar has produced, after `NavbarRecIndicator` and `NavbarSoundCloud`, and the
+      third time the refusal produced the better arrangement rather than a smaller comment.
+    */
+    max: 1094,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {
@@ -7073,7 +7118,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the reference makes this element silent three separate ways, and this bound it to the room's
       master volume. Harmless only while `addRemoteScreen` refuses a non-video producer.
     */
-    max: 678,
+    /*
+      678 -> 685, 2026-09-01. `data-ng-dblclick="fullScreen()"` is transcribed onto the screen video,
+      with the note that it is an AngularJS 1 attribute in an Angular 17 template — dead upstream and
+      dead here, which is what makes the exact transcription safe.
+    */
+    max: 685,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {

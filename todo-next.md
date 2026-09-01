@@ -70,7 +70,7 @@ state produces live in the DOM captures, and those are not here. A surface gap t
 measured pixels is therefore *not auditable in this checkout*, and must say so rather than be
 guessed.
 
-## The inventory — all 86 surfaces, measured
+## The inventory — all 87 surfaces, measured
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
@@ -79,15 +79,15 @@ guessed.
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,532 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,254 | no |
-| 6 | `lib/components/RoomNavbar.svelte` | 1,171 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
+| 6 | `lib/components/RoomNavbar.svelte` | 1,093 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 7 | `lib/components/PresentationArea.svelte` | 1,105 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,183 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
 | 10 | `lib/components/EmojiPicker.svelte` | 858 | `## EmojiPicker.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against |
-| 11 | `lib/components/PollPanel.svelte` | 883 | `poll-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-poll-modal` (selector at byte 2,112,472), all 53 consts decoded BY VALUE and swept against `PollPanel` + `PollSavedList`. ZERO gaps; one recorded divergence (the loader's `../../assets/` path). The finding is the `app-poll-modal` ANCESTOR: all 17 style rules are scoped to it in the generated sheet, so deleting the wrapper unstyles the panel with nothing else noticing. |
+| 11 | `lib/components/PollPanel.svelte` | 897 | `poll-panel-v4-contract.test.ts` — read end to end 2026-08-31 against `app-poll-modal` (selector at byte 2,112,472), all 53 consts decoded BY VALUE and swept against `PollPanel` + `PollSavedList`. ZERO gaps; one recorded divergence (the loader's `../../assets/` path). The finding is the `app-poll-modal` ANCESTOR: all 17 style rules are scoped to it in the generated sheet, so deleting the wrapper unstyles the panel with nothing else noticing. |
 | 12 | `lib/components/RoomSidebar.svelte` | 887 | `roster-identity-contract.test.ts` — read end to end 2026-08-31 against `app-room-roster` (byte 2,038,159), all 24 consts decoded BY VALUE. Twenty built; the four absent are `RS-03`/`RS-04`, blocked on a server-side supply. Three CITATIONS were wrong (`C2e`→`E2e`, `u2e`→`g2e`, and a bundle this repo does not hold) and the `{#each}` key's equivalence to upstream's `userXrefID` was unrecorded. |
 | 13 | `routes/session/+page.svelte` | 701 | §17.8 — 18 divergences, 11 gaps, 6 defects. **Audited at 659 lines; it is now 701.** Changed twice since (`3b4f3c5`, `b73c337`), so the audit covers a superseded revision. |
-| 14 | `lib/components/ScreenPane.svelte` | 671 | `## ScreenPane.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with |
+| 14 | `lib/components/ScreenPane.svelte` | 684 | `## ScreenPane.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against the same pinned bundle, with |
 | 15 | `lib/components/PostAlertModal.svelte` | 656 | no |
 | 16 | `lib/components/ExtraChatPane.svelte` | 761 | §XCP — 9 rows against `app-extra-chat` read whole: 3 built, 3 fixed, 1 measured refusal, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 17 | `lib/components/day-trade-alerts/DayTradeAlertsPane.svelte` | 638 | `## DayTradeAlertsPane.svelte` in the v4 register — **5 rows. |
@@ -117,7 +117,7 @@ guessed.
 | 41 | `lib/components/RichTextEditor.svelte` | 190 | `## components/RichTextEditor.svelte` in the v4 register — 6 rows (RTE-01…06) against `app-rich-text-editor`, read end to end 2026-08-31. |
 | 42 | `lib/components/MessageBody.svelte` | 195 | `## components/MessageBody.svelte` in the v4 register — 7 rows (MSB-01…07) against `urlwrapImg` and `showChatGif`, read end to end 2026-08-31. |
 | 43 | `lib/components/AlertQaAlertCard.svelte` | 244 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
-| 44 | `lib/components/FollowChatStylePane.svelte` | 152 | `## FollowChatStylePane.svelte` in the v4 register — 3 rows (FCS-01…03) read end to end 2026-08-31. FCS-01 is a real defect: `bind:value` on the Text Size number input writes `null` for an empty box, and `null + 1` is `1`, so clearing it and saving drew that person's username at 1px on every later message. |
+| 44 | `lib/components/FollowChatStylePane.svelte` | 181 | `## FollowChatStylePane.svelte` in the v4 register — 3 rows (FCS-01…03) read end to end 2026-08-31. FCS-01 is a real defect: `bind:value` on the Text Size number input writes `null` for an empty box, and `null + 1` is `1`, so clearing it and saving drew that person's username at 1px on every later message. |
 | 45 | `lib/components/AlertQaComposer.svelte` | 223 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
 | 46 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
 | 47 | `lib/components/Modal.svelte` | 188 | no |
@@ -129,7 +129,8 @@ guessed.
 | 53 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 54 | `lib/components/ChatArchivePane.svelte` | 169 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 55 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
-| 86 | `lib/components/ChatArchiveLogPane.svelte` | 227 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
+| 86 | `lib/components/ChatArchiveLogPane.svelte` | 242 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
+| 87 | `lib/components/NavbarTalkingIndicator.svelte` | 133 | `NavbarTalkingIndicator.svelte` — `NPe`/`LPe` transcribed with BOTH arms 2026-09-01, `G08` built: `presenterTalking` defaults FALSE as upstream (bytes 1,114,654 / 1,129,852) and is flipped by the two room commands at byte 1,014,971. |
 | 56 | `lib/components/ChatSearchBar.svelte` | 373 | no |
 | 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 | 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
@@ -161,7 +162,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**48 of 86 surfaces audited · 19,816 of 37,777 lines · 52.5%.**
+**49 of 87 surfaces audited · 19,942 of 37,903 lines · 52.6%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

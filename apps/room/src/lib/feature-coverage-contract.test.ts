@@ -107,6 +107,19 @@ import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
   list. The explanation for why something is missing counted as evidence that it is present, which
   is the worst direction for a list of open questions to fail in.
 
+  ── 2026-09-01: THOSE TWO LEFT THIS LIST AGAIN, AND THIS TIME BECAUSE THEY WERE BUILT ────────────
+
+  `presenterTalking` and `presenterNotTalking` are receivers in `events.svelte.ts` now, setting one
+  flag on `RoomMedia` that `NavbarTalkingIndicator.svelte` reads to choose between const 146 and
+  const 148. The refusal that put them here was wrong about the one thing that decides it: the
+  reference initialises `presenterTalking` to **false** (bytes 1,114,654 and 1,129,852), so its own
+  default is the flat line, and the flag is an ordinary payload-free room command rather than a
+  signal only a server can compute. Ten occurrences read end to end; the argument is at the
+  component.
+
+  The pair is worth keeping in this note because of the SHAPE: the same two commands left this list
+  once by being explained and once by being built, and only the second is progress.
+
   `gate/audit-feature-coverage.mjs` strips comments now, and its own note records that the first
   attempt at the line rule was too greedy and deleted real code — producing a bigger "discovery"
   that was an artefact. The narrow rule and the greedy one now agree, which is why this number is
@@ -145,8 +158,6 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'hardResetSession',
   'lockSession',
   'pingPopup',
-  'presenterNotTalking',
-  'presenterTalking',
   'privMsg',
   'reloadSessionConfig',
   'resetAllMediaServers',

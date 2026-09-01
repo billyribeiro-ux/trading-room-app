@@ -803,7 +803,21 @@
           <h2>{pollQuestion}</h2>
           <p>Total Responses: {total}</p>
           {#if total === 0}
-            <img src="/assets/images/ajax-loader.gif" alt="" width="32" height="32" />
+            <!--
+              CONST 49, EXACTLY: `["src","../../assets/images/ajax-loader.gif"]`.
+
+              This app served `/assets/…` until 2026-09-01, on the reasoning that the reference's
+              relative path is resolved from an Angular component's location and could not be
+              transcribed literally. **That reasoning was wrong, and it is wrong by measurement:**
+              RFC 3986 clamps `..` at the root, so `../../assets/images/ajax-loader.gif` resolves to
+              `/assets/images/ajax-loader.gif` from `/`, from `/room` and from `/a/b` alike — every
+              depth this application serves. `new URL()` was asked all three.
+
+              So the literal transcription and the "corrected" one are the same request, and the
+              literal one is what the dump says. `static/assets/images/ajax-loader.gif` is the file
+              both forms reach.
+            -->
+            <img src="../../assets/images/ajax-loader.gif" alt="" width="32" height="32" />
             <p style="margin: 10px; text-align: center;">
               Waiting for results to come in...Please Wait...
             </p>

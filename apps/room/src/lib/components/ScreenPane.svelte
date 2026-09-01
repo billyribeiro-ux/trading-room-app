@@ -543,10 +543,23 @@
           the half of the fix that makes the second predicate unwritable rather than merely absent:
           a caller cannot pass what does not exist. `PresentationArea` passes neither.
         -->
+        <!--
+          `data-ng-dblclick="fullScreen()"` IS TRANSCRIBED, and it is inert in both applications.
+
+          Const 8 carries it as a static attribute pair, before the `3` marker. It is an **AngularJS
+          1** directive attribute sitting in an Angular 17 template: nothing in the bundle reads it,
+          and the browser does not either, because it is not `ondblclick`. The reference ships a dead
+          attribute, so the exact transcription is a dead attribute.
+
+          It was omitted here until 2026-09-01 on the reasoning that a dead attribute is not worth
+          carrying. That is a judgement about the reference rather than a fact about this
+          application, and the decision is to match the dump.
+        -->
         <video
           id="webcamScreen-{id}"
           class={['webcamScreen', { hidden: pictureHidden, 'viewer-only-screen-video': viewerOnlyMode }]}
           autoplay
+          data-ng-dblclick="fullScreen()"
           playsinline
           muted
           {@attach attachStream}

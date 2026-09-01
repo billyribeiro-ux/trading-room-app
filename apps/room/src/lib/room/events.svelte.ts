@@ -442,6 +442,17 @@ export class RoomEventStream<Entry> {
           modal, both of which read `isPresenter && !media.limitedPresenter`. Taking it away puts them
           back.
         */
+        /*
+          `case "presenterTalking"` and `case "presenterNotTalking"`, byte 1,014,971 — two `case`
+          labels that emit a payload-free GUI event each, and two subscribers that set one flag
+          (1,117,020-1,117,129). One field, both directions, exactly as the recording pair above is
+          one field and four transitions. `NavbarTalkingIndicator.svelte` carries the measurement.
+        */
+        if (command?.cmd === 'presenterTalking' || command?.cmd === 'presenterNotTalking') {
+          this.#media.setPresenterTalking(command.cmd === 'presenterTalking');
+          return;
+        }
+
         if (command?.cmd === 'giveMicScreen') {
           if (command.targetUserId !== this.#session().user.id) return;
           this.#media.micScreenGranted(command.give === true);

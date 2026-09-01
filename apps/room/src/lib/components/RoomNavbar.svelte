@@ -1,5 +1,6 @@
 <script lang="ts">
   import NavbarRecIndicator from '#lib/components/NavbarRecIndicator.svelte';
+  import NavbarTalkingIndicator from '#lib/components/NavbarTalkingIndicator.svelte';
   import NavbarSoundCloud from '#lib/components/NavbarSoundCloud.svelte';
   import NavbarTipButton from '#lib/components/NavbarTipButton.svelte';
   import ScreenShareMenu from '#lib/components/ScreenShareMenu.svelte';
@@ -507,97 +508,18 @@
           </a>
         </li>
       {/if}
-      {#if media.anyoneTalking && media.talking.length > 0}
-        <li class="nav-item talkingIndicator animated fadeIn">
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a class="talking">
-            <i class="icon fa fa-microphone"></i>
-            &nbsp;
-            <span class="talking-string">
-              <!--
-                G04 — `d(0,"span",147)` at byte 2,473,449, const 147 `[3,"click"]`: each name is a
-                CONTROL, bound to `muteTalkingUserDialog(o)`. Ours was a bare `<span>`, so a
-                presenter watching one member hold the floor had no way to take it back short of
-                opening the roster and finding them — and `muteAllNonAdmins`, which is built, is
-                all-or-nothing.
-
-                The comma and the surrounding spaces are `ns(" ", i > 0 ? "," : "", " ", name, " ")`
-                and were already right; only the handler was missing. `role`/`tabindex`/`onkeydown`
-                are OURS, because the capture puts a click on a bare span and a span is neither
-                focusable nor keyboard-reachable — the same addition, for the same reason, as the
-                trade-order span in `MessageBody`.
-
-                The gate is inside `muteTalkingUserDialog`, not here: upstream's whole method body
-                is behind `globals.user.isPresenter`, so a member clicking a name gets no dialog
-                rather than a dialog whose command is refused.
-              -->
-              {#each media.talking as talkingUser, index (talkingUser.userID)}
-                <span
-                  role="button"
-                  tabindex="0"
-                  onclick={() => onmutetalkinguser(talkingUser)}
-                  onkeydown={(event) => {
-                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                    event.preventDefault();
-                    onmutetalkinguser(talkingUser);
-                  }}
-                >
-                  {index > 0 ? ',' : ''}
-                  {talkingUser.mediaValue.name}
-                </span>
-              {/each}
-            </span>
-            &nbsp;
-            <!--
-              ── G08 — THE IDLE WAVEFORM IS A MEASURED REFUSAL, not an omission ────────────────────
-
-              The reference switches between two images here:
-
-              ```js
-              O(8, e.mediaService.presenterTalking ? 8 : 9)          // byte 2,473,901
-              146  ["id","talkingLevelsImg","src","/assets/images/talking.gif",1,"talkingWaveform",…]
-              148  ["id","nolevelsImg","src","/assets/images/notalking.png",1,"talkingWaveform",…]
-              ```
-
-              **`presenterTalking` is not a fact this room can know.** It is written by exactly two
-              subscribers (byte 1,117,020) — `guiEventBus.subscribe("presenterTalking", …)` and its
-              `presenterNotTalking` twin — and the only thing that emits them is the SERVER socket
-              relaying `case "presenterTalking"` at byte 1,014,971. It is a live audio-activity
-              signal computed somewhere we do not have, and it is NOT the same thing as the list
-              beside it: "talking" in `talkingUsers` means A MICROPHONE IS OPEN, which
-              `media-transport.svelte.ts` records at length, and there is no level detection
-              anywhere in the reference either — its single `createAnalyser` is the AV-settings mic
-              test, and `audioLevel`, `activeSpeaker` and `volumeChange` do not occur at all.
-
-              So building the branch means one of two dishonest things: an image nothing can ever
-              show, or one that always shows. Neither is the reference. The waveform stays, which is
-              the state a room with an open microphone is actually in.
-
-              **This is also what explains `notalking.png`.** The audit row noticed the asset ships
-              here with no consumer and read that as strong evidence the branch was dropped. It is
-              evidence of something narrower: the MARKUP was transcribed from a capture whose driving
-              signal did not cross with it. The asset stays — it is a captured asset, and deleting it
-              would be deciding this can never be built.
-
-              WHAT WOULD UNBLOCK IT: our own server computing and pushing an activity signal on the
-              room channel. At that point this is one `{#if}` and the second const above.
-            -->
-            <img
-              id="talkingLevelsImg"
-              src="/assets/images/talking.gif"
-              class="talkingWaveform animated fadeIn ng-star-inserted"
-              alt=""
-              width="53"
-              height="60"
-            />
-          </a>
-        </li>
-      {:else}
-        <li class="nav-item talkingIndicator animated fadeIn">
-          <!-- svelte-ignore a11y_missing_attribute -->
-          <a>{noSpeakerText}</a>
-        </li>
-      {/if}
+      <!--
+        `NPe` and `LPe`, both arms — extracted 2026-09-01 with `G08`. See
+        `NavbarTalkingIndicator.svelte`: the ceiling refused the second image here, and upstream
+        keeps these as two sibling sub-templates rather than markup inline in its own create block.
+      -->
+      <NavbarTalkingIndicator
+        talkingUsers={media.talking}
+        anyoneTalking={media.anyoneTalking}
+        presenterTalking={media.presenterTalking}
+        {noSpeakerText}
+        {onmutetalkinguser}
+      />
       <!--
           The room's recording badge, for EVERYONE - this reports state, it does not change it, so
           it is deliberately outside the presenter block below. Slots 18, 19 and 20 of `U4e`, whose

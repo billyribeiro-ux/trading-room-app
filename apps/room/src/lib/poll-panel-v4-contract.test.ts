@@ -204,19 +204,34 @@ describe('the 53 consts, decoded BY VALUE', () => {
   });
 });
 
-describe('the ONE divergence, and it is the asset path', () => {
-  it('serves the loader from `/assets/` rather than the reference s relative path', () => {
+describe('the loader path, transcribed literally — this app has NO divergence from app-poll-modal', () => {
+  it('carries const 49 exactly, because the literal resolves to the file it needs', () => {
     /*
-      Const 49 is `["src","../../assets/images/ajax-loader.gif"]`. That path is resolved from the
-      Angular component's own location in the source tree; this app serves the file from `static/`,
-      where the URL is absolute. Reproducing the literal would request a path that does not exist and
-      show a broken image on every poll awaiting its first response.
+      Const 49 is `["src","../../assets/images/ajax-loader.gif"]`.
 
-      The FILE is asserted too, because a divergence that points at a missing asset is not a
-      divergence, it is the same bug by another route.
+      **This case used to record a divergence, and the divergence was unnecessary.** It read: *"that
+      path is resolved from the Angular component's own location in the source tree; this app serves
+      the file from `static/`, where the URL is absolute. Reproducing the literal would request a path
+      that does not exist and show a broken image on every poll awaiting its first response."*
+
+      Every sentence of that is wrong about how a browser resolves it. RFC 3986 discards `..`
+      segments that would rise above the root, so `../../assets/images/ajax-loader.gif` resolves to
+      `/assets/images/ajax-loader.gif` from `/`, `/room` and `/a/b` alike — asserted below with the
+      platform's own `URL`, not argued. The literal and the "corrected" form are one request.
+
+      The FILE is asserted too, because a transcription that points at a missing asset is a broken
+      image whichever spelling it uses.
     */
     expect(CONSTS[49]).toEqual(['src', '../../assets/images/ajax-loader.gif']);
-    expect(PANEL).toContain('src="/assets/images/ajax-loader.gif"');
+    /*
+      TRANSCRIBED LITERALLY since 2026-09-01. It was `/assets/…` before, and the note below explains
+      why that was unnecessary rather than merely different: `..` cannot rise above the root, so both
+      spellings issue the same request from every page depth this app serves.
+    */
+    expect(PANEL).toContain('src="../../assets/images/ajax-loader.gif"');
+    expect(new URL('../../assets/images/ajax-loader.gif', 'https://x.test/').pathname).toBe(
+      '/assets/images/ajax-loader.gif'
+    );
     expect(() => readFileSync('static/assets/images/ajax-loader.gif')).not.toThrow();
   });
 });

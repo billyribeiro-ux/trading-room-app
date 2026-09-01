@@ -452,8 +452,6 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   'app-room': [
     'https://intercom.help/simpler-trading/en/',
     'helpLink',
-    'nolevelsImg',
-    '/assets/images/notalking.png',
     'cssSoundCloudIcon',
     '/assets/images/playing.gif'
   ],
@@ -540,9 +538,7 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     measurement that it cannot be reached in this application. `ScreenPaneStatus.svelte` renders the
     other three headings and names its absence.
   */
-  'app-screenshare-view': ['#ffcc00', 'fullScreen()'],
-  /* Already recorded in `poll-panel-v4-contract.test.ts`: ours is `/assets/…`, served from `static/`. */
-  'app-poll-modal': ['../../assets/images/ajax-loader.gif']
+  'app-screenshare-view': ['#ffcc00']
 };
 
 describe('the sweep is reading the bundle it claims to read', () => {
@@ -580,15 +576,15 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-five components fully covered, one hundred and twenty-nine values not', () => {
+  it('holds the ratchet: thirty-six components fully covered, one hundred and twenty-five values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
       edits the table without knowing which way they moved it.
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
-    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(35);
-    expect(residuals).toBe(129);
+    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(36);
+    expect(residuals).toBe(125);
   });
 
   it('and the surfaces audited by hand this week are among the covered', () => {
@@ -620,9 +616,9 @@ describe('how much of the gap has already been written about', () => {
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
-  it('splits the 129 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(129);
-    expect(all.filter(mentioned)).toHaveLength(37);
+  it('splits the 125 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(125);
+    expect(all.filter(mentioned)).toHaveLength(33);
     expect(all.filter((value) => !mentioned(value))).toHaveLength(92);
   });
 
@@ -633,7 +629,12 @@ describe('how much of the gap has already been written about', () => {
       produced false alarms would produce them here first, on the surface that has been read hardest.
     */
     const room = ROWS.find((row) => row.component === 'app-room');
-    expect(room?.residuals).toHaveLength(6);
+    /*
+      SIX until 2026-09-01, four now: `nolevelsImg` and `/assets/images/notalking.png` left when
+      `G08` was built rather than refused. The four that remain are still all recorded refusals, which
+      is what this case is about.
+    */
+    expect(room?.residuals).toHaveLength(4);
     expect(room?.residuals.filter((value) => !mentioned(value))).toEqual([]);
   });
 });
@@ -651,6 +652,6 @@ describe('the comment stripping is load-bearing', () => {
     const raw = RAW_ROWS.reduce((total, row) => total + row.residuals.length, 0);
     const stripped = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(raw).toBeLessThan(stripped);
-    expect(stripped - raw).toBe(24);
+    expect(stripped - raw).toBe(22);
   });
 });
