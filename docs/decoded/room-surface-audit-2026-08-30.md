@@ -3034,6 +3034,20 @@ APe,5,2,"li",89)(15,PPe,3,2,"li",90)(16,NPe,10,1,"li",91)
 
 **BLOCKED 2026-08-30 13:32 UTC.** `O(9, disableStarYears || e.isP || !e.data.years ? -1 : 9)` needs `e.data.years`, and **that value has no supply anywhere in this repository** — the same absence the MESSAGE-side star already carries, recorded twice at `gates.ts:110` and `room-config-client.ts:82` (*"its `item.membershipYears` supply does not exist yet"*). The message-side markup exists and is gated on a value that is always undefined; adding the roster's copy would be a second node that can never render. The CSS shipping with no producer is explained by the same fact. What would unblock it: a membership age on the roster row, which is a controller-side decision about what `years` means (account age? membership age? per room?) rather than a transcription.
 
+**RE-MEASURED 2026-09-01, and the blocker is now SINGLE rather than double — worth recording because
+it changes what the next person will see.** The modal-side twin at `ModalHost.svelte:2341` reads
+`!disableStarYears && targetUser.permissions !== 'a' && targetUser.years`, and until 2026-09-01 its
+MIDDLE term was a constant: `modalTargetFromRosterRow` stamped every roster row `'a'` by comparing
+`role` against `'user'`, a value `RoomRole` does not contain, so `permissions !== 'a'` was always
+false and the block could not render whatever `years` held. That predicate is fixed (see
+`modal-target-permissions-contract.test.ts`), so **`years` is now the only thing standing between
+this markup and a render.**
+
+The row's own verdict is unchanged and still correct: `years` has no supply, and giving it one is a
+controller-side decision about what it MEANS (account age? membership age? per room?) rather than a
+transcription. But a reader who supplies `years` tomorrow will now get the modal-side star, where
+before 2026-09-01 they would have supplied it, seen nothing, and gone hunting for a second reason.
+
 **low** · `missing-behaviour` · reference byte **2,034,694**
 
 ```

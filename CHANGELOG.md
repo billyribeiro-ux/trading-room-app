@@ -45,6 +45,55 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 23:24 UTC — re-measuring the refusals, and proving the gate that holds one of them
+
+**Runtime impact: NONE.** Two recorded refusals re-tested against the match-exactly instruction; both
+survive, and one is now provably enforced rather than asserted.
+
+## The report modal: EVIDENCE ABSENT, and the gate that says so actually fires
+
+`RPT-01` and the five rows pointing at it refuse the alert-delivery report because the queue it views
+*"does not exist, is not written, and has no producer"* — no table across the migrations,
+`alerts.dispatch` being the REQUEST rather than the outcome, `getAlertReport` with no server half.
+
+Under match-exactly the markup alone would be transcribable and would render an empty state. What
+stops it is not markup: the six rows' entire CONTENT is per-recipient delivery data, and inventing a
+data source is forbidden by name. EVIDENCE ABSENT, not a preference.
+
+**The refusal claims to be gated, and I proved the gate fires** — I have found two vacuous gates
+today, so an ungated claim of gating is not evidence. Control: a real `alert_delivery_attempts` table
+carrying `status`, `sent_time`, `latency` and `fail_reason`, appended to a migration.
+`alert-report-modal-contract.test.ts` went **RED**, which is the designed behaviour — the six rows go
+live the moment the premise expires. Migration restored.
+
+## The roster star: still blocked, on ONE thing now instead of two
+
+`RS-03` refuses the stars/years indicator because `years` has no supply. Still true, and still a
+controller-side decision about what `years` MEANS rather than a transcription.
+
+What changed is its modal-side twin. `ModalHost.svelte:2341` reads `!disableStarYears &&
+targetUser.permissions !== 'a' && targetUser.years`, and until today the middle term was a CONSTANT —
+the dead `role === 'user'` predicate stamped every row `'a'`, so the block could not render whatever
+`years` held. That is fixed, so **`years` is now the only thing between that markup and a render**,
+and the audit row says so at itself.
+
+Recorded because it changes what the next person experiences: whoever supplies `years` tomorrow gets
+the star, where before today they would have supplied it, seen nothing, and gone hunting for a second
+reason nobody had written down.
+
+## What this pass did NOT establish, stated plainly
+
+The re-triage of all 115 non-code dispositions **did not complete**. Its agents died at 20:13 against
+the session usage limit having produced nothing, and the workflow sat at zero completions for three
+hours before I noticed. Four rows were re-measured by hand instead — the four whose recorded reason
+matches the shape that was wrong three times today (*"the server does not send it"*). Three are the
+Stream Player, an owner decision on anonymous playback authorisation rather than a transcription; the
+fourth is `RS-03`.
+
+**The remaining ~111 rows are still on their recorded reasons and have not been re-tested.**
+
+---
+
 ### 2026-09-01 23:13 UTC — every roster row was stamped "Presenter / Admin", and four branches were constants
 
 **Runtime impact: YES.** The user-info modal drew the wrong Permissions for every ordinary member,
