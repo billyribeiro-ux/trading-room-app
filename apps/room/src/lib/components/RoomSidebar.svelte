@@ -230,16 +230,16 @@
           </p>
           <p>Version: {dumpVersion}</p>
           <!--
-              `H(12, JAe, 2, 1, "p")` with `O(12, sessData.hideAppInfo ? -1 : 12)`.
+            `H(12, JAe, 2, 1, "p")` with `O(12, sessData.hideAppInfo ? -1 : 12)`.
 
-              This was an empty `<p>` — the element was in the right place with nothing in
-              it, so the room looked complete and the feature did not exist. Inside is
-              `XAe`, whose own gate is
-              `O(1, !ptrMobileAppEnabled && !customMobileAppEnabled
-                    || user.isFT && !freeTrialsGetApp ? -1 : 1)`:
-              a room that has no app hides the button, and a trial account is shut out of it
-              unless the room says trials may have the app.
-            -->
+            This was an empty `<p>` — the element was in the right place with nothing in
+            it, so the room looked complete and the feature did not exist. Inside is
+            `XAe`, whose own gate is
+            `O(1, !ptrMobileAppEnabled && !customMobileAppEnabled
+                  || user.isFT && !freeTrialsGetApp ? -1 : 1)`:
+            a room that has no app hides the button, and a trial account is shut out of it
+            unless the room says trials may have the app.
+          -->
           <!--
             `H(13, aPe, 5, 2, "p")` with `O(13, isTipEnabled ? 13 : -1)`, consts 34/35/36:
             `["type","button",1,"btn","btn-primary","btn-sm",3,"click","title"]`,
@@ -282,16 +282,16 @@
           {/if}
           <hr />
           <!--
-              The two connection lines. Both were hard-coded markup - a permanently spinning
-              cog next to "Reconnecting Media..." and a permanent tick next to "Chat" - bound
-              to nothing, so the spinner could never stop no matter what the media server did.
+            The two connection lines. Both were hard-coded markup - a permanently spinning
+            cog next to "Reconnecting Media..." and a permanent tick next to "Chat" - bound
+            to nothing, so the spinner could never stop no matter what the media server did.
 
-              The raw staff capture (`sidebar-forced-open`) shows the same two rows, and it
-              was taken mid-reconnect: `i.fas.fa-cog.fa-spin` beside "Reconnecting Media..."
-              and `i.fas.fa-check` beside "Chat". So the ELEMENTS are right; what was missing
-              is that they report state. `mediaConnected` already tracks the SFU socket, and
-              `roomEventsConnected` tracks the SSE channel that carries chat.
-            -->
+            The raw staff capture (`sidebar-forced-open`) shows the same two rows, and it
+            was taken mid-reconnect: `i.fas.fa-cog.fa-spin` beside "Reconnecting Media..."
+            and `i.fas.fa-check` beside "Chat". So the ELEMENTS are right; what was missing
+            is that they report state. `mediaConnected` already tracks the SFU socket, and
+            `roomEventsConnected` tracks the SSE channel that carries chat.
+          -->
           <!--
             ── RS-11 — FOUR NODES IN TWO SHAPES, and we had two nodes in one ─────────────────────
 
@@ -344,28 +344,28 @@
           </a>
         </li>
         <!--
-            `O(25, e.reopenAlertsChatBtn ? 25 : -1)` (`app-room.render-helpers.js:355`),
-            rendering `oPe` (`:76-87`) as `H(25, oPe, 5, 0, 'li', 19)` (`:312`) - which is
-            why it sits HERE, between Connectivity Check and General Settings, rather than at
-            the end of the list. Markup and classes from the const table: 19 is
-            `[1, 'nav-item']`, 38 is
-            `['title', 'Reopen Alerts / Chat', 1, 'nav-link', 'sidebar-item', 3, 'click']`,
-            39 is `[1, 'fas', 'fa-window-restore']` and 22 is `[1, 'pl-2']`
-            (`app-room.compiled.js:1324, 1416, 1417, 1337`).
+          `O(25, e.reopenAlertsChatBtn ? 25 : -1)` (`app-room.render-helpers.js:355`),
+          rendering `oPe` (`:76-87`) as `H(25, oPe, 5, 0, 'li', 19)` (`:312`) - which is
+          why it sits HERE, between Connectivity Check and General Settings, rather than at
+          the end of the list. Markup and classes from the const table: 19 is
+          `[1, 'nav-item']`, 38 is
+          `['title', 'Reopen Alerts / Chat', 1, 'nav-link', 'sidebar-item', 3, 'click']`,
+          39 is `[1, 'fas', 'fa-window-restore']` and 22 is `[1, 'pl-2']`
+          (`app-room.compiled.js:1324, 1416, 1417, 1337`).
 
-            This is the control the detach bootbox promises when it says the chat can be
-            reopened "from the side menu", and until now this room had no such item - the
-            affordance was a button inside the column, which upstream is deleted the moment
-            the chat detaches.
+          This is the control the detach bootbox promises when it says the chat can be
+          reopened "from the side menu", and until now this room had no such item - the
+          affordance was a button inside the column, which upstream is deleted the moment
+          the chat detaches.
 
-            Gated on `chatAlertsDetached` rather than a separate `reopenAlertsChatBtn`
-            field. Upstream needs two variables because `hideChatAlerts` is a plain property
-            that four other writers also set, so it cannot say WHY it is true; here
-            `hideChatAlerts` is derived and `chatAlertsDetached` IS the detach source, so a
-            second flag would be a copy that can only disagree. The reference sets both in
-            one statement and clears both in `onreopenalertschat` (`app-room.full.js:2179-2181`,
-            `:3047-3053`), so they are never independent.
-          -->
+          Gated on `chatAlertsDetached` rather than a separate `reopenAlertsChatBtn`
+          field. Upstream needs two variables because `hideChatAlerts` is a plain property
+          that four other writers also set, so it cannot say WHY it is true; here
+          `hideChatAlerts` is derived and `chatAlertsDetached` IS the detach source, so a
+          second flag would be a copy that can only disagree. The reference sets both in
+          one statement and clears both in `onreopenalertschat` (`app-room.full.js:2179-2181`,
+          `:3047-3053`), so they are never independent.
+        -->
         {#if chatAlertsDetached}
           <li class="nav-item">
             <!-- svelte-ignore a11y_missing_attribute -->
@@ -397,14 +397,14 @@
           </a>
         </li>
         <!--
-            `H(31, aPe, 4, 2, "li", 25)` with `O(31, sessData.hasBenzingaNews ? 31 : -1)`.
+          `H(31, aPe, 4, 2, "li", 25)` with `O(31, sessData.hasBenzingaNews ? 31 : -1)`.
 
-            `aPe` picks between two children on `O(2, altBenzingaLogoURL ? 2 : 3)`: a custom
-            logo, or the captured default pair of a `fas fa-newspaper` and the words
-            "Benzinga News". The default image the capture would otherwise use
-            (`/assets/images/benzinga-logo.png`) is not in this repository, so the icon form
-            is what an unconfigured room gets - not a broken `<img>`.
-          -->
+          `aPe` picks between two children on `O(2, altBenzingaLogoURL ? 2 : 3)`: a custom
+          logo, or the captured default pair of a `fas fa-newspaper` and the words
+          "Benzinga News". The default image the capture would otherwise use
+          (`/assets/images/benzinga-logo.png`) is not in this repository, so the icon form
+          is what an unconfigured room gets - not a broken `<img>`.
+        -->
         <!--
           ── SIDE-01 — NO TIP ITEM HERE. IT IS THE NAVBAR'S, AND IT WAS RENDERING A THIRD TIME ────
 
@@ -561,10 +561,10 @@
           </a>
         </li>
         <!--
-            `O(43, e.appService.globals.isPresenter ? 43 : -1)` - presenter only, and it acts
-            on the roster (`globals.roster.filter(r => !r.isP)`), which a member does not have.
-            This was shown to everyone.
-          -->
+          `O(43, e.appService.globals.isPresenter ? 43 : -1)` - presenter only, and it acts
+          on the roster (`globals.roster.filter(r => !r.isP)`), which a member does not have.
+          This was shown to everyone.
+        -->
         {#if isPresenter}
           <li class="nav-item py-0">
             <!-- svelte-ignore a11y_missing_attribute -->
@@ -861,11 +861,11 @@
                                   </div>
                                 </div>
                                 <!--
-                                `<p class="userLocation">`, a sibling of `.nickName` inside
-                                `.media-body`. Presenter-only: the reference gates it on
-                                `globals.isPresenter && entry.privData`, so a member never
-                                sees anyone's city — see `locationVisibleTo`.
-                              -->
+                                  `<p class="userLocation">`, a sibling of `.nickName` inside
+                                  `.media-body`. Presenter-only: the reference gates it on
+                                  `globals.isPresenter && entry.privData`, so a member never
+                                  sees anyone's city — see `locationVisibleTo`.
+                                -->
                                 {#if locationVisible(user)}
                                   <p class="userLocation">{user.locStr}</p>
                                 {/if}

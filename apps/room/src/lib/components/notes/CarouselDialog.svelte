@@ -451,42 +451,42 @@
   `.note-modal-dialog`; `note-dead-control-contract.test.ts` carries both searches.
 -->
 <!--
-    ── THE CAPTURED `aria-labelledby`, TRANSCRIBED 2026-09-01, AND THE REASON IT WAS NOT ──────────
+  ── THE CAPTURED `aria-labelledby`, TRANSCRIBED 2026-09-01, AND THE REASON IT WAS NOT ──────────
 
-    ```js
-    modalService.open(this.carouselModal,   {ariaLabelledBy:"carousel-modal-title",     size:"lg"})
-    modalService.open(this.fileBrowserModal,{ariaLabelledBy:"file-browser-modal-title", size:"lg"})
-    modalService.open(this.giphySearchPopOver,{ariaLabelledBy:"modal-basic-title"})
-    ["id","carousel-modal-title",1,"modal-title"]        // byte 1,484,582
-    ["id","file-browser-modal-title",1,"modal-title"]    // byte 1,486,486
-    ["id","modal-basic-title",1,"modal-title"]           // byte 1,486,810
-    ```
+  ```js
+  modalService.open(this.carouselModal,   {ariaLabelledBy:"carousel-modal-title",     size:"lg"})
+  modalService.open(this.fileBrowserModal,{ariaLabelledBy:"file-browser-modal-title", size:"lg"})
+  modalService.open(this.giphySearchPopOver,{ariaLabelledBy:"modal-basic-title"})
+  ["id","carousel-modal-title",1,"modal-title"]        // byte 1,484,582
+  ["id","file-browser-modal-title",1,"modal-title"]    // byte 1,486,486
+  ["id","modal-basic-title",1,"modal-title"]           // byte 1,486,810
+  ```
 
-    These were `aria-label` on the dialog instead, and the recorded reason was:
+  These were `aria-label` on the dialog instead, and the recorded reason was:
 
-    > a literal document-unique id belongs to a component that is mounted once, and this one is
-    > mounted inside `{#if dialog === 'carousel'}` in an editor that a room may hold more than one of
+  > a literal document-unique id belongs to a component that is mounted once, and this one is
+  > mounted inside `{#if dialog === 'carousel'}` in an editor that a room may hold more than one of
 
-    **The second half is false about this codebase, and `NotesPane.svelte` says so three levels up:**
-    *"ours mounts `NoteEditor` only in the panel being edited … `editingNoteId` is a single value — a
-    second instance could never be reached."* One editor, one dialog at a time, so a literal id is
-    document-unique here exactly as it is upstream.
+  **The second half is false about this codebase, and `NotesPane.svelte` says so three levels up:**
+  *"ours mounts `NoteEditor` only in the panel being edited … `editingNoteId` is a single value — a
+  second instance could never be reached."* One editor, one dialog at a time, so a literal id is
+  document-unique here exactly as it is upstream.
 
-    `aria-labelledby` is also the better of the two, which is why it is worth the correction rather
-    than merely the match: the accessible name becomes the visible heading element, so the two cannot
-    drift. `aria-label` is a second copy of the title that a rename leaves behind.
+  `aria-labelledby` is also the better of the two, which is why it is worth the correction rather
+  than merely the match: the accessible name becomes the visible heading element, so the two cannot
+  drift. `aria-label` is a second copy of the title that a rename leaves behind.
 
-    **The THIRD captured title, `modal-basic-title`, is NOT transcribed, and the difference is the
-    measurement rather than the effort.** It labels the Giphy modal, and `GiphyPicker` is mounted at
-    FOUR sites — the note editor, both chat columns and the private-chat composer — so a literal id
-    there really would appear four times in one document. It already carries an instance-suffixed
-    `popoverId` for exactly that reason. Two of the three ids are reproducible and one is not, which
-    is a sharper answer than the blanket one that covered all three.
+  **The THIRD captured title, `modal-basic-title`, is NOT transcribed, and the difference is the
+  measurement rather than the effort.** It labels the Giphy modal, and `GiphyPicker` is mounted at
+  FOUR sites — the note editor, both chat columns and the private-chat composer — so a literal id
+  there really would appear four times in one document. It already carries an instance-suffixed
+  `popoverId` for exactly that reason. Two of the three ids are reproducible and one is not, which
+  is a sharper answer than the blanket one that covered all three.
 
-    `note-editor-modal-labelling-contract.test.ts` asserts both premises rather than trusting this
-    paragraph — a `{#each}` around `NoteEditor` would make these two ids collide, and the prose would
-    still read as true.
-  -->
+  `note-editor-modal-labelling-contract.test.ts` asserts both premises rather than trusting this
+  paragraph — a `{#each}` around `NoteEditor` would make these two ids collide, and the prose would
+  still read as true.
+-->
 <div
   class="note-modal open"
   aria-hidden="false"
@@ -496,10 +496,10 @@
   <div class="note-modal-content">
     <div class="note-modal-header">
       <!--
-          Dismissing has to clear the target as well as the dialog. The reference does the same in
-          its modal's rejection handler: `() => { this.isEditingCarousel = !1; }`. Without it the
-          next carousel inserted from the toolbar would overwrite the one last opened for editing.
-        -->
+        Dismissing has to clear the target as well as the dialog. The reference does the same in
+        its modal's rejection handler: `() => { this.isEditingCarousel = !1; }`. Without it the
+        next carousel inserted from the toolbar would overwrite the one last opened for editing.
+      -->
       <button type="button" class="close" aria-label="Close" onclick={dismissCarouselModal}
         ><i class="note-icon-close"></i></button
       >
@@ -542,15 +542,15 @@
         {#each carouselSlides as slide, index (slide.key)}
           <div class="carousel-slide-row card mb-2 p-2">
             <!--
-                `x0e`'s header row — const 43 the flex line, 44 the `#N` badge, 45 the icon-only
-                trash with `ml-auto`, 46 the icon.
+              `x0e`'s header row — const 43 the flex line, 44 the `#N` badge, 45 the icon-only
+              trash with `ml-auto`, 46 the icon.
 
-                `disabled` is `1 === carouselImages.length`, and it replaces a behaviour that
-                reached the same end state by a worse route: deleting the last row here used to
-                splice it out and silently re-add a blank one, so the presenter's row appeared to
-                survive a delete they had asked for. A disabled button says the same thing without
-                the flicker, and it is what the capture does.
-              -->
+              `disabled` is `1 === carouselImages.length`, and it replaces a behaviour that
+              reached the same end state by a worse route: deleting the last row here used to
+              splice it out and silently re-add a blank one, so the presenter's row appeared to
+              survive a delete they had asked for. A disabled button says the same thing without
+              the flicker, and it is what the capture does.
+            -->
             <div class="d-flex align-items-center mb-1">
               <span class="badge badge-secondary mr-2">#{index + 1}</span>
               <button
@@ -563,31 +563,31 @@
               >
             </div>
             <!--
-                ── THREE STATES, ONE AT A TIME: `O(6, e.uploading ? 6 : e.url ? 8 : 7)` ───────────
+              ── THREE STATES, ONE AT A TIME: `O(6, e.uploading ? 6 : e.url ? 8 : 7)` ───────────
 
-                This row was ONE flat state until now — both URL boxes, always — and that is what
-                made the two confirmations below impossible to build: ` Change image ` has nothing
-                to change while the box that holds the URL is already on screen.
+              This row was ONE flat state until now — both URL boxes, always — and that is what
+              made the two confirmations below impossible to build: ` Change image ` has nothing
+              to change while the box that holds the URL is already on screen.
 
-                  uploading -> `D0e`, the spinner
-                  url       -> `k0e`, the preview and ` Change image `
-                  otherwise -> `E0e`, the file picker, the browser, and the staged URL box
-              -->
+                uploading -> `D0e`, the spinner
+                url       -> `k0e`, the preview and ` Change image `
+                otherwise -> `E0e`, the file picker, the browser, and the staged URL box
+            -->
             {#if uploadingSlideKey === slide.key}
               <!--
-                  `D0e` — byte 1,462,280. Const 47 the wrapper, 52 the icon, 53 the caption. It
-                  tells a presenter that a slow upload is still running rather than lost.
-                -->
+                `D0e` — byte 1,462,280. Const 47 the wrapper, 52 the icon, 53 the caption. It
+                tells a presenter that a slow upload is still running rather than lost.
+              -->
               <div class="text-center py-2">
                 <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
                 <div class="small mt-1">Uploading...</div>
               </div>
             {:else if slide.url}
               <!--
-                  `k0e` — byte 1,463,604. Const 68 the preview box, 69 the image, 70 the button,
-                  71 `fa-times`. The image is the slide's own `url`, which is the only thing on this
-                  row that can tell a presenter they picked the right file.
-                -->
+                `k0e` — byte 1,463,604. Const 68 the preview box, 69 the image, 70 the button,
+                71 `fa-times`. The image is the slide's own `url`, which is the only thing on this
+                row that can tell a presenter they picked the right file.
+              -->
               <div class="carousel-img-preview mb-2">
                 <img class="carousel-preview-img" src={slide.url} alt="Slide {index + 1}" />
                 <button
@@ -599,18 +599,18 @@
               </div>
             {:else}
               <!--
-                  `E0e` — byte 1,462,334. Const 54 the group, 55/56 the `Image *` label, 57 the
-                  button line, 58 the hidden file input, 59/60 the Upload label, 61/62 Browse,
-                  63 the separator, 64 the input group, 65 the staged URL box, 66/67 the check.
+                `E0e` — byte 1,462,334. Const 54 the group, 55/56 the `Image *` label, 57 the
+                button line, 58 the hidden file input, 59/60 the Upload label, 61/62 Browse,
+                63 the separator, 64 the input group, 65 the staged URL box, 66/67 the check.
 
-                  The label-for-hidden-input pattern is the reference's own and is what gives the
-                  file picker a styled trigger; `cfi_{index}` is its id and the `for` that reaches
-                  it.
+                The label-for-hidden-input pattern is the reference's own and is what gives the
+                file picker a styled trigger; `cfi_{index}` is its id and the `for` that reaches
+                it.
 
-                  **THE BROWSE BUTTON WAS LABELLED "Select Image" WHEN IT SHIPPED EARLIER TODAY** —
-                  that string is the file browser MODAL's title (` Select Image `, byte 1,466,205)
-                  and the button's is ` Browse `, with classes and icon that were invented too.
-                -->
+                **THE BROWSE BUTTON WAS LABELLED "Select Image" WHEN IT SHIPPED EARLIER TODAY** —
+                that string is the file browser MODAL's title (` Select Image `, byte 1,466,205)
+                and the button's is ` Browse `, with classes and icon that were invented too.
+              -->
               <div class="form-group mb-2">
                 <label class="small font-weight-bold" for="cfi_{index}"
                   >Image <span class="text-danger">*</span></label
@@ -640,14 +640,14 @@
                 </div>
                 <div class="input-group input-group-sm">
                   <!--
-                      The STAGED field, not the slide's `url` — see `confirmCarouselImageUrl`. A
-                      directly-bound box flips the row into the preview on the first keystroke and
-                      takes itself off the screen.
+                    The STAGED field, not the slide's `url` — see `confirmCarouselImageUrl`. A
+                    directly-bound box flips the row into the preview on the first keystroke and
+                    takes itself off the screen.
 
-                      `keyup.enter` and `paste` are both the reference's, and `onkeydown` is used
-                      here rather than `onkeyup` so the Enter that confirms cannot also submit
-                      anything behind it.
-                    -->
+                    `keyup.enter` and `paste` are both the reference's, and `onkeydown` is used
+                    here rather than `onkeyup` so the Enter that confirms cannot also submit
+                    anything behind it.
+                  -->
                   <input
                     class="form-control"
                     type="url"
@@ -678,9 +678,9 @@
               </div>
             {/if}
             <!--
-                Const 48 the group, 49/50 the label and its hint, 51 the input. The hint is the
-                reference's own and is the only thing on the row that says what a link DOES.
-              -->
+              Const 48 the group, 49/50 the label and its hint, 51 the input. The hint is the
+              reference's own and is the only thing on the row that says what a link DOES.
+            -->
             <div class="form-group mb-0">
               <label class="small" for={`${componentId}-carousel-link-${index}`}
                 >Link URL <span class="text-muted">(optional — clicking the image opens this)</span
@@ -705,10 +705,10 @@
     </div>
     <div class="note-modal-footer">
       <!--
-          The footer held one button, and dismissal was the header X alone. Const 41 is the
-          reference's ` Cancel `, and it is the same dismissal — a modal whose only way out is an
-          unlabelled X in a corner is one a presenter can fail to find.
-        -->
+        The footer held one button, and dismissal was the header X alone. Const 41 is the
+        reference's ` Cancel `, and it is the same dismissal — a modal whose only way out is an
+        unlabelled X in a corner is one a presenter can fail to find.
+      -->
       <button type="button" class="btn btn-outline-dark" onclick={dismissCarouselModal}
         >{' Cancel '}</button
       >
@@ -793,12 +793,12 @@
           <div class="file-browser-grid">
             {#each sessionImages as file (file.url)}
               <!--
-                  A BUTTON where the reference uses a clickable `<div>` (const 79 carries `click` on
-                  a plain div). This one diverges deliberately: the element exists to be activated,
-                  so it has to be reachable from a keyboard, and `type="button"` is what keeps it out
-                  of the enclosing form. The three class strings are the capture's and are what the
-                  transcribed CSS targets.
-                -->
+                A BUTTON where the reference uses a clickable `<div>` (const 79 carries `click` on
+                a plain div). This one diverges deliberately: the element exists to be activated,
+                so it has to be reachable from a keyboard, and `type="button"` is what keeps it out
+                of the enclosing form. The three class strings are the capture's and are what the
+                transcribed CSS targets.
+              -->
               <button
                 type="button"
                 class="file-browser-item"

@@ -467,16 +467,16 @@
           <div class="flex-fill p-3 text-center">No active chat</div>
         {:else}
           <!--
-              `app-privchatscroller`: `.pc-messages` scrolls, with a Load More badge above the
-              rows while `hasMoreData && !searchTerm`. Rows are `app-st-compactmessage` with
-              `logType="pc"`.
-            -->
+            `app-privchatscroller`: `.pc-messages` scrolls, with a Load More badge above the
+            rows while `hasMoreData && !searchTerm`. Rows are `app-st-compactmessage` with
+            `logType="pc"`.
+          -->
           <app-privchatscroller class="privChatScroller">
             <div class="pc-messages">
               <!--
-                  `O(2, o.hasMoreData && !o.searchTerm ? 2 : -1)` then `O(3, o.isLoadingMore ? 3 : -1)`
-                  at bundle byte 2,194,498 — two exclusive branches, badge or spinner.
-                -->
+                `O(2, o.hasMoreData && !o.searchTerm ? 2 : -1)` then `O(3, o.isLoadingMore ? 3 : -1)`
+                at bundle byte 2,194,498 — two exclusive branches, badge or spinner.
+              -->
               {#if hasMore && !searching}
                 <div class="text-center">
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -494,9 +494,9 @@
             </div>
           </app-privchatscroller>
           <!--
-              `#textAreaTxtPM`. Enter sends, Shift+Enter and Alt+Enter insert a newline -
-              `onKey(e)` in the capture, which calls `preventDefault()` on 13 either way.
-            -->
+            `#textAreaTxtPM`. Enter sends, Shift+Enter and Alt+Enter insert a newline -
+            `onKey(e)` in the capture, which calls `preventDefault()` on 13 either way.
+          -->
           <!--
             The composer is `PrivateChatComposer.svelte` — `pEe` at byte 2,198,563, which is a
             textarea, a three-button column, two popovers, a webinar notice and `autoExpand`.

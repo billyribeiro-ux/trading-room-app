@@ -252,26 +252,26 @@
           <div class="col-md-6 col-sm-6 d-xs-none animated fadeInLeft faster room-message">
             {#if data.roomTitle}
               <!--
-              const 34 `room-title` — an h1 in the component's CSS (`h1.room-title`).
+                const 34 `room-title` — an h1 in the component's CSS (`h1.room-title`).
 
-              The TEXT is not the room name on its own. `vde`, byte 1,182,4xx:
-              `Ne(" Welcome to the ",e.appService.globals.sessData.name," ")` — the template
-              prepends "Welcome to the ". `eue`, the centred arm's h1, is byte-for-byte the same
-              interpolation, so both layouts read alike and the capture's
-              "Welcome to the Room 3625" is that string with `sessData.name` = "Room 3625".
+                The TEXT is not the room name on its own. `vde`, byte 1,182,4xx:
+                `Ne(" Welcome to the ",e.appService.globals.sessData.name," ")` — the template
+                prepends "Welcome to the ". `eue`, the centred arm's h1, is byte-for-byte the same
+                interpolation, so both layouts read alike and the capture's
+                "Welcome to the Room 3625" is that string with `sessData.name` = "Room 3625".
 
-              We were rendering the bare name.
-            -->
+                We were rendering the bare name.
+              -->
               <h1 class="room-title">Welcome to the {data.roomTitle}</h1>
             {/if}
             <!--
-            const `[1,"room-description",2,"height","100%","overflow-x","hidden",3,"innerHtml"]` —
-            the two inline styles and the `innerHtml` binding are all the reference's.
+              const `[1,"room-description",2,"height","100%","overflow-x","hidden",3,"innerHtml"]` —
+              the two inline styles and the `innerHtml` binding are all the reference's.
 
-            `{@html}` is safe here ONLY because `sanitizeRoomDescription` ran on the SERVER in the
-            load. Rendering `data.roomDescription` raw would put owner-authored markup on a route
-            that needs no session.
-          -->
+              `{@html}` is safe here ONLY because `sanitizeRoomDescription` ran on the SERVER in the
+              load. Rendering `data.roomDescription` raw would put owner-authored markup on a route
+              that needs no session.
+            -->
             <div class="room-description" style="height: 100%; overflow-x: hidden;">
               <!-- eslint-disable-next-line svelte/no-at-html-tags -->
               {@html data.roomDescription}
@@ -280,14 +280,14 @@
         {/if}
 
         <!--
-        const 36 when there IS a description, and the offset variant when there is not.
+          const 36 when there IS a description, and the offset variant when there is not.
 
-        `yue`'s update block is `O(3, e.appService.globals.sessData.description ? 3 : 4)` — slot 3 is
-        `Wde`, the two-column layout above; slot 4 is `vue`, one column centred by
-        `offset-md-3 offset-sm-3`. A room with nothing to say on the left does not leave half the
-        page empty, it centres the form. The `col-sm-6`/`col-sm-12` difference is the reference's
-        too: the split view gives the form the full width at `sm`, the centred one keeps it halved.
-      -->
+          `yue`'s update block is `O(3, e.appService.globals.sessData.description ? 3 : 4)` — slot 3 is
+          `Wde`, the two-column layout above; slot 4 is `vue`, one column centred by
+          `offset-md-3 offset-sm-3`. A room with nothing to say on the left does not leave half the
+          page empty, it centres the form. The `col-sm-6`/`col-sm-12` difference is the reference's
+          too: the split view gives the form the full width at `sm`, the centred one keeps it halved.
+        -->
         <div
           class={[
             data.roomDescription
@@ -298,21 +298,21 @@
         >
           {#if !data.roomDescription && data.roomTitle}
             <!--
-            `bue` opens with `H(0,eue,2,1,"h1",34)` — const 34 is `room-title`, the SAME h1 as the
-            left column's, rendered here instead. It is not duplicated: the two are the two arms of
-            `sessData.description ? 3 : 4`, so exactly one of them exists at a time.
+              `bue` opens with `H(0,eue,2,1,"h1",34)` — const 34 is `room-title`, the SAME h1 as the
+              left column's, rendered here instead. It is not duplicated: the two are the two arms of
+              `sessData.description ? 3 : 4`, so exactly one of them exists at a time.
 
-            `eue` and `vde` carry the identical interpolation, checked rather than assumed:
-            `Ne(" Welcome to the ",e.appService.globals.sessData.name," ")`.
-          -->
+              `eue` and `vde` carry the identical interpolation, checked rather than assumed:
+              `Ne(" Welcome to the ",e.appService.globals.sessData.name," ")`.
+            -->
             <h1 class="room-title">Welcome to the {data.roomTitle}</h1>
           {/if}
 
           <!--
-          const 63 `text-center authenticate-info`, and `bue` renders it unconditionally between the
-          h1 and the form: `d(1,"p",63),v(2,"Please complete this form:")`. The component's own CSS
-          gives it `p.authenticate-info { padding: 15px 0 }`.
-        -->
+            const 63 `text-center authenticate-info`, and `bue` renders it unconditionally between the
+            h1 and the form: `d(1,"p",63),v(2,"Please complete this form:")`. The component's own CSS
+            gives it `p.authenticate-info { padding: 15px 0 }`.
+          -->
           <p class="text-center authenticate-info">Please complete this form:</p>
 
           <!-- const 64 `mb-3 login-form` with a submit binding. -->
@@ -356,15 +356,15 @@
                 <img src={data.avatarUrl} alt="" width="80" height="80" />
               </div>
               <!--
-              const 70 is `[1,"user-nick"]` — ONE class. The `text-center` that used to be here was
-              never in the reference: the component's own CSS is
-              `.user-nick { font-style: italic; font-size: 15px; margin-left: 0 }`, with no
-              `text-align` at all, so centring it was a guess that happened to look right.
+                const 70 is `[1,"user-nick"]` — ONE class. The `text-center` that used to be here was
+                never in the reference: the component's own CSS is
+                `.user-nick { font-style: italic; font-size: 15px; margin-left: 0 }`, with no
+                `text-align` at all, so centring it was a guess that happened to look right.
 
-              The content is the NICK, not the email — `O(9, e.nick ? 9 : -1)` renders the row only
-              when there is one, and the rendered capture reads `@[OWNER_NAME]`. The `@` is a
-              literal in the template, not part of the value.
-            -->
+                The content is the NICK, not the email — `O(9, e.nick ? 9 : -1)` renders the row only
+                when there is one, and the rendered capture reads `@[OWNER_NAME]`. The `@` is a
+                literal in the template, not part of the value.
+              -->
               {#if name}
                 <div class="user-nick">@{name}</div>
               {/if}
@@ -432,11 +432,11 @@
             {/if}
 
             <!--
-            const 99/101/102 — shown on `showPresenter = sessData.showPasswordField`. Never
-            REQUIRED on this path: `e.pw || 'pw' != authMode || passedToken`, and a token is always
-            present here. The value is posted and the CONTROLLER compares it, because `webinarPW`
-            may not cross to this application and does not cross in the reference either.
-          -->
+              const 99/101/102 — shown on `showPresenter = sessData.showPasswordField`. Never
+              REQUIRED on this path: `e.pw || 'pw' != authMode || passedToken`, and a token is always
+              present here. The value is posted and the CONTROLLER compares it, because `webinarPW`
+              may not cross to this application and does not cross in the reference either.
+            -->
             {#if showPresenter}
               <label for="login-password">Password</label>
               <div class="input-group mb-3">
@@ -464,13 +464,13 @@
             <!-- const 80, and 82 the submit: `btn-login btn btn-primary buttonload text-center`. -->
             <div class="d-flex p-2 justify-content-between mt-3 align-items-center">
               <!--
-              const 81 `form-check`, 107 the checkbox, 108 `for=remember-me form-check-label`, from
-              `pue`. This is what used to be an empty `<span>` holding the space open — dead
-              scaffolding standing where a real control belongs.
+                const 81 `form-check`, 107 the checkbox, 108 `for=remember-me form-check-label`, from
+                `pue`. This is what used to be an empty `<span>` holding the space open — dead
+                scaffolding standing where a real control belongs.
 
-              `.login-form .form-check:hover { cursor: pointer }` and
-              `.login-form .form-check-label { font-size: 12px }` are the component's own rules.
-            -->
+                `.login-form .form-check:hover { cursor: pointer }` and
+                `.login-form .form-check-label { font-size: 12px }` are the component's own rules.
+              -->
               <div class="form-check">
                 <input
                   type="checkbox"
@@ -496,14 +496,14 @@
             </div>
 
             <!--
-            const 83 `mt-1 text-right` > 84 `session-login-link` with the click ON THE ANCHOR:
-            `x("click", … doLoginFormClear())`, text "Not you? clear form".
+              const 83 `mt-1 text-right` > 84 `session-login-link` with the click ON THE ANCHOR:
+              `x("click", … doLoginFormClear())`, text "Not you? clear form".
 
-            A `<button>` rather than the reference's bare `<a>`: an anchor with no href is not
-            focusable or keyboard-operable, and this repository's floor is semantic accessible HTML.
-            The class list is the reference's, so the CSS
-            (`.session-login-link { font-size: 14px }`) still applies.
-          -->
+              A `<button>` rather than the reference's bare `<a>`: an anchor with no href is not
+              focusable or keyboard-operable, and this repository's floor is semantic accessible HTML.
+              The class list is the reference's, so the CSS
+              (`.session-login-link { font-size: 14px }`) still applies.
+            -->
             <div class="mt-1 text-right">
               <button type="button" class="session-login-link btn btn-link p-0" onclick={clearForm}>
                 Not you? clear form
@@ -512,13 +512,13 @@
 
             {#if !showPresenter}
               <!--
-              `gue`: const 112 `mt-3 t text-center` carries the CLICK, const 113 the anchor. The
-              stray single-letter class `t` is the reference's and is kept — it has no rule, which
-              is a fact about the reference rather than something to tidy away.
+                `gue`: const 112 `mt-3 t text-center` carries the CLICK, const 113 the anchor. The
+                stray single-letter class `t` is the reference's and is kept — it has no rule, which
+                is a fact about the reference rather than something to tidy away.
 
-              Guarded on `!showPresenter` because slot 32 renders this only while the password field
-              is hidden: `O(32, e.showPresenter ? 33 : 32)`.
-            -->
+                Guarded on `!showPresenter` because slot 32 renders this only while the password field
+                is hidden: `O(32, e.showPresenter ? 33 : 32)`.
+              -->
               <div class="mt-3 t text-center">
                 <button
                   type="button"

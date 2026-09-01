@@ -124,12 +124,12 @@
 </script>
 
 <!--
-                `z('hidden', o.appService.globals.viewerOnlyMode)` on this `ul`
-                (`app-presentationarea.compiled.js:3154-3155`, and const 3 at `:1598` declares the
-                `hidden` binding it feeds). Viewer-only mode is a room reduced to the screen: the
-                whole main tab strip goes, which is also why `.viewer-only-screen-tab` sets
-                `max-height: calc(-40px + 100vh)` — the 40px it reclaims is this strip.
-              -->
+  `z('hidden', o.appService.globals.viewerOnlyMode)` on this `ul`
+  (`app-presentationarea.compiled.js:3154-3155`, and const 3 at `:1598` declares the
+  `hidden` binding it feeds). Viewer-only mode is a room reduced to the screen: the
+  whole main tab strip goes, which is also why `.viewer-only-screen-tab` sets
+  `max-height: calc(-40px + 100vh)` — the 40px it reclaims is this strip.
+-->
 <ul id="mainTabs" class="nav nav-tabs mainTabset" role="tablist" hidden={viewerOnlyMode}>
   <li role="presentation" class="nav-item">
     <a
@@ -152,11 +152,11 @@
     </a>
   </li>
   <!--
-                  `z('hidden', o.hideStreams)` on the `li` (`app-presentationarea.full.js:5357`),
-                  the same flag the pane below uses. This carried a hardcoded `hidden` and no
-                  click handler until `useMediaMTX` reached the room — a tab that could never
-                  open, in every room, whether or not it had MediaMTX.
-                -->
+    `z('hidden', o.hideStreams)` on the `li` (`app-presentationarea.full.js:5357`),
+    the same flag the pane below uses. This carried a hardcoded `hidden` and no
+    click handler until `useMediaMTX` reached the room — a tab that could never
+    open, in every room, whether or not it had MediaMTX.
+  -->
   <li role="presentation" class="nav-item" hidden={hideStreams}>
     <a
       id="streams-tab"
@@ -231,27 +231,27 @@
     </a>
   </li>
   <!--
-                  The captured gate, verbatim, on both the tab (slot 25, byte 2,016,864) and its
-                  pane (slot 47, byte 2,017,661):
+    The captured gate, verbatim, on both the tab (slot 25, byte 2,016,864) and its
+    pane (slot 47, byte 2,017,661):
 
-                    O(25, (o.hideVideoPlayer && !o.isP) || o.isP ? 25 : -1)
+      O(25, (o.hideVideoPlayer && !o.isP) || o.isP ? 25 : -1)
 
-                  i.e. a presenter always sees it, and a member sees it only while a video is
-                  playing for the room. `hideVideoPlayer` is now modelled - `playVideoForAll`
-                  sets it and `stopVideoForAll` clears it, both on the `cmds` channel.
+    i.e. a presenter always sees it, and a member sees it only while a video is
+    playing for the room. `hideVideoPlayer` is now modelled - `playVideoForAll`
+    sets it and `stopVideoForAll` clears it, both on the `cmds` channel.
 
-                  Two earlier states of this gate, kept because each was a real defect: the tab
-                  once rendered with NO gate, so every member saw it; it was then reduced to
-                  `isPresenter`, correct only for as long as nothing could set the other term.
-                  Now that the broadcast exists, dropping the term would force-switch a member to
-                  a tab that renders nothing.
+    Two earlier states of this gate, kept because each was a real defect: the tab
+    once rendered with NO gate, so every member saw it; it was then reduced to
+    `isPresenter`, correct only for as long as nothing could set the other term.
+    Now that the broadcast exists, dropping the term would force-switch a member to
+    a tab that renders nothing.
 
-                  Evidence, stated as what was observed and no further: the owner's own MEMBER
-                  capture of `#mainTabs` has this tab collapsed to an empty Angular comment
-                  anchor, so the gate was false for that member at that moment. No member capture
-                  taken WHILE a video was playing exists, so the true branch is transcribed from
-                  the bundle above rather than from a rendered page.
-                -->
+    Evidence, stated as what was observed and no further: the owner's own MEMBER
+    capture of `#mainTabs` has this tab collapsed to an empty Angular comment
+    anchor, so the gate was false for that member at that moment. No member capture
+    taken WHILE a video was playing exists, so the true branch is transcribed from
+    the bundle above rather than from a rendered page.
+  -->
   {#if (broadcasts.hideVideoPlayer && !isPresenter) || isPresenter}
     <li role="presentation" class="nav-item">
       <a
@@ -275,16 +275,16 @@
     </li>
   {/if}
   <!--
-                  Swing Alerts — `XCe`, gated on the room setting rather than on presenter status:
+    Swing Alerts — `XCe`, gated on the room setting rather than on presenter status:
 
-                    O(26, o.hasSwingTradeAlerts ? 26 : -1)
+      O(26, o.hasSwingTradeAlerts ? 26 : -1)
 
-                  `{#if}` and not `hidden`, because `-1` is `ɵɵconditional`'s "instantiate
-                  nothing". An entitlement that ships hidden markup has already told the member
-                  the feature exists, and this one is what a room pays for.
+    `{#if}` and not `hidden`, because `-1` is `ɵɵconditional`'s "instantiate
+    nothing". An entitlement that ships hidden markup has already told the member
+    the feature exists, and this one is what a room pays for.
 
-                  The icon is `fas fa-bell` (const 64), shared with the Day Trades tab.
-                -->
+    The icon is `fas fa-bell` (const 64), shared with the Day Trades tab.
+  -->
   {#if swingAlerts.enabled}
     <li role="presentation" class="nav-item">
       <a
@@ -310,19 +310,19 @@
     </li>
   {/if}
   <!--
-                  Day Trades — `JCe`, byte 1,917,906, the `<li>` immediately after the Swing one
-                  and gated the same way, on its own room setting rather than on presenter status:
+    Day Trades — `JCe`, byte 1,917,906, the `<li>` immediately after the Swing one
+    and gated the same way, on its own room setting rather than on presenter status:
 
-                    O(27, o.hasDayTradeAlerts ? 27 : -1)
+      O(27, o.hasDayTradeAlerts ? 27 : -1)
 
-                  A conditional block and not a `hidden` attribute, because `-1` is
-                  `ɵɵconditional`'s "instantiate nothing". An entitlement that ships hidden markup has
-                  already told the member the feature exists, and this one is what a room pays for.
+    A conditional block and not a `hidden` attribute, because `-1` is
+    `ɵɵconditional`'s "instantiate nothing". An entitlement that ships hidden markup has
+    already told the member the feature exists, and this one is what a room pays for.
 
-                  The label is `Day Trades` (byte 1,918,110), NOT "Day Trade Alerts" — the pane's
-                  own heading says "Latest Day Trade Alerts" and the tab says the short form. The
-                  icon is `fas fa-bell` (const 64), the same tuple the Swing tab uses.
-                -->
+    The label is `Day Trades` (byte 1,918,110), NOT "Day Trade Alerts" — the pane's
+    own heading says "Latest Day Trade Alerts" and the tab says the short form. The
+    icon is `fas fa-bell` (const 64), the same tuple the Swing tab uses.
+  -->
   {#if dayTradeAlerts.enabled}
     <li role="presentation" class="nav-item">
       <a
@@ -348,17 +348,17 @@
     </li>
   {/if}
   <!--
-                  "Hide Files Section?" - `z('hidden', o.hideFiles)` on this `li`
-                  (app-presentationarea.full.js:5375) and on the `#files` pane (5410-5413). Both,
-                  because either one alone leaves a tab that opens nothing or a pane still
-                  reachable from a tab that is gone.
+    "Hide Files Section?" - `z('hidden', o.hideFiles)` on this `li`
+    (app-presentationarea.full.js:5375) and on the `#files` pane (5410-5413). Both,
+    because either one alone leaves a tab that opens nothing or a pane still
+    reachable from a tab that is gone.
 
-                  The reference feeds the binding `sessData.hideFiles || globals.videoOnlyMode`
-                  (2289-2290). Only the first term is implemented, and `filesSectionHidden` in
-                  `#lib/files-gates.js` says why: the second is not a setting but the recording-bot
-                  client global, set from the `r` query parameter, and this room has no media.recording
-                  bot to model.
-                -->
+    The reference feeds the binding `sessData.hideFiles || globals.videoOnlyMode`
+    (2289-2290). Only the first term is implemented, and `filesSectionHidden` in
+    `#lib/files-gates.js` says why: the second is not a setting but the recording-bot
+    client global, set from the `r` query parameter, and this room has no media.recording
+    bot to model.
+  -->
   <li role="presentation" class="nav-item" hidden={files.filesHidden}>
     <!-- svelte-ignore a11y_missing_attribute -->
     <a

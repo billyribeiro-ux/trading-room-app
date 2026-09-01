@@ -522,14 +522,14 @@
           aria-labelledby="screens-tab"
         >
           <!--
-                      The viewer's own "off to preserve data" switch, and it replaces the WHOLE
-                      pane rather than hiding the videos inside it. `TSe`
-                      (`app-presentationarea.render-helpers.js:496-499`) chooses between `eSe` -
-                      this one h3 - and `wSe`, and `wSe` is the empty-room h3, `ul#screenTabs` and
-                      `div#screensTabsContent` together, so nothing below survives the switch.
-                      That is the point: a tab strip with no video under it would still be
-                      requesting streams.
-                    -->
+            The viewer's own "off to preserve data" switch, and it replaces the WHOLE
+            pane rather than hiding the videos inside it. `TSe`
+            (`app-presentationarea.render-helpers.js:496-499`) chooses between `eSe` -
+            this one h3 - and `wSe`, and `wSe` is the empty-room h3, `ul#screenTabs` and
+            `div#screensTabsContent` together, so nothing below survives the switch.
+            That is the point: a tab strip with no video under it would still be
+            requesting streams.
+          -->
           <!--
             `O(38, sessData.customPlayerURL ? 38 : 39)` — byte 2,017,248, the two children of
             `div#screens`. Slot 38 is `eSe` (byte 1,918,589) with consts 21 and 68; slot 39 is
@@ -555,32 +555,32 @@
             <h3 class="text-center mt-4">Video off to preserve data...</h3>
           {:else}
             <!--
-                      `screenSharingUsers` is an array and each presenter holds a Map of screens, so
-                      N sharers x M screens each all land here as sibling tabs - the captured bar
-                      carried three at once, all belonging to a single presenter.
-                    -->
+              `screenSharingUsers` is an array and each presenter holds a Map of screens, so
+              N sharers x M screens each all land here as sibling tabs - the captured bar
+              carried three at once, all belonging to a single presenter.
+            -->
             <!--
-                      The h3 and the bar are SIBLINGS, not alternatives. The bar used to sit in the
-                      alternate branch of this conditional, so an idle room rendered the h3 INSTEAD
-                      of `ul#screenTabs` and the strip's background simply did not exist - the
-                      owner's report, 2026-08-11, that the background div is missing from where the
-                      screens go.
+              The h3 and the bar are SIBLINGS, not alternatives. The bar used to sit in the
+              alternate branch of this conditional, so an idle room rendered the h3 INSTEAD
+              of `ul#screenTabs` and the strip's background simply did not exist - the
+              owner's report, 2026-08-11, that the background div is missing from where the
+              screens go.
 
-                      The capture settles it without ambiguity. `app.css:1225` cites the computed
-                      style at path `r.0#screens.1#screenTabs`, and 1229 records that in that same
-                      capture NO screen was shared: index `.0` is this h3, index `.1` is the bar.
-                      Both present, in that order, with nothing being presented. The bar reported
-                      `background-color: rgb(17,17,17)`, `width: 1186.53px` and `height: 1px` -
-                      that 1px being 0px of content plus its own bottom border, which is exactly
-                      what an empty flex container measures.
+              The capture settles it without ambiguity. `app.css:1225` cites the computed
+              style at path `r.0#screens.1#screenTabs`, and 1229 records that in that same
+              capture NO screen was shared: index `.0` is this h3, index `.1` is the bar.
+              Both present, in that order, with nothing being presented. The bar reported
+              `background-color: rgb(17,17,17)`, `width: 1186.53px` and `height: 1px` -
+              that 1px being 0px of content plus its own bottom border, which is exactly
+              what an empty flex container measures.
 
-                      So the bar is unconditional and only its CONTENTS are conditional, which
-                      `ScreenTabs` already handles: the `{#each}` renders nothing and the
-                      `li.nav-item.ms-auto` controls slot is gated on `screens.length > 0`.
-                      `height: auto` then reproduces both states for free, because
-                      `.nav-tabs .nav-item { margin-bottom: -1px }` cancels the bar's own border
-                      once it has tabs.
-                    -->
+              So the bar is unconditional and only its CONTENTS are conditional, which
+              `ScreenTabs` already handles: the `{#each}` renders nothing and the
+              `li.nav-item.ms-auto` controls slot is gated on `screens.length > 0`.
+              `height: auto` then reproduces both states for free, because
+              `.nav-tabs .nav-item { margin-bottom: -1px }` cancels the bar's own border
+              once it has tabs.
+            -->
             {#if mediaTransport.screens.length === 0}
               <h3 class="text-center mt-4">No one is presenting right now...</h3>
             {/if}
@@ -597,12 +597,12 @@
               onstopscreen={(id) => screens.stop(id)}
             >
               <!--
-                        The `li.nav-item.ms-auto` slot, which the capture fills and this page
-                        never did. `ScreenTabs` already renders the captured container around it
-                        (`div.zoom-controls-container.position-relative`, const 88 of
-                        `app-presentationarea`), so the snippet supplies that container's
-                        children only.
-                      -->
+                The `li.nav-item.ms-auto` slot, which the capture fills and this page
+                never did. `ScreenTabs` already renders the captured container around it
+                (`div.zoom-controls-container.position-relative`, const 88 of
+                `app-presentationarea`), so the snippet supplies that container's
+                children only.
+              -->
               {#snippet controls()}
                 <ScreenZoomControls
                   variant="attached"
@@ -624,23 +624,23 @@
               {/snippet}
             </ScreenTabs>
             <!--
-                      `viewer-only-screen-tab` lives HERE, on const 72, and nowhere else.
+              `viewer-only-screen-tab` lives HERE, on const 72, and nowhere else.
 
-                      `wSe`'s update block walks `O(0,…)`, `m(2)`, `pt(…)`, `m(2)`, `O(4,…)` — an
-                      explicit index, so the pointer is fixed — then `m()` to node 5, where
-                      `z('ngClass', ut(3, jCe, …viewerOnlyMode))` lands
-                      (`app-presentationarea.render-helpers.js:483-493`). Node 5 is
-                      `d(5,'div',72)` and const 72 is
-                      `['id','screensTabsContent',1,'tab-content',3,'ngClass']` — the only element in
-                      that block whose const carries a binding marker (`…compiled.js:2044`). The tab
-                      strip's const 70 has none, and the pane's const 73 binds `{'show active': …}`
-                      alone.
+              `wSe`'s update block walks `O(0,…)`, `m(2)`, `pt(…)`, `m(2)`, `O(4,…)` — an
+              explicit index, so the pointer is fixed — then `m()` to node 5, where
+              `z('ngClass', ut(3, jCe, …viewerOnlyMode))` lands
+              (`app-presentationarea.render-helpers.js:483-493`). Node 5 is
+              `d(5,'div',72)` and const 72 is
+              `['id','screensTabsContent',1,'tab-content',3,'ngClass']` — the only element in
+              that block whose const carries a binding marker (`…compiled.js:2044`). The tab
+              strip's const 70 has none, and the pane's const 73 binds `{'show active': …}`
+              alone.
 
-                      `.viewer-only-screen-tab { padding-bottom: 5px; height: 100% !important;
-                      max-height: calc(-40px + 100vh) !important }`
-                      (`css/complete-app-styles.css:6978`) — the 40px it reclaims is `ul#mainTabs`,
-                      which is `hidden` in this mode.
-                    -->
+              `.viewer-only-screen-tab { padding-bottom: 5px; height: 100% !important;
+              max-height: calc(-40px + 100vh) !important }`
+              (`css/complete-app-styles.css:6978`) — the 40px it reclaims is `ul#mainTabs`,
+              which is `hidden` in this mode.
+            -->
             <div
               id="screensTabsContent"
               class={['tab-content', { 'viewer-only-screen-tab': viewerOnlyMode }]}
@@ -688,23 +688,23 @@
           {/if}
         </div>
         <!--
-                    The `#streams` pane — `d(40,'div',22)` with `H(41, DSe, 2, 0, 'h3', 23)(42, OSe, 7, 1)`
-                    (`app-presentationarea.full.js:5277-5278`), and its update block at `:5388-5393`:
+          The `#streams` pane — `d(40,'div',22)` with `H(41, DSe, 2, 0, 'h3', 23)(42, OSe, 7, 1)`
+          (`app-presentationarea.full.js:5277-5278`), and its update block at `:5388-5393`:
 
-                      z('ngClass', ut(57, Hr, 'presAreaTabs-streams' == o.selectedMainTab))
-                       ('hidden', o.hideStreams),
-                      m(), O(41, o.appService.globals.preferences.disableVideo ? 41 : 42)
+            z('ngClass', ut(57, Hr, 'presAreaTabs-streams' == o.selectedMainTab))
+             ('hidden', o.hideStreams),
+            m(), O(41, o.appService.globals.preferences.disableVideo ? 41 : 42)
 
-                    `Hr` is `t => ({'show active': t})`, so the pane gets BOTH classes, exactly like
-                    `#screens`.
+          `Hr` is `t => ({'show active': t})`, so the pane gets BOTH classes, exactly like
+          `#screens`.
 
-                    THE SAME `disableVideo` PREFERENCE BLANKS THIS PANE TOO. `DSe` (`:500`) renders
-                    the identical `<h3 class="text-center mt-4">Video off to preserve data...</h3>`
-                    that `eSe` renders for `#screens`. One switch, two panes — a viewer who turns
-                    video off to save data must not keep pulling an HLS playlist here, which is the
-                    whole point of the preference. `disable-video-gate-contract.test.ts` already
-                    pins the polarity: the flag being SET selects the MESSAGE.
-                  -->
+          THE SAME `disableVideo` PREFERENCE BLANKS THIS PANE TOO. `DSe` (`:500`) renders
+          the identical `<h3 class="text-center mt-4">Video off to preserve data...</h3>`
+          that `eSe` renders for `#screens`. One switch, two panes — a viewer who turns
+          video off to save data must not keep pulling an HLS playlist here, which is the
+          whole point of the preference. `disable-video-gate-contract.test.ts` already
+          pins the polarity: the flag being SET selects the MESSAGE.
+        -->
         <div
           id="streams"
           class={mainTab === 'streams' ? 'tab-pane fade show active' : 'tab-pane fade'}
@@ -716,10 +716,10 @@
             <h3 class="text-center mt-4">Video off to preserve data...</h3>
           {:else}
             <!--
-                        `O(0, 0 == mtxStreams.length ? 0 : -1)` — the empty-state h3 is the ONLY
-                        conditional part. The `ul` and the `div` are always rendered, empty, which is
-                        why this sits beside them rather than replacing them.
-                      -->
+              `O(0, 0 == mtxStreams.length ? 0 : -1)` — the empty-state h3 is the ONLY
+              conditional part. The `ul` and the `div` are always rendered, empty, which is
+              why this sits beside them rather than replacing them.
+            -->
             {#if mtx.streams.length === 0}
               <h3 class="text-center mt-4">No one is streaming right now...</h3>
             {/if}
@@ -732,16 +732,16 @@
               ontogglelock={toggleLockStreamMtx}
             />
             <!--
-                        `d(4,'div',119)` then `ht(5, ISe, 2, 7, 'div', 73, pc)`. Each pane is const
-                        73 — `['role','tabpanel',1,'tab-pane','fade',3,'ngClass','id']` — with
-                        `ngClass` from `Hr` and `aria-labelledby` interpolated as `${_id}-tab`.
+              `d(4,'div',119)` then `ht(5, ISe, 2, 7, 'div', 73, pc)`. Each pane is const
+              73 — `['role','tabpanel',1,'tab-pane','fade',3,'ngClass','id']` — with
+              `ngClass` from `Hr` and `aria-labelledby` interpolated as `${_id}-tab`.
 
-                        Every pane stays MOUNTED and only the classes change, which is why
-                        `onStreamTabChange` has no stop/start counterpart: unlike
-                        `onScreenShareTabChange`, which emits `stopWatchScreenOf` /
-                        `startWatchScreenOf`, switching stream tabs upstream touches nothing but the
-                        selection. `StreamingView` owns its own hls.js lifecycle from `active`.
-                      -->
+              Every pane stays MOUNTED and only the classes change, which is why
+              `onStreamTabChange` has no stop/start counterpart: unlike
+              `onScreenShareTabChange`, which emits `stopWatchScreenOf` /
+              `startWatchScreenOf`, switching stream tabs upstream touches nothing but the
+              selection. `StreamingView` owns its own hls.js lifecycle from `active`.
+            -->
             <div id="streamsTabsContent" class="tab-content">
               {#each mtx.streams as mtxStream (mtxStream._id)}
                 <div
@@ -753,13 +753,13 @@
                   aria-labelledby="{mtxStream._id}-tab"
                 >
                   <!--
-                              `T(1,'app-streaming-view',117)` — const 117 is `[1,'h-inherit',3,'muser']`,
-                              so the HOST element carries `h-inherit` and the component's own root
-                              carries `h-100` (its const 1). Angular has a host element; Svelte has
-                              none, so the host becomes this wrapper `div` and the two nested
-                              elements survive. Dropping it would drop the height chain and the
-                              video would collapse to its intrinsic size.
-                            -->
+                    `T(1,'app-streaming-view',117)` — const 117 is `[1,'h-inherit',3,'muser']`,
+                    so the HOST element carries `h-inherit` and the component's own root
+                    carries `h-100` (its const 1). Angular has a host element; Svelte has
+                    none, so the host becomes this wrapper `div` and the two nested
+                    elements survive. Dropping it would drop the height chain and the
+                    video would collapse to its intrinsic size.
+                  -->
                   <div class="h-inherit">
                     <StreamingView
                       muser={mtxStream}
@@ -904,15 +904,15 @@
           </div>
         {/if}
         <!--
-                    The `#swingAlerts` pane — `vwe`, slot 48, carrying the SAME gate as the nav
-                    item above (`O(48, o.hasSwingTradeAlerts ? 48 : -1)`). Both, because either one
-                    alone leaves a tab that opens nothing or a pane reachable from a tab that is
-                    gone.
+          The `#swingAlerts` pane — `vwe`, slot 48, carrying the SAME gate as the nav
+          item above (`O(48, o.hasSwingTradeAlerts ? 48 : -1)`). Both, because either one
+          alone leaves a tab that opens nothing or a pane reachable from a tab that is
+          gone.
 
-                    The pane re-applies the gate itself, which is not redundancy for its own sake:
-                    it is what lets the contract test prove the component renders nothing on a false
-                    entitlement without standing up this whole page.
-                  -->
+          The pane re-applies the gate itself, which is not redundancy for its own sake:
+          it is what lets the contract test prove the component renders nothing on a false
+          entitlement without standing up this whole page.
+        -->
         {#if swingAlerts.enabled}
           <div
             id="swingAlerts"
@@ -946,15 +946,15 @@
           </div>
         {/if}
         <!--
-                    The `#dayTradeAlerts` pane — `Iwe`, slot 49, carrying the SAME gate as the nav
-                    item above (`O(49, o.hasDayTradeAlerts ? 49 : -1)`, byte 2,017,748). Both,
-                    because either one alone leaves a tab that opens nothing or a pane reachable
-                    from a tab that is gone.
+          The `#dayTradeAlerts` pane — `Iwe`, slot 49, carrying the SAME gate as the nav
+          item above (`O(49, o.hasDayTradeAlerts ? 49 : -1)`, byte 2,017,748). Both,
+          because either one alone leaves a tab that opens nothing or a pane reachable
+          from a tab that is gone.
 
-                    The pane re-applies the gate itself, which is not redundancy for its own sake:
-                    it is what lets the contract test prove the component renders nothing on a false
-                    entitlement without standing up this whole page.
-                  -->
+          The pane re-applies the gate itself, which is not redundancy for its own sake:
+          it is what lets the contract test prove the component renders nothing on a false
+          entitlement without standing up this whole page.
+        -->
         {#if dayTradeAlerts.enabled}
           <div
             id="dayTradeAlerts"
@@ -990,12 +990,12 @@
           </div>
         {/if}
         <!--
-                    The second half of the `hideFiles` gate - `z('hidden', o.hideFiles)` at
-                    full.js:5410-5413. `#files.active` sets `display: block`, which the UA rule for
-                    `[hidden]` cannot beat on its own, so `app.css` carries `#files[hidden]` after
-                    it; the note there records that the two selectors are equally specific and it is
-                    the order that decides.
-                  -->
+          The second half of the `hideFiles` gate - `z('hidden', o.hideFiles)` at
+          full.js:5410-5413. `#files.active` sets `display: block`, which the UA rule for
+          `[hidden]` cannot beat on its own, so `app.css` carries `#files[hidden]` after
+          it; the note there records that the two selectors are equally specific and it is
+          the order that decides.
+        -->
         <FilesPane
           {data}
           {isPresenter}
@@ -1009,10 +1009,10 @@
       </div>
       {#if broadcasts.youtubeForAllUrl}
         <!--
-                    Two DIFFERENT handlers, which is the whole point of the two buttons: `onstop`
-                    posts `stopYTForAll` and takes the video off the room, `onclose` dismisses this
-                    viewer's own iframe and nothing else. Both were wired to one function.
-                  -->
+          Two DIFFERENT handlers, which is the whole point of the two buttons: `onstop`
+          posts `stopYTForAll` and takes the video off the room, `onclose` dismisses this
+          viewer's own iframe and nothing else. Both were wired to one function.
+        -->
         <YoutubePlayerOverlay
           url={broadcasts.youtubeForAllUrl}
           startSeconds={broadcasts.youtubeStartSeconds}
@@ -1042,13 +1042,13 @@
         </app-scplayer>
       {/if}
       <!--
-                  `z('src', o.mp3Url, Mt)` — the element binds its src to the room-wide sound.
+        `z('src', o.mp3Url, Mt)` — the element binds its src to the room-wide sound.
 
-                  It was `src=""`, so the element existed, autoplayed nothing, and a presenter's
-                  "Play For All" was silent in every browser including their own. `#mp3player` is
-                  the capture's own id and is load-bearing: `setBkgMusicVol` reaches it with
-                  `un('#mp3player').prop('volume', o)`.
-                -->
+        It was `src=""`, so the element existed, autoplayed nothing, and a presenter's
+        "Play For All" was silent in every browser including their own. `#mp3player` is
+        the capture's own id and is load-bearing: `setBkgMusicVol` reaches it with
+        `un('#mp3player').prop('volume', o)`.
+      -->
       <audio
         {@attach setAutoplayAttribute}
         {...{ autoplay: 'autoplay' } as Record<string, string>}
@@ -1056,29 +1056,29 @@
         src={broadcasts.mp3Url ?? ''}
       ></audio>
       <!--
-                  `.speech-reco-overlay` is `position: absolute` pinned to the bottom of its
-                  containing block, so it belongs inside `.mainPresentationAreaHolder` - the
-                  presentation area is what it captions.
+        `.speech-reco-overlay` is `position: absolute` pinned to the bottom of its
+        containing block, so it belongs inside `.mainPresentationAreaHolder` - the
+        presentation area is what it captions.
 
-                  Two gates, and both must be open: `subtitles` is this viewer's
-                  `presentation-subtitles` / `showSpeechRecoOverlay` preference, and a caption only
-                  exists at all while session-level `doSpeechReco` is running recognition.
+        Two gates, and both must be open: `subtitles` is this viewer's
+        `presentation-subtitles` / `showSpeechRecoOverlay` preference, and a caption only
+        exists at all while session-level `doSpeechReco` is running recognition.
 
-                  `PA-07` — and it goes LAST, which the paragraph above argued correctly and did not
-                  say. The reference's create block ends
+        `PA-07` — and it goes LAST, which the paragraph above argued correctly and did not
+        say. The reference's create block ends
 
-                  ```js
-                  H(86,n2e,1,2,"app-ytplayer",49)(87,i2e,1,1,"app-scplayer",50),
-                  T(88,"audio",51), H(89,u2e,9,7,"div",52), u())              // byte 2,016,249
-                  ```
+        ```js
+        H(86,n2e,1,2,"app-ytplayer",49)(87,i2e,1,1,"app-scplayer",50),
+        T(88,"audio",51), H(89,u2e,9,7,"div",52), u())              // byte 2,016,249
+        ```
 
-                  and that `u()` closes the holder, so the overlay is its final child — after the two
-                  players and the `<audio>`. It was FIRST here, which paint order does not care about
-                  (`z-index: 9999`) and the keyboard does: the overlay's three `z-index: 10000`
-                  buttons — transcript, history, close — came before the whole tab strip in tab
-                  order, so a viewer tabbing into the presentation column met the caption controls
-                  before anything they were there to use.
-                -->
+        and that `u()` closes the holder, so the overlay is its final child — after the two
+        players and the `<audio>`. It was FIRST here, which paint order does not care about
+        (`z-index: 9999`) and the keyboard does: the overlay's three `z-index: 10000`
+        buttons — transcript, history, close — came before the whole tab strip in tab
+        order, so a viewer tabbing into the presentation column met the caption controls
+        before anything they were there to use.
+      -->
       {#if subtitles}
         <SpeechRecoOverlay
           current={currentCaption}
