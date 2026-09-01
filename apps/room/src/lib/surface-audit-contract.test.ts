@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { auditSurface } from '../../gate/audit-surface.mjs';
 
@@ -253,6 +254,82 @@ const CLEAN: readonly {
     files: ['src/lib/components/ModalHost.svelte', 'src/lib/components/ScreenPane.svelte']
   },
   {
+    selector: 'app-chat',
+    consts: 93,
+    views: 27,
+    files: [
+      'src/lib/components/AlertChatArea.svelte',
+      'src/lib/components/ChatSearchBar.svelte',
+      'src/lib/components/ChatTabStrip.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/GiphyPicker.svelte',
+      'src/lib/components/MessageMenu.svelte',
+      'src/lib/chat-mode.ts'
+    ]
+  },
+  {
+    /*
+      The extra column, and its file list carries a lesson: `extra-chat-surface.ts` has to be in it.
+      Without that module the audit reports `textAreaHolder` missing, because the id reaches the
+      markup through `EXTRA_CHAT_COMPOSER_HOLDER_ID` rather than as a literal — which is `XCP-01`, the
+      defect where an `Extra` suffix cost this column every `#textAreaHolder` rule in `app.css`.
+    */
+    selector: 'app-extra-chat',
+    consts: 90,
+    views: 26,
+    files: [
+      'src/lib/components/ExtraChatPane.svelte',
+      'src/lib/extra-chat-surface.ts',
+      'src/lib/components/ChatSearchBar.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/GiphyPicker.svelte',
+      'src/lib/components/ChatTabStrip.svelte'
+    ]
+  },
+  {
+    selector: 'app-poll-modal',
+    consts: 53,
+    views: 9,
+    files: [
+      'src/lib/components/PollPanel.svelte',
+      'src/lib/components/PollSavedList.svelte',
+      'src/lib/room/polls.svelte.ts'
+    ]
+  },
+  {
+    selector: 'app-debug-log-modal',
+    consts: 11,
+    views: 0,
+    files: ['src/lib/components/ModalHost.svelte', 'src/lib/components/Modal.svelte']
+  },
+  {
+    selector: 'app-reply-modal',
+    consts: 23,
+    views: 2,
+    files: [
+      'src/lib/components/ReplyModal.svelte',
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/GiphyPicker.svelte'
+    ]
+  },
+  {
+    selector: 'app-kicked-page',
+    consts: 3,
+    views: 0,
+    files: ['src/lib/components/KickedPage.svelte']
+  },
+  {
+    selector: 'app-root',
+    consts: 4,
+    views: 6,
+    files: [
+      'src/routes/+page.svelte',
+      'src/lib/components/KickedPage.svelte',
+      'src/lib/components/RoomShell.svelte'
+    ]
+  },
+  {
     /* Two consts and no embedded views — a thin container, and the numbers say so. */
     selector: 'app-positions-container',
     consts: 2,
@@ -284,6 +361,67 @@ describe('seven surfaces measured clean — audited 2026-09-01', () => {
     expect(report.views.unresolved).toEqual([]);
     expect(report.constGaps.map((gap) => gap.value)).toEqual([]);
     expect(report.textGaps).toEqual([]);
+  });
+});
+
+describe('app-privchat — audited 2026-09-01, and its four gaps are ONE refusal', () => {
+  /*
+    Four values, one reason, and the reason is `G7` in `room/private-chat.svelte.ts`.
+
+    ```js
+    O(1, e.getAllPCLogsLoading ? 1 : 2)   // " Loading private chats. Please wait... " / " No active chat "
+    O(3, e.getAllPCLogsLoading ? 3 : -1)  // the tab column's own "Loading all private chats." block
+    ```
+
+    Upstream needs that flag because it POSTs `getAllPCLogs` when the panel opens. **This room has no
+    such moment**: the conversation list is resolved in `+page.server.ts` before the page renders, and
+    the only refresh is `invalidateAll()`, which keeps the previous list on screen while it runs.
+    There is no instant at which the strip exists and its contents are unknown, so both branches
+    would be branches that can never render.
+
+    `my-1` is the fourth, and it is the same refusal: const 47 is used ONLY inside `sEe`, the
+    "Loading all private chats." block. Reading where a class is USED rather than assuming it is
+    surface is what turned four findings into one.
+  */
+  const report = auditSurface({
+    selector: 'app-privchat',
+    files: [
+      'src/lib/components/PrivateChatPanel.svelte',
+      'src/lib/components/PrivateChatComposer.svelte',
+      'src/lib/room/private-chat.svelte.ts',
+      'src/lib/components/GiphyPicker.svelte',
+      'src/lib/components/RoomOverlays.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/ModalHost.svelte'
+    ]
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(79);
+    expect(report.views.resolved).toBe(19);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('has exactly the one loading block left, and nothing else', () => {
+    expect(report.constGaps.map((gap) => gap.value)).toEqual(['my-1']);
+    expect(report.textGaps).toEqual([
+      'Loading all private chats.',
+      'Please wait...',
+      ' Loading private chats. Please wait... '
+    ]);
+  });
+
+  it("and the refusal's premise is still what it says it is", () => {
+    /*
+      Read rather than trusted: if the conversation list ever starts being fetched on OPEN, the
+      loading states stop being unreachable and this refusal expires. The premise is that the list
+      arrives with the page.
+    */
+    const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
+    expect(server).toContain('loadConversations(');
+    const panel = readFileSync(new URL('./room/private-chat.svelte.ts', import.meta.url), 'utf8');
+    expect(panel).toContain('getAllPCLogsLoading');
+    expect(panel).toContain('branches that can never render');
   });
 });
 

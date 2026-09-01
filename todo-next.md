@@ -157,7 +157,7 @@ guessed.
 | 74 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
 | 75 | `lib/components/ToastHost.svelte` | 64 | no |
 | 76 | `lib/components/YoutubePlayerOverlay.svelte` | 88 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-ytplayer` (5 consts, 1 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. Five consts — thin, and the pinned count says so. |
-| 77 | `lib/components/PollSavedList.svelte` | 59 | no |
+| 77 | `lib/components/PollSavedList.svelte` | 59 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-poll-modal` (53 consts, 9 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. Audited with the poll panel. |
 | 78 | `lib/components/NavbarTipButton.svelte` | 58 | §NAV — born 2026-08-31 out of `RoomNavbar`; RS-09 s navbar copy and its `noopener` refusal. |
 | 79 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
 | 80 | `lib/components/PositionsControls.svelte` | 44 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-positions-container` (2 consts, 0 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. Audited with row 72 — one reference component, two files here. |
@@ -167,7 +167,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 114 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**73 of 92 surfaces audited · 26,292 of 38,904 lines · 67.6%.**
+**74 of 92 surfaces audited · 26,351 of 38,904 lines · 67.7%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
