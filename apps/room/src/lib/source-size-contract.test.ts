@@ -774,6 +774,78 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     max: 1889,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
+  /*
+    ── THE FOUR ROUTE COMPONENTS BELOW WERE ADMITTED BY `every route component is discovered and
+       capped`, ADDED 2026-09-01, AND THE DELAY IS THE FINDING AGAIN ─────────────────────────────
+
+    `every component is discovered and capped` was written on 2026-08-28 after a hand-kept list of
+    `lib/components/` failed exactly the way a hand-kept list fails: 12 of 48 covered. Its own note
+    says *"a gate that reports success over the thing it does not look at is worse than no gate"*.
+
+    `src/routes/` was that thing. The entry directly above — `routes/+page.svelte`, the largest
+    component in the repository — has been capped since this file was written, and the four beside it
+    had nothing, because a route is a `.svelte` file this gate never enumerated. Found on 2026-09-01
+    when `+error.svelte` was created and the suite stayed green through the addition of a new page.
+
+    `session/+page.svelte` at 702 lines is the one that matters: the entry door, the largest uncapped
+    file in the app, and the file whose own history includes an infinite navigation loop that shipped.
+
+    All four arrive at MEASURED size, which is this file's standing practice for a sweep — *"floors to
+    descend from"*, not invented targets nobody could defend.
+  */
+  {
+    file: 'routes/+error.svelte',
+    /*
+      NEW 2026-09-01, capped at what it landed at, and it is 159 lines for eight elements because the
+      decode is the file. This app had no error boundary at all, so 124 `error(...)` call sites — the
+      closed room's presenter-written sentence among them — rendered on SvelteKit's unstyled fallback.
+
+      What is written down here rather than in a test: which half of `app-closed-session-page` this is
+      and which half it refuses (`closed-container` styles nothing in the 444,793-byte captured sheet,
+      and its `innerHTML` is a stored-XSS primitive against every member who arrives at a closed room);
+      why the layout is `app-kicked-page`'s three captured consts rather than a design; and why the
+      status number is gated at 500. `error-page-contract.test.ts` re-reads all four on every run.
+
+      141 -> 159 on the same day, before it had ever been pushed: a browser probe showed the shell had
+      to be a SECOND file. `+error.svelte` covers errors raised inside a route; an error thrown in
+      `hooks.server.ts`'s `handle` is raised before a route resolves, so `hooks.server.ts:89` — the
+      authentication choke point, the app's most-hit refusal — falls through to `src/error.html`
+      instead. The eighteen lines are that distinction, written where the next person will look for it.
+
+      If this climbs, the question is whether it has grown a BRANCH. It reads two values and renders
+      one string; a second status rule, or anything that reads room state, is the signal that a page
+      whose whole job is to work when everything else failed has started depending on things.
+    */
+    max: 159,
+    why: 'the page every refusal in this app lands on, including a closed room'
+  },
+  {
+    file: 'routes/+layout.svelte',
+    max: 28,
+    why: 'the root layout: the stylesheet import and the three preloaded icon faces'
+  },
+  {
+    file: 'routes/logout/+page.svelte',
+    max: 32,
+    why: 'the signed-out page'
+  },
+  {
+    file: 'routes/session/+page.svelte',
+    /*
+      Capped at measured size on 2026-09-01, having never been capped. It is the ENTRY DOOR — the
+      page a member reaches from a handoff — and the largest uncapped file in the app.
+
+      The reason to want a ceiling on this one specifically is in its own history: the shallow-navigation
+      loop that shipped on 2026-08-13 and was found on 2026-08-28 lived in this file, in an effect whose
+      docblock argued its own termination correctly for the API it no longer used. A file this size is
+      where that hides.
+
+      If this climbs, the extraction is the entry logic — the token strip, the latch and the redirect
+      decisions — into a `.svelte.ts` module that can be driven without a mount.
+    */
+    max: 702,
+    why: 'the entry door: handoff, token strip and the login form'
+  },
   {
     file: 'lib/room/chat-log-save.ts',
     /*
@@ -3025,7 +3097,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       string and reads no gate; a prop that is an entitlement, or any branch at all beyond the
       fallback, is the signal that the page's job has started leaking into it.
     */
-    max: 107,
+    /*
+      RAISED 107 -> 115 on 2026-09-01, and the check the paragraph above asks for was made first: the
+      markup is still five elements, the style rule is still four lines, and no branch, prop or gate
+      was added. Every one of the eight lines is prose CORRECTING a claim this file made about a
+      different file.
+
+      It said the closed-session arm of the five-way switch is *"`CloseSessionPane` inside the modal
+      host"*. That conflates the presenter's editor for the close message with the page a member sees,
+      and a member never sees `CloseSessionPane`. The member's side is an HTTP 403 —
+      `session/+page.server.ts:257` — which until the same day landed on SvelteKit's unstyled fallback
+      because this app had no `+error.svelte`. It has one now, and it borrows this component's three
+      captured consts.
+
+      This is the raise the ratchet should always accept. A false sentence about a neighbouring
+      surface is the failure mode the whole comment practice exists to prevent, and the correction
+      cannot be extracted anywhere: it is about THIS file's switch decode, which is why the decode is
+      here rather than at the branch.
+    */
+    max: 115,
     why: 'the page a kicked member is left on - five elements, and the decode that says why'
   },
   {
@@ -7936,6 +8026,20 @@ function svelteFilesUnder(dir: string): string[] {
 
 const componentFiles = svelteFilesUnder('lib/components/').sort();
 
+/*
+  ROUTES ARE DISCOVERED TOO, added 2026-09-01, and the delay is the same finding a second time.
+
+  `svelteFilesUnder` was already recursive and already generic; nothing pointed it at `routes/`. So
+  `routes/+page.svelte` was capped — by hand, because somebody happened to care about the largest
+  file in the repository — and the four route components beside it were not, including the 701-line
+  entry door. The gap surfaced when `+error.svelte` was created and every gate stayed green through
+  the addition of a whole new page.
+
+  `+page.server.ts` and the `.remote.ts` files are deliberately NOT swept in here: they are modules,
+  and the note on `svelteFilesUnder` already states why this gate does not claim that jurisdiction.
+*/
+const routeComponents = svelteFilesUnder('routes/').sort();
+
 describe('every component is discovered and capped', () => {
   it('found the components it is meant to cap', () => {
     /*
@@ -7967,6 +8071,38 @@ describe('every component is discovered and capped', () => {
     const onDisk = new Set(componentFiles);
     const stale = CEILINGS.map((entry) => entry.file)
       .filter((file) => file.startsWith('lib/components/'))
+      .filter((file) => !onDisk.has(file));
+    expect(
+      stale,
+      `${stale.join(', ')} has a ceiling but no file. Remove the entry — a ceiling on a file that does not exist is a test that cannot fail.`
+    ).toEqual([]);
+  });
+});
+
+describe('every route component is discovered and capped', () => {
+  it('found the routes it is meant to cap, including nested ones', () => {
+    /*
+      The vacuity guard. `routes/` holds five `.svelte` files across three directory levels, and a
+      non-recursive read would find three of them and report success over the two it skipped — one of
+      which is `session/+page.svelte`, the entry door.
+    */
+    expect(routeComponents.length).toBeGreaterThan(3);
+    expect(routeComponents.filter((file) => file.split('/').length > 2).length).toBeGreaterThan(0);
+  });
+
+  it('every route component on disk has a declared ceiling', () => {
+    const capped = new Set(CEILINGS.map((entry) => entry.file));
+    const uncapped = routeComponents.filter((file) => !capped.has(file));
+    expect(
+      uncapped,
+      `${uncapped.join(', ')} exists under routes/ with no ceiling. A PAGE cannot be added without saying what too big means for it — four route components, one of them the 702-line entry door, sat uncapped from this file's creation until 2026-09-01 because this gate only ever looked at lib/components/. Add an entry to CEILINGS at the size it actually lands, with a why that says what the page IS.`
+    ).toEqual([]);
+  });
+
+  it('and every declared route ceiling still has a file', () => {
+    const onDisk = new Set(routeComponents);
+    const stale = CEILINGS.map((entry) => entry.file)
+      .filter((file) => file.startsWith('routes/') && file.endsWith('.svelte'))
       .filter((file) => !onDisk.has(file));
     expect(
       stale,

@@ -30,8 +30,41 @@
     <!--
       NO <title> HERE, AND ITS REMOVAL FIXED A SHIPPED FEATURE.
 
-      The shell used to carry `<title>PTRChat</title>` on this line, immediately BEFORE
-      `%sveltekit.head%`. Every route in this application sets its own title through `<svelte:head>`,
+      ## FIRST, THE RULE THIS COMMENT ITSELF BROKE, 2026-08-13 to 2026-09-01
+
+      This paragraph used to write SvelteKit's head placeholder out in full, one line below, to say
+      where the title had been. **Never name a `%sveltekit.…%` placeholder inside this file, in a
+      comment or anywhere else, except at the site where it is meant to be substituted.** SvelteKit
+      substitutes the FIRST occurrence in the template, and the first occurrence was the one in this
+      comment — so the whole head was injected HERE, and the real placeholder at the bottom of this
+      block was served to browsers as the literal text `%svelte` + `kit.head%`.
+
+      That alone would have been invisible. What made it a defect on every page of the room is that
+      the injected head OPENS WITH AN HTML COMMENT OF ITS OWN — Svelte's style-hash marker, a bare
+      comment wrapping a hash such as 12qhfyh — and HTML comments do not nest. Its closing sequence
+      closed THIS comment early, so everything after it, the rest of these paragraphs included,
+      escaped into the document as body text and was painted across the top of every page.
+
+      Which is the SECOND rule, learned the same hour, by writing that marker out verbatim here and
+      watching this file's own prose reappear on the page: **no HTML comment in this file may contain
+      a comment opening or closing sequence**, not even quoted as evidence. There is no escape for one
+      inside a comment — the parser stops at the first closer it sees and has no notion of quoting.
+
+      Found on 2026-09-01 by screenshotting the new `+error.svelte` in a real browser. Nothing else
+      could have found it: `svelte-check` does not read `app.html`, the markup is valid HTML either
+      way, `document.title` stayed CORRECT (the injected `<title>` still landed in `<head>`), and the
+      room's own e2e specs assert on locators rather than on the absence of stray text. It is the
+      same shape as the rule `CLAUDE.md` states for Svelte blocks — *"a comment quoting a block is
+      prose to a human and an unclosed block to any parser reading the file"* — one templating
+      language over.
+
+      `app-html-contract.test.ts` now fails if a placeholder is ever named outside its substitution
+      site, and the room's browser suite fails if this file's prose reaches the page.
+
+      ## The original finding, which is why there is no title element here
+
+      The shell used to carry `<title>PTRChat</title>` on this line, immediately before the head
+      placeholder below. Every route in this application sets its own title through `<svelte:head>`,
       so every page was served with TWO title elements — and `document.title` is the FIRST one in the
       document, so the browser tab said "PTRChat" on every page of the room, always.
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import { handoffUrl } from './handoff';
@@ -239,8 +241,57 @@ test.describe('the room itself', () => {
       `string | undefined`, and no unit test read that node. A browser sees it immediately.
     */
     const body = (await page.locator('body').innerText()).toLowerCase();
-    for (const marker of ['undefined', 'nan', '[object object]', '{{']) {
+    /*
+      `%sveltekit` JOINED THIS LIST ON 2026-09-01, and it was absent for the reason every list like
+      this is incomplete: the four above are the markers that had already gone wrong.
+
+      `app.html`'s docblock named the head placeholder in prose. SvelteKit substitutes the FIRST
+      occurrence in the template, so the head was injected into the COMMENT and the real placeholder
+      was served to browsers as literal text. This assertion ran on every commit for weeks and saw
+      it, because it was looking for four other strings.
+    */
+    for (const marker of ['undefined', 'nan', '[object object]', '{{', '%sveltekit']) {
       expect(body, `the page renders the literal "${marker}"`).not.toContain(marker);
+    }
+  });
+
+  test('no prose from the shell has escaped into the page', async () => {
+    /*
+      THE OTHER HALF OF THE SAME DEFECT, and the half no marker list can be written for.
+
+      The injected head opens with Svelte's style-hash marker — an HTML comment — and HTML comments do
+      not nest, so its closing sequence ended `app.html`'s comment early and the rest of that docblock
+      was painted across the top of every page. The escaped text is ordinary English; there is no
+      token to look for.
+
+      ## The first version of this test PASSED under its own negative control
+
+      It derived its probes by matching `<!--…-->` over `app.html` — which is exactly how a browser
+      parses it, and therefore exactly the parse that is WRONG when this defect is present. Under the
+      mutation, the regex stopped at the injected closer too, so the escaped prose was never a probe
+      and the test went green over the thing it was written to catch. Re-run properly it is red; the
+      run that reported "1 passed" was the finding.
+
+      ## What it reads instead: prose LINES, with no notion of comments at all
+
+      A line of `app.html` that does not begin with a tag is prose the author wrote for other authors,
+      whatever the parser later decides about it — so it is the right probe whether the comment
+      structure is intact or broken. None of those lines may appear in what a member reads.
+
+      A new comment is covered the moment it is written, which is the property a hard-coded sentinel
+      would not have. `app-html-contract.test.ts` catches the same defect at the source, faster and
+      with a better message; this is the backstop that does not depend on knowing the mechanism —
+      the one thing that was missing when the mechanism was unknown.
+    */
+    const bodyText = await page.locator('body').innerText();
+    const shell = readFileSync(new URL('../src/app.html', import.meta.url), 'utf8');
+    const probes = shell
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 40 && !line.startsWith('<') && !line.includes('%sveltekit'));
+    expect(probes.length, 'app.html must carry prose for this to test anything').toBeGreaterThan(0);
+    for (const probe of probes) {
+      expect(bodyText, `app.html prose reached the page: "${probe}"`).not.toContain(probe);
     }
   });
 

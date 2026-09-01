@@ -33,6 +33,114 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 00:38 UTC — the room had no error page, and `app.html` was printing its own docblock on every page
+
+**Runtime impact: YES, on every page of the application, and one of the two was a shipped defect
+visible to every member since 2026-08-13.**
+
+## The defect, found by looking at a screenshot
+
+`app.html`'s docblock explained where a `<title>` element used to sit, and to say where, it wrote
+SvelteKit's head placeholder out in full. SvelteKit substitutes the **first** occurrence of
+`%sveltekit.head%` in the template — `@sveltejs/kit/src/core/sync/write_server.js` does it with a
+non-global `.replace()`, read rather than inferred — and the first occurrence was the one in that
+comment. So the whole head was injected inside the comment, and the real placeholder at the bottom of
+the block was served to browsers as literal text.
+
+That alone would have been invisible. What made it visible is that the injected head opens with
+Svelte's style-hash marker, which is an HTML comment, and **HTML comments do not nest**: its closing
+sequence ended `app.html`'s comment early, and the rest of that docblock escaped into the document as
+body text and was painted across the top of every page in the room.
+
+Nothing here could see it. `svelte-check` does not read `app.html`, eslint does not lint HTML, the
+markup is valid either way, `document.title` stayed CORRECT because the injected `<title>` still
+landed in `<head>`, and the browser suite's marker list looked for `undefined`, `NaN`,
+`[object Object]` and `{{`. It was found by screenshotting a new error page and reading the picture.
+
+**The first repair reproduced it.** Quoting the offending marker verbatim as evidence put a comment
+closer back inside a comment; the probe went straight back to two `<title>` elements and the prose
+reappeared. There is no escaping sequence for a delimiter inside an HTML comment — the parser stops
+at the first closer it sees. Both rules are now written at the file and both are gated.
+
+## Why an error page was being built at all
+
+`reference-const-coverage-contract` carried `app-closed-session-page`'s three residuals on the reason
+*"this room's closed-session page is not a Bootstrap navbar with a collapsible menu"*. Both clauses
+assume a closed-session page. **There isn't one** — and there was no `+error.svelte` and no
+`src/error.html` either, so **124** `error(...)` call sites rendered SvelteKit's unstyled fallback.
+The one that matters is `session/+page.server.ts:257`: a closed room answers with the presenter's own
+sentence, written per room in `CloseSessionPane`'s editor, and it was being delivered on a page that
+looked like the site had broken.
+
+That is the sixth blocker re-measured this session and the fifth found to be describing the
+reference's mechanism rather than this room's capability.
+
+## What was built
+
+**`src/routes/+error.svelte`** — for errors raised inside a route. **`src/error.html`** — for errors
+thrown in `hooks.server.ts`'s `handle`, which is raised before a route resolves and therefore cannot
+render a route component. That distinction decides which file covers the app's single most common
+refusal: `hooks.server.ts:89`, the authentication choke point, throws from `handle`. It was measured,
+not assumed: with only the route page in place, `GET /no-such-route` still rendered SvelteKit's
+fallback in a browser.
+
+Both use `app-kicked-page`'s three captured consts (byte 2,561,780) and its verbatim `h2` rule —
+upstream's own answer to "the room, replaced by a sentence saying why" — read from `KickedPage.svelte`
+by the contract so the two cannot drift into two designs.
+
+**The message is rendered as TEXT, and that is a security boundary rather than a preference.**
+Upstream's closed page injects it: `[1,"m-2","w-100","closed-container",3,"innerHTML"]`, byte
+2,573,542, carrying Summernote rich text a presenter wrote. Reproducing that would be a stored-XSS
+primitive stored per room by whoever runs it and fired at every member who arrives after it closes.
+`CloseSessionPane.svelte` already recorded the divergence at the write end; this is the read end, and
+both are needed — a textarea still accepts `<img onerror=…>` as literal text, so plain-text STORAGE
+is not what makes it safe, plain-text RENDERING is.
+
+`closed-container` stays a residual on a measurement rather than a guess: the captured stylesheet is
+444,793 bytes and holds no rule for it — the only `closed` in the whole sheet is
+`.ui-icon-mail-closed`, a jQuery UI sprite offset.
+
+## Two stale claims corrected, and the ratchet's own blind spot closed
+
+`KickedPage.svelte` named the closed-session arm's counterpart as *"`CloseSessionPane` inside the
+modal host"*, conflating the presenter's editor with the page a member sees. Corrected in place.
+
+`source-size-contract` only ever enumerated `lib/components/`, so `routes/` was the thing its own note
+warns about — *"a gate that reports success over the thing it does not look at is worse than no
+gate"*. `routes/+page.svelte` was capped by hand; the four beside it, including the **702-line entry
+door**, were not, and the suite stayed green through the addition of a whole new page.
+`every route component is discovered and capped` now admits them, and all four are capped at measured
+size.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 325 files, 5,866 passed, 1 skipped; `svelte-check` 1,613
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+Both pages were opened in a browser and screenshotted. `GET /session` → `+error.svelte`,
+`document.title` `"500 — This room is not configured to accept sign-ins."`, exactly one `<title>`,
+`h2` `rgb(0, 0, 0)` centred, `Error 500` beneath it. `GET /no-such-route` → `src/error.html`, title
+`"403 — Open this room from your account page."`, no stray marker anywhere in the body.
+
+**Fifteen negative controls, all seen red on the case they were aimed at**, and two of them found
+defects in the tests rather than in the code:
+
+- The browser guard's first version **passed under its own negative control.** It derived its probes
+  by matching `<!--…-->` over `app.html` — which is exactly the parse that is wrong when this defect
+  is present, so the escaped prose was never a probe and it went green over the thing it was written
+  to catch. It reads prose LINES now, with no notion of comments at all, and is red on the mutation.
+- A control aimed at the Repeat select failed the wrong case, because its slice ran forward from the
+  first `<label class="field">` in the file. Anchored backwards from the Repeat caption now.
+
+The `%sveltekit.error.message%` placeholder name was also found the hard way: `%sveltekit.message%`
+is the name anyone would guess, is replaced by nothing, and renders itself to the person being turned
+away. The contract refuses it by name.
+
+**The Svelte MCP has been disconnected for the remainder of this session, so `svelte-autofixer` did
+not run on `+error.svelte`.** That is a gate this repository requires and it was not met;
+`svelte-check`, the contract tests and a real browser are what stand in its place, and they are not
+the same thing.
+
 ### 2026-09-01 23:41 UTC — PAM-08 and PAM-09's two captured ids, and the third control that keeps its wrap
 
 **Runtime impact: YES, small.** Two send-later controls in the alert composer are now associated with

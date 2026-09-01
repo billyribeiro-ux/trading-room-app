@@ -461,9 +461,45 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     'followChatStyle.fontSize'
   ],
   /*
-    The navbar collapse toggler — `data-bs-target="#navbarsExampleDefault"` plus the matching
-    `aria-controls` and the id it names — and one class on the page body. This room's closed-session
-    page is not a Bootstrap navbar with a collapsible menu, so the toggler has nothing to toggle.
+    ── RE-MEASURED 2026-09-01, BECAUSE THE REASON WAS WRONG ABOUT OUR OWN CODE ──────────────────
+
+    It read: *"This room's closed-session page is not a Bootstrap navbar with a collapsible menu, so
+    the toggler has nothing to toggle."* Both clauses assume a closed-session page. **There isn't
+    one.** `grep -rn closed-container src/` finds only this list, and there is no component, route or
+    page state for a closed room anywhere in `apps/room`: `session/+page.server.ts:257` answers with
+    `error(403, closedRoomMessage(shortCode))` and the presenter's sentence is delivered in an HTTP
+    error body. `KickedPage.svelte` decoded the reference's five-way page switch and named this arm's
+    counterpart as `CloseSessionPane` — which is the PRESENTER's editor for the message, not the page
+    a member sees; that sentence is corrected there too.
+
+    Upstream's is a whole page: `app-closed-session-page`, selector at byte **2,571,301**, running to
+    `app-detached-screen` at **2,593,043** — the room shell repeated (navbar, sidebar, Connectivity
+    Check, General Settings, Muted Users, Followed Users, Session Control, the mobile-app button)
+    around one content const.
+
+    All three stay residuals, and each now has its own measured reason rather than one shared guess:
+
+    - **`#navbarsExampleDefault` / `navbarsExampleDefault`** — a Bootstrap collapse toggler and the id
+      it targets, `["type","button","data-bs-toggle","collapse","data-bs-target","#navbarsExampleDefault",
+      "aria-controls","navbarsExampleDefault","aria-expanded","false","aria-label","Toggle navigation",
+      1,"navbar-toggler"]` at byte 2,571,858, paired with `["id","navbarsExampleDefault",1,"collapse",
+      "navbar-collapse"]`. Bootstrap's data API is replaced by state throughout this room — the group
+      three rows above says so for thirteen more of these — and it is the SELECTOR that has no
+      counterpart, not the pane.
+
+    - **`closed-container`** — `[1,"m-2","w-100","closed-container",3,"innerHTML"]`, byte 2,573,542,
+      and it **styles nothing**. The captured stylesheet is 444,793 bytes and holds no rule for it;
+      the only `closed` in the whole sheet is `.ui-icon-mail-closed`, a jQuery UI sprite offset. It is
+      an `innerHTML` host hook, and this repository's standard forbids carrying a class no rule reads.
+      The `innerHTML` is the second reason and the load-bearing one: upstream injects presenter-authored
+      Summernote markup there, which is a stored-XSS primitive reaching every member who arrives at a
+      closed room. `CloseSessionPane.svelte` records the divergence at the write end and
+      `error-page-contract.test.ts` guards it at the read end.
+
+    What DID come of the re-measurement is `src/routes/+error.svelte`, built the same day: this app
+    had no error boundary at all, so the closed-room sentence — and 123 other refusals — rendered on
+    SvelteKit's unstyled fallback. It uses `app-kicked-page`'s three captured consts, because that is
+    the reference's own answer for "the room, replaced by a sentence saying why".
   */
   'app-closed-session-page': [
     '#navbarsExampleDefault',
@@ -793,10 +829,23 @@ describe('how much of the gap has already been written about', () => {
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
+  /*
+    29/86 -> 30/85 on 2026-09-01, and the ONE value that moved is worth naming because the mechanism
+    looks like a bug and is not: `closed-container` became examined the moment the re-measurement
+    above wrote its reason down. That is precisely what `mentioned` is defined to mean — *"a value
+    named in a docblock or a contract test has been examined and refused or deferred, with a reason
+    on record"* — so a value crossing this line as a result of being reasoned about is the split
+    working, not the split being gamed.
+
+    The distinction that keeps it honest: writing a reason moves a value from UNEXAMINED to EXAMINED;
+    nothing anybody writes moves it out of `all`. Only rendering the value does that, and rendering is
+    measured against stripped source. The two siblings (`#navbarsExampleDefault` and the bare id) did
+    NOT move, because the reason they already carried named them literally.
+  */
   it('splits the 115 into what is on record and what nobody has looked at', () => {
     expect(all).toHaveLength(115);
-    expect(all.filter(mentioned)).toHaveLength(29);
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(86);
+    expect(all.filter(mentioned)).toHaveLength(30);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(85);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {
@@ -910,6 +959,12 @@ describe('the comment stripping is load-bearing', () => {
     const raw = RAW_ROWS.reduce((total, row) => total + row.residuals.length, 0);
     const stripped = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(raw).toBeLessThan(stripped);
-    expect(stripped - raw).toBe(19);
+    /*
+      19 -> 20 on 2026-09-01. The twentieth is `closed-container`: the `app-closed-session-page`
+      re-measurement quotes the const it belongs to, so an UNSTRIPPED read of our source now finds
+      that string in a docblock and calls the gap closed. Which is the exact failure this case
+      exists to prove is still being avoided — the gap is open, and only the stripped read says so.
+    */
+    expect(stripped - raw).toBe(20);
   });
 });
