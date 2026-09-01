@@ -33,6 +33,184 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 04:55 UTC — seven surfaces measured clean and pinned, and a template slice that read the wrong component
+
+**Runtime impact: NONE.** Contract coverage and tracker rows only.
+
+Seven reference components measured with `gate/audit-surface.mjs` and found complete — zero absent
+const values, zero absent text literals each: `app-muted-users-modal`, `app-followed-users-modal`,
+`app-alert-filter-modal`, `app-scheduled-alerts-modal`, `app-mobile-app-info-modal`,
+`app-positions-container`, `app-webcam-holder`. All seven are pinned in
+`surface-audit-contract.test.ts`, table-driven, with the const and view COUNTS asserted beside the
+gaps.
+
+## The counts are asserted because one of them caught a bug
+
+`app-muted-users-modal` reported **sixteen** resolved views for a template that declares two, and two
+text gaps that belonged to the recording preview card. The template slice was bounded by
+`},dependencies:` alone, and this component goes straight from its template to `},styles:` — so the
+slice ran past the component entirely and the view walk picked up the four `app-rec-preview` views
+declared just below it. It is bounded by the earliest of four markers now.
+
+That is why the pins carry sizes: a surface with one const and no embedded views proves very little,
+and `app-webcam-holder` is recorded as *"the weakest evidence in this file"* rather than given a green
+tick that reads like the others.
+
+## A negative control that was correct to stay green
+
+Removing `list-group-flush` from the muted-users modal did not fail — because the same value is still
+rendered by the followed-users modal in the same file, so it is present in that surface's file set.
+Removing BOTH occurrences is red. Worth recording: the control was wrong the first time and the tool
+was right, which is the opposite of the two cases earlier today.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 329 files, 5,933 passed, 1 skipped; `svelte-check` 1,620
+files, 0 errors, 0 warnings.
+
+Three negative controls: a value genuinely removed from a clean surface (red), the template slice
+un-bounded again (red, on the view counts), and the one above.
+
+`todo-next.md` rows 46, 55, 59, 61, 72 and 80 audited — **63 of 92 surfaces, 23,829 of 38,857 lines
+(61.3%)**, up from 51 of 89 when this session began.
+
+### 2026-09-02 04:25 UTC — a hidden card with two inert controls, and the sentence that said it wasn't there
+
+**Runtime impact: NONE.** The card was and remains invisible; what changed is that its state is now
+argued and gated instead of accidental.
+
+## What the new audit script found on its second batch
+
+Twelve surfaces run through `gate/audit-surface.mjs`. **Seven measured clean** —
+`app-muted-users-modal`, `app-mobile-app-info-modal`, `app-positions-container`,
+`app-scheduled-alerts-modal`, `app-webcam-holder`, `app-followed-users-modal`,
+`app-alert-filter-modal` — zero absent const values and zero absent text literals each.
+`app-alert-send-report-modal`'s nineteen are the `RPT-*` refusal, already argued in
+`alert-report-modal-contract.test.ts` against a system with no per-recipient delivery record.
+
+`app-rec-preview` reported three, and the read behind them found a defect the three did not name.
+
+## The card nothing could see
+
+`ModalHost.svelte` rendered `app-rec-preview` whole — holder, title, close icon, expand icon,
+"Recording paused." — and **every part of it was unreachable**. `.recsHolderScreen` carries
+`display: none`, which is the reference's own rule, and nothing in this room ever removes it: one
+markup site, no gate, no class toggle, no writer. The two icons had no handlers at all; upstream both
+are `x("click", …)` on `closePreview()` and `expandPreview()`, with the expand icon swapping to
+`fa-compress-arrows-alt` under `O(8, expandRecPreview ? 8 : 9)`.
+
+And the reason recorded for the two residuals ended: *"**No card**, so no element to carry either
+name."* There was a card. That is the ninth claim this session that was false about this repository's
+own code, found the same way as the rest — by measuring instead of reading the note.
+
+## Deleting it was wrong, and the gate said so
+
+The card was removed, and `captured-css-ancestor-contract` went red: `app-rec-preview` is a scoped
+host in the GENERATED stylesheet, so an absent host leaves its rules matching nothing and those
+components *"ship unstyled and silently"*. The generated sheet is regenerated from the capture and
+cannot be trimmed by hand, so the host is what keeps its rules attached to an element. Restored.
+
+## What replaces the deletion
+
+`RecordingPreviewCard.svelte` — extracted, because `source-size-contract` refused `ModalHost.svelte`
+the forty lines the decision costs and that rule's answer is extract, not raise. Eleven lines of
+markup and forty of why.
+
+`rec-preview-contract.test.ts` asserts the **conditional**, not the absence: *the icons may stay
+handler-less only while the card cannot be reached.* A test asserting "we did not build it" passes
+forever and stops nobody. `reachable` is computed from the two facts — the `display: none` rule and
+the presence of a gate — so it cannot be satisfied by editing a constant. The day somebody makes this
+card visible, the handlers become required.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 329 files, 5,926 passed, 1 skipped; `svelte-check` 1,620
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+**Four negative controls on the conditional, and the fourth stayed green.** Renaming
+`showRecPreview` did not fail, because the method's own docblock quotes `showRecPreview()` two lines
+above the declaration — the eighth time this session a check's subject matched the prose recording
+it. Comments stripped, it is red. The other three — the rule removed, a gate added, the host renamed
+— were red on target.
+
+`todo-next.md`: 57 of 92 surfaces, 23,152 of 38,857 lines (59.6%). The const sweep's examined split
+moved 32/79 → 34/77, both moves caused by audits rather than prose.
+
+### 2026-09-02 03:51 UTC — the surface audit becomes a script and a ratchet, and substring matching cost a control
+
+**Runtime impact: NONE.** A new gate script, a new contract, and three surfaces pinned. No shipped
+code changed.
+
+## Why a script
+
+`todo-next.md` asks for a per-surface read: every const by value, every text literal, measured
+against the files that implement one component. Thirty-odd surfaces remain and each was being done by
+hand. Two hand audits earlier today found real gaps — `PAM-11`'s seven classes, and a Repeat select
+shipping with **no classes at all** — which is the argument for the method; doing it thirty more
+times by eye is the argument for `gate/audit-surface.mjs`.
+
+It answers a question `reference-const-coverage-contract` structurally cannot. That sweep searches
+the WHOLE application, so `form-select`, `d-flex` and `m-0` count as present because they occur
+somewhere while being absent from the component under audit. This one scopes to the files
+implementing one surface, and it reads TEXT LITERALS too, which that sweep does not read at any scope
+because they are not in the const table.
+
+`surface-audit-contract.test.ts` pins the answer for each surface already done, so re-opening a gap
+is a failing test rather than something a person has to notice — the shape
+`feature-coverage-contract.test.ts` uses, for the reason its own note gives: *"a count would have
+caught none of those three."*
+
+## Four things the script got wrong, each found by running it
+
+**The view walk resolved 2 of 15.** Angular hoists every embedded view to a function ABOVE the
+component's consts, and the template declares them CHAINED: `H(59,VTe,4,3,"div",35)(60,HTe,…)(61,…)`
+— one `H`, then bare call syntax. A regex anchored on `H(` finds the first of each chain. It matches
+the SIGNATURE now — `(number, Identifier, number, number` — and resolves all fifteen.
+
+**A 32 KB window swept up the neighbours.** The first version read text from a byte window below the
+const table and reported "Create New Poll", "Pre-Canned Polls" and "Debug Log" as gaps in
+`app-post-alert-modal`. Views are resolved transitively from the template now, so the text read is
+exactly the set the component can render.
+
+**Two decoders, for two spellings of the same string.** `Send on this date & time:` in the capture
+against `&amp;` in our markup; `v(1,"\xa0Chat")` in the capture — four source characters for one
+non-breaking space — against `&nbsp;Chat` here. Both sides are normalised; values are reported in
+their original spelling because that is what a reader greps for.
+
+**Substring matching, and this is the fourth time this repository has paid for it.** A negative
+control cut `class="form-select form-select-sm"` down to `class="form-select-sm"` — a class the
+reference carries and this room had just lost — and the contract **stayed green**, because
+`ours.includes('form-select')` is true of `form-select-sm`. It is the same shape as `js` inside
+`json`, `pmToolbar` inside `pmToolbarZZ`, and a declaration assertion passing on the comment above it.
+Matching is whole-token now, with the hyphen counted as a token character because every value at risk
+is a hyphenated class or id.
+
+**Making it strict immediately surfaced something real**: `pe`, from the reference's own
+`["pe","button",…]` typo in consts 261 and 269 — an attribute literally named `pe`, leaving the button
+at its `submit` default. It had been counted present because `pe` occurs inside a dozen ordinary
+words. Not reproduced, and now pinned in two places.
+
+## What is pinned
+
+`app-post-alert-modal` (79 consts, 15 views) — four const values and four text literals left, each a
+refusal on record: Twilio SMS, the linked-room fan-out, and `PAM-10`'s refusal to let a presenter post
+under someone else's name. The chat toolbar (bytes 1,449,150–1,451,150, 27 views) — **clean, zero and
+zero**. The `#files` region (consts 238–266) — one const, the `pe` typo; one literal, the
+never-fetched message.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 328 files, 5,914 passed, 1 skipped; `svelte-check` 1,618
+files, 0 errors, 0 warnings; eslint clean.
+
+**Four negative controls, three red on target and one that exposed the substring bug** — which is the
+control doing its job. The script's own output was cross-checked against both hand audits done earlier
+today and reproduces each exactly.
+
+`todo-next.md`: rows 19 and 56 audited — 56 of 91 surfaces, 23,092 of 38,807 lines (59.5%). The const
+sweep's examined split moved 30/81 → 32/79, the first such move caused by an audit rather than by
+prose.
+
 ### 2026-09-02 03:04 UTC — FilesPane read end to end, and 100 comment bodies stranded by extraction
 
 **Runtime impact: NONE.** Comment indentation and a new gate; no shipped markup, style or behaviour

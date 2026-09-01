@@ -6,6 +6,7 @@
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
   import { shortWhen } from '#lib/short-when.js';
+  import RecordingPreviewCard from './RecordingPreviewCard.svelte';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import ReplyModal from './ReplyModal.svelte';
   import SessionHistoryPane from './SessionHistoryPane.svelte';
@@ -5287,18 +5288,7 @@
     <div class="ui-resizable-handle ui-resizable-nw" style="z-index: 90;"></div>
   </div>
 </app-screenshare-preview>
-<app-rec-preview>
-  <div id="recLocalPreviewHolder" class="card recsHolderScreen">
-    <div class="card-body">
-      <h5 class="card-title m-0">
-        <div class="d-inline-block p-2 text-white">Recording Preview. (DELAYED UPTO 20s)</div>
-        <span class="float-right p-2"><i class="fas fa-times text-white"></i></span>
-        <span class="float-right p-2 mx-1"><i class="fas fa-expand text-white"></i></span>
-      </h5>
-      <div class="text-center py-4 text-white"><h4>Recording paused.</h4></div>
-    </div>
-  </div>
-</app-rec-preview>
+<RecordingPreviewCard />
 <app-followed-users-modal>
   <Modal
     id="followedUsersModal"

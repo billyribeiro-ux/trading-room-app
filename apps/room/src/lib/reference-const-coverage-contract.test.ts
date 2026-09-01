@@ -690,10 +690,27 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     effect is its own presence.
   */
   /*
-    The id and class of the `<video>` inside the reference's IN-PAGE preview card. This room's
-    preview is a separate WINDOW, argued in `room/recording.ts`: upstream points its card at a
-    server-supplied `recPreviewLocation`, there is no such URL here, and the window shows the local
-    recording instead. No card, so no element to carry either name.
+    The id and class of the `<img>` inside the reference's IN-PAGE preview card. This room's preview
+    is a separate WINDOW, argued in `room/recording.ts`: upstream points its card at a server-supplied
+    `recPreviewLocation`, there is no such URL here, and the window shows the local recording instead.
+
+    ## The clause that used to end this paragraph was false about our own code
+
+    It read *"No card, so no element to carry either name."* There IS a card — `ModalHost.svelte`
+    renders `app-rec-preview` whole — and the two names are absent from INSIDE it, which is a
+    different and smaller claim. Corrected 2026-09-01 rather than made true by deleting the card:
+    removing it turned `captured-css-ancestor-contract` red, because `app-rec-preview` is a scoped
+    host in the generated stylesheet and an absent host leaves its rules matching nothing.
+
+    The card is unreachable — `.recsHolderScreen` is `display: none`, the reference's own rule, with
+    no writer in this room — and `rec-preview-contract.test.ts` now fails if it ever becomes
+    reachable while its two icons still have no handlers.
+
+    Found by `gate/audit-surface.mjs`, which reports THREE gaps here rather than these two —
+    `fa-compress-arrows-alt` as well, the icon the expand control swaps to under
+    `O(8, expandRecPreview ? 8 : 9)`. It is absent from this list because the sweep searches the whole
+    application and the icon is used elsewhere; scoped to this surface it was missing, which is the
+    difference between the two measurements and the reason both exist.
   */
   'app-rec-preview': ['recScreenLocalPreview', 'recPreviewScreen']
   /*
@@ -981,15 +998,24 @@ describe('how much of the gap has already been written about', () => {
   */
   it('splits the 111 into what is on record and what nobody has looked at', () => {
     expect(all).toHaveLength(111);
-    expect(all.filter(mentioned)).toHaveLength(30);
+    expect(all.filter(mentioned)).toHaveLength(34);
     /*
       85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
       means work: the four were `app-session-login`'s loading view and they left `all` by being
       BUILT, not by being written about. Compare the 29 -> 30 move recorded above, which was one
       value crossing from unexamined to examined because a reason was finally written for it. Both
       are legitimate and they are not the same event, so both are recorded.
+
+      30/81 -> 32/79 -> 34/77 over one day, and every step is a per-surface audit rather than prose.
+      The last two are `recScreenLocalPreview` and `recPreviewScreen`, named at the card in
+      `ModalHost.svelte` when the audit measured that card unreachable and the reason recorded here
+      turned out to be false about it. `surface-audit-contract.test.ts` pins `app-post-alert-modal`'s four
+      remaining values by name, with the refusal each one carries, so two that no reader had ever
+      named became named. The audit is the examination this split is trying to measure — which is the
+      distinction working, not being gamed: the values are still in `all`, and only rendering them
+      moves them out of it.
     */
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(81);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(77);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {
@@ -1109,6 +1135,6 @@ describe('the comment stripping is load-bearing', () => {
       that string in a docblock and calls the gap closed. Which is the exact failure this case
       exists to prove is still being avoided — the gap is open, and only the stripped read says so.
     */
-    expect(stripped - raw).toBe(20);
+    expect(stripped - raw).toBe(22);
   });
 });
