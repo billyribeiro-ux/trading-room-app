@@ -45,6 +45,65 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 18:49 UTC — all three trackers are down to the owner, an environment, or hardware
+
+**Runtime impact: NONE.** This entry records a position, and every claim in it was re-measured today
+rather than read off the trackers that make it.
+
+## The three trackers, together
+
+| tracker | where it stands |
+| --- | --- |
+| `todo-next.md` | **93 of 93 room surfaces**, from 2 of 42 on 2026-08-16. Closed, with four limits stated at the number |
+| `NEW-TODO.md` | **three items**, all blocked outside this repository |
+| `TODO.md` | every open row names who or what unblocks it, and none of them is a decision an audit can take |
+| the register | 70 closed, 2 open — `T5-24` and `T5-25`, both on **one sentence from the owner** |
+| the settings enumeration | last buildable row closed 2026-08-29; `enableDiscord` needs an application registration that does not exist |
+
+Re-measured today, not inherited:
+
+- **`INERT_ACTIONS` is FOUR**, each with its reason at the entry: `start-recording` and
+  `stop-recording` (no server-side recorder), `disable-private-chat` (a MATCH — the reference wires
+  nothing to it) and `get-my-token` (a security divergence: this room's session cookie is `httpOnly`,
+  so building it would hand the server the job of putting into the DOM a value an XSS currently
+  cannot read).
+- **`EXACT_ALERTS` holds no liar.** `unmute-chat`, `force-reload`, `mute-chat-24` and
+  `mute-chat-indefinitely` all left; what is left announces something that really is sent.
+- **`gate/audit-setting-coverage.mjs`**: 269 declared, 105 read here, 26 the reference reads and this
+  room does not — and every one of the 26 is a credential that must never cross, a not-a-gap, an
+  enumeration artefact or Discord.
+- **`services/**` is untouched by this session**, so its gate was correctly not run — the
+  test-what-changed table, followed rather than quoted.
+
+## What is NOT claimed
+
+That the room matches the reference everywhere. Many surfaces close on a recorded refusal or a
+measured blocker, and each says so where it stands. **Audited means the gap is known and argued, never
+that there is none** — the four limits now printed beside `todo-next.md`'s 100% say the same thing in
+the place somebody would read the number.
+
+## One question moved TO the owner's desk today
+
+Closing the surface table found it: **this product credits `ProTradingRoom.com` on its login page and
+`TradingRoomApp` in the room, ninety seconds apart.** The sidebar was rebranded on a recorded ground
+that applies word for word to the login page and was not applied there.
+`brand-attribution-contract.test.ts` pins both ends, and each failure message names what the other
+site says, so it cannot be half-resolved again. Which name goes on a login page is not an audit's
+call.
+
+## Verification
+
+Room gate exit 0 — **337 files, 6,055 passed, 1 skipped**. Controller gate exit 0 — **109 files,
+1,139 passed, 21 skipped**. `svelte-check` clean in both. No backend gate: nothing under `services/`
+changed in any of this session's fourteen commits, verified with `git diff --stat`.
+
+**The Svelte MCP has been unavailable for this entire session.** `svelte-autofixer` has not run on
+any of the components touched today — `ChatArchivePane`, `ChatArchiveLogPane`, `TypingIndicatorDots`,
+`AlertChatArea`, `ExtraChatPane`, `ModalHost`, `GiphyPicker`, `Modal`, `NoteEditor`,
+`ViewerAlertPrefsPane`, `ReactionPrefsPane`, `UserNotesPane`, `ImageUploadDialog`, `ToastHost`,
+`GifConfirmDialog` and `session/+page.svelte`. That is the one gate in `CLAUDE.md` this session could
+not run, and it is recorded here rather than left to be assumed.
+
 ### 2026-09-01 18:38 UTC — the surface table closes at 93 of 93, and the number is bounded where it stands
 
 **Runtime impact: one line.** `GifConfirmDialog.svelte` gains the `.modal-backdrop` its three

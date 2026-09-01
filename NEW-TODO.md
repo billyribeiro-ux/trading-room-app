@@ -14,6 +14,21 @@ established it says so.
 
 ---
 
+> ## ⛳ WHERE THIS FILE STANDS, 2026-09-01
+>
+> **Three items remain and all three are blocked on something outside this repository.** Parts 1, 2,
+> 4 and 5 are built; the "suggested order" below records each landing.
+>
+> | remaining | blocked on |
+> | --- | --- |
+> | `presAreaTabs-recordings` | an archive service. Fully SPECIFIED 2026-08-31 so building it is a transcription — the entitlement, the URL and a measured MediaMTX candidate are all recorded — but zero recordings or archive tables exist in either database |
+> | Part 3, v5 | an account the vendor has cleared for v5. Re-tested 2026-08-31: the `/v5` 404 now distinguishes nothing (every version path 404s), and the conclusion rests on its other measurement instead |
+> | the five operator reset commands | a central console AND a media plane. What is missing is REACH, not the commands |
+>
+> `TODO.md`'s header carries the same statement for the whole repository, and `todo-next.md` closed
+> at 93 of 93 room surfaces on the same day.
+
+
 # PART 1 — BOTH BUILT, 2026-08-27
 
 Both revenue leaks are closed. What follows is the record of what was built and the decisions taken,

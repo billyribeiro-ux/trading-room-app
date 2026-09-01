@@ -8,6 +8,29 @@ DO, it does not belong.
 This is the root index. Anything recorded per-app stays where it is; this file points at it, so
 there is one place to look rather than four.
 
+> ## ⛳ WHERE THIS STANDS, 2026-09-01
+>
+> **Every row still open in this file, in `NEW-TODO.md`, and in the register needs the OWNER, an
+> ENVIRONMENT, or HARDWARE.** Nothing is waiting on a decision an audit can take.
+>
+> `todo-next.md` closed the same day at **93 of 93 room surfaces**, from 2 of 42 on 2026-08-16, with
+> its own four limits stated at the number. `NEW-TODO.md` is down to three items — the recordings
+> tab (needs an archive service), v5 (needs an account cleared for it) and the five operator reset
+> commands (need a central console and a media plane). The register is 70 closed, 2 open, and both
+> open ones are `T5-24`/`T5-25`, blocked by the credential guard on **one sentence from the owner**.
+> The settings enumeration reached its last buildable row on 2026-08-29; what remains is
+> `enableDiscord`, which needs an application registration that does not exist.
+>
+> **What is NOT claimed:** that the room matches the reference everywhere. Many surfaces close on a
+> recorded refusal or a measured blocker, and each says so where it stands. Audited means the gap is
+> known and argued, never that there is none.
+>
+> **One question is on the owner's desk that was not there before**, found by closing the surface
+> table: this product credits `ProTradingRoom.com` on its login page and `TradingRoomApp` in the
+> room, ninety seconds apart. The sidebar was rebranded on a recorded ground that applies word for
+> word to the login page and was not applied there. `brand-attribution-contract.test.ts` pins both
+> ends so it cannot be half-resolved again; which name goes on a login page is not an audit's call.
+
 **The project rule this file exists for:** when something cannot be found in the evidence, it gets
 (1) said plainly in the reply, (2) written here under **Evidence gaps** with what is missing, every
 file already read looking for it, and what it blocks, and (3) given a browser-console script that
