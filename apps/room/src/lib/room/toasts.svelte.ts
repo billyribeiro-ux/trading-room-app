@@ -28,18 +28,18 @@ import type { ToastNotice } from '#lib/toast.js';
   to take it away. It has no opinion about whether a thing should be shown, which is why nothing in
   here reads a preference.
 
-  ## `$state`, not `$state.raw`, and that is a deliberate non-change
+  ## `$state.raw`, and the MOVE that deliberately deferred it for one commit
 
   The array qualifies for `$state.raw` on this repository's own rule — it is only ever REPLACED,
   never mutated in place. Both writers reassign (`filter` on the way out, spread on the way in), and
   `ToastHost.svelte` reads `id`/`kind`/`title`/`message`/`enableHtml` and mutates none of them, which
   was checked rather than assumed.
 
-  It stays `$state` anyway, because this slice is a MOVE. A move plus an optimisation is two changes
-  in one commit, and when the pair breaks something there is no way to tell which one did it — the
-  same reasoning that kept the Files pane out of the `PresentationArea` extraction. The analysis is
-  recorded here so the next person has it, and so that converting it is a one-word change backed by
-  evidence rather than a guess.
+  It stayed `$state` through THIS slice, because the slice is a MOVE. A move plus an optimisation is
+  two changes in one commit, and when the pair breaks something there is no way to tell which one did
+  it — the same reasoning that kept the Files pane out of the `PresentationArea` extraction. `S2`
+  then made that one-word change against the evidence recorded above: `#notices` is read on every
+  render of the toast host and replaced on every add and every expiry, so the proxy was pure cost.
 */
 export class RoomToasts {
   #notices = $state.raw<ToastNotice[]>([]);

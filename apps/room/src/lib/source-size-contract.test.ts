@@ -4999,7 +4999,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       about sixty lines and should stay there: a FOURTH source is the thing this module exists to
       make obvious rather than to accommodate.
     */
-    max: 178,
+    /*
+      178 -> 204, 2026-09-01, and the twenty-six lines are the answer to a DEAD PREDICATE rather
+      than new mapping.
+
+      `permissions: user.role === 'user' ? 'r' : 'a'` compared against a value `RoomRole` does not
+      contain, so every roster-derived target was stamped `'a'` and three branches downstream became
+      constants. It is `user.isP` now — the row's own flag, which `private-chat.svelte.ts:444`
+      already used for the identical question — plus the `isP?: boolean` field and its note on why
+      `isPresenterRole(user.role)` is NOT the substitute.
+
+      **The first draft of that comment was 39 lines and this entry refused it**, which is the ratchet
+      doing its job rather than obstructing: it listed all four downstream consequences, and
+      `modal-target-permissions-contract.test.ts` already carries and ENFORCES them. Removing the
+      duplication between a comment and the test that enforces it is not the same act as shortening a
+      reason to look tidy, which CLAUDE.md forbids — the reason stayed, in one place, next to the
+      check that makes it true.
+
+      If this climbs again, the question is whether a field arrived or whether an argument is being
+      written twice.
+    */
+    max: 204,
     why: 'how a roster row, a message and a managed-chat row each become the modal’s target'
   },
   {

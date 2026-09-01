@@ -46,6 +46,20 @@ export interface RosterRowForTarget {
   avatarUrl: string;
   status: string;
   role: string;
+  /**
+   * `membership.isP` — THE ROW'S OWN presenter flag, and the field this builder's `permissions`
+   * turns on since 2026-09-01.
+   *
+   * Optional for the reason the five below are: it reaches a target through two paths and the
+   * mapping must not care which. Both supply it — `+page.server.ts:240` on the load and
+   * `sess/[room]/events/+server.ts:201` on the `/roster/` frame, each as `… ?.isP === true`.
+   *
+   * NOT `isPresenterRole(user.role)`, and that is a measured distinction rather than a preference:
+   * the roster frame deliberately moved OFF that expression, and its own comment at
+   * `events/+server.ts:192` records why — a roster row's `role` is another account's `users` row,
+   * reconciled only on that account's next page load, so it goes stale where `isP` does not.
+   */
+  isP?: boolean;
   /*
     The five permission checkboxes, optional because they reach a target through two paths and the
     mapping must not care which. Both DO carry them — `+page.server.ts` on the load and
@@ -83,7 +97,19 @@ export function modalTargetFromRosterRow(user: RosterRowForTarget): ModalTargetU
     emailHash: user.emailHash,
     pic: user.avatarUrl,
     status: user.status,
-    permissions: user.role === 'user' ? 'r' : 'a',
+    /*
+      `isP`, NOT `role === 'user'` — the old test could never be true.
+
+      `RoomRole` is `'admin' | 'staff' | 'member'` (`server/room-role.ts:22`). **There is no
+      `'user'`**: it is the REFERENCE's role vocabulary, which is how this typechecked on both sides
+      while comparing against a value no row can hold. Every roster-derived target was therefore
+      stamped `'a'` — "Presenter / Admin" — and three branches downstream of it became constants.
+      `modal-target-permissions-contract.test.ts` names all four consequences and enforces the
+      property that catches the class: both answers must be reachable from a role we can mint.
+
+      `private-chat.svelte.ts:444` asks the identical question and already had it right.
+    */
+    permissions: user.isP ? 'a' : 'r',
     /*
       UIM-09. The Trial badge had markup and a gate at `ModalHost.svelte:2771` and no supply, so
       `targetUser.isTrial` was `undefined` for every member and the badge could not render for
