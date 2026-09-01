@@ -170,7 +170,24 @@
   {#if log.error}
     <div class="text-warning py-2">{log.error}</div>
   {:else if log.loading}
-    <h5 class="mt-2"><i class="ml-2 fas fa-spinner fa-spin"></i> Loading…</h5>
+    <!--
+      `O(10, o.showLogs && o.loading ? 10 : -1)` — template `Fxe`, const 6 `[1,"text-center","my-4"]`
+      and const 16 `[1,"ml-2","fas","fa-spinner","fa-spin"]`, transcribed. It is the same block
+      `ModalHost.svelte` already carries twice, for `app-all-user-pmmodal` and the advanced search;
+      this one had drifted to `mt-2` and a `…` character, which is a third spelling of one idiom.
+
+      `ml-2` is Bootstrap 4 and this project is on 5, where it is `ms-2`. It is transcribed as
+      captured for the same reason `btn-ligth` is kept above: what the reference ships is the
+      specification, and a class silently "corrected" here is a difference the next reader cannot
+      find when a stylesheet starts keying on the captured name.
+
+      **OURS: the chrome above stays on screen while this renders.** Upstream's `Fxe` is a SIBLING
+      of the viewer, not a branch inside it, so its Back button disappears for the whole fetch and a
+      presenter who opened a slow log has no way out but the modal's Close.
+    -->
+    <div class="text-center my-4">
+      <h5><i class="ml-2 fas fa-spinner fa-spin"></i> Loading...</h5>
+    </div>
   {:else}
     {#if log.truncated}
       <!--

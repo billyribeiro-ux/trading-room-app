@@ -4278,8 +4278,10 @@
               <a title="Choose Speakers" class="nav-link">
                 <div class="form-group d-flex justify-content-between align-items-end">
                   <div class="w-75 mr-2">
-                    <label for="av-speakers-device">Speakers:</label>
-                    <select id="av-speakers-device" name="avSpeakersDevice" class="form-control">
+                    <!-- Const 20 exactly: no `av-` prefix, no `name`. See the ID sweep in
+                         `orphan-style-contract.test.ts` for what the prefix cost. -->
+                    <label for="speakers-device">Speakers:</label>
+                    <select id="speakers-device" class="form-control">
                       <option>Default - External Headphones</option>
                       <option>Default - External Headphones 2</option>
                     </select>

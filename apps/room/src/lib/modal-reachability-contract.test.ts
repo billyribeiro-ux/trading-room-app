@@ -17,6 +17,14 @@ import { codeOf } from '#lib/source-comments.js';
   It was found by `gate/audit-surface.mjs`, which reported `speakers-device` missing from
   `app-av-settings-modal` — a one-word gap that turned out to sit inside a modal nobody can open.
 
+  **That one word was also a real defect, and it took until 2026-09-01 to read it as one.** The
+  markup said `id="av-speakers-device"`; two rules in `app.css` written in the same change key on
+  the captured name (`label[for='speakers-device']` at `:2117`, `#speakers-device` at `:2123`), so
+  both matched nothing from the day they landed — `XCP-01` exactly, an ours-prefix costing an
+  element every rule written for it. Corrected, and `orphan-style-contract.test.ts` now sweeps ID
+  and `[for=…]` selectors as well as classes, which is the generalisation that would have caught it
+  without an audit run.
+
   ## Why `'av'` STAYS, rather than being wired or deleted
 
   Three measurements decided it, and none of them was a preference:

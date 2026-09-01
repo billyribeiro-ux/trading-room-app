@@ -46,6 +46,7 @@
   } from '#lib/extra-chat-surface.js';
   import type { ChatMode } from '#lib/chat-mode.js';
   import { ngbTooltip } from '#lib/ngb-tooltip.js';
+  import TypingIndicatorDots from '#lib/components/TypingIndicatorDots.svelte';
   import { pastedImageFrom } from '#lib/pasted-image.js';
   import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
@@ -574,13 +575,15 @@
     <!-- `O(23, o.isConnected && o.chatEnabled ? 23 : 24)`. -->
     <!--
       `O(22, o.showTyping && o.usersTypingCnt > 0 ? 22 : -1)` at byte 2,400,312 — the extra column's
-      own copy of the indicator, and it reads its OWN channel. Same markup and the same omission as
-      the main column's; see `AlertChatArea.svelte` for why the animated dots are not reproduced.
+      own copy of the indicator, and it reads its OWN channel. Same markup as the main column's, dots
+      included since 2026-09-01 — see `TypingIndicatorDots.svelte` for the capture's own `styles:[…]`
+      and for what the paragraph that used to stand here got wrong.
     -->
     {#if typists.length > 0}
       <div>
         <div class="d-flex align-items-center typing-indicator-container">
           <strong class="users-count me-1">[{typists.length}]</strong>
+          <TypingIndicatorDots />
           <span class="users-typing"><em class="mx-1">{typists.join(',')}</em></span>
         </div>
       </div>

@@ -507,3 +507,199 @@ describe('the #files region of app-presentationarea — audited 2026-09-01', () 
     expect(report.textGaps).toContain('No room files found.');
   });
 });
+
+/*
+  The two LOG ARCHIVE modals are the same surface twice — upstream's two components differ only in
+  the word "chat" or "alerts" and the `type` on the wire, and `LogArchiveModals.svelte` says so at
+  length. They are pinned as two entries anyway, against two byte ranges, because the day the alerts
+  half stops being a placeholder is the day one of these two has to move without the other.
+*/
+const LOG_ARCHIVE_FILES = [
+  'src/lib/components/LogArchiveModals.svelte',
+  'src/lib/components/ChatArchivePane.svelte',
+  'src/lib/components/ChatArchiveLogPane.svelte',
+  /* The shared modal chrome: `modal-dialog`, `modal-header`, `btn-close`, the Close label. */
+  'src/lib/components/Modal.svelte',
+  /* Upstream's `app-st-message` inside the log; this room's compact row stands in for it. */
+  'src/lib/components/CompactMessageRow.svelte'
+];
+
+describe('app-chat-logs-modal — audited 2026-09-01', () => {
+  const report = auditSurface({ selector: 'app-chat-logs-modal', files: LOG_ARCHIVE_FILES });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(38);
+    expect(report.views.resolved).toBe(11);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('renders every const value and every text literal the reference does', () => {
+    /*
+      CLEAN as of 2026-09-01, and it took two findings to get here — both invisible to the whole-app
+      sweep, which is the argument for this file existing at all:
+
+      `vxe`, the archive ROW, is three labelled lines and the middle one is
+      `<strong class="fw-bold">By:&nbsp;</strong><i>{{createdBy}}</i>`. This room drew one compressed
+      line with no `By:` at all, while `chat_archives.archived_by_user_id` had held the answer since
+      the table was added. `chat-archive-row-render.test.ts` now asserts it on the rendered page.
+
+      `Fxe`, the loading arm, is `[1,"text-center","my-4"]` around
+      `[1,"ml-2","fas","fa-spinner","fa-spin"]` and the literal `" Loading..."`. Ours had drifted to
+      `mt-2` and a `…` character — a third spelling of an idiom `ModalHost.svelte` already carries
+      verbatim twice.
+
+      Both were reported 0/0 by the WHOLE-APP sweep, because `By:&nbsp;`, `my-4` and `" Loading..."`
+      all occur elsewhere in this application while being absent from this surface.
+    */
+    expect(report.constGaps).toEqual([]);
+    expect(report.textGaps).toEqual([]);
+  });
+});
+
+describe('app-alert-logs-modal — audited 2026-09-01', () => {
+  const report = auditSurface({ selector: 'app-alert-logs-modal', files: LOG_ARCHIVE_FILES });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(38);
+    expect(report.views.resolved).toBe(11);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('renders every const value and every text literal the reference does', () => {
+    /*
+      The alerts half of the modal is a PLACEHOLDER — `LogArchiveModals.svelte` records that its
+      sweep is gated on `deleteAlertPW`, one of the seven credential-shaped settings that never reach
+      this room — and it still measures clean, because the two components share every const and
+      almost every literal. The two that differ are the empty-state and the row's third line:
+      upstream's alerts row is `Pxe`, two labelled lines (a date and `By:`) where the chat row's
+      `vxe` has three, since an alert has no channel.
+
+      That is the honest reading of this green: what is pinned is the CHROME, and the chrome is one
+      surface drawn twice. It is not a claim that the alerts sweep is built.
+    */
+    expect(report.constGaps).toEqual([]);
+    expect(report.textGaps).toEqual([]);
+  });
+});
+
+describe('app-alert-send-report-modal — audited 2026-09-01', () => {
+  /*
+    ONE REFUSAL, FORTY-SIX GAPS. Every value below belongs to the report body, the search bar, the
+    status select, the flot pie or the per-recipient row — and all five rest on the same thing:
+    a list of DELIVERY RECORDS for one alert, which this application has nowhere.
+
+    `AlertSendReportModal.svelte` carries the measurement in full: 24 tables searched for `queue`,
+    `latency`, `fail_reason`, `sent_time` and `delivery`; `alerts.dispatch` is five booleans naming
+    which channels the presenter TICKED, not what happened; no mail transport exists in
+    `apps/room/src/lib/server` at all; and `getAlertReport` has zero occurrences across `apps/`.
+
+    So this is not a backlog. It is one decision, and the list is here so that BUILDING the queue
+    turns this test red — forty-six values arriving at once is exactly the signal that the refusal
+    expired.
+  */
+  const report = auditSurface({
+    selector: 'app-alert-send-report-modal',
+    files: ['src/lib/components/AlertSendReportModal.svelte', 'src/lib/components/Modal.svelte']
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(39);
+    expect(report.views.resolved).toBe(11);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('is missing exactly the report, and nothing outside it', () => {
+    /*
+      Asserted as a SET rather than a length. Half of these are generic Bootstrap classes —
+      `input-group`, `form-select`, `fw-bold`, `bg-dark` — that this application uses freely
+      elsewhere; they are absent HERE because the elements that would carry them are refused, and a
+      count could not tell that apart from one of them turning up on something unrelated.
+    */
+    expect(report.constGaps.map((gap) => gap.value)).toEqual([
+      /* the spinner, RPT-02's fake-loading defect */
+      'my-4',
+      'ml-2',
+      'fas',
+      'fa-spinner',
+      'fa-spin',
+      /* the report container and its header */
+      'w-100',
+      'report-header-container',
+      'text-white',
+      'my-1',
+      'report-header',
+      /* `$.plot("#pie-container", …)` — jQuery flot, which this room does not load */
+      'pie-container',
+      /* the status select: All / sent / queued / failed */
+      'input-group',
+      'search-select-addon',
+      'input-group-text',
+      'Search select',
+      'form-select',
+      'sent',
+      'queued',
+      'failed',
+      /* the search box and its two addons, including upstream's `btn-ligth` typo */
+      'search-term',
+      'search-addon',
+      'Enter search term',
+      'form-control',
+      'clear-search-addon',
+      'btn-ligth',
+      'fa-search',
+      'report-body',
+      'fa-times',
+      /* the per-recipient row: name, address, sent time, latency, failure reason */
+      'list-group',
+      'list-group-item',
+      'list-group-item-action',
+      'border-0',
+      'bg-dark',
+      'fw-bold',
+      'sent-time',
+      'failed-reason',
+      'm-1',
+      'fa-clock',
+      'ms-1',
+      'fa-exclamation-circle',
+      'me-1'
+    ]);
+  });
+
+  it('and the five literals are the four filter labels and the empty-queue answer', () => {
+    /*
+      `No Reports.` is deliberately NOT rendered. It means "the fetch came back empty", and there is
+      no fetch — a presenter reading it under a title carrying a real AlertID would conclude their
+      alert reached nobody. `REPORT_UNAVAILABLE` says what is actually true instead, and is marked
+      as ours at the code.
+    */
+    expect(report.textGaps).toEqual([' Loading...', 'All', 'Queued', 'Failed', 'No Reports.']);
+  });
+});
+
+describe('app-typing-indicator-dots — audited 2026-09-01', () => {
+  /*
+    The smallest reference component there is: one const, no embedded views, four instructions.
+    It is pinned anyway, and the reason is what it took to get here rather than what it costs to
+    keep — the surface reported one gap for four days behind a recorded reason that was half right,
+    and the half that was wrong ("inventing the animation would be inventing a design") is the kind
+    that only ever gets caught by re-reading the bundle.
+
+    `typing-indicator-contract.test.ts` holds the values; this holds the fact that there are no
+    others.
+  */
+  const report = auditSurface({
+    selector: 'app-typing-indicator-dots',
+    files: ['src/lib/components/TypingIndicatorDots.svelte']
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(1);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('renders every const value and every text literal the reference does', () => {
+    expect(report.constGaps).toEqual([]);
+    expect(report.textGaps).toEqual([]);
+  });
+});

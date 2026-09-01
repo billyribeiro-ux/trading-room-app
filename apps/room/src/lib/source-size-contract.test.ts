@@ -1732,7 +1732,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reference ships, and that the `<button>` element is the one carve-out the repository's own rule
       already names.
     */
-    max: 243,
+    /*
+      243 -> 260, 2026-09-01. The loading arm becomes the capture's own block — `Fxe`, const 6
+      `[1,"text-center","my-4"]`, const 16 `[1,"ml-2","fas","fa-spinner","fa-spin"]` and the literal
+      `" Loading..."` — which is what `gate/audit-surface.mjs` had been reporting as this surface's
+      last two gaps. It had drifted to `mt-2` and a `…` character: a THIRD spelling of an idiom
+      `ModalHost.svelte` already carries twice, verbatim, for `app-all-user-pmmodal` and the advanced
+      search.
+
+      Two lines of markup; the rest is the note. It records why `ml-2` is transcribed rather than
+      "fixed" to Bootstrap 5's `ms-2`, and the divergence that this arm is a BRANCH INSIDE the
+      viewer where upstream's is a sibling of it — so the Back button survives a slow fetch here and
+      does not there. Neither fact is inferable from the two lines above it, which is the test for
+      whether a comment earns its space.
+    */
+    max: 260,
     why: 'the archived-log viewer - a back button, a search, a download, and the reference styles that came with it'
   },
   {
@@ -5316,7 +5330,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       That is what makes this a module and not a second class, and it is the thing to re-check if it
       grows: state arriving here means the seam was drawn in the wrong place.
     */
-    max: 110,
+    max: 111,
     why: "the private-chat log's two scrolls, and the two transcribed numbers they turn on"
   },
   {
@@ -6610,6 +6624,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the emoji chooser and its captured category strip'
   },
   {
+    file: 'lib/components/TypingIndicatorDots.svelte',
+    /*
+      `app-typing-indicator-dots` — three blinking dots, born 2026-09-01, and it is 110 lines for
+      forty of markup and CSS because the other seventy are the correction.
+
+      Both chat columns carried a paragraph saying the dots could not be reproduced, on the ground
+      that `.typing-indicator` has no rule in any stylesheet this repository holds. That is true of
+      the captured STYLESHEETS and beside the point: an Angular component's `styles:[…]` array is
+      injected at runtime out of the bundle, so it is never in one, and this component's array
+      specifies the whole appearance — 3px circles, `#9e9ea1`, resting opacity `.4`, a 1.5s blink
+      staggered a third of a cycle apart. The array is quoted here verbatim so the next reader can
+      check the transcription without re-deriving where it came from.
+
+      Two declarations carry their own paragraph and both would otherwise read as mistakes: the
+      `!important` on `display: flex`, and a `float: left` that is inert inside a flex parent in the
+      reference exactly as it is here. And the one line the capture does not have — a
+      `prefers-reduced-motion` block, the first in this application — says so where it sits.
+    */
+    max: 111,
+    why: "the capture's three blinking typing dots, its own styles array, and the reason they were not drawn until now"
+  },
+  {
     file: 'lib/components/ExtraChatPane.svelte',
     /*
       543 -> 567, 2026-08-28 — the typing indicator. The extra column's own copy of the indicator and its two handlers. Its OWN channel, which is the
@@ -6721,7 +6757,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       gate there. A reader adding a gate here for consistency would remove a control from every
       member.
     */
-    max: 772,
+    /*
+      772 -> 774, 2026-09-01, and the two lines are an import and a `<TypingIndicatorDots />`.
+
+      This is the raise the extraction rule ASKS for rather than one it forbids: the animated typing
+      dots became `TypingIndicatorDots.svelte`, and the cost of consuming an extracted component is
+      exactly one import plus one usage at each of its two call sites. Refusing it here would mean
+      inlining eleven lines of transcribed CSS into both chat columns instead.
+    */
+    max: 774,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

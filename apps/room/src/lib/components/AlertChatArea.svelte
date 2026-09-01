@@ -45,6 +45,7 @@
   import ChatSearchBar from '#lib/components/ChatSearchBar.svelte';
   import ChatTabStrip from '#lib/components/ChatTabStrip.svelte';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
+  import TypingIndicatorDots from '#lib/components/TypingIndicatorDots.svelte';
   import { presenterColorsFor, type PresenterColorMap } from '#lib/presenter-colors.js';
   import { pastedImageFrom } from '#lib/pasted-image.js';
   import {
@@ -1212,14 +1213,13 @@
                 <span class="users-typing"><em class="mx-1">{{ usersTyping }}</em></span>
               </div></div>
 
-            THE ANIMATED DOTS ARE NOT REPRODUCED, and that is a measurement rather than a shortcut.
-            `app-typing-indicator-dots` is three empty spans whose whole appearance is CSS, and
-            neither `app-typing-indicator-dots` nor its `.typing-indicator` class has a single rule
-            in any stylesheet this repository holds — the same check `smallerImagePreview` failed and
-            `blinkingRec` passed. Emitting three empty spans that style to nothing would be markup
-            with no consumer; inventing the animation would be inventing a design. The three classes
-            that DO have rules — `typing-indicator-container`, `users-count`, `users-typing` — are
-            all here.
+            THE ANIMATED DOTS ARE DRAWN, as of 2026-09-01, and the paragraph that used to sit here
+            was half wrong. It said the dots could not be reproduced because *"neither
+            `app-typing-indicator-dots` nor its `.typing-indicator` class has a single rule in any
+            stylesheet this repository holds"* — true of the CLASS, and beside the point: an Angular
+            component's `styles:[…]` array is injected at runtime from the BUNDLE, so it is never in
+            a captured stylesheet, and this one specifies the whole appearance. It is transcribed in
+            `TypingIndicatorDots.svelte`, which carries the array verbatim.
 
             The COUNT is `typists.length` rather than a second field: a joined string that has to be
             split to be counted is two representations of one fact, and upstream carries both only
@@ -1229,6 +1229,7 @@
             <div>
               <div class="d-flex align-items-center typing-indicator-container">
                 <strong class="users-count me-1">[{typists.length}]</strong>
+                <TypingIndicatorDots />
                 <span class="users-typing"><em class="mx-1">{typists.join(',')}</em></span>
               </div>
             </div>

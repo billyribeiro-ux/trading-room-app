@@ -998,7 +998,17 @@ describe('how much of the gap has already been written about', () => {
   */
   it('splits the 111 into what is on record and what nobody has looked at', () => {
     expect(all).toHaveLength(111);
-    expect(all.filter(mentioned)).toHaveLength(34);
+    /*
+      34 -> 38, 2026-09-01, and all four moved by the same mechanism the note above describes: a
+      reason was written for them. They came from two per-surface audits pinned that day in
+      `surface-audit-contract.test.ts` — `app-alert-send-report-modal`, whose forty-six absent
+      values are one refusal and are now listed by name with the section of the report each belongs
+      to, and `app-typing-indicator-dots`.
+
+      Which is the split working. None of the four left `all`, because only RENDERING does that, and
+      the unexamined side fell by exactly four — the side that means work.
+    */
+    expect(all.filter(mentioned)).toHaveLength(38);
     /*
       85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
       means work: the four were `app-session-login`'s loading view and they left `all` by being
@@ -1015,7 +1025,7 @@ describe('how much of the gap has already been written about', () => {
       distinction working, not being gamed: the values are still in `all`, and only rendering them
       moves them out of it.
     */
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(77);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(73);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

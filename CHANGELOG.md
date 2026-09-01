@@ -45,6 +45,133 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 16:55 UTC — the typing dots were refused on a reason that was half right, and an id prefix cost two rules
+
+**Runtime impact: yes, twice.** The three blinking dots beside "[2] alice,bob" are drawn in both chat
+columns. And the Audio/Video settings modal's speaker picker gets the two `app.css` rules written for
+it, which had matched nothing since `3b4f3c5`.
+
+## The dots: a recorded reason that had held since 2026-08-28
+
+Both chat columns and `typing-indicator-contract.test.ts` carried the same paragraph:
+
+> `app-typing-indicator-dots` is three empty spans whose entire appearance is CSS, and NEITHER it nor
+> its `.typing-indicator` class has a rule in any stylesheet this repository holds. Emitting them
+> would be markup with no consumer — the check `smallerImagePreview` failed — and inventing the
+> animation would be inventing a design.
+
+The first clause is TRUE and re-measured: grep `captured-runtime-components.css` for
+`typing-indicator` and all three hits are `.typing-indicator-container`, a different class.
+
+**The conclusion does not follow.** An Angular component's `styles:[…]` array is injected at runtime
+out of the BUNDLE, so it is never in a captured stylesheet — and this component's array is right
+beside its template, four lines from the selector the audit was reporting against:
+
+```js
+selectors:[["app-typing-indicator-dots"]],decls:4,vars:0,consts:[[1,"typing-indicator"]],
+template:function(i,o){1&i&&(d(0,"div",0),T(1,"span")(2,"span")(3,"span"),u())},
+styles:[".typing-indicator[_ngcontent-%COMP%]{display:flex!important}
+         .typing-indicator[_ngcontent-%COMP%]   span[_ngcontent-%COMP%]{height:3px;width:3px;
+           float:left;margin:0 1px;background-color:#9e9ea1;display:block;border-radius:50%;
+           opacity:.4}
+         …:nth-of-type(1){animation:1.5s …_blink infinite .3333s}
+         @keyframes _ngcontent-%COMP%_blink{50%{opacity:1}}"]
+```
+
+3px circles, `#9e9ea1`, resting opacity `.4`, a 1.5s blink staggered a third of a cycle apart.
+**Nothing had to be invented.** `TypingIndicatorDots.svelte` transcribes it into a scoped `<style>`,
+which is what `_ngcontent-%COMP%` is. One line is ours and is marked as ours: a
+`prefers-reduced-motion` block, the first in this application — the dots blink for as long as
+somebody is typing, which is the case WCAG 2.2.2 is about.
+
+**This is the eleventh recorded reason this session that did not survive re-measurement**, and the
+first that was half right — which is the harder kind, because the half that is checkable checks out.
+
+## `speakers-device`: `XCP-01` again, and the gate that could not see it
+
+`gate/audit-surface.mjs` reported `speakers-device` absent from `app-av-settings-modal`. That was
+already recorded as sitting inside a modal nobody can open — true, and it hid a second fact.
+
+The markup said `id="av-speakers-device"`. Two rules landed in `app.css` in the SAME change against
+the captured name: `label[for='speakers-device']` at `:2117` and `#speakers-device` at `:2123`. Both
+have matched nothing since the day they were written.
+
+That is `XCP-01` exactly — an `Extra` suffix on `textAreaHolder` cost the second chat column every
+`#textAreaHolder` rule in that file, including the `container-type` its two `@container` queries
+resolved against. **The gate written to catch that class of defect could not see this one, because
+an id is not a class:** `orphan-style-contract.test.ts` swept class selectors only.
+
+It now sweeps `#id` and `label[for='…']` too. **Fifty-eight ids are styled in `app.css` and exactly
+one was unworn** — this one. No allow-list, deliberately: the class sweep needs one because the
+reference styles four classes it never renders, and no such case exists for ids, every one of which
+was written for markup in this repository.
+
+The invented `name="avSpeakersDevice"` went with the prefix: const 20 is
+`["id","speakers-device",1,"form-control"]` and carries none.
+
+## Verification
+
+Room gate exit 0 — **332 files, 5,992 passed, 1 skipped**; `svelte-check` 1,624 files, 0 errors.
+
+**Three negative controls, each red on target and restored:** the dots moved after the names failed
+the ordering assertion; `opacity: 0.4` changed to `0.5` failed the transcription assertion; and
+restoring the `av-` prefix failed the new ID sweep naming `#speakers-device (app.css:2117, 2123)`.
+
+`app-typing-indicator-dots` now measures CLEAN per-surface and is pinned. The Svelte MCP has been
+unavailable for this entire session, so `svelte-autofixer` has NOT been run on the new component.
+
+### 2026-09-01 16:55 UTC — both log-archive modals measure clean, and the report modal's 46 gaps are one refusal
+
+**Runtime impact: small and real.** The archived-log viewer's loading state is the capture's own
+block rather than a third spelling of it.
+
+## `app-chat-logs-modal` and `app-alert-logs-modal`: 0/0
+
+Scoped to the five files that implement them, both now report zero absent const values and zero
+absent text literals. Two findings got them there and **the whole-app sweep reported 0/0 for both
+the entire time**, which is the argument for per-surface measurement in one line:
+
+1. `vxe`'s `By:&nbsp;<i>{createdBy}</i>` line, missing outright — the entry above.
+2. `Fxe`, the loading arm: const 6 `[1,"text-center","my-4"]` around const 16
+   `[1,"ml-2","fas","fa-spinner","fa-spin"]` and the literal `" Loading..."`. Ours had drifted to
+   `mt-2` and a `…` character — a THIRD spelling of an idiom `ModalHost.svelte` already carries
+   verbatim twice, for `app-all-user-pmmodal` and the advanced search.
+
+`By:&nbsp;`, `my-4` and `" Loading..."` all occur elsewhere in this application, so a sweep that
+searches the whole app finds every one of them.
+
+One divergence is recorded with it: this room's loading arm is a BRANCH INSIDE the viewer where
+upstream's `Fxe` is a sibling of it, so the Back button survives a slow fetch here and does not
+there.
+
+## `app-alert-send-report-modal`: 41 const values and 5 literals, and all 46 are one decision
+
+Pinned as a SET rather than a count, with each value labelled by the part of the report it belongs
+to — the spinner, the header, the flot pie, the status select, the search box, the per-recipient row.
+Half of them are generic Bootstrap classes this application uses freely elsewhere; they are absent
+HERE because the elements that would carry them are refused, and a count could not tell that apart
+from one turning up on something unrelated.
+
+The refusal itself was already measured in full at `AlertSendReportModal.svelte` and is unchanged:
+24 tables searched for `queue`, `latency`, `fail_reason`, `sent_time` and `delivery`;
+`alerts.dispatch` is five booleans naming which channels the presenter TICKED, not what happened; no
+mail transport exists in `apps/room/src/lib/server` at all; `getAlertReport` has zero occurrences
+across `apps/`. `No Reports.` is deliberately not rendered — it means "the fetch came back empty",
+and there is no fetch.
+
+**Building the queue turns this pin red**, forty-six values arriving at once, which is exactly the
+signal that the refusal expired.
+
+## Verification
+
+Room gate exit 0 — 332 files, 5,992 passed, 1 skipped. **Two negative controls, both red on target
+and restored:** the captured loading block replaced with the old `mt-2` spelling failed both log
+modals' pins; `REPORT_UNAVAILABLE` swapped for the literal `No Reports.` failed the report modal's
+literal assertion.
+
+`ChatArchiveLogPane.svelte` 243 → 260, argued at the ratchet entry. `todo-next.md`: 75 of 93
+surfaces, 67.9%.
+
 ### 2026-09-01 16:16 UTC — the archive browser never said who swept the log, and the column had the answer
 
 **Runtime impact: yes.** A presenter opening Chat Logs now reads WHO archived each log, on the row,

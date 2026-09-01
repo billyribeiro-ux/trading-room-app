@@ -170,7 +170,7 @@ describe('the send is debounced into TWO frames', () => {
   });
 });
 
-describe('both columns render it, and neither invents the dots', () => {
+describe('both columns render it, dots included', () => {
   it.each([
     ['the main column', () => chat],
     ['the extra column', () => extra]
@@ -182,17 +182,69 @@ describe('both columns render it, and neither invents the dots', () => {
   });
 
   /*
-    `app-typing-indicator-dots` is three empty spans whose entire appearance is CSS, and NEITHER it
-    nor its `.typing-indicator` class has a rule in any stylesheet this repository holds. Emitting
-    them would be markup with no consumer — the check `smallerImagePreview` failed — and inventing
-    the animation would be inventing a design.
+    THE PARAGRAPH THAT USED TO STAND HERE WAS HALF WRONG, and it had held since 2026-08-28.
+
+    It said the dots could not be drawn because *"neither `app-typing-indicator-dots` nor its
+    `.typing-indicator` class has a rule in any stylesheet this repository holds"*, and concluded
+    that inventing the animation would be inventing a design. The first clause is true — grep
+    `captured-runtime-components.css` for `typing-indicator` and all three hits are
+    `.typing-indicator-container`, a different class. The conclusion does not follow: an Angular
+    component's `styles:[…]` array is injected at runtime OUT OF THE BUNDLE, so it is never in a
+    captured stylesheet, and this component's array specifies the appearance to the last decimal.
+
+    Read 2026-09-01 beside the template, at the selector's own definition:
+
+      consts:[[1,"typing-indicator"]],
+      template:function(i,o){1&i&&(d(0,"div",0),T(1,"span")(2,"span")(3,"span"),u())},
+      styles:[".typing-indicator[_ngcontent-%COMP%]{display:flex!important}
+               .typing-indicator[_ngcontent-%COMP%]   span[_ngcontent-%COMP%]{height:3px;width:3px;
+                 float:left;margin:0 1px;background-color:#9e9ea1;display:block;
+                 border-radius:50%;opacity:.4}
+               …:nth-of-type(1){animation:1.5s …_blink infinite .3333s}
+               @keyframes _ngcontent-%COMP%_blink{50%{opacity:1}}"]
+
+    Nothing was invented. `TypingIndicatorDots.svelte` transcribes it, scoped, because Svelte's
+    scoped block is what Angular's `_ngcontent-%COMP%` is.
   */
   it.each([
     ['the main column', () => chat],
     ['the extra column', () => extra]
-  ])('%s does not emit the unstyled dots', (_label, source) => {
-    expect(codeOf(source())).not.toContain('typing-indicator-dots');
-    expect(codeOf(source())).not.toContain('class="typing-indicator"');
+  ])('%s mounts the dots between the count and the names', (_label, source) => {
+    const code = codeOf(source());
+    /*
+      Position is part of the transcription: consts 58-61 put the dots BETWEEN the `users-count`
+      strong and the `users-typing` span, so a component rendered in the right container but the
+      wrong order is still not the capture.
+    */
+    const count = code.indexOf('class="users-count me-1"');
+    const dots = code.indexOf('<TypingIndicatorDots />');
+    const names = code.indexOf('class="users-typing"');
+    expect(count, 'the count is drawn').toBeGreaterThan(-1);
+    expect(dots, 'the dots are drawn').toBeGreaterThan(count);
+    expect(names, 'the names follow the dots').toBeGreaterThan(dots);
+  });
+
+  it('transcribes the capture s own styles array rather than a lookalike', () => {
+    /*
+      Every value here is read from the bundle, and each one is the kind a hand-written animation
+      would get almost right: the resting opacity, the grey, and three delays that are thirds of a
+      1.5s cycle rather than round numbers.
+    */
+    const dots = readFileSync(
+      new URL('./components/TypingIndicatorDots.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(dots).toContain(
+      '<div class="typing-indicator"><span></span><span></span><span></span></div>'
+    );
+    expect(dots).toContain('display: flex !important;');
+    expect(dots).toContain('background-color: #9e9ea1;');
+    expect(dots).toContain('opacity: 0.4;');
+    expect(dots).toContain('animation: 1.5s blink infinite 0.3333s;');
+    expect(dots).toContain('animation: 1.5s blink infinite 0.6666s;');
+    expect(dots).toContain('animation: 1.5s blink infinite 0.9999s;');
+    /* The one line the capture does not have, and it is marked as ours at the code. */
+    expect(dots).toContain('@media (prefers-reduced-motion: reduce)');
   });
 
   it('counts from the list rather than carrying a second field', () => {
