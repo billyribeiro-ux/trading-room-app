@@ -241,3 +241,44 @@ describe('the Admin Notes tab has both of its states', () => {
     expect(codeOf(HOLDER), 'nothing here pushes or splices').not.toMatch(/#notes\.(push|splice)/);
   });
 });
+
+describe('the two const values `mTe` has that this pane did not', () => {
+  /*
+    Found 2026-09-01 by a background sweep over the surfaces `todo-next.md` still lists as unread,
+    and verified against the pinned bundle before either was built. `mTe` @ 2,065,327, verbatim:
+
+        d(0,"div",38)(1,"div",93),ht(2,fTe,7,8,"div",94,z2e),u()(),
+        T(4,"hr"),
+        d(5,"div",38)(6,"div",39)(7,"button",95),x("click",…addNote()),T(8,"i",96),v(9," Add Note ")
+
+    with const 38 `[1,"row"]`, const 39 `[1,"col"]`, const 93
+    `[1,"col",2,"max-height","300px","overflow-y","scroll"]` and const 96
+    `[1,"icon","fa","fa-plus-circle"]`.
+
+    Neither was recorded anywhere. Four separate places in this repository describe `mTe` — this
+    file, `server/db/schema.ts`, `server/user-notes.ts` and two CHANGELOG entries — and every one of
+    them calls it "a `col` scrolling at max-height 300px", so the row around that col had simply
+    never been read.
+  */
+  it('wraps the notes list in the row the reference wraps it in', () => {
+    /*
+      Not cosmetic. A bare `.col` carries half a gutter of horizontal padding, and `.row`'s negative
+      margin is the only thing that cancels it — so the list sat inset from the panel while the Add
+      Note row below it, which has always HAD its `.row`, did not.
+    */
+    const code = codeOf(PANE);
+    const row = code.indexOf('<div class="row">');
+    const col = code.indexOf('<div class="col" style="max-height: 300px; overflow-y: scroll;">');
+    expect(row, 'const 38 opens the list block').toBeGreaterThan(-1);
+    expect(col, 'const 93 is the scrolling column').toBeGreaterThan(row);
+  });
+
+  it('carries the Add Note icon s three classes, `icon` among them', () => {
+    expect(codeOf(PANE)).toContain('<i class="icon fa fa-plus-circle"></i> Add Note');
+  });
+
+  it('and the delete icon keeps its own two, which were already right', () => {
+    /* Const 99 is `[1,"fas","fa-minus-circle"]` — asserted so the fix above cannot drift onto it. */
+    expect(codeOf(PANE)).toContain('<i class="fas fa-minus-circle"></i>');
+  });
+});

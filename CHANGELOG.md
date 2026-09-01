@@ -45,6 +45,121 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 17:49 UTC — nine gaps on four surfaces nobody had read, one of them markup this room invented
+
+**Runtime impact: yes, on all four.** An alert group gains its name, its divider and four gates it
+should always have had; two invented headers with an icon that drew nothing are gone; the user-notes
+list stops sitting inset; and the image-upload dialog dims the room behind it and closes on Escape.
+
+## Where these came from
+
+A background sweep read every reference surface `todo-next.md` still lists as unread and put each
+candidate through four refutation routes — is it rendered here under another spelling, is there a
+reason recorded anywhere, is it Angular machinery rather than surface, and do the byte offsets
+verify. **Nine survived all four; eleven did not.** Every one of the nine was re-verified here
+against the pinned bundle before anything was built.
+
+## `ViewerAlertPrefsPane.svelte` — three, and the last is the one that mattered
+
+`tke` @ 2,230,654, verbatim:
+
+```js
+d(0,"div",52)(1,"div",139),T(2,"i",140),d(3,"span",16),v(4,"Users join/leave:"),u()(),
+H(5,GEe,6,2,"div",17)(6,KEe,6,2,"div",17),T(7,"hr"),H(8,XEe,6,2,"div",17)(9,eke,6,2,"div",17),u()
+…  O(5, sessData.beepOnUserJoin ? 5 : -1)      O(6, sessData.userJoinAndLeavePopup ? 6 : -1)
+   O(8, sessData.beepOnUserJoin ? 8 : -1)      O(9, sessData.userJoinAndLeavePopup ? 9 : -1)
+```
+
+- **`d(3,"span",16),v(4,"Users join/leave:")`** — const 16 is `[1,"pl-2"]`. The group had **no
+  visible name at all**: a bare user icon whose only identification was a `title` tooltip, which a
+  pointer has to rest on and a keyboard never reaches. Twenty-odd other section headers in this modal
+  carry exactly that icon-then-`span.pl-2` pair, so this one was the outlier.
+- **`T(7,"hr")`** — the one thing dividing arrivals from departures. No const index and no `O(…)`, so
+  it renders whenever the group does, even when one of the pairs beside it does not.
+- **Four PER-ROW gates.** The group gate is an OR, so a room that enabled only the beep passed it and
+  then drew **all four switches, two of them over a popup the room had turned off**. The gate reads
+  the ROOM's `beepOnUserJoin`, never the identically-named viewer preference the checkbox writes —
+  gating a control on its own value would make an unchecked box vanish and be impossible to restore.
+
+The pane's own docblock transcribed const 139 and const 140 and jumped straight to the checkbox ids,
+so the `d(3,"span",16)` between them had never been read. Its contract asserted the ids, the checked
+states, the written preference names, the labels and both halves of the group gate — and none of
+these three.
+
+## `ReactionPrefsPane.svelte` — the INVERSE, and an icon that drew nothing
+
+Both reaction rows carried a header block **this room invented**:
+
+```html
+<div id="appReactionsPopup" title="Reactions Response" class="pb-2">
+  <i class="fas fa-face-smile"></i><span class="pl-2">Reactions Response:</span>
+</div>
+```
+
+`REe` @ 2,226,939 and `NEe` @ 2,227,411 are `d(0,"div",17)` — const 17 is `[1,"ml-5"]` — and nothing
+else. Occurrences in the 2,891,205-byte bundle: `appReactionsPopup` **0**, `fa-face-smile` **0**,
+`"Reactions Response:"` **0**; `appDisableVideo`, the header of the group immediately beside these
+two, **1**. That adjacency is why it looked right.
+
+**And the icon drew nothing.** `fa-face-smile` is a Font Awesome **6** name; this project ships
+`@fortawesome/fontawesome-free@5.8.1` (`apps/room/package.json:30`), where the smile is `fa-smile`
+and `grep -c fa-face-smile css/all.min.css` returns 0.
+
+`font-awesome-contract.test.ts` now sweeps that whole class of defect and **found four more on its
+first run** — `fa-waveform` and `fa-disk` are FA6, `fa-floppy-o` and `fa-pause-circle-o` are FA**4**.
+All four are in the bundle, and `deployed-index.html` shows the reference loading the *same*
+5.8.1, so all four are upstream's own broken icons: two are already repaired by `app.css:13`, one
+has a working sibling class, and `fa-pause-circle-o` draws nothing upstream either — the const
+immediately before it in the same table is the correct `[1,"far","fa-pause-circle"]`. Transcribed
+and pinned, in the spirit of the `btn-ligth` typo this repository keeps by name.
+
+## `UserNotesPane.svelte` — two const values, four descriptions that missed them
+
+`mTe` @ 2,065,327 opens `d(0,"div",38)(1,"div",93)`: const 38 is `[1,"row"]`, const 93 the scrolling
+`col`. This room had the bare `.col`, **and that is not cosmetic** — a Bootstrap column carries half
+a gutter of horizontal padding that only `.row`'s negative margin cancels, so the notes list sat
+inset from the panel while the Add Note row below it, which has always had its `.row`, did not.
+
+And const 96 is `[1,"icon","fa","fa-plus-circle"]`; `icon` had been dropped. Four separate places in
+this repository describe `mTe` and every one of them calls it "a `col` scrolling at max-height
+300px", so the row around it had never been read.
+
+## `ImageUploadDialog.svelte` — two bootbox options, and one of them cost three paragraphs
+
+`bootbox.dialog({ …, title:"Image Upload", backdrop:!0, onEscape:!0, size:"xl", … })` @ 1,442,225.
+
+**`backdrop:!0`** is the `.modal-backdrop` element, and this repository had already ruled that option
+rendered surface twice and built the same element from it — `ROV-04` for the lightbox and `VID-01`
+for the video player. This was the one dialog of that family with none, and `app.css:1556` sets
+`.modal { background: transparent }` with `modal-open` occurring nowhere, so the room stayed at full
+brightness under a dialog covering it.
+
+**`onEscape:!0`** did nothing here at all: the room's single global Escape ladder closes the
+popovers, the lightbox and `BootboxDialog`'s three modes, and this dialog is in none of them. Two
+things made it more than one line — it needs **focus on open**, because bootbox binds Escape to the
+modal and Bootstrap focuses the modal on show while this room ships no Bootstrap JavaScript (the
+same `ASR-3` finding `Modal.svelte` records); and it **stops the event**, because the global ladder's
+last arm is `else if (dialogs.alert) …` and a failed upload raises exactly such an alert, so a
+window-bound handler would let one keystroke close two things.
+
+## Verification
+
+Room gate exit 0 — **334 files, 6,020 passed, 1 skipped**; `svelte-check` 1,625 files, 0 errors.
+
+**Ten negative controls, every one red on the assertion it targets and every one restored:** the
+header span deleted; the `<hr>` deleted; the row gate switched from `roomKey` to `key`; the invented
+reaction header restored; a sixth undefined Font Awesome class introduced; `fa-face-smile` put back;
+`icon` dropped from the Add Note icon; the notes row unwrapped; the backdrop deleted;
+`stopPropagation` removed; and `{@attach takeFocus}` removed.
+
+Four ceilings raised and argued at their entries. **One raise landed on the wrong entry and was
+caught before the commit** — a `s.replace(…, 1)` on `max: 100,` matched the FIRST such line in an
+8,700-line file rather than the one under the entry being edited, and silently raised
+`lib/room/caption-window.ts` from 100 to 126. `git diff` on the ratchet file is what found it; that
+is why the diff is re-read before every push here.
+
+`todo-next.md`: 80 of 93 surfaces, 73.4%.
+
 ### 2026-09-01 17:17 UTC — GIF-07: the note editor's GIF picker was the wrong KIND of thing, and a counter could not read an arrow function
 
 **Runtime impact: yes.** Opening GIFs from a note now raises the dialog the capture raises, in the

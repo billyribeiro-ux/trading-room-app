@@ -244,3 +244,68 @@ describe('the three controls', () => {
     }
   });
 });
+
+describe('the two rows are bare, because the reference gives them no header', () => {
+  /*
+    THE INVERSE OF EVERY OTHER FINDING THIS WEEK — markup this room INVENTED, rather than markup the
+    reference has and this room lacks. Found 2026-09-01 by a background sweep and confirmed against
+    the pinned bundle.
+
+    `REe` @ 2,226,939 and `NEe` @ 2,227,411 are, in full:
+
+        d(0,"div",17)(1,"input",131),x("change",…reactionsPopupOnChange()),u(),
+        d(2,"label",132),v(3," Reactions Response "),H(4,AEe,2,0,"span")(5,PEe,2,0),u()()
+
+    const 17 is `[1,"ml-5"]`. That is the whole template: a row, a checkbox, a label, an on/off
+    span. There is no header, no icon and no id.
+
+    This pane carried one anyway, on both rows:
+
+        <div id="appReactionsPopup" title="Reactions Response" class="pb-2">
+          <i class="fas fa-face-smile"></i><span class="pl-2">Reactions Response:</span>
+        </div>
+
+    Occurrences in the 2,891,205-byte bundle: `appReactionsPopup` 0, `fa-face-smile` 0,
+    `"Reactions Response:"` (with the colon) 0. `appDisableVideo` — the header of the group
+    IMMEDIATELY BESIDE these two — is 1, which is why it looked right: this modal has twenty-odd
+    section headers of exactly that icon-then-`span.pl-2` shape, and the pattern was carried across
+    to two rows that do not have one.
+
+    And the icon drew nothing: `fa-face-smile` is Font Awesome 6 and this project ships 5.8.1.
+    `font-awesome-contract.test.ts` is the sweep that now catches that half.
+  */
+  it('renders no header block on either row', () => {
+    const source = pane();
+    expect(source).not.toContain('appReactionsPopup');
+    expect(source).not.toContain('fa-face-smile');
+    expect(source).not.toContain('Reactions Response:');
+    expect(source).not.toContain('Reactions QA Response:');
+  });
+
+  it('still renders both rows, with the capture s own class and label', () => {
+    /* The deletion took the header and nothing else — const 17, and the label `REe` renders. */
+    const source = pane();
+    expect(source).toContain('<div class="ml-5">');
+    expect(source).toContain('id="app-reactions-popup"');
+    expect(source).toContain('id="app-reactions-popup-qa"');
+    expect(source).toContain('>Reactions Response');
+    expect(source).toContain('>Reactions QA Response');
+  });
+
+  it('keeps the box around them, which IS ours and is recorded as ours', () => {
+    /*
+      `H(115,MEe,…)(116,REe,…)(117,NEe,…)(118,UEe,…)(119,HEe,…),u()` @ 2,278,483 — upstream has
+      these two as siblings inside a box the other three share, and three of those five live in
+      `ModalHost.svelte`. A component cannot be a sibling inside a box its parent opened without the
+      parent threading it through, which is what the size ratchet refused when this pane was made.
+    */
+    expect(pane()).toContain('<div class="p-2 text-mode-box">');
+    /*
+      Read RAW and not through `codeOf`: what is asserted here is that the REASON is written down
+      beside the markup, and `codeOf` exists to remove exactly that.
+    */
+    expect(read('src/lib/components/ReactionPrefsPane.svelte')).toContain(
+      'a box their four\n  siblings share'
+    );
+  });
+});

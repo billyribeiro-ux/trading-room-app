@@ -1584,7 +1584,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       presenter who cleared the password got an empty panel. Found by an orphan CSS class rather than
       by reading the capture: `smallAvatarImg` is the avatar on a row of this list.
     */
-    max: 124,
+    /*
+      124 -> 125, 2026-09-01. TWO const values that were absent and had never been read, plus the
+      lines that record them.
+
+        38  [1,"row"]                          the row `mTe` wraps the notes LIST in. Ours had a
+                                               bare `.col`, which carries half a gutter of padding
+                                               that only `.row`'s negative margin cancels — so the
+                                               list sat inset while the Add Note row below it, which
+                                               DID have its row, did not.
+        96  [1,"icon","fa","fa-plus-circle"]   the Add Note icon. `icon` was dropped.
+
+      One line of markup each; the rest is the decode and the consequence of the missing row, which
+      is the part that would otherwise be rediscovered as "why is this list indented".
+    */
+    max: 125,
     why: 'the Admin Notes tab - a gate, a list, and the two actions on it'
   },
   {
@@ -3296,7 +3310,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       whose switches did not exist, behind the two room gates the reference gives them. If this
       climbs, the question is whether a sixth gated preference belongs here or in its own pane.
     */
-    max: 140,
+    /*
+      140 -> 241, 2026-09-01, and the raise is three gaps a background sweep found in `tke` (bundle
+      byte 2,230,654) that nothing here had ever read.
+
+        d(3,"span",16),v(4,"Users join/leave:")   the group's only visible NAME. It had none: a bare
+                                                 user icon whose sole identification was a `title`
+                                                 tooltip, which a keyboard never reaches.
+        T(7,"hr")                                the one thing dividing arrivals from departures.
+        O(5,…)/O(6,…)/O(8,…)/O(9,…)              a PER-ROW gate on each of the four, on top of the
+                                                 group gate — which is an OR, so a room that enabled
+                                                 only the beep drew all four switches, two of them
+                                                 over a popup it had turned off.
+
+      Sixty of the hundred lines are the `rows` table becoming two typed tables with a `roomKey`
+      column, at prettier's four-lines-per-object; the rest is the decode, the paragraph saying why
+      `roomKey` reads the ROOM's `beepOnUserJoin` and not the identically-named viewer preference the
+      checkbox writes, and the note recording that this pane's `p-2 text-mode-box` around the
+      positions row is OURS — upstream draws that row as the last of five siblings in a box the
+      other four of which live in `ModalHost.svelte`.
+
+      Nothing is separable. The extraction the rule asks for already happened inside the file: the
+      row markup is a snippet, rendered by both tables, so the four rows are written once.
+    */
+    max: 241,
     why: 'the alerts tab’s five gated viewer preferences — the arrival group, and the positions refresh'
   },
   {
@@ -6526,7 +6563,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       than shared — four lines whose only reason to exist is that `bind:checked` over a plain
       `Record` loses every race with the DOM, and sharing it would mean a module for a closure.
     */
-    max: 100,
+    /*
+      100 -> 126, 2026-09-01, and the MARKUP SHRANK by eight lines while the file grew by
+      twenty-six. Every added line is the note explaining what left.
+
+      Both rows carried a header block this room invented — `<div id="appReactionsPopup"
+      title="Reactions Response" class="pb-2"><i class="fas fa-face-smile"></i><span class="pl-2">
+      Reactions Response:</span></div>` and its `-Qa` twin. `REe` and `NEe` are `d(0,"div",17)` and
+      nothing else. Occurrences in the pinned bundle: `appReactionsPopup` 0, `fa-face-smile` 0,
+      `"Reactions Response:"` 0 — against `appDisableVideo`, the header of the group IMMEDIATELY
+      beside these two, at 1.
+
+      That note is the whole raise, and it is worth more than the eight lines it replaced: markup
+      the reference does not have is the hardest kind of divergence to find later, because nothing
+      is missing and everything looks deliberate. Deleting it without saying what was deleted, and
+      that `fa-face-smile` is a Font Awesome 6 name in a project on 5.8.1, would leave the next
+      reader to rediscover both.
+    */
+    max: 126,
     why: 'the two reaction popups and the two room settings that decide whether they exist'
   },
   {
@@ -6903,7 +6957,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ImageUploadDialog.svelte',
-    max: 126,
+    /*
+      126 -> 186, 2026-09-01. TWO bootbox options that were never reproduced, and this was the one
+      dialog of its family with neither.
+
+          bootbox.dialog({ …, title:"Image Upload", backdrop:!0, onEscape:!0, size:"xl", … })
+                                                    ^^^^^^^^^^  ^^^^^^^^^^^
+      `backdrop:!0` is the `.modal-backdrop` element, and this repository has twice already ruled
+      that option rendered surface and built the element from it — `ROV-04` for the image lightbox
+      and `VID-01` for the video player. Nothing was dimmed behind this one: `app.css:1556` sets
+      `.modal { background: transparent }` and `modal-open` occurs nowhere, so the room stayed at
+      full brightness under a dialog covering it.
+
+      `onEscape:!0` cost more than one line, and the extra is the reason it is worth the space.
+      Bootbox binds Escape to the MODAL and Bootstrap focuses the modal on show; this room ships no
+      Bootstrap JavaScript, so a handler here would never have received a keystroke — the same
+      finding `ASR-3` recorded for `Modal.svelte`, one layer down. And it is bound to the ELEMENT
+      with `stopPropagation` rather than to `<svelte:window>`, because the room's global Escape
+      ladder ends in `else if (dialogs.alert) …` and a failed upload raises exactly such an alert.
+      Both of those are paragraphs the next reader cannot re-derive from the four lines of code.
+    */
+    max: 186,
     why: 'the composer image dialog, instantiated per feature rather than shared'
   },
   {

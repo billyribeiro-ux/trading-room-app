@@ -154,6 +154,101 @@ describe('the arrival group', () => {
   });
 });
 
+describe('the group is named and divided, and each row has its own gate', () => {
+  /*
+    THREE GAPS FOUND 2026-09-01 by re-reading `tke` at bundle byte 2,230,654, verbatim:
+
+        d(0,"div",52)(1,"div",139),T(2,"i",140),d(3,"span",16),v(4,"Users join/leave:"),u()(),
+        H(5,GEe,6,2,"div",17)(6,KEe,6,2,"div",17),T(7,"hr"),H(8,XEe,6,2,"div",17)(9,eke,6,2,"div",17),u()
+        …  O(5, sessData.beepOnUserJoin        ? 5 : -1)
+           O(6, sessData.userJoinAndLeavePopup ? 6 : -1)
+           O(8, sessData.beepOnUserJoin        ? 8 : -1)
+           O(9, sessData.userJoinAndLeavePopup ? 9 : -1)
+
+    const 16 is `[1,"pl-2"]`, const 17 `[1,"ml-5"]`, const 139
+    `["id","appBeepOnUserJoinLeave","title","Beep on user",1,"pb-2"]`.
+
+    None of the three was recorded anywhere. This file asserted the four ids, their checked states,
+    the written preference names, the labels and BOTH halves of the group gate — and the docblock in
+    the pane transcribes const 139 and const 140 and then jumps straight to the checkbox ids, so the
+    `d(3,"span",16)` between them had simply never been read.
+  */
+  it('names the group in the header, beside the icon', () => {
+    /*
+      The group had no visible name at all: a bare user icon whose only identification was the
+      `title` tooltip, which a pointer has to rest on and a keyboard never reaches.
+    */
+    const header = render().root.querySelector('#appBeepOnUserJoinLeave');
+    expect(header?.querySelector('i')?.className).toBe('fas fa-user');
+    const label = header?.querySelector('span');
+    expect(label?.className).toBe('pl-2');
+    expect(label?.textContent).toBe('Users join/leave:');
+  });
+
+  it('divides arrivals from departures with the capture s rule', () => {
+    const { root } = render();
+    const group = root.querySelector('#appBeepOnUserJoinLeave')?.parentElement;
+    expect(group?.querySelector('hr'), 'T(7,"hr")').not.toBeNull();
+  });
+
+  it('and the rule renders even when one of the two pairs does not', () => {
+    /* `T(7,"hr")` carries no const index and no `O(…)`: it is unconditional inside the group. */
+    const { root } = render({ roomJoinLeavePopup: false });
+    expect(root.querySelector('hr')).not.toBeNull();
+  });
+
+  it('offers only the BEEP rows to a room that enabled only the beep', () => {
+    /*
+      The group gate is an OR, so this room passes it — and before 2026-09-01 it then drew all four
+      switches, two of them over a popup the room has turned off. A control whose only effect is
+      drawing itself.
+    */
+    const { root } = render({ roomBeepOnUserJoin: true, roomJoinLeavePopup: false });
+    expect(root.querySelector('#beep-on-user-join')).not.toBeNull();
+    expect(root.querySelector('#beep-on-user-leave')).not.toBeNull();
+    expect(root.querySelector('#popup-on-user-join')).toBeNull();
+    expect(root.querySelector('#popup-on-user-leave')).toBeNull();
+  });
+
+  it('and only the POPUP rows to a room that enabled only the popup', () => {
+    /*
+      The LEAVE beep goes with the JOIN beep and not with its own direction, because `O(8, …)` reads
+      `sessData.beepOnUserJoin` — there is no `beepOnUserLeave` room setting upstream at all. That
+      quirk is reproduced rather than tidied, and this case is what would notice it being tidied.
+    */
+    const { root } = render({ roomBeepOnUserJoin: false, roomJoinLeavePopup: true });
+    expect(root.querySelector('#popup-on-user-join')).not.toBeNull();
+    expect(root.querySelector('#popup-on-user-leave')).not.toBeNull();
+    expect(root.querySelector('#beep-on-user-join')).toBeNull();
+    expect(root.querySelector('#beep-on-user-leave')).toBeNull();
+  });
+
+  it('gates on the ROOM value and never on the one the checkbox writes', () => {
+    /*
+      Both are called `beepOnUserJoin`, which is the whole hazard: gating a control on the viewer
+      preference it WRITES would make an unchecked box vanish and become impossible to switch back
+      on. Here the viewer has every preference off and every row is still drawn.
+    */
+    const { root } = render({
+      beepOnUserJoin: false,
+      popupOnUserJoin: false,
+      beepOnUserLeave: false,
+      popupOnUserLeave: false
+    });
+    for (const id of [
+      'beep-on-user-join',
+      'popup-on-user-join',
+      'beep-on-user-leave',
+      'popup-on-user-leave'
+    ]) {
+      expect(
+        root.querySelector(`#${id}`),
+        `${id} must survive its own preference being off`
+      ).not.toBeNull();
+    }
+  });
+});
+
 describe('the positions refresh switch', () => {
   it('appears only when the room actually has a positions panel', () => {
     expect(
