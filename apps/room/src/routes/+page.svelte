@@ -68,6 +68,8 @@
   import type { FollowChatStyle, MainTab, Theme } from '#lib/types.js';
   import type { PageProps } from './$types';
   import { mediaReplay } from '#lib/room/media-replay.js';
+  import { promptForChatLog } from '#lib/room/chat-log-save.js';
+  import { downloadChatLog } from './log-pages.remote';
 
   let { data }: PageProps = $props();
 
@@ -677,6 +679,26 @@
   const chatToolbarControls = $derived({
     onchatarchive:
       isPresenter && !media.limitedPresenter ? () => modals.open('chat-logs') : undefined,
+    /*
+      `ACA-06` — "Save chat messages", and it is UNGATED where its neighbour is presenter-only.
+
+      `K_e` at byte 1,421,929 wraps the archive button and carries no gate of its own; the gate is on
+      node 2 INSIDE it. So a member gets Save and not Archive, which is why this is a plain function
+      rather than a ternary — and why writing it as one would have been the easy mistake: every other
+      entry in this object is gated, so a gate here looks like consistency.
+
+      It takes the COLUMN, unlike its two neighbours here, and that difference is load-bearing.
+      `onchatarchive` opens one modal and `onchatmodechange` sets one room-wide mode, so neither
+      cares which bar was clicked; a download is OF a channel. Written `() => saveChatLog('main')`
+      first, which shipped the extra column downloading the main one — the same file, the right
+      button, and nothing on screen to say so. `searchChat` resolves a column the same way and is
+      where the idiom comes from.
+    */
+    onchatsave: (column: 'main' | 'extra') =>
+      promptForChatLog(
+        { dialogs, fetchLog: downloadChatLog },
+        column === 'main' ? chat.tab : chat.extraTab
+      ),
     chatMode,
     onchatmodechange:
       (!isPresenter && data.user.hasMic !== true) || media.limitedPresenter
@@ -1484,6 +1506,7 @@
                 onsavealerts={() => alertsPane.save()}
                 onarchivealerts={() => alertsPane.archive()}
                 onchatarchive={chatToolbarControls.onchatarchive}
+                onchatsave={() => chatToolbarControls.onchatsave('main')}
                 chatMode={chatToolbarControls.chatMode}
                 onchatmodechange={chatToolbarControls.onchatmodechange}
                 ondetachchat={chatOnlyMode ? undefined : () => alertsPane.detach()}
@@ -1646,6 +1669,7 @@
                   onmodonly={(next) => chat.setModOnly('extra', next)}
                   ontoggletoolbar={() => chat.search.toggleExtended('extra')}
                   onchatarchive={chatToolbarControls.onchatarchive}
+                  onchatsave={() => chatToolbarControls.onchatsave('extra')}
                   chatMode={chatToolbarControls.chatMode}
                   onchatmodechange={chatToolbarControls.onchatmodechange}
                   onimageupload={() => composer.openImageUpload()}

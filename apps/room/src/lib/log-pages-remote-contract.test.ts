@@ -101,13 +101,19 @@ describe('the channel is validated, not trusted', () => {
 
 describe('the room comes from the session, never the request', () => {
   /*
-    A COUNT, not a spot check, and the count is the assertion: this module exports three readers of
-    the room's logs, and every one of them has to take its room from the session. It was two until
-    `searchChatMessages` arrived on 2026-08-29, and this test going red is how that arrival was
+    A COUNT, not a spot check, and the count is the assertion: every reader of the room's logs this
+    module exports has to take its room from the session.
+
+    It was two until `searchChatMessages` arrived on 2026-08-29, and THREE until `downloadChatLog`
+    arrived on 2026-09-01 for `ACA-06`'s save control. This test going red is how each arrival was
     forced to be looked at rather than assumed — a new export inheriting the file's reputation is
-    exactly how the third one would have shipped taking a room from its caller.
+    exactly how one of them would have shipped taking a room from its caller.
+
+    The fourth is the one where it would have mattered most: a download reads a channel's WHOLE
+    history in one request, so a `roomShortCode` on its argument would hand a caller another room's
+    entire chat log in a single file.
   */
-  const READERS = 3;
+  const READERS = 4;
 
   it('takes the room short code from locals in every one', () => {
     /*
@@ -126,14 +132,20 @@ describe('the room comes from the session, never the request', () => {
 
   it('checks the channel against THIS member list wherever a channel is named', () => {
     /*
-      The two channel-scoped readers — the page loader and the search. A search is the shape that
-      makes such a leak useful, since it takes a term as well as a channel, so it is asserted
-      alongside rather than trusted to have copied the gate.
+      The three channel-scoped readers — the page loader, the search and, since 2026-09-01, the
+      download. A search is the shape that makes such a leak useful, since it takes a term as well as
+      a channel; a DOWNLOAD is worse, because it takes the whole channel and hands it over as a file.
+      Both are asserted alongside the page read rather than trusted to have copied its gate.
     */
     expect((remoteCode.match(/memberChatChannels\(request, shortCode, user\)/g) ?? []).length).toBe(
-      2
+      3
     );
-    expect((remoteCode.match(/isMemberChatChannel\(channels, channel\)/g) ?? []).length).toBe(2);
+    /*
+      THREE since 2026-09-01. `downloadChatLog` checks the channel for the same reason the page read
+      and the search do, and for one more: "download" must not become a way to READ a channel this
+      member cannot open, in bulk, as a file.
+    */
+    expect((remoteCode.match(/isMemberChatChannel\(channels, channel\)/g) ?? []).length).toBe(3);
   });
 });
 

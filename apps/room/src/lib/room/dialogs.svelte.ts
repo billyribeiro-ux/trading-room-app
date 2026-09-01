@@ -70,6 +70,19 @@ export interface RoomPrompt {
   title: string;
   value: string;
   onconfirm: (value: string) => void;
+  /**
+   * `inputType: "radio"` with `inputOptions` — a prompt that CHOOSES rather than types.
+   *
+   * Absent for every text prompt, which is all of them until `downloadLog("chat")`. Optional rather
+   * than a second dialog kind because that is bootbox's own shape: one `prompt`, an `inputType` that
+   * selects the control. See `BootboxDialog.svelte`.
+   */
+  options?: readonly { readonly text: string; readonly value: string }[];
+  /**
+   * The sentence above the options — upstream's `message`, which its radio call passes and its text
+   * calls do not.
+   */
+  message?: string;
 }
 
 export class RoomDialogs {

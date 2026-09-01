@@ -221,6 +221,13 @@
      * handed each entitlement's RESULT and deliberately not `isPresenter`.
      */
     onchatarchive?: () => void;
+    /**
+     * `ACA-06` — "Save chat messages", `K_e` at byte 1,421,929.
+     *
+     * UNGATED, unlike `onchatarchive` beside it: the archive button is node 2 INSIDE the save span
+     * upstream and carries the presenter gate, so a member sees Save and not Archive.
+     */
+    onchatsave?: () => void;
     chatMode?: ChatMode;
     onchatmodechange?: (mode: ChatMode) => void;
     onimageupload: () => void;
@@ -305,6 +312,7 @@
     onmodonly,
     ontoggletoolbar,
     onchatarchive,
+    onchatsave,
     chatMode,
     onchatmodechange,
     onimageupload,
@@ -498,6 +506,7 @@
         {modOnly}
         {onmodonly}
         onarchive={onchatarchive}
+        onsave={onchatsave}
         {chatMode}
         onchatmode={onchatmodechange}
       />

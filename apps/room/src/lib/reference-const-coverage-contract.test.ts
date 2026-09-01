@@ -361,6 +361,17 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   ],
 
   /*
+    `app-chat` and `app-extra-chat` were BOTH here with one residual each — `'Save chat messages'` —
+    and both are fully covered since 2026-09-01. It was the `K_e` save control, and the note that
+    held it recorded a blocker naming the reference's TRANSPORT rather than this room's capability:
+    *"`downloadLogType` awaits `invokeServerCommand("getAllLog", …)`. There is no such command in
+    this repository."* True, and beside the point — `getAllLog` is how the reference asks ITS server
+    for history its page has never seen, and this room keeps that history itself.
+
+    Left as a comment with no entries beneath it for the reason `app-screenshare-view`'s note is: a
+    closed gap whose argument is deleted is a gap the next reader of the const table reopens.
+  */
+  /*
     THREE — BOOTSTRAP'S DATA API, AND FOURTEEN OF THESE ARE FALSE GAPS.
 
     Every `#`-prefixed value here is a `data-bs-target` or an `href`: the reference asks Bootstrap's
@@ -578,8 +589,6 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     Nothing stands in for it, which is deliberate — an empty toolbar section is a control whose only
     effect is its own presence.
   */
-  'app-chat': ['Save chat messages'],
-  'app-extra-chat': ['Save chat messages'],
   /*
     The id and class of the `<video>` inside the reference's IN-PAGE preview card. This room's
     preview is a separate WINDOW, argued in `room/recording.ts`: upstream points its card at a
@@ -643,15 +652,15 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-seven components fully covered, one hundred and twenty-one values not', () => {
+  it('holds the ratchet: thirty-nine components fully covered, one hundred and nineteen values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
       edits the table without knowing which way they moved it.
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
-    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(37);
-    expect(residuals).toBe(121);
+    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(39);
+    expect(residuals).toBe(119);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -766,9 +775,9 @@ describe('how much of the gap has already been written about', () => {
   const mentioned = (value: string): boolean => value !== REDACTED && REPOSITORY.includes(value);
   const all = ROWS.flatMap((row) => row.residuals);
 
-  it('splits the 121 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(121);
-    expect(all.filter(mentioned)).toHaveLength(31);
+  it('splits the 119 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(119);
+    expect(all.filter(mentioned)).toHaveLength(29);
     expect(all.filter((value) => !mentioned(value))).toHaveLength(90);
   });
 
@@ -883,6 +892,6 @@ describe('the comment stripping is load-bearing', () => {
     const raw = RAW_ROWS.reduce((total, row) => total + row.residuals.length, 0);
     const stripped = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(raw).toBeLessThan(stripped);
-    expect(stripped - raw).toBe(21);
+    expect(stripped - raw).toBe(19);
   });
 });

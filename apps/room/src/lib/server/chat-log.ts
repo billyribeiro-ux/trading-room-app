@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, like, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, like, type SQL } from 'drizzle-orm';
 
 import { db } from './db';
 import { messages, users } from './db/schema';
@@ -215,6 +215,100 @@ export function loadChatPage(roomShortCode: string, channel: ChatChannel, page =
       /* Back into chronological order, because every reader downstream — the renderer, the date
        separators, the autoscroll — assumes oldest-first. `loadThread` does the same. */
       .reverse()
+  );
+}
+
+/**
+ * `downloadLog("chat")`'s three ranges, and the file they produce.
+ *
+ * ```js
+ * bootbox.prompt({ title: "Chat Log", message: "<p>Please select an option below:</p>",
+ *   inputType: "radio", inputOptions: [
+ *     { text: "Entire chat history", value: "all" },
+ *     { text: "Last 24 hours",       value: "24hrs" },
+ *     { text: "Last 7 days",         value: "7days" }],
+ *   callback: o => { o && this.downloadLogType(e, !1, o) } })                  // byte 1,415,703
+ *
+ * const f = (yield invokeServerCommand("getAllLog", {type: s, channel, limit: a},
+ *                                      {ackTimeoutMs: 6e4})).data              // byte 1,416,126
+ * ```
+ *
+ * ## The blocker this replaces named the reference's TRANSPORT, not this room's capability
+ *
+ * `ChatSearchBar.svelte` recorded the save button as *"the one of the four that is not blocked on
+ * scope … `downloadLogType` awaits `invokeServerCommand("getAllLog", …)`. **There is no such command
+ * in this repository** — so the button would open a dialog whose every option fails."*
+ *
+ * Both sentences are true and the conclusion does not follow. `getAllLog` is how the REFERENCE asks
+ * its server for history its page has never seen; this room keeps that history itself, in the table
+ * this module already reads four other ways. The room does not need the command — it needs a query,
+ * and the predicate it needs is one `gte` on a column that has always been there.
+ *
+ * That is the third blocker of this shape re-measured this week, after `G08`'s waveform and
+ * `SP2-04`'s local preview: a note describing the mechanism upstream uses, read as a statement about
+ * what is possible here.
+ *
+ * ## Bounded, unlike the reference
+ *
+ * Upstream sends `limit: "all"` and serialises whatever comes back. This caps at
+ * {@link CHAT_DOWNLOAD_LIMIT} for the reason every read path in this file is capped: an unbounded
+ * SELECT that grows with usage is the shape `CLAUDE.md` names, and "entire chat history" is exactly
+ * the read whose size nobody controls. The caller is told when it truncated rather than handed a
+ * short file that looks complete.
+ */
+export type ChatDownloadRange = 'all' | '24hrs' | '7days';
+
+/** The three the reference offers, as its own radio values. Exported so the UI cannot invent a fourth. */
+export const CHAT_DOWNLOAD_RANGES: readonly ChatDownloadRange[] = ['all', '24hrs', '7days'];
+
+/**
+ * The most messages one download will carry.
+ *
+ * Ten times `CHAT_ARCHIVE_LOG_LIMIT`, because the units differ in the same way that limit's own note
+ * describes: an archive is one presenter's sweep, and this is a room's whole history. Twenty
+ * thousand lines is a file a person can still open, and it is two orders of magnitude more than any
+ * reader will scroll.
+ */
+export const CHAT_DOWNLOAD_LIMIT = 20_000;
+
+/** Milliseconds in the two bounded ranges — named, because `86400000` in a predicate says nothing. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Every live message of one channel within `range`, oldest-first, bounded.
+ *
+ * Oldest-first because a transcript is read from its beginning, which is also why the LIMIT must
+ * keep the oldest — the same distinction `loadArchivedChatLog` records against `loadChatPage`.
+ *
+ * ARCHIVED ROWS ARE EXCLUDED, by going through `chatRows` like every other live reader. A presenter
+ * who swept the log and then downloaded it gets what is on screen, not what used to be — and the
+ * archive browser is where the swept rows live.
+ */
+export function chatLogForDownload(
+  roomShortCode: string,
+  channel: ChatChannel,
+  range: ChatDownloadRange,
+  now: Date = new Date()
+) {
+  const since =
+    range === '24hrs'
+      ? new Date(now.getTime() - DAY_MS)
+      : range === '7days'
+        ? new Date(now.getTime() - 7 * DAY_MS)
+        : null;
+
+  return chatRowsToMessages(
+    chatRows(
+      and(
+        eq(messages.roomShortCode, roomShortCode),
+        eq(messages.room, channel),
+        /* `undefined` and not a tautology: drizzle drops it from the AND rather than emitting `1=1`. */
+        since ? gte(messages.createdAt, since) : undefined
+      )
+    )
+      .orderBy(asc(messages.createdAt), asc(messages.id))
+      .limit(CHAT_DOWNLOAD_LIMIT)
+      .all()
   );
 }
 

@@ -758,8 +758,44 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the next reader finds "an armed play that outlives the room" is now the point rather than the
       hazard, instead of re-deriving it from a diff.
     */
-    max: 1866,
+    /*
+      1,866 -> 1,889, 2026-09-01, for `ACA-06`'s SAVE control — the chat-log download, whose blocker
+      named the reference's transport rather than this room's capability.
+
+      One call, and the flow it replaced was 104 lines here. `#lib/room/chat-log-save.ts` owns the
+      prompt, the read and the file; this keeps the line that resolves a COLUMN to a channel, which
+      is the page's because `chat.tab` and `chat.extraTab` are.
+
+      The extraction was forced by this ceiling — the first draft put it 125 lines over — and is
+      better than the number: the flow now has seven cases and three negative controls without
+      mounting a page or a network, and one of those controls found a case of mine that passed for
+      the wrong reason.
+    */
+    max: 1889,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
+  },
+  {
+    file: 'lib/room/chat-log-save.ts',
+    /*
+      Created 2026-09-01 and capped at what it landed at — `downloadLog("chat")`'s whole flow,
+      extracted from `+page.svelte` when that file went 125 lines past its ceiling.
+
+      A better module than a line count, which is the test this rule asks of a split: `fetchLog` is
+      INJECTED, so seven cases drive the prompt, the mapping and the failure path without a network
+      or a mount. One of its negative controls found a case of mine that passed for the wrong reason —
+      a synchronous assertion against an async download.
+
+      Capped at 165 rather than the 158 it first landed at, and the seven lines are a DELETION with
+      its reason over it: an exported `ChatLogRange` union that nothing consumed. `dead-export-contract`
+      caught the orphan, and the note that replaced it says why the type is not simply re-used — the
+      dialog hands back whatever a radio input carried, so narrowing it here would be this module
+      asserting a fact it cannot check. The real gate is the server's `z.enum`.
+
+      If this climbs, the question is whether the FORMAT has come back. `#lib/chat-log-download.ts`
+      owns the text and the name because those three details are the invisible ones.
+    */
+    max: 165,
+    why: 'the chat-log download: the range prompt, the read and the file'
   },
   {
     file: 'lib/room/events.svelte.ts',
@@ -1913,7 +1949,11 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       them and went red with `expected 6 to be 5` the moment this landed — which is exactly what its
       own comment predicted would happen when a sixth arrived.
     */
-    max: 1184,
+    /*
+      1,184 -> 1,185, 2026-09-01. Two attributes forwarding the radio prompt's `options` and
+      `message`, minus the `message=""` they replace.
+    */
+    max: 1185,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2155,7 +2195,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       fails — worse than no button. The alerts column's twin exports rows the page already holds;
       this one asks the server for history the page has never seen.
     */
-    max: 374,
+    /*
+      374 -> 451, 2026-09-01, for `ACA-06`'s SAVE control — the chat-log download, whose blocker
+      named the reference's transport rather than this room's capability.
+
+      The `K_e` span, its keyboard handling, and the `stopPropagation` the nesting requires — plus the
+      decode of why the archive button is INSIDE it, which is what puts the presenter gate on archive
+      and leaves save ungated. Read the nesting the other way round and a whole control disappears for
+      every member; that is the sentence worth the lines.
+    */
+    max: 451,
     why: 'the chat columns search bar, transcribed once and rendered by both panes'
   },
   {
@@ -4265,7 +4314,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The seam question above still has the same answer: this is one primitive, and the labels
       belong to the confirmation they label.
     */
-    max: 197,
+    /*
+      197 -> 210, 2026-09-01, for `ACA-06`'s SAVE control — the chat-log download, whose blocker
+      named the reference's transport rather than this room's capability.
+
+      `RoomPrompt` gains `options` and `message` — `bootbox.prompt({inputType: "radio", inputOptions})`.
+      A field on the existing prompt rather than a fourth dialog kind, because that is bootbox's own
+      shape: ONE prompt whose `inputType` selects the control.
+    */
+    max: 210,
     why: 'the three bootbox dialogs, which STACK and therefore stay three fields; the alert carries a dismissal'
   },
   {
@@ -6264,7 +6321,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rather than a second copy, because two columns are one behaviour and the reason they drifted is
       that each was read alone.
     */
-    max: 1533,
+    /*
+      1,533 -> 1,543, 2026-09-01. One prop and its docblock, forwarding `ACA-06`'s save control to the
+      toolbar. The note is what earns the lines: this prop is UNGATED where `onchatarchive` beside it
+      is presenter-only, because upstream nests the archive button inside the save span and puts the
+      gate there. A reader adding a gate here for consistency would remove a control from every
+      member.
+    */
+    max: 1543,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -6283,7 +6347,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       132 -> 146, 2026-08-30. RS-07's other half: the four labels rendered, with the defaults that
       keep every existing caller identical. The two buttons were hardcoded `OK` and `Cancel`.
     */
-    max: 146,
+    /*
+      146 -> 214, 2026-09-01. `bootbox.prompt({inputType: "radio", inputOptions})` — the variant
+      `downloadLog("chat")` opens, byte 1,415,703.
+
+      Sixty-eight lines for one branch, and most of them are the reasons. Three are worth the entry:
+      the radio group is a FIELD on the existing prompt rather than a fourth `mode`, because that is
+      bootbox's own shape; the `message` is rendered as text and not `{@html}`, though the capture's
+      value is a `<p>` wrapper, because admitting HTML into a dialog body for a tag nobody sees is a
+      trade this repository does not make; and NOTHING is preselected, which is upstream's `o && …`
+      guard read back — a default would turn a mis-click into a download of the whole chat history.
+    */
+    max: 214,
     why: 'the dialog primitive this repository uses in place of bootbox'
   },
   {
@@ -6498,7 +6573,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reference's own `this.isConnected=!0` (byte 2,375,326) and the only safe default: `false` would
       announce that chat is off in every render that omits the prop.
     */
-    max: 762,
+    /*
+      762 -> 772, 2026-09-01. One prop and its docblock, forwarding `ACA-06`'s save control to the
+      toolbar. The note is what earns the lines: this prop is UNGATED where `onchatarchive` beside it
+      is presenter-only, because upstream nests the archive button inside the save span and puts the
+      gate there. A reader adding a gate here for consistency would remove a control from every
+      member.
+    */
+    max: 772,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

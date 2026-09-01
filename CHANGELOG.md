@@ -33,6 +33,103 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 21:40 UTC — `ACA-06`'s save control, and the third blocker this week that named the wrong thing
+
+**Runtime impact: YES** — the chat toolbar's "Save chat messages" button is built. It downloads the
+column's log as a text file, over the reference's own three ranges.
+
+`ChatSearchBar.svelte` recorded this control as unbuilt, precisely:
+
+> the one of the four that is not blocked on scope: `downloadLog("chat")` opens a radio prompt …
+> and hands the answer to `downloadLogType`, which awaits `invokeServerCommand("getAllLog", …)`.
+> **There is no such command in this repository** — so the button would open a dialog whose every
+> option fails.
+
+Both sentences are true and the conclusion does not follow. `getAllLog` is how the REFERENCE asks
+ITS server for history its page has never seen; this room keeps that history itself, in the table
+`chat-log.ts` already reads four other ways. It needed a **query**, not a command.
+
+**Third blocker of that shape re-measured this week**, after `G08`'s waveform and `SP2-04`'s local
+preview: a note describing the mechanism upstream uses, read as a statement about what is possible
+here.
+
+## What the capture decides, and three details that are invisible afterwards
+
+    K_e  span const 38, click downloadLog("chat"), WRAPPING q_e (the archive button)   1,421,929
+    38   ["id","addon-chat-save","title","Save chat messages",1,"btn","btn-outline-secondary",
+          "d-inline-flex","pl-2","pr-2","input-group-text",3,"click"]
+    …toLocaleTimeString("en-us",c)+"["+B.n+"]: "+B.txt+"\r\n"                         1,416,419
+    ("chat"==s?"ChatLog_":"AlertsLog_")+(new Date).toDateString()+".txt"
+
+**The nesting is the gate.** The archive button is node 2 INSIDE the save span and carries
+`isPresenter && !isLimitedPresenter`; the span carries nothing. So a member sees Save and not
+Archive — read the nesting the other way round and a whole control disappears for everyone not
+running the room. It also means an archive click bubbles to the save handler, which
+`stopPropagation` answers; upstream has the same shape and the same problem.
+
+The class run on the save button is in a **different order** from the clear button's. Both are the
+capture's and both are reproduced; making the three siblings agree would be this room editing the
+reference.
+
+The file format's three invisible details: `toLocaleTimeString` carrying **date** fields, **no space**
+before the bracket (unlike `private-chat.svelte.ts`'s transcription, whose capture has one), and
+**CRLF**. They are why the format is a module — asserting them by mounting a component would be
+testing the mount.
+
+## Bounded where the reference is not, and refused where it must be
+
+Upstream sends `limit: "all"` and serialises whatever comes back. `chatLogForDownload` caps at
+20,000, excludes archived rows through the shared `chatRows` builder, and takes its room from the
+SESSION. The channel is checked against `memberChatChannels` — download must not become a way to
+read a channel this member cannot open, in bulk, as a file.
+
+`log-pages-remote-contract`'s reader COUNT went red on the new export, which is what it is for: the
+fourth reader is the one where a `roomShortCode` on the argument would have handed a caller another
+room's entire chat log in a single file.
+
+## Two defects of my own, both caught by things written to catch them
+
+**Both toolbars downloaded the MAIN column.** `str.replace` with the 16-space call site matched
+inside the 18-space one, so the extra column's binding was rewritten too — the right button, a real
+file, the wrong channel, and nothing on screen to say so. The same substring trap as
+`pmToolbar`/`pmToolbarZZ`. The contract case caught it on its first run.
+
+**A test that passed for the wrong reason.** `confirming with NO choice downloads nothing` was
+synchronous, and `onconfirm` starts a download it does not await — so deleting the `if (!range)
+return;` guard left it green. It now awaits, and asserts the read was never ASKED rather than that no
+file appeared: a guard placed after the fetch would still have sent the request.
+
+## The ratchet forced a better module again
+
+`+page.svelte` went 125 lines over. `#lib/room/chat-log-save.ts` takes the flow with `fetchLog`
+INJECTED, so seven cases drive the prompt, the mapping and the failure path without a network or a
+mount. `dead-export-contract` then caught an exported `ChatLogRange` union nothing consumed — deleted,
+with the reason recorded: the dialog hands back whatever a radio input carried, so narrowing it there
+would be the module asserting a fact it cannot check. The real gate is the server's `z.enum`.
+
+`BootboxDialog` gained the radio variant as a FIELD on the existing prompt rather than a fourth
+`mode`, because that is bootbox's own shape — one `prompt`, an `inputType` that selects the control.
+Nothing is preselected, which is upstream's `o && …` read back: a default would turn a mis-click into
+a download of the whole history.
+
+`app-chat` and `app-extra-chat` are now **fully covered** — this was the only residual each had.
+Components at 39, residuals at 119.
+
+## Verification
+
+Eight negative controls, each seen RED then restored. Four on the read: the 24-hour boundary off by
+3600×, `gte` → `gt`, the archived exclusion dropped, the channel predicate dropped. Three on the
+flow: the empty-choice guard, a preselected option, a swallowed failure. One on the file format's
+column resolution.
+
+Room gate exit 0: `svelte-check` 1,609 files / 0 errors / 0 warnings. **Not opened in a browser** —
+the untested path here is a real click producing a real file.
+
+**The Svelte MCP was unavailable in this session** (the server disconnected), so `svelte-autofixer`
+did not run on the four `.svelte` files this touched. `svelte-check` is clean and the two standing
+autofixer exceptions at `AGENTS.md:106` are unaffected, but that gate was not run and this says so
+rather than implying it was.
+
 ### 2026-09-01 19:05 UTC — a stale triage row, and the gate that would have caught it two days ago
 
 **Runtime impact: NO** — one document corrected and one contract case added.

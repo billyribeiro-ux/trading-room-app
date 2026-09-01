@@ -261,6 +261,13 @@
      * two answers to one question come to disagree.
      */
     onchatarchive?: () => void;
+    /**
+     * `ACA-06` — "Save chat messages", `K_e` at byte 1,421,929.
+     *
+     * UNGATED, unlike `onchatarchive` beside it: the archive button is node 2 INSIDE the save span
+     * upstream and carries the presenter gate, so a member sees Save and not Archive.
+     */
+    onchatsave?: () => void;
     chatMode?: ChatMode;
     onchatmodechange?: (mode: ChatMode) => void;
     ondetachchat?: () => void;
@@ -397,6 +404,7 @@
     onsavealerts,
     onarchivealerts,
     onchatarchive,
+    onchatsave,
     chatMode,
     onchatmodechange,
     ondetachchat,
@@ -1132,6 +1140,7 @@
               modOnly={chat.modOnly('main')}
               onmodonly={(next) => chat.setModOnly('main', next)}
               onarchive={onchatarchive}
+              onsave={onchatsave}
               {chatMode}
               onchatmode={onchatmodechange}
               ondetach={ondetachchat}
