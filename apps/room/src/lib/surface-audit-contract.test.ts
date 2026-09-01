@@ -843,3 +843,76 @@ describe('app-room — audited 2026-09-01, the whole page', () => {
     expect(report.textGaps).toEqual([' ProTradingRoom.com ']);
   });
 });
+
+describe('app-presentationarea — audited 2026-09-01, the page s other giant', () => {
+  /*
+    292 consts and 125 embedded views — the main tab area: the screen tabs, the stream tabs, the
+    notes, the files pane, and the swing and day-trade alert forms. Second only to `app-room`, and
+    like it a GLOB, for the same reason and with the same measured weakness recorded there.
+
+    Getting from 82 gaps to 5 was four separate corrections to the FILE LIST and two to the tool,
+    and the split is worth recording because only one of the six was a fact about this room:
+
+      * `src/lib/components/notes/**` and `src/lib/components/swing-alerts/**` and
+        `day-trade-alerts/**` are SUBDIRECTORIES, and the first list globbed `components/*.svelte`.
+        Nineteen values — `notesTabs`, `swingAlert-symbol`, `AAPL`, `123.57` — were reported missing
+        against files that render every one of them.
+      * `ngForm` is `app-presentationarea`'s const 0, `["alertForm","ngForm"]`, a local reference
+        with an `exportAs`. The tool now finds reference lists by POSITION (the fourth argument of
+        `d(slot,"tag",attrs,refs)`) rather than by shape — the shape fix was tried first and
+        swallowed `["value","sent"]` along with it.
+      * The 261-character default-screen tooltip is rendered twice, at `ScreenTabs.svelte:102` and
+        `StreamTabs.svelte:120`, and prettier splits it across a `+`. The tool now folds adjacent
+        string literals the way the engine does.
+
+    Four of the six were the measurement being wrong about itself, which is the ordinary case.
+  */
+  const files = [
+    ...globSync('src/lib/components/**/*.svelte').filter((path) => !path.includes('Probe')),
+    'src/routes/+page.svelte',
+    'src/lib/navbar-labels.ts',
+    'src/lib/screen-share-menu.ts',
+    'src/lib/file-sort.ts',
+    'src/lib/files-gates.ts',
+    'src/lib/components/notes/note-tab-chrome.ts'
+  ].sort();
+
+  const report = auditSurface({ selector: 'app-presentationarea', files });
+
+  it('reads the component and the files it says it reads', () => {
+    expect(report.region.consts).toBe(292);
+    expect(report.views.resolved).toBe(125);
+    expect(report.views.unresolved).toEqual([]);
+    expect(files.length, 'a component was added or removed under lib/components').toBe(94);
+  });
+
+  it('is missing the RECORDINGS tab and one recorded divergence, and nothing else', () => {
+    /*
+      `recordings`, `recordings-tab`, `#recordings`, `fa-file-video` and the literal `"Recordings"`
+      are one blocked feature: a recordings archive, which needs a service neither database has a
+      table for. `TODO.md` carries it as blocked on an archive service, not as a decision.
+
+      `dropdownMenuNote` is `NTC-3`, argued at `notes/NoteTabContent.svelte`: the capture freezes the
+      per-note gear's `id` at that literal, so two open notes would be two elements with one id and
+      every menu's `aria-labelledby` would resolve to the first gear. Reproducing it would reproduce
+      a defect, so the id is per-note here.
+    */
+    expect(report.constGaps.map((gap) => gap.value)).toEqual([
+      'recordings',
+      'recordings-tab',
+      '#recordings',
+      'fa-file-video',
+      'dropdownMenuNote'
+    ]);
+  });
+
+  it('and two literals: the same tab, and the never-fetched files message', () => {
+    /*
+      `"No room files found."` is the `#files` region's own recorded refusal —
+      `O(84, sessionFiles ? -1 : 84)` and `O(85, sessionFiles && length > 0 ? 85 : -1)` are NOT
+      complements, because an empty array is truthy, so it is the never-fetched state and our loader
+      ends in `.all()`.
+    */
+    expect(report.textGaps).toEqual(['Recordings', 'No room files found.']);
+  });
+});

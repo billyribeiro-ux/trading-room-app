@@ -45,6 +45,86 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 18:24 UTC — `app-presentationarea` pinned, and two tool bugs where the obvious fix was wrong
+
+**Runtime impact: NONE.** No component changed. The page's second giant is measured and pinned, and
+`gate/audit-surface.mjs` stops reporting two whole classes of false gap.
+
+## 82 gaps to 5, and only one of the six corrections was about this room
+
+`app-presentationarea` — 292 consts, 125 embedded views: the screen tabs, the stream tabs, the
+notes, the files pane and the swing and day-trade alert forms.
+
+| correction | what it was |
+| --- | --- |
+| the file list, ×4 | `components/notes/**`, `components/swing-alerts/**` and `day-trade-alerts/**` are SUBDIRECTORIES, and the glob was `components/*.svelte`. Nineteen values — `notesTabs`, `swingAlert-symbol`, `AAPL`, `123.57` — reported missing against files rendering every one |
+| the tool, ×1 | `ngForm` — const 0 is `["alertForm","ngForm"]`, a local reference |
+| the tool, ×1 | a 261-character tooltip prettier splits across a `+` |
+
+Five of the six were the measurement being wrong about itself. What is left is one blocked feature
+and one recorded divergence: the **Recordings tab** (`recordings`, `recordings-tab`, `#recordings`,
+`fa-file-video` and the literal), blocked on an archive service neither database has a table for;
+`dropdownMenuNote`, which is `NTC-3` — the capture freezes the per-note gear's `id` at that literal,
+so two open notes would be two elements with one id and every menu's `aria-labelledby` would resolve
+to the first gear; and `"No room files found."`, the `#files` region's own refusal.
+
+## The local-reference fix, and why the obvious version of it was wrong
+
+`#alertForm="ngForm"` compiles to `["alertForm","ngForm"]`. The first fix widened the shape test from
+`["x",""]` to any two-string const — and **that also swallows `["value","sent"]`, `["value","queued"]`
+and `["value","failed"]`**, ordinary attribute pairs, so four real gaps quietly left
+`app-alert-send-report-modal`'s pin. A shape two different things share cannot tell them apart.
+
+Angular's own encoding does: a const index in the THIRD argument of `d(slot,"tag",N)` is the
+attribute list, and a FOURTH is the local-refs list.
+
+```js
+d(23,"div",74,3)      // consts[74] = attributes, consts[3] = local refs
+d(0,"div",52)         // attributes only
+```
+
+So the indices are read from the template and every view it reaches, and a const at one of them is
+skipped wherever it is and whatever it looks like — which is why that loop now runs after the view
+walk instead of beside the const table.
+
+**And it is restricted to `--selector` runs, which is a correctness requirement rather than caution.**
+A `--from`/`--to` run parses a SLICE, so its index 0 is the first entry in the range while the
+template's indices are the whole component's. Applying one numbering to the other skips an arbitrary
+entry, and on the first run it did: the `#files` region's pinned `pe` gap — upstream's own typo, an
+attribute literally named `pe` — disappeared because an unrelated four-argument call carried its
+range-relative index.
+
+## Adjacent string literals are joined now, the way the engine joins them
+
+```ts
+'This is the default screen users are taken to right now. If you are a presenter and talking ' +
+  'whichever screen you select will be forced on others…'
+```
+
+One string to JavaScript, two to a text search. Whitespace collapsing cannot fix it — the break is in
+SOURCE, not markup, and there is a `+` between the halves — so the 261-character tooltip was reported
+absent against `ScreenTabs.svelte:102` and `StreamTabs.svelte:120`, both of which render it. A closing
+quote, optional whitespace, `+`, optional whitespace, an opening quote of the SAME kind, all removed.
+Different quote characters are left alone: that is a concatenation of two genuinely different strings.
+
+Every search reads the folded text now, const values included — an attribute value is exactly as
+splittable as a text node.
+
+## Verification
+
+Room gate exit 0 — **336 files, 6,038 passed, 1 skipped**.
+
+**Every one of the ten pinned surfaces gives the identical answer after both tool changes**, which is
+the only evidence that a smarter reader is still reading the same thing — and the one that did not,
+`app-alert-send-report-modal`, is what caught the wrong version of the local-reference fix.
+
+**Two negative controls, each red naming the value it restores:** the literal-join reverted (the
+tooltip reappears in `app-presentationarea`'s const list) and the positional filter reverted
+(`ngForm` reappears).
+
+`todo-next.md`: 84 of 93 surfaces, 82.7%. `TabGearMenu.svelte` moved with `app-room`, whose pin holds
+its two cogs.
+
 ### 2026-09-01 18:09 UTC — the toasts flew in from nowhere, and two pages of this product credit different companies
 
 **Runtime impact: yes.** Toasts fade in the way ngx-toastr fades them instead of sliding 300px from
