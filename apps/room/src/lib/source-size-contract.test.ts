@@ -749,7 +749,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       half MOVES THE TAB, which must not happen during SSR; and the YouTube half reads the clock,
       which on the server would be render time rather than this member's arrival.
     */
-    max: 1857,
+    /*
+      1,857 -> 1,866, 2026-09-01. The scheduled play moved to the SERVER (`TODO.md`'s consequence 2),
+      and this file's share of it is a DELETION with a paragraph over it: `onMount`'s teardown used
+      to clear a `window.setTimeout` that armed the play, and there is no timer any more.
+
+      Nine lines to record why a call went away, which is the trade this repository makes on purpose:
+      the next reader finds "an armed play that outlives the room" is now the point rather than the
+      hazard, instead of re-deriving it from a diff.
+    */
+    max: 1866,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -4303,7 +4312,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `for-all-broadcast-contract` asserts on the METHOD body rather than the file —
       `scheduleVideoForAll` legitimately reads the clock to size its own timer.
     */
-    max: 517,
+    /*
+      517 -> 549, 2026-09-01, and the code SHRANK — `#scheduledVideoTimer` and its two teardowns are
+      gone, because the schedule is a row now and `sweepDueVideos` fires it.
+
+      What replaced them is the argument. `scheduleVideoForAll` posts the moment instead of arming a
+      timer, and `clearScheduledVideoTimer` became `clearScheduledVideoLine` — renamed because a
+      method named for a timer that no longer exists is the comment-that-lies this repository hunts,
+      and kept because the pending line it clears is still real: it is what THIS presenter armed,
+      shown back to them, and deliberately not a claim about room state.
+
+      The behaviour the timer protected is not lost, it improved: a stop nulls `video_play_time`
+      server-side, so it cancels an armed play for everyone — including a presenter whose browser is
+      closed, which a local timer could never do.
+    */
+    max: 549,
     why: 'the video, YouTube and mp3 broadcasts; receivers rather than setters, so a stop cannot be half-applied'
   },
   {

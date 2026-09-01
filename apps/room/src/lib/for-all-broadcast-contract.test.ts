@@ -248,8 +248,20 @@ describe('the server owns the authority', () => {
       The `cmd !== 'x' && cmd !== 'y'` pairs became `z.enum`, which refuses before the handler runs
       rather than inside it — same two values per command, checked earlier.
     */
+    /*
+      `videoForAll` took its OWN schema on 2026-09-01: it is the one command that carries a TIME, and
+      the shared `forAllArgs` has no field for one. The two names are still enumerated, which is what
+      this case is about, and `videoForAllArgs` is asserted below to keep the bound `forAllArgs` gave
+      it — a hand-rolled schema silently dropping the length cap is exactly what a shared factory
+      exists to prevent.
+    */
     const video = commandBody('videoForAll');
-    expect(video).toContain("forAllArgs(['playVideoForAll', 'stopVideoForAll'])");
+    expect(video).toContain('videoForAllArgs');
+    expect(remoteCode).toContain("cmd: z.enum(['playVideoForAll', 'stopVideoForAll'])");
+    expect(
+      remoteCode,
+      'videoForAllArgs must keep the url length bound the shared factory applies'
+    ).toContain('url: z.string().max(MAX_BROADCAST_URL).optional(),');
     const youtube = commandBody('youtubeForAll');
     expect(youtube).toContain("forAllArgs(['playYTForAll', 'stopYTForAll'])");
     /*
@@ -369,7 +381,7 @@ describe('the client sends, instead of moving its own screen', () => {
 
   it('both "For All" senders post to the server', () => {
     expect(functionBody(BROADCASTS, 'async #sendVideoForAllCommand(')).toContain(
-      'await this.#commands.video({ cmd, url });'
+      'await this.#commands.video({ cmd, url, videoPlayTime });'
     );
     expect(functionBody(BROADCASTS, 'async #sendYoutubeForAllCommand(')).toContain(
       'await this.#commands.youtube({ cmd, url });'
@@ -474,14 +486,19 @@ describe('the client receives, so it reaches another browser', () => {
 
     expect(eventsCode).toContain("if (command?.cmd === 'stopVideoForAll') {");
     /*
-      Four writes are one receiver now, and that is the point rather than a tidy-up: stopping a
-      video must ALSO clear the armed timer and blank the schedule, and a caller holding setters
-      could do one of the three. `videoStopped` is asserted to do all of it.
+      Three writes are one receiver, and that is the point rather than a tidy-up: stopping a video
+      must ALSO blank the pending line, and a caller holding setters could do one of the two.
+
+      It was FOUR until 2026-09-01, and the fourth cleared a `window.setTimeout`. There is no timer
+      any more — the schedule is a row and `clearVideoForAll` nulls it, so cancelling now reaches
+      browsers that are closed. Removed rather than kept as a no-op: a call that clears nothing is
+      the dead scaffolding this repository forbids, and one named for a timer that does not exist is
+      the comment-that-lies it hunts.
     */
     const stopped = functionBody(BROADCASTS, 'videoStopped()');
-    expect(stopped).toContain('this.clearScheduledVideoTimer();');
     expect(stopped).toContain("this.#videoPlayerUrl = '';");
     expect(stopped).toContain('this.#hideVideoPlayer = false;');
+    expect(stopped, 'no timer survives to be cleared').not.toContain('Timer');
     expect(eventsCode).toContain("if (!isPresenter()) showTab('screens');");
   });
 
@@ -516,13 +533,21 @@ describe('the client receives, so it reaches another browser', () => {
     // caller holding setters. The dispatch calls it; the receiver is asserted to do all of it.
     expect(body).toContain('broadcasts.videoStopped();');
     const stopped = functionBody(BROADCASTS, 'videoStopped()');
-    expect(
-      stopped,
-      'videoStopped must still clear the armed timer, which is the whole point of it being one call'
-    ).toContain('this.clearScheduledVideoTimer();');
     expect(stopped, 'the schedule must be blanked with the picture').toContain(
       "this.#scheduledVideoForAll = { videoURL: '', videoPlayTime: null };"
     );
+    /*
+      IT CANCELS THE PLAY ITSELF NOW, not just this browser's copy of it, and that is stronger than
+      what this case used to assert.
+
+      It required `videoStopped` to clear a `window.setTimeout` — the armed play lived in the
+      presenter's own browser, so a stop could only cancel it in browsers that were still open. Since
+      2026-09-01 the schedule is a row, and `clearVideoForAll` nulls the time along with the url, so a
+      stop cancels an armed play for everyone — including one armed by a presenter who has since
+      closed their browser, which was not possible before.
+    */
+    expect(MEDIA_STATE).toContain('.set({ videoUrl: null, videoPlayTime: null, updatedAt: now })');
+    expect(remoteCode).toContain('clearVideoForAll(room);');
   });
 
   it('tears the overlay down on stop, everywhere', () => {
@@ -1074,21 +1099,60 @@ describe('the LATE-JOIN REPLAY — what the room is already playing', () => {
     }
   });
 
-  it('does NOT claim the scheduled play moved to the server, because it did not', () => {
+  it('and the SCHEDULE is the server s, so an armed play survives the presenter closing the tab', () => {
     /*
-      `TODO.md`'s consequence 2: upstream posts `playVideoForAll` with `videoPlayTime` the moment Send
-      is pressed and its SERVER broadcasts when it fires (bytes 1,981,560 and 1,024,587). Here the
-      presenter's own `setTimeout` is still the scheduler, so closing that tab still cancels the play.
+      ── `TODO.md`'s CONSEQUENCE 2, CLOSED THE SAME DAY THE OTHER TWO WERE ────────────────────────
 
-      Persisting the url does not fix it, and this case is what stops "the replay is built" being
-      read as "the schedule is server-side". `videoPlayTime` is written as `null` on every play this
-      room sends, which is the reference's "Play now" value — an honest record of what we do, not a
-      column pretending to hold a schedule.
+      This case was written hours earlier asserting the OPPOSITE — *"does NOT claim the scheduled
+      play moved to the server, because it did not"* — so that persisting the url could not be read
+      as having moved the schedule. It has moved now, and inverting the case is the record of that
+      rather than deleting it: the sentence it used to protect is exactly what changed.
+
+      ```js
+      sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: i})    // byte 1,981,560
+      case "playVideoForAll": guiEventBus.emit("playVideoForAll", {url: i.url}) // byte 1,024,587
+      ```
+
+      The dispatch is what settles it: it forwards `url` alone, so if the browser were the scheduler
+      there would be nothing for the server to hold and the payload would not carry a time at all.
+
+      ## The schedule and the claim are the same column
+
+      `video_play_time` is NULL for "playing now" and a moment for "armed", so firing is one atomic
+      `UPDATE … SET video_play_time = NULL WHERE video_play_time <= now RETURNING`. The row becomes
+      live in the same statement that claims it, and the replay gate (`videoUrl && !videoPlayTime`)
+      starts answering with it for the same reason. A SELECT-then-UPDATE would be the TOCTOU
+      `CLAUDE.md` names, and two sweeps would both broadcast.
     */
-    expect(remoteCode).toContain('recordVideoForAll(room, playable, null);');
     expect(BUNDLE).toContain('sendServerAdminCommand("playVideoForAll",{url:e,videoPlayTime:i})');
-    /* Still the browser's timer, and the page still cancels it on unmount. */
-    expect(stripComments(BROADCASTS)).toContain('clearScheduledVideoTimer');
-    expect(pageCode).toContain('broadcasts.clearScheduledVideoTimer();');
+    expect(BUNDLE).toContain(
+      'case"playVideoForAll":this.guiEventBus.emit("playVideoForAll",{url:i.url})'
+    );
+
+    /* The moment is POSTED, not armed locally. */
+    const scheduleBody = functionBody(
+      stripComments(BROADCASTS),
+      'scheduleVideoForAll(url: string, whenLocal: string) {'
+    );
+    expect(scheduleBody).toContain(
+      "void this.#sendVideoForAllCommand('playVideoForAll', url, at);"
+    );
+    expect(scheduleBody, 'no local timer arms the play any more').not.toContain('setTimeout');
+
+    /* The server holds it, and fires it. */
+    expect(remoteCode).toContain('recordVideoForAll(room, playable, armAt);');
+    expect(MEDIA_STATE).toContain('export function claimDueVideos(now: Date): DueVideo[] {');
+    expect(MEDIA_STATE).toContain('.set({ videoPlayTime: null, updatedAt: now })');
+    expect(MEDIA_STATE).toContain('isNotNull(roomState.videoPlayTime),');
+    expect(MEDIA_STATE).toContain('lte(roomState.videoPlayTime, now)');
+    /* And the broadcast carries the url alone, exactly as the reference's dispatch does. */
+    expect(MEDIA_STATE).toContain("data: { cmd: 'playVideoForAll', url }");
+
+    /* Started where the alert scheduler is, for the reason that one records about itself. */
+    const hooks = stripComments(
+      readFileSync(new URL('../hooks.server.ts', import.meta.url), 'utf8')
+    );
+    expect(hooks).toContain('startVideoScheduler();');
+    expect(hooks).toContain('startAlertScheduler();');
   });
 });

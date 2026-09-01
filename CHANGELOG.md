@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 16:40 UTC — the scheduled play moved to the server, and the evidence-gap row is deleted
+
+**Runtime impact: YES** — a video armed for later now fires whether or not the presenter's tab is
+still open, and a stop cancels an armed play for everyone, including presenters whose browsers are
+closed.
+
+`TODO.md`'s consequence 2, and the last of three. Until today an armed play was a `window.setTimeout`
+in the presenter's own browser. The capture settles it in one line:
+
+    sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: i})       byte 1,981,560
+    case "playVideoForAll": guiEventBus.emit("playVideoForAll", {url: i.url})   byte 1,024,587
+
+The dispatch forwards `url` alone — so if the browser were the scheduler there would be nothing for
+the server to hold, and the payload would not carry a time at all.
+
+## The schedule and the claim are the SAME COLUMN, which is what makes this small
+
+`video_play_time` is NULL for "playing now" and a moment for "armed", so firing is one atomic
+`UPDATE … SET video_play_time = NULL WHERE video_play_time <= now RETURNING`. The row becomes live in
+the same statement that claims it, and the late-join replay's gate (`videoUrl && !videoPlayTime`)
+starts answering with it for the same reason — a member joining a second after the sweep gets the
+video. No second column and no separate `claimed_at`: `scheduled_alerts` needs one because a
+repeating series stays a row after it fires, and a video has one state at a time.
+
+A conditional UPDATE and not SELECT-then-UPDATE, which `CLAUDE.md` names: two sweeps that both read a
+due row would both broadcast it, and the room would watch the video start twice.
+
+## Dead scaffolding removed rather than left as a no-op
+
+`#scheduledVideoTimer` had no writer left, so it went — along with `videoStopped`'s clear of it and
+the page's teardown call. `clearScheduledVideoTimer` became `clearScheduledVideoLine`, renamed
+because a method named for a timer that does not exist is the comment-that-lies this repository
+hunts, and kept because what it clears is still real: the pending line is what THIS presenter armed,
+shown back to them, and deliberately not a claim about room state.
+
+**The behaviour the timer protected is not lost — it improved.** A stop nulls `video_play_time`
+server-side, so it cancels an armed play for everyone, which a local timer could never do.
+
+## A contract case INVERTED, which is the record of the change
+
+Hours earlier this same file gained `does NOT claim the scheduled play moved to the server, because
+it did not` — written so that persisting the url could not be read as having moved the schedule. It
+has moved now, so the case asserts the opposite and says why in place. Deleting it would have thrown
+away the sentence that changed.
+
+Three more cases in `broadcasts.svelte.test.ts` were written against the local timer and now assert
+what is true: the moment is POSTED once, no local timer arms anything, and advancing fake time sends
+nothing further — a leftover `setTimeout` would post a duplicate the server has already fired.
+
+## A negative control found a test that could not fail
+
+`ignores a row whose url was cleared while a time remained` asserted only that `claimDueVideos` comes
+back empty — and deleting the `isNotNull(videoUrl)` predicate left it **green**, because the
+`flatMap` that narrows the return type already drops such a row. The case was testing the type
+narrowing, not the guard.
+
+What the guard actually buys is the SIDE EFFECT: without it the row is claimed, its `video_play_time`
+nulled, and then thrown away — a schedule silently consumed by a sweep that could not act on it. The
+case reads the row back now, and its control fails.
+
+## Verification
+
+Four negative controls, each seen RED then restored: `lte` → `lt` on the fire boundary (a play armed
+for exactly the moment would wait up to a sweep); a claim that does not mark the row live (three
+cases red, including the exactly-once race); the `isNotNull(videoUrl)` guard, after the case was
+strengthened; and the earlier three on the store still hold.
+
+`orphaned-comment-contract` caught a section header with no code under it — a real defect, and the
+fix moved the header onto the declaration it introduces.
+
+**`TODO.md`'s evidence-gap row is DELETED, not struck through.** All three consequences are closed:
+a member joining mid-video sees it, a late joiner drops into the middle of a YouTube video, and an
+armed play survives the presenter closing their tab.
+
+Room gate exit 0: `svelte-check` 1,602 files / 0 errors / 0 warnings. **Not opened in a browser**, and
+for this row the untested path is specific: arm a play, close the presenter's tab, and watch it fire.
+
 ### 2026-09-01 15:05 UTC — the late-join replay, and two of three consequences closed
 
 **Runtime impact: YES** — a member who joins a room mid-video now sees the video, and a late joiner

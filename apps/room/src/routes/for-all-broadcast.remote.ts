@@ -79,19 +79,34 @@ const forAllArgs = <const T extends readonly [string, ...string[]]>(commands: T)
   });
 
 /**
+ * `videoForAll`'s own shape, because it is the one command that carries a TIME.
+ *
+ * `sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: i})` — byte 1,981,560 for the
+ * scheduled form, and `videoPlayTime: null` at 1,981,700 for "Play now". The dispatch forwards only
+ * the url (byte 1,024,587), so this value never reaches a browser: it is the SERVER's, and holding
+ * it is the whole reason a scheduled play survives the presenter closing their tab.
+ *
+ * `.int()` and a positive bound rather than a bare number: this becomes a `Date` and a NaN or a
+ * negative would arm a play for the epoch, which the sweep would fire on its next pass.
+ */
+const videoForAllArgs = z.strictObject({
+  cmd: z.enum(['playVideoForAll', 'stopVideoForAll']),
+  url: z.string().max(MAX_BROADCAST_URL).optional(),
+  videoPlayTime: z.number().int().positive().nullable().optional()
+});
+
+/**
  * `playVideoForAll` / `stopVideoForAll` — "Play For All", and the overlay's "Stop For All".
  *
  * The url IS parsed here, because it reaches a `<video src>` as itself. That is the difference from
  * the YouTube command below and it is not an inconsistency.
  */
-export const videoForAll = command(
-  forAllArgs(['playVideoForAll', 'stopVideoForAll']),
-  async ({ cmd, url }) => {
-    ensureDatabase();
-    const room = presenterRoom();
+export const videoForAll = command(videoForAllArgs, async ({ cmd, url, videoPlayTime }) => {
+  ensureDatabase();
+  const room = presenterRoom();
 
-    if (cmd === 'stopVideoForAll') {
-      /*
+  if (cmd === 'stopVideoForAll') {
+    /*
         THE ROW FIRST, THEN THE BROADCAST, and the order is the one that fails safely.
 
         Between the two, a member joining sees the row — so writing the row first means the worst
@@ -99,28 +114,39 @@ export const videoForAll = command(
         watching. The other order leaves the row saying a stopped video is playing, and every
         arrival after it is dropped onto a dead VideoPlayer tab until somebody plays something else.
       */
-      clearVideoForAll(room);
-      publishToRoom(room, { channel: 'cmds', data: { cmd } });
-      return;
-    }
-
-    const playable = broadcastableUrl(url ?? '');
-    if (!playable) error(400, 'That is not a playable video url.');
-
-    /*
-      `videoPlayTime: null` — this room's Play is the reference's "Play now" button, whose callback
-      is `sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: null})` at byte
-      1,981,700. The scheduled sibling posts a timestamp instead and is a separate gap: this room's
-      scheduler is the presenter's own `setTimeout`, which `TODO.md` records and which persisting the
-      url does not by itself fix.
-
-      Recorded as null rather than omitted, because null is what the REPLAY gate reads —
-      `videoURL && !videoPlayTime` — so "playing now" has to be written, not merely implied.
-    */
-    recordVideoForAll(room, playable, null);
-    publishToRoom(room, { channel: 'cmds', data: { cmd, url: playable } });
+    clearVideoForAll(room);
+    publishToRoom(room, { channel: 'cmds', data: { cmd } });
+    return;
   }
-);
+
+  const playable = broadcastableUrl(url ?? '');
+  if (!playable) error(400, 'That is not a playable video url.');
+
+  /*
+      ARMED, OR LIVE — and the difference is whether anything is broadcast NOW.
+
+      `videoPlayTime` null is the reference's "Play now" (byte 1,981,700); a timestamp is its "Play
+      later" (byte 1,981,560), posted the moment Send is pressed so the SERVER holds the schedule.
+      That is the half this room was missing: its scheduler was the presenter's own `setTimeout`, so
+      closing that tab cancelled the play.
+
+      A due-or-past time is treated as NOW rather than refused. The reference's own client does the
+      same (`delay <= 0` plays immediately), and refusing would turn a presenter who picked a minute
+      ago into an error dialog instead of a video.
+
+      Written before the broadcast either way, and for the armed case there is no broadcast at all —
+      `sweepDueVideos` sends it when the moment arrives.
+    */
+  const armAt =
+    videoPlayTime !== null && videoPlayTime !== undefined ? new Date(videoPlayTime) : null;
+  if (armAt && armAt.getTime() > Date.now()) {
+    recordVideoForAll(room, playable, armAt);
+    return;
+  }
+
+  recordVideoForAll(room, playable, null);
+  publishToRoom(room, { channel: 'cmds', data: { cmd, url: playable } });
+});
 
 /**
  * `playYTForAll` / `stopYTForAll` — the YouTube modal's Play, and the overlay's "Stop For All".

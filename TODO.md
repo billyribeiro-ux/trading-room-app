@@ -189,42 +189,6 @@ speculative change this file exists to prevent.
   `note-carousel.test.ts`.
 - **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
 
-**The presenter's own `setTimeout` is still the scheduler for a "play later" video.** The rest of
-this row closed on 2026-09-01: `room_state` now carries `video_url`, `video_play_time`, `yt_url` and
-`yt_start_time`, `#lib/server/room-media-state.ts` writes them on every For-All broadcast, and
-`#lib/room/media-replay.ts` replays them at connect. What that fixed, and what it did not:
-
-1. **CLOSED — a member who joins while a video is playing now sees it.** The reference replays from
-   server state on connect (`roomState.videoURL && !roomState.videoPlayTime`, bundle byte 1,967,330),
-   and so does this room. The `!videoPlayTime` term is reproduced: a play ARMED for later has a url
-   in the row and nothing on screen, so replaying it would drop an arriving member onto an empty
-   VideoPlayer tab minutes before the video exists.
-2. **STILL OPEN, and it is this row now.** Upstream posts `playVideoForAll` with `videoPlayTime` the
-   moment Send is pressed (byte 1,981,613) and its SERVER holds the pair and broadcasts when it
-   fires, which is why the dispatch forwards only `{url: i.url}` (byte 1,024,587). Here the
-   presenter's own `setTimeout` is the scheduler and posts at fire time, so **closing that tab still
-   cancels the play.** Persisting the url did not fix this and the contract says so rather than
-   letting two-of-three read as done: `does NOT claim the scheduled play moved to the server` in
-   `for-all-broadcast-contract.test.ts`. Every play this room sends records `videoPlayTime: null` —
-   the reference's own "Play now" value — which is an honest record of what we do rather than a
-   column pretending to hold a schedule.
-3. **CLOSED — a late joiner drops into the middle of a YouTube video.** `ytStartTime` is written when
-   the play goes out; `media-replay.ts` derives the elapsed seconds (`Math.round((now - startTime) /
-   1000)`, byte 1,964,799) and `YoutubePlayerOverlay` appends `start=` on the video-id form, which is
-   where and only where the reference appends it (byte 1,503,354). **Nothing invents a `startTime`
-   onto the wire**: the live command still carries `url` alone, and the contract re-asserts that on
-   the far side of this change, because building the replay is precisely what could have broken it.
-
-- **What is missing:** a server-side timer. `scheduled_alerts` already has the shape — a claimed-at
-  column and a sweeper — so the pattern exists; what it needs is the same treatment for one video per
-  room, plus a decision about what happens to an armed play when the presenter's session ends.
-- **Where I looked:** bundle bytes 1,024,137–1,024,708 (the dispatch), 1,503,095–1,503,354 (the
-  overlay and its `start=`), 1,964,799–1,967,430 (the four subscribers and both replays),
-  1,981,560–1,981,945 (the senders); and `apps/room/src/lib/server/db/schema.ts`, which now has the
-  four columns.
-- **What it blocks:** a scheduled play surviving the presenter closing their tab. Late joiners are no
-  longer affected.
-
 ---
 
 ## What the SETTINGS enumeration says — new, 2026-08-28

@@ -1,7 +1,8 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull, lte } from 'drizzle-orm';
 
 import { db, ensureDatabase } from './db/index.js';
 import { roomState } from './db/schema.js';
+import { publishToRoom } from './room-events.js';
 
 /**
  * WHAT THE ROOM IS PLAYING, SO SOMEBODY WHO ARRIVES LATE GETS TO SEE IT.
@@ -183,4 +184,160 @@ export function clearYoutubeForAll(shortCode: string, now = new Date()): void {
     .set({ ytUrl: null, ytStartTime: null, updatedAt: now })
     .where(eq(roomState.roomShortCode, shortCode))
     .run();
+}
+
+/**
+ * ── THE SERVER-SIDE SCHEDULER ─────────────────────────────────────────────────────────────────────
+ *
+ * `TODO.md`'s consequence 2, and the last of the three: *"a scheduled play lives in the presenter's
+ * browser… closing that tab cancels the play."*
+ *
+ * ```js
+ * // "Play later" — posted the MOMENT Send is pressed, carrying the time
+ * sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: i})       // byte 1,981,560
+ * // "Play now"
+ * sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: null})    // byte 1,981,700
+ * // and the dispatch forwards only the url, so the SERVER decides WHEN
+ * case "playVideoForAll": guiEventBus.emit("playVideoForAll", {url: i.url})   // byte 1,024,587
+ * ```
+ *
+ * That third line is the one that settles it. If the browser were the scheduler there would be
+ * nothing for the server to hold, and the payload would not carry a time at all.
+ *
+ * ## The schedule and the claim are the SAME COLUMN, which is what makes this small
+ *
+ * `video_play_time` is NULL for "playing now" and a moment for "armed". Firing is therefore one
+ * atomic `UPDATE … SET video_play_time = NULL WHERE video_play_time <= now RETURNING` — the row
+ * becomes live in the same statement that claims it, and the replay gate
+ * (`videoUrl && !videoPlayTime`) starts answering with it immediately and for the same reason.
+ *
+ * No second column, no separate `claimed_at`. `scheduled_alerts` needs one because a repeating
+ * series must stay a row after it fires; a video has one state at a time.
+ *
+ * ## Why a conditional UPDATE and not SELECT-then-UPDATE
+ *
+ * `CLAUDE.md` names it: a SELECT-then-UPDATE is a TOCTOU, and two sweeps that both read a due row
+ * would both broadcast it. Zero rows back means nothing was due or another sweep won, and losing
+ * that race is the normal path rather than an error.
+ *
+ * ── One room whose armed play has come due ───────────────────────────────────────────────────────
+ */
+export interface DueVideo {
+  readonly roomShortCode: string;
+  readonly url: string;
+}
+
+/**
+ * Take ownership of every room whose armed play is due, atomically, and mark them live.
+ *
+ * Unbounded, unlike `claimDueScheduledAlerts`'s `MAX_PER_SWEEP`, and the difference is real rather
+ * than an oversight: that bound exists because a repeating series can build a BACKLOG for one room,
+ * and posting it in one pass would put a wall of alerts on one member's screen. A video has one
+ * armed play per room, so the batch size here is bounded by the number of rooms that scheduled one
+ * for the same moment — and pacing it would mean some rooms starting late for no benefit.
+ *
+ * `video_url IS NOT NULL` guards the SIDE EFFECT, not the return value, and the difference is what
+ * a negative control taught: the `flatMap` below already drops a row with no url, so removing this
+ * predicate leaves every assertion about what comes back GREEN. What changes is that the row gets
+ * claimed on the way — its `video_play_time` nulled and then thrown away — which is a schedule
+ * silently consumed by a sweep that could not act on it. `room-media-state.test.ts` reads the row
+ * back for exactly that reason.
+ */
+export function claimDueVideos(now: Date): DueVideo[] {
+  ensureDatabase();
+  const rows = db
+    .update(roomState)
+    .set({ videoPlayTime: null, updatedAt: now })
+    .where(
+      and(
+        isNotNull(roomState.videoPlayTime),
+        isNotNull(roomState.videoUrl),
+        lte(roomState.videoPlayTime, now)
+      )
+    )
+    .returning({ roomShortCode: roomState.roomShortCode, videoUrl: roomState.videoUrl })
+    .all();
+  /*
+    The `videoUrl` non-null is enforced by the predicate above; this narrows the TYPE rather than
+    re-checking the fact, because `.returning()` cannot know what the `where` guaranteed. Filtering
+    rather than asserting, so a row that somehow arrives without one is dropped instead of
+    broadcasting `undefined` to a room.
+  */
+  return rows.flatMap((row) =>
+    row.videoUrl ? [{ roomShortCode: row.roomShortCode, url: row.videoUrl }] : []
+  );
+}
+
+/** How often the sweep looks for due rows — the alert scheduler's interval, for the same reasons. */
+export const VIDEO_SWEEP_INTERVAL_MS = 15_000;
+
+/**
+ * Fire every armed play that has come due, and answer how many.
+ *
+ * `publish` is injected rather than imported so this module keeps no dependency on the event hub —
+ * which is also what lets a test drive a whole sweep without a subscriber. The sweep is exported for
+ * the same reason `sweepScheduledAlerts` is: a timer is not a thing a test should have to wait on.
+ */
+export function sweepDueVideos(
+  publish: (roomShortCode: string, url: string) => void,
+  now: Date = new Date()
+): number {
+  const due = claimDueVideos(now);
+  for (const row of due) {
+    try {
+      publish(row.roomShortCode, row.url);
+    } catch (error) {
+      /*
+        One room failing must not take the rest of the batch with it, and it will NOT be retried —
+        deliberately, and for the reason the alert sweep records: the row is already live, so a retry
+        would need to re-arm a schedule the presenter did not ask for. It is reported instead, which
+        is the loud failure `CLAUDE.md` asks for rather than a silent loop.
+      */
+      console.error(
+        '[video-scheduler] a due video could not be broadcast',
+        row.roomShortCode,
+        error
+      );
+    }
+  }
+  return due.length;
+}
+
+/**
+ * Start the video sweep, and hand back the way to stop it.
+ *
+ * The same shape as `startAlertScheduler`, and the same argument for why a `setInterval` is an
+ * acceptable answer: the timer holds NO schedule. Every question it asks is answered from
+ * `room_state`, so a restart resumes rather than recovers — a play armed for 18:00 fires at 18:00
+ * whether or not this process was alive at 17:59.
+ *
+ * `publishToRoom` is imported here rather than injected, unlike in `sweepDueVideos`: this is the
+ * production wiring and the injection point exists one level down, where a test needs it.
+ */
+export function startVideoScheduler(): () => void {
+  const timer = setInterval(() => {
+    try {
+      sweepDueVideos((roomShortCode, url) =>
+        publishToRoom(roomShortCode, {
+          channel: 'cmds',
+          /*
+            The URL and nothing else, which is the reference's own dispatch: `case
+            "playVideoForAll": guiEventBus.emit("playVideoForAll", {url: i.url})` at byte 1,024,587.
+            The time was the server's to hold and its job is finished.
+          */
+          data: { cmd: 'playVideoForAll', url }
+        })
+      );
+    } catch (error) {
+      // The sweep must never kill its own interval — the room would be left with no scheduler and
+      // nothing would say so. Same guard, same reason, as the alert sweep's.
+      console.error('[video-scheduler] sweep failed', error);
+    }
+  }, VIDEO_SWEEP_INTERVAL_MS);
+
+  // `unref` so the timer cannot hold a test runner or a shutdown open; guarded because the method is
+  // Node's and not on the DOM `setInterval` the type resolves to in some configs.
+  (timer as unknown as { unref?: () => void }).unref?.();
+
+  return () => clearInterval(timer);
 }

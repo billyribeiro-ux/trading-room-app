@@ -1062,8 +1062,16 @@
       if (previousOpenImageModal) imageModalWindow.openImageModal = previousOpenImageModal;
       else delete imageModalWindow.openImageModal;
       feedScroll.destroy();
-      // An armed "play at" that outlives the room would post a broadcast from a page nobody is on.
-      broadcasts.clearScheduledVideoTimer();
+      /*
+        This read *"an armed 'play at' that outlives the room would post a broadcast from a page
+        nobody is on"* and cleared a `window.setTimeout`. There is no timer here any more: the
+        schedule is the SERVER's since 2026-09-01, which is the whole point — a play armed at 17:55
+        fires at 18:00 whether or not this page is still open.
+
+        The call is deleted rather than re-pointed at `clearScheduledVideoLine`, because clearing the
+        line on unmount would clear state that dies with the component anyway. A teardown for state
+        that has already gone is the dead code this repository refuses.
+      */
       toasts.destroy();
       unloadSoundEffects();
       media.stopTalking(data.user.id);

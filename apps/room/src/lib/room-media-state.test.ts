@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { roomState } from '#lib/server/db/schema.js';
 import {
+  claimDueVideos,
   clearVideoForAll,
   clearYoutubeForAll,
   recordVideoForAll,
   recordYoutubeForAll,
-  roomMediaState
+  roomMediaState,
+  sweepDueVideos
 } from '#lib/server/room-media-state.js';
 
 /**
@@ -190,5 +192,136 @@ describe('the room short code scopes it, as it scopes every other channel here',
     recordYoutubeForAll(OTHER, 'https://youtu.be/other');
     expect(roomMediaState(ROOM).ytUrl).toBeNull();
     expect(roomMediaState(OTHER).ytUrl).toBe('https://youtu.be/other');
+  });
+});
+
+describe('the server-side scheduler for a play armed later', () => {
+  /*
+    `TODO.md`'s consequence 2. Until 2026-09-01 an armed play was a `window.setTimeout` in the
+    presenter's browser, so closing the tab cancelled it. The schedule is a row now and the sweep
+    fires it — which is what the capture does, and the dispatch is what proves it: it forwards `url`
+    alone (byte 1,024,587), so if the browser were the scheduler there would be nothing for the
+    server to hold and the payload would not carry a time.
+
+    Driven rather than read, because the two things that can go wrong here are invisible to a source
+    assertion: firing early or late by a unit error, and firing TWICE when two sweeps race.
+  */
+  const AT = new Date('2026-09-01T18:00:00.000Z');
+
+  it('does not fire before the moment', () => {
+    recordVideoForAll(ROOM, 'https://cdn.example.com/later.mp4', AT);
+    expect(claimDueVideos(new Date(AT.getTime() - 1))).toEqual([]);
+    /* And the row is untouched, so the next sweep still has something to find. */
+    expect(roomMediaState(ROOM).videoPlayTime).toBe(AT.getTime());
+  });
+
+  it('fires AT the moment, not a tick after it', () => {
+    /*
+      `lte`, not `lt`. A boundary written the other way leaves a play armed for exactly 18:00:00.000
+      waiting for the next sweep — up to fifteen seconds late, which is the kind of off-by-one that
+      never reproduces on a machine whose clock is not on the boundary.
+    */
+    recordVideoForAll(ROOM, 'https://cdn.example.com/later.mp4', AT);
+    expect(claimDueVideos(AT)).toEqual([
+      { roomShortCode: ROOM, url: 'https://cdn.example.com/later.mp4' }
+    ]);
+  });
+
+  it('marks it LIVE in the same statement that claims it', () => {
+    /*
+      The schedule and the claim are one column: `SET video_play_time = NULL` both fires the row and
+      makes the replay gate (`videoUrl && !videoPlayTime`) start answering with it. A member joining
+      one second after the sweep gets the video, which is the whole point of the two features being
+      built against the same column.
+    */
+    recordVideoForAll(ROOM, 'https://cdn.example.com/later.mp4', AT);
+    claimDueVideos(AT);
+    const state = roomMediaState(ROOM);
+    expect(state.videoPlayTime).toBeNull();
+    expect(state.videoUrl).toBe('https://cdn.example.com/later.mp4');
+  });
+
+  it('fires EXACTLY ONCE, which is what the conditional UPDATE buys', () => {
+    /*
+      THE RACE. A SELECT-then-UPDATE is a TOCTOU — `CLAUDE.md` names it — and two sweeps that both
+      read a due row would both broadcast it, so the room would see the video start twice. The second
+      claim here stands in for the losing sweep: it must come back empty.
+    */
+    recordVideoForAll(ROOM, 'https://cdn.example.com/later.mp4', AT);
+    expect(claimDueVideos(AT)).toHaveLength(1);
+    expect(claimDueVideos(AT), 'a second sweep must find nothing').toEqual([]);
+  });
+
+  it('claims every due room, because one room s play must not wait on another s', () => {
+    recordVideoForAll(ROOM, 'https://cdn.example.com/a.mp4', AT);
+    recordVideoForAll(OTHER, 'https://cdn.example.com/b.mp4', AT);
+    expect(claimDueVideos(AT)).toHaveLength(2);
+  });
+
+  it('leaves a row whose url was cleared UNTOUCHED, rather than claiming and dropping it', () => {
+    /*
+      ── THE FIRST VERSION OF THIS CASE COULD NOT FAIL, AND ITS CONTROL SAID SO ──────────────────
+
+      It asserted only `claimDueVideos(AT)` comes back empty, and deleting the `isNotNull(videoUrl)`
+      predicate left it GREEN — because the `flatMap` that narrows the return type already drops a
+      row with no url. The case was testing the type narrowing, not the guard.
+
+      What the guard actually buys is the SIDE EFFECT: without it the row is claimed, its
+      `video_play_time` is nulled, and then it is thrown away — a schedule silently discarded by a
+      sweep that had nothing to do with it. So the row is read back, which is where the difference
+      lives.
+
+      It cannot arise through this module's own writers, since `clearVideoForAll` nulls both. That is
+      exactly why it is worth asserting: the guard's whole value is against a path that does not
+      exist yet, and a guard nobody can see working is a guard somebody deletes.
+    */
+    recordVideoForAll(ROOM, 'https://cdn.example.com/later.mp4', AT);
+    db.update(roomState).set({ videoUrl: null }).run();
+    expect(claimDueVideos(AT)).toEqual([]);
+    expect(
+      roomMediaState(ROOM).videoPlayTime,
+      'the sweep must not consume a schedule it cannot act on'
+    ).toBe(AT.getTime());
+  });
+
+  it('a STOP cancels an armed play, for everyone, including a closed browser', () => {
+    /*
+      The second thing moving the schedule fixed. While the timer was local a stop could only cancel
+      it in browsers that were still open; now `clearVideoForAll` nulls the time, so the sweep never
+      finds it.
+    */
+    recordVideoForAll(ROOM, 'https://cdn.example.com/later.mp4', AT);
+    clearVideoForAll(ROOM);
+    expect(claimDueVideos(AT)).toEqual([]);
+  });
+
+  it('the sweep publishes what it claimed, once per room', () => {
+    const published: { room: string; url: string }[] = [];
+    recordVideoForAll(ROOM, 'https://cdn.example.com/a.mp4', AT);
+    recordVideoForAll(OTHER, 'https://cdn.example.com/b.mp4', AT);
+    expect(sweepDueVideos((room, url) => published.push({ room, url }), AT)).toBe(2);
+    expect(published).toEqual([
+      { room: ROOM, url: 'https://cdn.example.com/a.mp4' },
+      { room: OTHER, url: 'https://cdn.example.com/b.mp4' }
+    ]);
+    /* Nothing left to fire, so a second sweep is silent. */
+    expect(sweepDueVideos(() => {}, AT)).toBe(0);
+  });
+
+  it('one room failing to publish does not take the rest of the batch with it', () => {
+    /*
+      And it is NOT retried, deliberately: the row is already live, so a retry would have to re-arm a
+      schedule the presenter did not ask for. It is reported instead — the loud failure `CLAUDE.md`
+      asks for rather than a silent loop.
+    */
+    recordVideoForAll(ROOM, 'https://cdn.example.com/a.mp4', AT);
+    recordVideoForAll(OTHER, 'https://cdn.example.com/b.mp4', AT);
+    const reached: string[] = [];
+    const count = sweepDueVideos((room) => {
+      if (room === ROOM) throw new Error('hub is down');
+      reached.push(room);
+    }, AT);
+    expect(count).toBe(2);
+    expect(reached, 'the second room still got its video').toEqual([OTHER]);
   });
 });
