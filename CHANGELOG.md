@@ -33,6 +33,47 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 04:55 UTC — seven surfaces measured clean and pinned, and a template slice that read the wrong component
+
+**Runtime impact: NONE.** Contract coverage and tracker rows only.
+
+Seven reference components measured with `gate/audit-surface.mjs` and found complete — zero absent
+const values, zero absent text literals each: `app-muted-users-modal`, `app-followed-users-modal`,
+`app-alert-filter-modal`, `app-scheduled-alerts-modal`, `app-mobile-app-info-modal`,
+`app-positions-container`, `app-webcam-holder`. All seven are pinned in
+`surface-audit-contract.test.ts`, table-driven, with the const and view COUNTS asserted beside the
+gaps.
+
+## The counts are asserted because one of them caught a bug
+
+`app-muted-users-modal` reported **sixteen** resolved views for a template that declares two, and two
+text gaps that belonged to the recording preview card. The template slice was bounded by
+`},dependencies:` alone, and this component goes straight from its template to `},styles:` — so the
+slice ran past the component entirely and the view walk picked up the four `app-rec-preview` views
+declared just below it. It is bounded by the earliest of four markers now.
+
+That is why the pins carry sizes: a surface with one const and no embedded views proves very little,
+and `app-webcam-holder` is recorded as *"the weakest evidence in this file"* rather than given a green
+tick that reads like the others.
+
+## A negative control that was correct to stay green
+
+Removing `list-group-flush` from the muted-users modal did not fail — because the same value is still
+rendered by the followed-users modal in the same file, so it is present in that surface's file set.
+Removing BOTH occurrences is red. Worth recording: the control was wrong the first time and the tool
+was right, which is the opposite of the two cases earlier today.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 329 files, 5,933 passed, 1 skipped; `svelte-check` 1,620
+files, 0 errors, 0 warnings.
+
+Three negative controls: a value genuinely removed from a clean surface (red), the template slice
+un-bounded again (red, on the view counts), and the one above.
+
+`todo-next.md` rows 46, 55, 59, 61, 72 and 80 audited — **63 of 92 surfaces, 23,829 of 38,857 lines
+(61.3%)**, up from 51 of 89 when this session began.
+
 ### 2026-09-02 04:25 UTC — a hidden card with two inert controls, and the sentence that said it wasn't there
 
 **Runtime impact: NONE.** The card was and remains invisible; what changed is that its state is now

@@ -502,7 +502,20 @@ export function auditSurface(options) {
       collectViews(body, depth + 1);
     }
   };
-  const template = bundle.slice(to, bundle.indexOf('},dependencies:', to) + 1);
+  /*
+    The template's own bytes, bounded by the EARLIEST of the three things Angular emits after it.
+
+    `},dependencies:` alone was the first bound and it is not always present: `app-muted-users-modal`
+    goes straight from its template to `},styles:`, so the slice ran past the component entirely and
+    the view walk picked up the four `app-rec-preview` views declared just below it — reporting
+    "Recording paused." as a gap in the muted-users modal. Sixteen views resolved for a component
+    whose template declares two, which is the number that gave it away.
+  */
+  const templateEnd = ['},dependencies:', '},styles:', '},encapsulation:', '}})']
+    .map((marker) => bundle.indexOf(marker, to))
+    .filter((at) => at !== -1)
+    .reduce((earliest, at) => Math.min(earliest, at), bundle.length);
+  const template = bundle.slice(to, templateEnd + 1);
   collectViews(template, 0);
   collectViews(region, 0);
 

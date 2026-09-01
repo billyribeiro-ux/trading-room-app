@@ -91,6 +91,107 @@ describe('app-post-alert-modal — audited 2026-09-01', () => {
   });
 });
 
+/**
+ * The surfaces measured CLEAN on 2026-09-01 — zero absent const values, zero absent text literals.
+ *
+ * Table-driven because seven identical assertions written seven times is seven places for one of
+ * them to be quietly weakened, and because the interesting per-surface fact is the SIZE: a component
+ * with one const and no views proves very little, and saying so is more honest than a green tick.
+ *
+ * `views` and `consts` are asserted alongside the gaps for exactly that reason. Both numbers already
+ * caught a bug: the view walk resolved SIXTEEN views for `app-muted-users-modal`, whose template
+ * declares two, because the template slice ran past `},styles:` into the four `app-rec-preview` views
+ * declared below it and reported "Recording paused." as a gap here.
+ */
+const CLEAN: readonly {
+  readonly selector: string;
+  readonly consts: number;
+  readonly views: number;
+  readonly files: readonly string[];
+}[] = [
+  {
+    selector: 'app-muted-users-modal',
+    consts: 16,
+    views: 3,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/PresenterMuteRows.svelte'
+    ]
+  },
+  {
+    selector: 'app-followed-users-modal',
+    consts: 19,
+    views: 4,
+    files: ['src/lib/components/ModalHost.svelte', 'src/lib/components/Modal.svelte']
+  },
+  {
+    selector: 'app-alert-filter-modal',
+    consts: 19,
+    views: 6,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/alert-filter.ts'
+    ]
+  },
+  {
+    selector: 'app-scheduled-alerts-modal',
+    consts: 17,
+    views: 2,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/ScheduledAlertsTable.svelte',
+      'src/lib/components/ScheduledAlerts.svelte',
+      'src/lib/scheduled-alert.ts'
+    ]
+  },
+  {
+    selector: 'app-mobile-app-info-modal',
+    consts: 15,
+    views: 1,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/MobileRestorePane.svelte'
+    ]
+  },
+  {
+    /* Two consts and no embedded views — a thin container, and the numbers say so. */
+    selector: 'app-positions-container',
+    consts: 2,
+    views: 0,
+    files: [
+      'src/lib/components/PositionsContainer.svelte',
+      'src/lib/components/PositionsControls.svelte',
+      'src/lib/positions-iframe.ts'
+    ]
+  },
+  {
+    /* ONE const. Pinned for completeness, and it is the weakest evidence in this file. */
+    selector: 'app-webcam-holder',
+    consts: 1,
+    views: 0,
+    files: ['src/lib/components/WebcamStrip.svelte', 'src/lib/components/PresentationArea.svelte']
+  }
+];
+
+describe('seven surfaces measured clean — audited 2026-09-01', () => {
+  it.each(CLEAN)('$selector renders every const value and text literal', (surface) => {
+    const report = auditSurface({ selector: surface.selector, files: [...surface.files] });
+    expect(report.region.consts, `${surface.selector}'s const table must still parse`).toBe(
+      surface.consts
+    );
+    expect(report.views.resolved, `${surface.selector}'s view walk must still reach them`).toBe(
+      surface.views
+    );
+    expect(report.views.unresolved).toEqual([]);
+    expect(report.constGaps.map((gap) => gap.value)).toEqual([]);
+    expect(report.textGaps).toEqual([]);
+  });
+});
+
 describe('the chat toolbar — audited 2026-09-01, and it is CLEAN', () => {
   /*
     A byte RANGE rather than a selector: the toolbar has no component of its own upstream. It is a

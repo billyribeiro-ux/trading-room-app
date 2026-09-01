@@ -119,7 +119,7 @@ guessed.
 | 43 | `lib/components/AlertQaAlertCard.svelte` | 244 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-08` to `QAM-11`. The reference's own `e3e`. |
 | 44 | `lib/components/FollowChatStylePane.svelte` | 181 | `## FollowChatStylePane.svelte` in the v4 register — 3 rows (FCS-01…03) read end to end 2026-08-31. FCS-01 is a real defect: `bind:value` on the Text Size number input writes `null` for an empty box, and `null + 1` is `1`, so clearing it and saving drew that person's username at 1px on every later message. |
 | 45 | `lib/components/AlertQaComposer.svelte` | 223 | §QAM — born 2026-08-31 out of `AlertQaModal`, carrying `QAM-04` to `QAM-06`. |
-| 46 | `lib/components/ScheduledAlertsTable.svelte` | 163 | no |
+| 46 | `lib/components/ScheduledAlertsTable.svelte` | 163 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-scheduled-alerts-modal` (17 consts, 2 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. |
 | 47 | `lib/components/Modal.svelte` | 188 | no |
 | 48 | `lib/components/TabGearMenu.svelte` | 156 | no |
 | 49 | `lib/components/AlertSendReportModal.svelte` | 161 | `## AlertSendReportModal.svelte` in the v4 register — 3 rows (ASR-01…03) read end to end 2026-08-31: 2 measured refusals, 1 blocked on a one-line change in `Modal.svelte` that this pass did not own. |
@@ -128,7 +128,7 @@ guessed.
 | 52 | `lib/components/BootboxDialog.svelte` | 212 | no |
 | 53 | `lib/components/SessionHistoryPane.svelte` | 145 | no |
 | 54 | `lib/components/ChatArchivePane.svelte` | 169 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
-| 55 | `lib/components/PresenterMuteRows.svelte` | 142 | no |
+| 55 | `lib/components/PresenterMuteRows.svelte` | 142 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-muted-users-modal` (16 consts, 3 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. |
 | 86 | `lib/components/ChatArchiveLogPane.svelte` | 242 | `## The archived-log viewer` — `chat-archive-log-contract.test.ts` + `room/chat-archive-log.svelte.test.ts`, read end to end 2026-08-31 against `jxe` (byte 2,309,873) and consts 17–37: the second view of `app-chat-logs-modal`, built. 3 divergences recorded (a duplicate `id`, the `btn-ligth` typo kept, the compact row standing in for `app-st-message`). |
 | 87 | `lib/components/NavbarTalkingIndicator.svelte` | 133 | `NavbarTalkingIndicator.svelte` — `NPe`/`LPe` transcribed with BOTH arms 2026-09-01, `G08` built: `presenterTalking` defaults FALSE as upstream (bytes 1,114,654 / 1,129,852) and is flipped by the two room commands at byte 1,014,971. |
 | 88 | `lib/components/ConnectivityModal.svelte` | 893 | `connectivity-audience-contract.test.ts`, `connectivity-test-contract.test.ts`, `connectivity-status-rows.test.ts`, `troubleshooter-retained-contract.test.ts` and `mobile-restore-contract.test.ts` — `app-webrtc-troubleshooter`, read against the v4 bundle across CONN-01…CONN-04 and pinned by five contracts that all moved onto this file when it left `ModalHost.svelte` on 2026-09-01. |
@@ -139,9 +139,9 @@ guessed.
 | 56 | `lib/components/ChatSearchBar.svelte` | 450 | `surface-audit-contract.test.ts`, `chat-search-contract.test.ts`, `chat-mode-contract.test.ts` — READ END TO END 2026-09-01 against `app-chat`'s `chatToolbar` region (bytes 1,449,150–1,451,150; the extra column's copy at 2,395,378 is byte-identical, which is why this room has ONE component and the size contract refused the second transcription). **CLEAN — zero absent const values, zero absent text literals**, across 27 resolved views. Pinned as a ratchet, so a regression is a failing test rather than a thing somebody has to notice. |
 | 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
 | 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
-| 59 | `lib/components/MobileRestorePane.svelte` | 130 | no |
+| 59 | `lib/components/MobileRestorePane.svelte` | 130 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-mobile-app-info-modal` (15 consts, 1 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. |
 | 60 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
-| 61 | `lib/components/WebcamStrip.svelte` | 124 | no |
+| 61 | `lib/components/WebcamStrip.svelte` | 124 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-webcam-holder` (1 consts, 0 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. ONE const — the weakest evidence in that contract, and it is recorded as such there. |
 | 62 | `lib/components/UserNotesPane.svelte` | 114 | no |
 | 63 | `lib/components/RestreamPane.svelte` | 105 | no |
 | 64 | `lib/components/ChatTabStrip.svelte` | 104 | no |
@@ -152,7 +152,7 @@ guessed.
 | 69 | `lib/components/RoomBranding.svelte` | 91 | no |
 | 70 | `lib/components/CompactMessageRow.svelte` | 77 | no |
 | 71 | `lib/components/ImagePasteConfirm.svelte` | 76 | no |
-| 72 | `lib/components/PositionsContainer.svelte` | 74 | no |
+| 72 | `lib/components/PositionsContainer.svelte` | 74 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-positions-container` (2 consts, 0 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. Thin: two consts and no embedded views, and the pinned counts say so rather than implying more. |
 | 73 | `lib/components/ModeratorMessage.svelte` | 73 | no |
 | 74 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
 | 75 | `lib/components/ToastHost.svelte` | 64 | no |
@@ -160,14 +160,14 @@ guessed.
 | 77 | `lib/components/PollSavedList.svelte` | 59 | no |
 | 78 | `lib/components/NavbarTipButton.svelte` | 58 | §NAV — born 2026-08-31 out of `RoomNavbar`; RS-09 s navbar copy and its `noopener` refusal. |
 | 79 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
-| 80 | `lib/components/PositionsControls.svelte` | 44 | no |
+| 80 | `lib/components/PositionsControls.svelte` | 44 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-positions-container` (2 consts, 0 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. Audited with row 72 — one reference component, two files here. |
 | 81 | `routes/logout/+page.svelte` | 31 | no |
 | 82 | `routes/+layout.svelte` | 27 | no |
 | 83 | `lib/components/ScreenPaneStatus.svelte` | 167 | `## ScreenPane.svelte` in the v4 register — extracted from `ScreenPane.svelte` on 2026-08-31 so the three status headings could leave `.pan-element` and stop riding the global zoom (SP2-03); audited as part of that surface. |
 | 84 | `lib/components/KickedPage.svelte` | 114 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**57 of 92 surfaces audited · 23,152 of 38,857 lines · 59.6%.**
+**63 of 92 surfaces audited · 23,829 of 38,857 lines · 61.3%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference
