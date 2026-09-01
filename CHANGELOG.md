@@ -45,6 +45,65 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 22:00 UTC — a client-supplied field was ordered ahead of the authenticated session
+
+**Runtime impact: YES.** The email that decides who enters a room, which room rules apply to them,
+and which identity the room is handed, is now taken from the authenticated controller session before
+anything the client sent.
+
+## The defect, and the file that already forbade it
+
+`(public)/session/[code]/+page.server.ts` resolved the entering member as:
+
+```ts
+const email = String(form.get('email') ?? locals.user?.email ?? storedIdentity?.email ?? '')
+```
+
+A CLIENT-SUPPLIED FIELD, ahead of the authenticated session. The same file's `load` states the
+opposite rule in as many words — *"The authenticated controller session is the identity authority. A
+remembered room guest is only a fallback; it must never replace the account that just launched the
+room from the controller"* — so the comment and the line under it disagreed, and the line is what
+runs. That is the 2026-08-07 privilege escalation's shape, which CLAUDE.md names and forbids.
+
+**A second defect in the same expression.** `??` falls through only on `null`/`undefined`. A
+submitted-but-BLANK field is `''`, a real value, so `email=` alone stopped the chain and handed an
+EMPTY identity to `decideRoomEntry` for a signed-in account. `||` falls through the empty string too.
+
+Found by the whole-project audit; the fix is the audit's, the verification and the test are mine.
+
+## The test, which the fix did not have
+
+Nothing enforced the precedence. A fix with no guard gets re-broken, and CLAUDE.md's unit of work is
+*"the reason and the test that enforces it"*. `identity-precedence-contract.test.ts` asserts the
+ORDER inside the expression, the `||`, that an anonymous guest's typed email still admits them, and
+that the decision is still delegated to `decideRoomEntry` rather than re-made locally.
+
+**Four negative controls, four seen RED** — the first of them restores the original defect exactly.
+
+It reads STRIPPED source, and that is load-bearing for the reason eight other files here record: this
+test's own docblock quotes the defective expression verbatim, and an unstripped read would match the
+prose describing the bug instead of the code. Its line-finder is anchored on `locals.user` rather
+than on `const email =`, because a `parseStoredIdentity` helper forty lines above declares
+`const email` too — the first draft found that one and reported `-1` for everything.
+
+## Two more from the same audit, verified before being kept
+
+* **`stream-read` and `mobile-restore` selected the whole `users` row** — `password_hash`,
+  `account_id`, `email_verified_at`, `created_at` — for EVERY member of the room, to answer a
+  question about one. Nothing downstream reads any of the four; verified by reading the only two
+  field accesses that follow (`user.email` at :103 and `roomUser.role` at :115) and confirming the
+  response carries no member data at all. A credential column nothing reads is one that should never
+  leave the database.
+* **`register` hashed the password inside the transaction.** `hashPassword` is `scryptSync` —
+  deliberately slow AND synchronous — so every signup pinned a pooled PostgreSQL connection and
+  blocked the event loop for its duration, for no benefit: the hash depends on nothing the
+  transaction reads. `setPasswordFromReset` already hoists its own for exactly this reason; the two
+  password writers now agree.
+
+Room gate 338, controller gate 110 — both exit 0.
+
+---
+
 ### 2026-09-01 21:15 UTC — the 100% was true of a list that could not contain the gap
 
 **Runtime impact: NONE.** One new gate, one vacuous gate repaired, two warnings answered.

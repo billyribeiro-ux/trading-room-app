@@ -836,9 +836,9 @@
         This item sat inside the presenter block with everything else, and it is the one entry there
         whose gate upstream is wider: rendered when `(isPresenter || user.hasMic)` AND NOT
         `isLimitedPresenter`. A member whose membership carries the mic permission gets it, and the
-        modal answers them with the device picker alone (`ModalHost.svelte`'s `{:else if hasMic}`
-        arm, SC-14/SC-17). Without this they could produce audio and had no way to choose which
-        microphone it came from.
+        modal answers them with the device picker alone (`ModalHost.svelte`'s `hasMic` arm — NAMED
+        and not quoted, per the local-recording note above — SC-14/SC-17). Without this they could
+        produce audio and had no way to choose which microphone it came from.
 
         `media.limitedPresenter` is the reference's own term and it is not redundant: `giveMicScreen`
         assigns `globals.user.isPresenter = globals.isLimitedPresenter = e.give`, so somebody handed

@@ -106,9 +106,37 @@ export const actions: Actions = {
     const form = await request.formData();
     const name = String(form.get('name') ?? '').trim();
     const storedIdentity = readRoomIdentity(cookies.get(IDENTITY));
-    const email = String(form.get('email') ?? locals.user?.email ?? storedIdentity?.email ?? '')
-      .trim()
-      .toLowerCase();
+    /*
+      THE AUTHENTICATED SESSION IS THE IDENTITY, AND IT WAS BEING OVERRULED BY A FORM FIELD.
+
+      `load` above states the rule in as many words — *"The authenticated controller session is the
+      identity authority. A remembered room guest is only a fallback; it must never replace the
+      account that just launched the room from the controller"* — and then this line read
+      `form.get('email') ?? locals.user?.email ?? storedIdentity?.email`, which put a
+      client-supplied field ahead of both. The comment and the next line disagreed.
+
+      Nothing legitimate posts that field while signed in: `RoomLogin.svelte` renders the email
+      input `disabled` whenever `known` is set, and a disabled input submits nothing. But a disabled
+      input is markup, and markup is advisory — this action is reachable with `curl`. A request
+      carrying a controller session cookie AND `email=<somebody else>` entered this room under that
+      address, and the address is not decoration: it is what gets written into the `room_identity`
+      cookie below, what `/session/[code]/joined` mints a handoff token for, and what the room then
+      hands to `internal/room-config` to resolve a MEMBERSHIP by. An email accepted from the client
+      here is an authority claim two hops later.
+
+      Order, now, and the reason for each place:
+
+        1. `locals.user.email`  the server owns it — a cookie this application issued and read back
+        2. the typed field      the ordinary public arrival; a guest has no account here to read
+        3. `storedIdentity`     last, because it is the only one of the three the visitor rewrites
+                                at will (`httpOnly: false`, see the cookie write below)
+
+      `||` rather than `??` throughout, deliberately: an empty string is a missing answer, not an
+      answer of "". `?? ` treated a submitted-but-blank field as a real value and stopped the chain
+      there, which is how `email=` alone produced an empty identity for a signed-in account.
+    */
+    const typedEmail = String(form.get('email') ?? '').trim();
+    const email = (locals.user?.email || typedEmail || storedIdentity?.email || '').trim().toLowerCase();
     const remember = form.get('remember') === 'on';
 
     /*
@@ -160,14 +188,35 @@ export const actions: Actions = {
       });
     }
 
-    if (remember) {
-      cookies.set(IDENTITY, JSON.stringify({ name, email }), {
-        path: '/',
-        httpOnly: false,
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30
-      });
-    }
+    /*
+      WRITTEN ON EVERY SUCCESSFUL ENTRY, not only when "Keep me logged in" is ticked.
+
+      This was `if (remember) { … }`, and the checkbox was therefore not deciding how long a
+      convenience lasted — it was deciding whether entry completed at all. The redirect at the end
+      of this action goes to `/session/[code]/joined`, and that page has exactly ONE input: this
+      cookie. With no cookie it redirects straight back here. So a visitor who unticked "Keep me
+      logged in", answered every one of the room's entry rules correctly and pressed Login was
+      returned to the form they had just passed, with no error rendered and nothing logged to say
+      why. A silent failure on the SUCCESS path is the one this application is least allowed to
+      have, and it survived only because `RoomLogin.svelte` renders the box `checked`, so almost
+      nobody ever took the failing branch.
+
+      `remember` now decides exactly what its label promises. With the box ticked the cookie carries
+      `maxAge` and survives the browser closing; without it, `maxAge` is omitted and this is a
+      SESSION cookie — gone when the browser is, which is what declining to be remembered means,
+      while still carrying the entry across the one redirect that needs it.
+
+      `httpOnly: false` is deliberate and load-bearing, not an oversight: "Not you? clear form" in
+      `RoomLogin.svelte` expires this cookie from the client with `document.cookie`, which an
+      HttpOnly cookie cannot do. It is why the identity in here is treated as the LOWEST-trust of
+      the three sources above rather than as proof of anything.
+    */
+    cookies.set(IDENTITY, JSON.stringify({ name, email }), {
+      path: '/',
+      httpOnly: false,
+      sameSite: 'lax',
+      maxAge: remember ? 60 * 60 * 24 * 30 : undefined
+    });
 
     // Entry succeeds. The room itself is a separate application; this hands off
     // rather than pretending to render a room that does not live here.

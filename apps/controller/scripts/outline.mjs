@@ -4,7 +4,28 @@ const src = readFileSync(process.argv[2], 'utf8')
   .replace(/<script[\s\S]*?<\/script>/gi, '')
   .replace(/<style[\s\S]*?<\/style>/gi, '')
   .replace(/<!--[\s\S]*?-->/g, '');
-const body = src.slice(src.indexOf('<body'));
+/*
+  THE MARKER IS ASSERTED, because `slice(indexOf(...))` without one cannot fail.
+
+  `indexOf` returns -1 when the capture has no `<body`, and `slice(-1)` is the LAST CHARACTER of the
+  file rather than an error. Everything below then walks one character, matches nothing, and this
+  script writes an EMPTY outline and exits 0 — measured: a fragment with no `<body` produced
+  `lines 0` and a zero-byte file, reported as success.
+
+  It has a downstream floor and it is not the one to rely on. `extract-manage-schema.mjs` invokes
+  this decoder and then refuses on `expected <N> editable settings; found 0`, so the schema
+  pipeline does fail — but the failure names the SCHEMA, not the decode that produced nothing, and
+  the other caller is a person decoding a capture by hand (`docs/PROCESS.md`), who gets an empty
+  file and no complaint at all.
+
+  So the marker is checked here, where the assumption is made.
+*/
+const bodyAt = src.indexOf('<body');
+if (bodyAt === -1) {
+  console.error(`no <body in ${process.argv[2]} — refusing to emit an outline of one character`);
+  process.exit(1);
+}
+const body = src.slice(bodyAt);
 
 const VOID = new Set([
   'area',

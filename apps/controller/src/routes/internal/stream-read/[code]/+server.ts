@@ -71,9 +71,32 @@ export const POST: RequestHandler = async ({ params, request }) => {
     .toLowerCase();
   if (!email) error(400, 'An email is required.');
 
+  /*
+    THE PROJECTION IS NAMED, and `select({ user: users })` was not the read it looked like.
+
+    Selecting the whole `users` row pulled `password_hash` — along with `account_id`,
+    `email_verified_at` and `created_at` — for EVERY member of the room, on every playback-token
+    request, in order to answer a question about ONE member. Nothing below reads any of those four:
+    the match needs `users.email` and the ban check needs `room_users.role`, and that is the whole
+    of it.
+
+    A credential column nothing reads is a credential column that should never leave the database.
+    The response of this handler travels to the room application, so the narrower the row that ever
+    exists in this process, the smaller the accident a future edit here can make — a `json(member)`
+    written in a hurry would have shipped a password hash to the room, and now there is none to
+    ship. `mintRoomReadToken` also refreshes on a TTL, so this read is not once per session; it is
+    once per token, per viewer.
+
+    WHAT IS DELIBERATELY UNCHANGED: the full-roster scan, and the JS `.find`. The comparison
+    normalises with `.trim().toLowerCase()` because `users.email` is NOT guaranteed normalised —
+    `0001_baseline.sql` is byte-identical to the captured legacy schema and its rows came with it —
+    so moving the predicate into SQL as `eq(users.email, email)` would silently stop matching rows
+    that match today, and refusing a legitimate viewer is still a regression even though it fails
+    closed. That is a real cost at 10,000 members and it is reported rather than half-fixed here.
+  */
   const member = (
     await getDb()
-      .select({ roomUser: roomUsers, user: users })
+      .select({ roomUser: { role: roomUsers.role }, user: { email: users.email } })
       .from(roomUsers)
       .innerJoin(users, eq(roomUsers.userId, users.id))
       .where(eq(roomUsers.roomId, room.id))

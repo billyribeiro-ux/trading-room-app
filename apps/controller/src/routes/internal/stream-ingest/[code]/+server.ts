@@ -79,10 +79,43 @@ export const POST: RequestHandler = async ({ params, request }) => {
     error(404, 'Room not found');
   }
 
-  const body = (await request.json()) as { email?: string };
-  const email = String(body.email ?? '')
-    .trim()
-    .toLowerCase();
+  /*
+    The body is PARSED DEFENSIVELY, which `internal/room-mute` beside it already does and this
+    route did not.
+
+    `await request.json()` was called bare. A body that is not JSON throws a `SyntaxError` out of
+    the handler, and a body that is the literal `null` parses to `null` and then throws a
+    `TypeError` on `body.email` — so two shapes of malformed request became a 500 through
+    `handleError` ("An unexpected error occurred.") rather than the 400 they are. A caller that
+    sent a bad request must be told it sent a bad request; a 500 says the server broke, points an
+    operator at this file, and buries the one fact that would have resolved it.
+
+    `!parsed || typeof parsed !== 'object'` and not a bare `typeof` test, because `typeof null` is
+    `'object'` — and not a bare truthiness test either, because a JSON body of `"a string"` or `7`
+    is truthy, parses fine, and has no `.email` to read.
+  */
+  let parsed: unknown;
+  try {
+    parsed = await request.json();
+  } catch {
+    /*
+      Only the PARSE is inside the try. The shape check below is deliberately outside it, because
+      `error()` throws: a `catch` wrapped around a check that raises its own refusal swallows that
+      refusal and replaces it with this one, which is the "try that swallows" shape this repository
+      refuses even when the two happen to produce the same status.
+    */
+    error(400, 'A JSON body is required.');
+  }
+  if (!parsed || typeof parsed !== 'object') error(400, 'A JSON body is required.');
+  const body = parsed as { email?: unknown };
+
+  /*
+    `typeof === 'string'` rather than the old `String(body.email ?? '')`. Coercion turned a
+    `{ "email": 12345 }` into the string `"12345"` and then asked the roster whether anybody has
+    that address — a question with a well-defined answer, which is worse than a refusal. A field
+    that is not a string is a malformed request, and it now lands on the 400 below.
+  */
+  const email = (typeof body.email === 'string' ? body.email : '').trim().toLowerCase();
   if (!email) error(400, 'An email is required.');
 
   /*

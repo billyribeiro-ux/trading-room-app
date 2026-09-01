@@ -72,6 +72,25 @@ export const actions: Actions = {
 
     const now = new Date();
     /*
+      HASHED OUTSIDE THE TRANSACTION, and that is the rule this file was breaking.
+
+      `hashPassword` is `scryptSync` — deliberately slow AND synchronous, so the call both pins a
+      pooled database connection for its whole duration and blocks the Node event loop. It used to
+      sit inline in the `.values({…})` below, which meant every signup held an open PostgreSQL
+      transaction across it for no benefit whatsoever: the hash depends on nothing the transaction
+      reads and nothing the transaction writes depends on when it is computed.
+
+      `setPasswordFromReset` in `#lib/server/auth.js` already states this rule, in these words —
+      *"scrypt is deliberately slow, and holding a database transaction open across it would pin a
+      connection for the duration for no benefit"* — and hoists its own hash for exactly this
+      reason. The two password writers in this application now agree.
+
+      It still happens AFTER the reCAPTCHA check and after the uniqueness lookup, which is the
+      ordering the block above exists to guarantee: an unverified submission must never be able to
+      burn server CPU on a hash.
+    */
+    const passwordHash = hashPassword(password);
+    /*
       One transaction: an account without its owner is not a state worth persisting, and neither is
       an account whose first room half-exists.
     */
@@ -86,7 +105,7 @@ export const actions: Actions = {
           accountId: account.id,
           email,
           displayName: name,
-          passwordHash: hashPassword(password),
+          passwordHash,
           createdAt: now
         })
         .returning({ id: users.id });
