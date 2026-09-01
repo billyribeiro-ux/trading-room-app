@@ -346,10 +346,79 @@ const CLEAN: readonly {
     consts: 1,
     views: 0,
     files: ['src/lib/components/WebcamStrip.svelte', 'src/lib/components/PresentationArea.svelte']
+  },
+  /*
+    ── FIVE MORE, 2026-09-01, and they are what finished `ModalHost.svelte` ──────────────────────
+
+    That file is the union of two dozen reference modals, so it could not be audited as one surface
+    and was the last row in `todo-next.md` still reading `no`. These five are the ones it implements
+    that had never been measured against their own selectors.
+
+    `app-av-settings-modal` reached 0/0 the same day and not before: the audit had reported
+    `speakers-device` against markup that said `av-speakers-device`, an ours-prefix that cost the
+    select both of the `app.css` rules written for it.
+  */
+  {
+    selector: 'app-av-settings-modal',
+    consts: 36,
+    views: 3,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/AvDevicePane.svelte'
+    ]
+  },
+  {
+    selector: 'app-play-youtube-modal',
+    consts: 19,
+    views: 3,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/YoutubePlayerOverlay.svelte'
+    ]
+  },
+  {
+    selector: 'app-alerts-advanced-search',
+    consts: 50,
+    views: 17,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/AlertChatArea.svelte'
+    ]
+  },
+  {
+    /*
+      Eighty-five consts and FORTY-THREE views, the largest clean surface here — and it needs
+      `connectivity-status-rows.ts` in the list, because `UDP Enabled`, `TCP Enabled` and the three
+      status glyphs reach the markup through a table rather than as literals.
+    */
+    selector: 'app-webrtc-troubleshooter',
+    consts: 85,
+    views: 43,
+    files: [
+      'src/lib/components/ConnectivityModal.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/connectivity-status-rows.ts',
+      'src/lib/components/MobileRestorePane.svelte'
+    ]
+  },
+  {
+    selector: 'app-alert-qa-modal',
+    consts: 38,
+    views: 15,
+    files: [
+      'src/lib/components/AlertQaModal.svelte',
+      'src/lib/components/AlertQaComposer.svelte',
+      'src/lib/components/AlertQaAlertCard.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/CompactMessageRow.svelte'
+    ]
   }
 ];
 
-describe('seven surfaces measured clean — audited 2026-09-01', () => {
+describe('the surfaces measured clean — audited 2026-09-01', () => {
   it.each(CLEAN)('$selector renders every const value and text literal', (surface) => {
     const report = auditSurface({ selector: surface.selector, files: [...surface.files] });
     expect(report.region.consts, `${surface.selector}'s const table must still parse`).toBe(
@@ -914,5 +983,73 @@ describe('app-presentationarea — audited 2026-09-01, the page s other giant', 
       ends in `.all()`.
     */
     expect(report.textGaps).toEqual(['Recordings', 'No room files found.']);
+  });
+});
+
+describe('app-user-info-modal — audited 2026-09-01, and its nine gaps are TWO recorded reasons', () => {
+  /*
+    131 consts and 35 embedded views — the member card, its four tabs, the avatar menu, the admin
+    notes and the follow-chat style pane.
+
+    Nine values remain and they are two groups, both already argued elsewhere in this repository
+    before this pin existed. That is the ordinary outcome for a surface that has been worked on for
+    weeks, and it is why the pin asserts the SET rather than a count: a tenth arriving is a new
+    thing, and the nine cannot quietly become a different nine.
+  */
+  const report = auditSurface({
+    selector: 'app-user-info-modal',
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/UserNotesPane.svelte',
+      'src/lib/components/FollowChatStylePane.svelte',
+      /*
+        Needed, and its absence is instructive: without it the audit reports SEVEN more —
+        `edit-user-avatar-options`, `remove-profile-picture-btn`, `fa-cog`, the Gravatar URL and the
+        three avatar-menu literals — against a component that renders every one of them.
+      */
+      'src/lib/components/AvatarOptionsMenu.svelte'
+    ]
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(131);
+    expect(report.views.resolved).toBe(35);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('is missing four `#`-prefixed tab targets and five Angular value attributes, and nothing else', () => {
+    /*
+      THE FOUR `#nav-*` are the false-gap family `reference-const-coverage-contract.test.ts`
+      measures: the room emits the exact string, composed at runtime from a bare id in an `{#each}`,
+      and a substring sweep over source cannot see a string the source never contains. That file's
+      `every #-prefixed residual with a composing site is emitted at runtime` proves it per value
+      rather than asserting it.
+
+      THE FIVE `followChatStyle.*` are `value="followChatStyle.color"` and its siblings — static
+      attributes beside an `[(ngModel)]` that overwrites them, which is upstream's own mistake, and
+      the same one again on the four `chatStyle.*` at byte 2,261,183.
+
+      **Transcribing them was attempted on 2026-09-01 and Svelte refuses it:**
+      `Attributes need to be unique` (svelte.dev/e/attribute_duplicate). `value` and `bind:value`
+      are one attribute to the compiler, so the pair Angular accepts is UNWRITABLE here — not
+      undesirable, unwritable. `FollowChatStylePane.svelte` records the error that establishes it,
+      so nobody re-attempts it from the const table alone.
+    */
+    expect(report.constGaps.map((gap) => gap.value)).toEqual([
+      '#nav-info',
+      '#nav-system',
+      '#nav-options',
+      '#nav-notes',
+      'followChatStyle.color',
+      'followChatStyle.usernameColor',
+      'followChatStyle.bgColor',
+      'followChatStyle.tickerColor',
+      'followChatStyle.fontSize'
+    ]);
+  });
+
+  it('and renders every text literal, avatar menu included', () => {
+    expect(report.textGaps).toEqual([]);
   });
 });

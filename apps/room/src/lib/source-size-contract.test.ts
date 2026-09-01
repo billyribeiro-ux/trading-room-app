@@ -6910,7 +6910,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `…post this image:`, and this one component serves both. The default is the chat string, so the
       surface that already had this dialog is unchanged.
     */
-    max: 66,
+    /*
+      66 -> 85, 2026-09-01. ONE line of markup — `<div class="modal-backdrop fade show"></div>` —
+      and eighteen saying why it is an INTERNAL CONSISTENCY fix rather than a transcription, which
+      this repository holds to a different standard.
+
+      `sendGif` calls the SHORT form `bootbox.confirm(message, callback)`, so no `backdrop:!0`
+      appears at the call site the way it does in `imgUpload`'s options object; and the one captured
+      bootbox DOM here begins at `div.modal-content` and does not show the element either. What
+      decides it is that this room already answered the question three times — `BootboxDialog` emits
+      one and serves the SAME `bootbox.confirm`, `ImageLightbox` for `ROV-04`, `VideoPlayer` for
+      `VID-01`. Four dialogs from one library either all dim the page or none do; this was the only
+      one that did not, and the difference was nobody's decision.
+
+      A reader who finds this line with no note has to re-derive that whole argument, and the most
+      likely conclusion is that it was invented — which is the failure this file's rule exists to
+      prevent.
+    */
+    max: 85,
     why: 'the one confirmation between picking a GIF and inserting or posting it'
   },
   {

@@ -1021,10 +1021,17 @@ describe('how much of the gap has already been written about', () => {
       `app-typing-indicator-dots`. None of the four left `all`, because only RENDERING does that.
 
       The one that LEFT is `modal-basic-title`, and it left `all` entirely: `GIF-07` built it. So
-      the examined side is 37 rather than 38, the unexamined side is untouched at 73, and the total
-      is 110 rather than 111.
+      the examined side was 37 rather than 38, the unexamined side untouched at 73, and the total
+      110 rather than 111.
+
+      37 -> 43 later the same day, and all six moved the same way again: `todo-next.md` closed at
+      93 of 93 surfaces, and the rows written to get there name values this file lists — the
+      Recordings tab's four consts and its literal among them, and `dropdownMenuNote`. Six values
+      crossing from unexamined to examined because a reason was finally written for each is the
+      split working; none of the six left `all`, because only rendering does that, and the
+      unexamined side fell by exactly six.
     */
-    expect(all.filter(mentioned)).toHaveLength(37);
+    expect(all.filter(mentioned)).toHaveLength(43);
     /*
       85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
       means work: the four were `app-session-login`'s loading view and they left `all` by being
@@ -1041,7 +1048,7 @@ describe('how much of the gap has already been written about', () => {
       distinction working, not being gamed: the values are still in `all`, and only rendering them
       moves them out of it.
     */
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(73);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(67);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

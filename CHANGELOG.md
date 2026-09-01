@@ -45,6 +45,84 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 18:38 UTC — the surface table closes at 93 of 93, and the number is bounded where it stands
+
+**Runtime impact: one line.** `GifConfirmDialog.svelte` gains the `.modal-backdrop` its three
+siblings emit. Everything else here is measurement.
+
+## From 2 of 42 to 93 of 93
+
+`todo-next.md` opened on 2026-08-16 at *"2 surfaces of 42, ~2.7% of lines"*. It closes today. The
+last nine rows went in one pass, and only two of them were work:
+
+| surface | verdict |
+| --- | --- |
+| `app-presentationarea` | pinned — the Recordings tab and `NTC-3`, both recorded |
+| `ModalHost.svelte` | **audited as a SET**, not a surface: twelve of its modals measure CLEAN, `app-user-info-modal`'s nine values are two recorded reasons, and five more carry their own pins |
+| `BootboxDialog`, `ImagePasteConfirm`, `GifConfirmDialog` | read against the one captured bootbox DOM this repository holds |
+| `RoomBranding` | read against `changeFavicon` and `addCustomCSS`, both imperative |
+| `RemoteAudioSinks`, `Modal`, `TabGearMenu` | covered by the `app-room` pin that names them |
+| `routes/logout`, `routes/+layout` | OURS — no reference counterpart, and the absence is the point |
+
+Five surfaces reached CLEAN in that pass and were pinned: `app-av-settings-modal` (36 consts, 3
+views), `app-play-youtube-modal` (19/3), `app-alerts-advanced-search` (50/17),
+`app-webrtc-troubleshooter` (85/43 — the largest clean surface here) and `app-alert-qa-modal` (38/15).
+
+`app-av-settings-modal` reached 0/0 **today and not before**: the audit had been reporting
+`speakers-device` against markup that said `av-speakers-device`.
+
+## The bootbox family, and the capture that is from the wrong application
+
+bootbox builds its markup in JavaScript, so none of it is in the Angular bundle —
+`bootbox-close-button`, `bootbox-accept`, `bootbox-cancel` and `bootbox-input` all return **zero**
+there. The rendered DOM exists in exactly one place, `docs/reference/evidence-dumps-full-read.md`,
+which says of itself: *"meta.json config has `OPEN_BOOTBOX: false`, so NEXT-STEP never captured a
+bootbox at all. THIS FILE IS THAT MISSING EVIDENCE."*
+
+**And it is the AngularJS ACCOUNT page on Bootstrap 3**, where the room is Angular 17 on Bootstrap 5.
+The same file makes the point about a different dependency thirty lines later — *"Do not assume one
+icon set across the two surfaces"* — and it applies here with the same force. So three captured
+values are refused and the refusal is now written down: `data-dismiss` (BS3's spelling of
+`data-bs-dismiss`), `data-bb-handler` (bootbox's own dispatch hooks, which nothing here reads), and
+`btn-default` alone — kept BESIDE `btn-secondary` rather than instead of it, so a stylesheet keyed on
+the captured name still finds it. The class names and the Cancel-then-OK order the evidence states
+explicitly are transcribed.
+
+**One gap found there.** `GifConfirmDialog` was the only bootbox dialog in the room with no
+`.modal-backdrop`, and this one is an INTERNAL CONSISTENCY fix rather than a transcription — worth
+saying, because the two are held to different standards. `sendGif` uses the short form
+`bootbox.confirm(message, callback)`, so no `backdrop:!0` appears at the call site, and the captured
+DOM begins at `div.modal-content` and does not show the element either. What decides it is that this
+room already answered the question three times: `BootboxDialog` emits one and serves the SAME
+`bootbox.confirm`, `ImageLightbox` for `ROV-04`, `VideoPlayer` for `VID-01`. Four dialogs from one
+library either all dim the page or none do.
+
+## What 100% means, bounded at the number itself
+
+The header now carries four limits, because a coverage figure nobody bounds is the next thing to go
+stale:
+
+1. **Audited is not perfect.** Many rows end in a recorded refusal or a measured blocker.
+2. **Two rows are pinned by a GLOB and are weaker for it** — and both pins say so, with the control
+   that proves it.
+3. **Four rows have no Angular selector at all** and say what they were read against instead.
+4. **`ModalHost.svelte` is a set, not a surface.**
+
+## Verification
+
+Room gate exit 0 — **337 files, 6,055 passed, 1 skipped**.
+
+**Four negative controls, three red on target and one that correctly did not fire:** the close
+button's second class removed; `btn-default` removed from the GIF dialog's Cancel; the
+`speakers-device` id renamed, which turns the `app-av-settings-modal` pin AND the `app.css` id sweep
+red from one edit. The fourth was an attempted control on that same id run against the wrong file
+list, which stayed green because the value lives in `ModalHost.svelte` and not in `AvDevicePane.svelte`
+— rerun against the right file, it fires.
+
+`reference-const-coverage-contract.test.ts`'s examined/unexamined split moved 37/73 to 43/67: six
+values crossed to EXAMINED because closing this table wrote a reason for each. None left `all` —
+only rendering does that.
+
 ### 2026-09-01 18:24 UTC — `app-presentationarea` pinned, and two tool bugs where the obvious fix was wrong
 
 **Runtime impact: NONE.** No component changed. The page's second giant is measured and pinned, and
