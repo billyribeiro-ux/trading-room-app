@@ -230,9 +230,43 @@ describe('the login form controls decoded from the v4 bundle', () => {
     expect(pageCode).toContain('{#if !showPresenter}');
   });
 
-  it('says " Connecting " while submitting, not "Login"', () => {
-    // `mue` is `d(0,"span"),v(1," Connecting "),T(2,"i",110)`. The WORD changes, not just the spinner.
-    expect(pageCode).toContain('Connecting <i class="ml-2 fas fa-spinner fa-spin"></i>');
+  it('does NOT say " Connecting ", because upstream can never show that label', () => {
+    /*
+      ── CORRECTED 2026-09-01, AND THE CORRECTION IS THE OPPOSITE OF WHAT THIS CASE ASSERTED ──────
+
+      It read: *"says ' Connecting ' while submitting, not 'Login'"*, citing `mue` —
+      `d(0,"span"),v(1," Connecting "),T(2,"i",110)`, const 110
+      `[1,"ml-2","fas","fa-spinner","fa-spin"]`. Every word of that citation is accurate, and the
+      conclusion drawn from it was wrong, because `mue` was read without reading its GATE.
+
+      `mue` lives in `yue`, the login-form view, and `yue`'s swap on the busy flag is at byte
+      1,187,265:
+
+      ```js
+      z("disabled",e.appService.globals.logginIn||!e.loginReady),m(),
+      O(30,e.appService.globals.logginIn?31:30)
+      ```
+
+      The component's ROOT template reads that same flag one level up, at byte 1,209,498, and swaps
+      the WHOLE PAGE:
+
+      ```js
+      template:function(i,o){ 1&i && H(0,gde,5,0,"div",0)(1,yue,39,2),
+                              2&i && O(0, o.appService.globals.logginIn ? 0 : 1) }
+      ```
+
+      So by the time `mue` would be chosen, `yue` is not on the page. A member of the original
+      application never sees " Connecting "; they see `gde`, a centred spinner reading "Loading...".
+      This room shipped the unreachable label and not the visible view.
+
+      Found by reading every occurrence of `logginIn` instead of the one nearest the markup — the
+      same method that overturned `G08` and `SP2-04`, pointed the other way: those were reachable
+      branches recorded as unreachable, this was an unreachable branch built as if it were visible.
+
+      `session-login-loading-contract.test.ts` holds both gate readings and the loading view.
+    */
+    expect(pageCode).not.toContain('Connecting');
+    expect(pageCode).not.toContain('ml-2 fas fa-spinner fa-spin');
   });
 
   it('greets rather than labelling — the h1 is "Welcome to the <name>"', () => {

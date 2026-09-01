@@ -308,11 +308,30 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     handoff. These are listed rather than excluded because "out of scope" is a decision that should be
     visible and re-decidable, not a filter that hides the surface.
   */
+  /*
+    FOUR LEFT THIS LIST ON 2026-09-01, AND THEY WERE NEVER PART OF THE FLOW THIS GROUP IS ABOUT.
+
+    `top-50`, `start-50`, `translate-middle` and `ms-3` sat under "account management lives on the
+    controller" with the forgot-password and avatar-chooser values, and they are not account
+    management. They are consts 1 and 3 of `app-session-login`'s LOADING VIEW — the whole page while
+    a sign-in is in flight:
+
+    ```js
+    template:function(i,o){ 1&i && H(0,gde,5,0,"div",0)(1,yue,39,2),
+                            2&i && O(0, o.appService.globals.logginIn ? 0 : 1) }
+    function gde(t,n){ 1&t && (d(0,"div",0)(1,"div",1),T(2,"i",2),d(3,"span",3),v(4,"Loading..."),u()()()) }
+    ```
+
+    Built, and it cost a branch that had been built backwards: the button's " Connecting " label
+    (`mue`, const 110) came from `yue`, whose own gate on the SAME flag is at byte 1,187,265 — so the
+    root swap has already replaced the form and that label is markup the reference ships and cannot
+    paint. `session-login-loading-contract.test.ts` re-reads both gates.
+
+    The mis-grouping is the lesson rather than the four values: a group whose heading is a DECISION
+    ("out of scope") absorbs anything filed near it, and nobody re-reads a value that already has a
+    reason. The heading below still describes the twenty-six that remain.
+  */
   'app-session-login': [
-    'top-50',
-    'start-50',
-    'translate-middle',
-    'ms-3',
     'col-md-2',
     'col-sm-10',
     'solid 1px #0a0a0a',
@@ -706,7 +725,7 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-nine components fully covered, one hundred and fifteen values not', () => {
+  it('holds the ratchet: thirty-nine components fully covered, one hundred and eleven values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
@@ -714,7 +733,11 @@ describe('coverage of the reference const tables', () => {
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(39);
-    expect(residuals).toBe(115);
+    /*
+      115 -> 111 on 2026-09-01. The four are `app-session-login`'s loading view — consts 1 and 3 of
+      the root swap, built, with the reason recorded at that entry. The ratchet only goes down.
+    */
+    expect(residuals).toBe(111);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -842,10 +865,17 @@ describe('how much of the gap has already been written about', () => {
     measured against stripped source. The two siblings (`#navbarsExampleDefault` and the bare id) did
     NOT move, because the reason they already carried named them literally.
   */
-  it('splits the 115 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(115);
+  it('splits the 111 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(111);
     expect(all.filter(mentioned)).toHaveLength(30);
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(85);
+    /*
+      85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
+      means work: the four were `app-session-login`'s loading view and they left `all` by being
+      BUILT, not by being written about. Compare the 29 -> 30 move recorded above, which was one
+      value crossing from unexamined to examined because a reason was finally written for it. Both
+      are legitimate and they are not the same event, so both are recorded.
+    */
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(81);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

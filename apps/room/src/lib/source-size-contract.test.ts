@@ -843,7 +843,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this climbs, the extraction is the entry logic — the token strip, the latch and the redirect
       decisions — into a `.svelte.ts` module that can be driven without a mount.
     */
-    max: 702,
+    /*
+      702 -> 711 on 2026-09-01, hours after the cap was declared, and the EXTRACTION WAS DONE FIRST —
+      which is what this entry's own rule asks for and what makes the nine lines arguable.
+
+      `app-session-login`'s root template is a two-way swap and this room had only one arm. Building
+      the other took the file to 771. `SessionLoadingView.svelte` is that arm — `gde`, byte 1,170,863,
+      five declarations and no variables — and the seam is upstream's own: two sibling template
+      functions, not a slice cut to fit a number. It took 771 back to 710, below where this started.
+
+      What remains here is irreducible and is all of it: the import, the `{#if}`/`{:else}`/`{/if}` that
+      IS the root swap, a six-line note saying why the gate stays at the call site, and a corrected
+      four-line note where the login button's " Connecting " label used to be. That label came from
+      `mue` inside the arm the swap replaces, so it is markup the reference ships and cannot paint —
+      an unreachable branch this room had built as if it were the visible one.
+
+      Both notes point at the component rather than repeating it, which is the only reason they are
+      four and six lines instead of forty.
+    */
+    max: 711,
     why: 'the entry door: handoff, token strip and the login form'
   },
   {
@@ -7494,6 +7512,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 727,
     why: 'the screenshare pane and its zoom/stack controls'
+  },
+  {
+    file: 'lib/components/SessionLoadingView.svelte',
+    /*
+      NEW 2026-09-01, capped at what it landed at, and it exists because `source-size-contract`
+      refused `routes/session/+page.svelte` at 771 against 702 the moment its second arm was built.
+
+      `gde` — `app-session-login`'s loading view, byte 1,170,863, five declarations and NO variables.
+      Six lines of markup, one CSS rule and fifty of decode, and the ratio is right for this file: the
+      whole point of the change was a measurement, not a spinner. Two gates read one flag, the outer
+      one wins, and the label this room had built from the inner one can never paint upstream.
+
+      The seam is the reference's own — `gde` and `yue` are two sibling template functions under a
+      root conditional — which is what makes this an extraction rather than a slice cut to fit a
+      number. No props, because `gde` has no variables; the gate stays at the call site where the root
+      swap keeps it.
+
+      If this climbs, the question is whether it has grown a PROP. It has none by design, and the
+      first one would mean this arm had started depending on the arm it replaces.
+    */
+    max: 70,
+    why: "the login page while a sign-in is in flight - app-session-login's other root arm"
   },
   {
     file: 'lib/components/ScheduledAlertFields.svelte',

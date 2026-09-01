@@ -33,6 +33,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 01:27 UTC — the login page's other root arm, and a busy label upstream can never paint
+
+**Runtime impact: YES.** Pressing Login now replaces the page with a centred "Loading...", which is
+what a member of the original application sees. The button's " Connecting " state is gone.
+
+## The finding
+
+`reference-const-coverage-contract` filed `top-50`, `start-50`, `translate-middle` and `ms-3` under
+*"account management lives on the CONTROLLER"*, beside forgot-password and the avatar chooser. They
+are not account management. They are consts 1 and 3 of `app-session-login`'s **loading view** — the
+arm this room had never built.
+
+`app-session-login`'s root template is a two-way swap:
+
+```js
+template:function(i,o){ 1&i && H(0,gde,5,0,"div",0)(1,yue,39,2),
+                        2&i && O(0, o.appService.globals.logginIn ? 0 : 1) }
+```
+
+`yue` is the login form, 39 declarations. `gde` is five, at byte **1,170,863**, and it is the whole
+page while a sign-in is in flight — `position-relative w-100 h-100` > `position-absolute top-50
+start-50 translate-middle` > a `fa-spinner fa-spin fa-2x` and `ms-3 loading-message` reading
+"Loading...".
+
+**And the arm this room HAD built is unreachable upstream.** `session-login-contract.test.ts`
+asserted the button says " Connecting " while submitting, citing `mue` and const 110 — an accurate
+citation with the wrong conclusion, because `mue` was read without reading its gate. It lives inside
+`yue`, whose swap on the same flag is at byte 1,187,265, and the root reads that flag one level up.
+By the time " Connecting " would be chosen, `yue` is not on the page.
+
+Same method as `G08` and `SP2-04`, pointed the other way: those were reachable branches recorded as
+unreachable; this was an unreachable branch built as if it were the visible one. All three were found
+by reading every occurrence of the flag instead of the one nearest the markup.
+
+**The mis-grouping is the lesson rather than the four values.** A group whose heading is a DECISION —
+"out of scope" — absorbs anything filed near it, and nobody re-reads a value that already has a
+reason.
+
+## What was built, and the extraction that came with it
+
+`SessionLoadingView.svelte` — `gde`, decoded whole, **no props**, because `gde` has no variables
+either and a `busy` prop would be inventing state the reference's own arm does not have. The gate
+stays on the page, where the root swap keeps it.
+
+It is a component rather than markup inline because `source-size-contract` refused
+`session/+page.svelte` at 771 against 702 the moment the arm arrived, and the seam is the reference's
+own: `gde` and `yue` are two sibling template functions under one conditional. The extraction took the
+page to **710**, below where it started; the ceiling was raised 702 → 711 for the import, the swap and
+two notes that point at the component rather than repeating it.
+
+`.loading-message` is carried because the login component's own `styles:` array defines it
+(`font-size: 24px`); the five Bootstrap utilities beside it are asserted present in
+`css/complete-app-styles.css` rather than copied, so the view ships no class without a rule.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 326 files, 5,885 passed, 1 skipped; `svelte-check` 1,615
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+The view was driven in a browser with the form POST held for four seconds: `.loading-message` visible,
+box `{x: 611, y: 347}` in a 1280×720 viewport — centred — `font-size` computed **24px**, one
+`i.fas.fa-spinner.fa-spin.fa-2x`, and `form.login-form` **count 0**, which is the swap rather than an
+overlay. Screenshotted.
+
+**Seven negative controls, all seen red on the case they were aimed at**: the busy label restored, the
+view rendered after the form instead of replacing it, the component rule dropped, the captured consts
+swapped for a plain `text-center`, a `busy` prop added, the view moved below the form, and the import
+replaced by a bare div.
+
+The const sweep went **115 → 111** residuals, and the whole move is on the unexamined side (85 → 81) —
+these four left by being BUILT rather than by being written about, which is a different event from the
+29 → 30 move recorded the same day and both are now distinguished at the case.
+
+**The Svelte MCP has been disconnected for the remainder of this session, so `svelte-autofixer` did
+not run on `SessionLoadingView.svelte` or on `session/+page.svelte`.** That gate was not met;
+`svelte-check`, the contracts and a real browser stand in its place and are not the same thing.
+
 ### 2026-09-02 00:38 UTC — the room had no error page, and `app.html` was printing its own docblock on every page
 
 **Runtime impact: YES, on every page of the application, and one of the two was a shipped defect
