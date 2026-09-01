@@ -274,9 +274,13 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
 
       Recorded rather than quietly deleted, because it is the measurement's one real weakness: a
       short, generic value can be matched by an unrelated surface. It cannot produce a FALSE GAP,
-      only miss a true one, which is the direction that fails safe — and the eight-line placeholder
-      `app-session-transcript` still shows twenty-six absent values, so nothing about its verdict
-      moved.
+      only miss a true one, which is the direction that fails safe — and this component still shows
+      TWENTY-SEVEN absent values, so nothing about its verdict moved.
+
+      (That figure read "twenty-six" until 2026-09-01 and the list has held twenty-seven throughout:
+      a hand count written beside a list, which is the one thing this file exists to stop being
+      trusted. `the transcript verdict states its own size` re-derives it now, so the two cannot
+      disagree again.)
     */
     'pagination-info',
     'transcript-body',
@@ -648,7 +652,30 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   ],
   /* `recordings` is the archive tab — blocked on an archive service, and recorded as such. */
   'app-presentationarea': ['recordings', 'recordings-tab', '#recordings', 'fa-file-video'],
-  /* `discord-settings` is the Discord-registration blocker; the two `presenterStyle.` are group three's defect again. */
+  /*
+    `discord-settings` is the Discord-registration blocker.
+
+    The two `presenterStyle.` are the SAME upstream defect as `app-user-info-modal`'s five, and since
+    2026-09-01 that is a reading rather than a cross-reference — `the seven <expression>-as-a-value
+    residuals are an UPSTREAM DEFECT` below reads each const whole from the pinned bundle, including
+    the `3,"ngModelChange","ngModel"` tail that makes it a defect rather than a choice: the binding is
+    there, beside the literal it was meant to replace.
+
+    ```js
+    ["type","color","name","presenter-text-color","value","presenterStyle.color",
+     "id","presenter-text-color",1,"form-check-input",3,"ngModelChange","ngModel"]   // byte 2,274,009
+    ["type","color","name","presenter-bg-color","value","presenterStyle.bgColor",
+     "id","presenter-bg-color",1,"form-check-input",3,"ngModelChange","ngModel"]     // byte 2,274,230
+    ```
+
+    (Both offsets are the START OF THE CONST, not the position of the value string inside it — 55 and
+    53 bytes later respectively. Seven citations in this repository were off by exactly that kind of
+    difference before they were re-measured on 2026-09-01.)
+
+    The FEATURE is built here — `routes/presenter-colors.remote.ts` and `presenter-colors-contract`
+    cover `savePresenterColors`, whose payload the reference builds at byte 2,243,603. What is not
+    reproduced is a colour input shipping the text `presenterStyle.color` as its value.
+  */
   'app-user-settings-modal': [
     'discord-settings',
     'discord-settings-tab',
@@ -820,6 +847,93 @@ describe('coverage of the reference const tables', () => {
       '#navbarsExampleDefault',
       '#recordings'
     ]);
+  });
+
+  it('the seven `<expression>-as-a-value` residuals are an UPSTREAM DEFECT, read from the bundle', () => {
+    /*
+      ── PROSE TURNED INTO A READING, 2026-09-01 ──────────────────────────────────────────────────
+
+      Seven residuals across two components are the same mistake in the reference, and until now that
+      was recorded twice in prose — five under `app-user-info-modal` as *"a defect in the original,
+      deliberately not transcribed"*, and two under `app-user-settings-modal` as *"group three's
+      defect again"*. The second is doing a lot of work in four words, and neither could be checked.
+
+      The defect: a `<input type="color">` is given BOTH a static `value` attribute holding the text
+      of an expression AND the `ngModel` binding that was meant to fill it. Angular's compiler puts
+      the literal in the const table, so the control ships with `followChatStyle.color` — the source
+      text — as its DOM value until the binding runs.
+
+      Both halves are read here. If the reference ever turns out to bind these properly, this case
+      goes red and the seven stop being a refusal.
+    */
+    const STATIC_VALUE_DEFECT: readonly { readonly value: string; readonly name: string }[] = [
+      { value: 'followChatStyle.color', name: 'follow-chat-text-color' },
+      { value: 'followChatStyle.usernameColor', name: 'follow-chat-username-color' },
+      { value: 'followChatStyle.bgColor', name: 'follow-chat-bg-color' },
+      { value: 'followChatStyle.tickerColor', name: 'follow-chat-ticker-color' },
+      { value: 'presenterStyle.color', name: 'presenter-text-color' },
+      { value: 'presenterStyle.bgColor', name: 'presenter-bg-color' }
+    ];
+
+    for (const { value, name } of STATIC_VALUE_DEFECT) {
+      /*
+        The whole const, in order, so this cannot pass on the two strings happening to co-occur. The
+        `3,"ngModelChange","ngModel"` tail is the half that makes it a defect rather than a choice:
+        the binding IS there, beside the literal it was supposed to replace.
+      */
+      expect(
+        BUNDLE,
+        `\`${value}\` must still be a static value= beside its own ngModel binding`
+      ).toContain(
+        `["type","color","name","${name}","value","${value}","id","${name}",` +
+          '1,"form-check-input",3,"ngModelChange","ngModel"]'
+      );
+    }
+
+    /*
+      `followChatStyle.fontSize` is the seventh and it is NOT this shape — it is a `range`, not a
+      colour — so it is asserted separately rather than bent into the list. Getting this wrong in the
+      other direction (asserting six as seven) is how a table starts describing itself.
+    */
+    expect(STATIC_VALUE_DEFECT).toHaveLength(6);
+    expect(BUNDLE).toContain('"value","followChatStyle.fontSize"');
+
+    /* And every one of the seven is still recorded as a residual rather than quietly transcribed. */
+    const declared = new Set(Object.values(RESIDUALS).flat());
+    for (const { value } of STATIC_VALUE_DEFECT) expect(declared).toContain(value);
+    expect(declared).toContain('followChatStyle.fontSize');
+  });
+
+  it('the transcript verdict states its own size', () => {
+    /*
+      The one place in this file where a count is written in PROSE beside the list it counts, because
+      the paragraph's argument depends on it — "nothing in this repository renders a transcript list"
+      is a claim about how many of the component's values are absent, and the number was wrong by one
+      from 2026-08-31 to 2026-09-01.
+
+      Both spellings are read, because the paragraph uses the word and the header uses it too. If a
+      value is built or added, this fails until the prose is corrected rather than after somebody
+      notices.
+    */
+    const listed = RESIDUALS['app-session-transcript'];
+    expect(listed).toHaveLength(27);
+    /*
+      Bounded to the RESIDUALS block — from group one's heading to the end of the transcript list —
+      and the bound is the assertion. This case's own body says the wrong spelling out loud in order
+      to refuse it, so a search over the whole file would find the refusal and call it the defect.
+      Seventh time this session a check's subject matched the prose recording it.
+    */
+    const source = readFileSync('src/lib/reference-const-coverage-contract.test.ts', 'utf8');
+    const opened = source.indexOf('ONE — SURFACES THIS ROOM HAS NOT BUILT AT ALL');
+    expect(opened, "group one's heading must be findable").toBeGreaterThan(-1);
+    const listed_at = source.indexOf("'app-session-transcript': [", opened);
+    expect(listed_at, 'the transcript list must be findable').toBeGreaterThan(-1);
+    const closed = source.indexOf('\n  ],', listed_at);
+    expect(closed, 'the transcript list must be closed').toBeGreaterThan(-1);
+    const paragraph = source.slice(opened, closed);
+    expect(paragraph).toContain('eighty values, twenty-seven of');
+    expect(paragraph).toContain('TWENTY-SEVEN absent values');
+    expect(paragraph).not.toContain('twenty-six absent');
   });
 
   it('and the surfaces audited by hand this week are among the covered', () => {

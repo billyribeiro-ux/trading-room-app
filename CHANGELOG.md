@@ -33,6 +33,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 01:52 UTC — two const-sweep verdicts turned from prose into readings
+
+**Runtime impact: NONE.** Contract tests and comments only; no shipped behaviour changed.
+
+Two of the sweep's verdicts rested on sentences nothing checked, and one of the sentences was wrong.
+
+## The seven `<expression>-as-a-value` residuals
+
+Five values under `app-user-info-modal` were recorded as *"a defect in the original, deliberately not
+transcribed"*, and two under `app-user-settings-modal` as *"group three's defect again"* — four words
+carrying the whole argument, and neither could be verified.
+
+The defect is real and is now read from the pinned bundle, each const whole and in order:
+
+```js
+["type","color","name","presenter-text-color","value","presenterStyle.color",
+ "id","presenter-text-color",1,"form-check-input",3,"ngModelChange","ngModel"]   // byte 2,274,009
+```
+
+A `<input type="color">` given BOTH a static `value` holding the source text of an expression AND the
+`ngModel` binding meant to fill it. The `3,"ngModelChange","ngModel"` tail is the half that makes it a
+defect rather than a choice, so it is asserted rather than assumed — as is the fact that all seven are
+still listed as residuals rather than quietly transcribed. `followChatStyle.fontSize` is asserted
+separately because it is a `range`, not a colour, and bending it into the list would be the table
+starting to describe itself.
+
+Both offsets are the START OF THE CONST, 55 and 53 bytes before the value string inside it. Seven
+citations in this repository were off by exactly that kind of difference before they were re-measured
+earlier the same day, so the distinction is recorded at the citation.
+
+## `app-session-transcript` said twenty-six and the list held twenty-seven
+
+A hand count written beside the list it counts — the one thing this file exists to stop being
+trusted. The verdict itself is unchanged and is an owner decision rather than work: the component is a
+standalone page rendering a stored history of everything anybody SAID in a session, and this room
+relays captions and stores none of them at either layer (`room/recording.ts` and
+`services/media/src/server.rs` both relay with no write). Building the viewer means first deciding to
+record every spoken word of every session to disk, which in a multi-tenant fintech application is a
+retention, consent and jurisdiction question.
+
+The count is re-derived now, bounded to the RESIDUALS block — because the new case's own body says the
+wrong spelling out loud in order to refuse it, and a file-wide search would find the refusal and call
+it the defect. **Seventh time this session a check's subject matched the prose recording it**; the fix
+is always at the assertion's target, never at the string.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 326 files, 5,887 passed, 1 skipped; `svelte-check` 1,615
+files, 0 errors, 0 warnings.
+
+**Four negative controls, all seen red on the case they were aimed at** — and the first attempt at one
+of them **did not apply**: the residual it deleted is the last entry in its array and has no trailing
+comma, so the substitution silently matched nothing and the run reported green. Re-run properly it is
+red. That is the second time this session a control has failed to apply and been caught only by
+checking; a control that does not apply has not been run.
+
 ### 2026-09-02 01:27 UTC — the login page's other root arm, and a busy label upstream can never paint
 
 **Runtime impact: YES.** Pressing Login now replaces the page with a centred "Loading...", which is
