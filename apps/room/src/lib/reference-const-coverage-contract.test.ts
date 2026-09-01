@@ -981,15 +981,22 @@ describe('how much of the gap has already been written about', () => {
   */
   it('splits the 111 into what is on record and what nobody has looked at', () => {
     expect(all).toHaveLength(111);
-    expect(all.filter(mentioned)).toHaveLength(30);
+    expect(all.filter(mentioned)).toHaveLength(32);
     /*
       85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
       means work: the four were `app-session-login`'s loading view and they left `all` by being
       BUILT, not by being written about. Compare the 29 -> 30 move recorded above, which was one
       value crossing from unexamined to examined because a reason was finally written for it. Both
       are legitimate and they are not the same event, so both are recorded.
+
+      30/81 -> 32/79 later the same day, and it is the FIRST move here caused by a per-surface audit
+      rather than by prose. `surface-audit-contract.test.ts` pins `app-post-alert-modal`'s four
+      remaining values by name, with the refusal each one carries, so two that no reader had ever
+      named became named. The audit is the examination this split is trying to measure — which is the
+      distinction working, not being gamed: the values are still in `all`, and only rendering them
+      moves them out of it.
     */
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(81);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(79);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

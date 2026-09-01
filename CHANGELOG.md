@@ -33,6 +33,81 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 03:51 UTC — the surface audit becomes a script and a ratchet, and substring matching cost a control
+
+**Runtime impact: NONE.** A new gate script, a new contract, and three surfaces pinned. No shipped
+code changed.
+
+## Why a script
+
+`todo-next.md` asks for a per-surface read: every const by value, every text literal, measured
+against the files that implement one component. Thirty-odd surfaces remain and each was being done by
+hand. Two hand audits earlier today found real gaps — `PAM-11`'s seven classes, and a Repeat select
+shipping with **no classes at all** — which is the argument for the method; doing it thirty more
+times by eye is the argument for `gate/audit-surface.mjs`.
+
+It answers a question `reference-const-coverage-contract` structurally cannot. That sweep searches
+the WHOLE application, so `form-select`, `d-flex` and `m-0` count as present because they occur
+somewhere while being absent from the component under audit. This one scopes to the files
+implementing one surface, and it reads TEXT LITERALS too, which that sweep does not read at any scope
+because they are not in the const table.
+
+`surface-audit-contract.test.ts` pins the answer for each surface already done, so re-opening a gap
+is a failing test rather than something a person has to notice — the shape
+`feature-coverage-contract.test.ts` uses, for the reason its own note gives: *"a count would have
+caught none of those three."*
+
+## Four things the script got wrong, each found by running it
+
+**The view walk resolved 2 of 15.** Angular hoists every embedded view to a function ABOVE the
+component's consts, and the template declares them CHAINED: `H(59,VTe,4,3,"div",35)(60,HTe,…)(61,…)`
+— one `H`, then bare call syntax. A regex anchored on `H(` finds the first of each chain. It matches
+the SIGNATURE now — `(number, Identifier, number, number` — and resolves all fifteen.
+
+**A 32 KB window swept up the neighbours.** The first version read text from a byte window below the
+const table and reported "Create New Poll", "Pre-Canned Polls" and "Debug Log" as gaps in
+`app-post-alert-modal`. Views are resolved transitively from the template now, so the text read is
+exactly the set the component can render.
+
+**Two decoders, for two spellings of the same string.** `Send on this date & time:` in the capture
+against `&amp;` in our markup; `v(1,"\xa0Chat")` in the capture — four source characters for one
+non-breaking space — against `&nbsp;Chat` here. Both sides are normalised; values are reported in
+their original spelling because that is what a reader greps for.
+
+**Substring matching, and this is the fourth time this repository has paid for it.** A negative
+control cut `class="form-select form-select-sm"` down to `class="form-select-sm"` — a class the
+reference carries and this room had just lost — and the contract **stayed green**, because
+`ours.includes('form-select')` is true of `form-select-sm`. It is the same shape as `js` inside
+`json`, `pmToolbar` inside `pmToolbarZZ`, and a declaration assertion passing on the comment above it.
+Matching is whole-token now, with the hyphen counted as a token character because every value at risk
+is a hyphenated class or id.
+
+**Making it strict immediately surfaced something real**: `pe`, from the reference's own
+`["pe","button",…]` typo in consts 261 and 269 — an attribute literally named `pe`, leaving the button
+at its `submit` default. It had been counted present because `pe` occurs inside a dozen ordinary
+words. Not reproduced, and now pinned in two places.
+
+## What is pinned
+
+`app-post-alert-modal` (79 consts, 15 views) — four const values and four text literals left, each a
+refusal on record: Twilio SMS, the linked-room fan-out, and `PAM-10`'s refusal to let a presenter post
+under someone else's name. The chat toolbar (bytes 1,449,150–1,451,150, 27 views) — **clean, zero and
+zero**. The `#files` region (consts 238–266) — one const, the `pe` typo; one literal, the
+never-fetched message.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 328 files, 5,914 passed, 1 skipped; `svelte-check` 1,618
+files, 0 errors, 0 warnings; eslint clean.
+
+**Four negative controls, three red on target and one that exposed the substring bug** — which is the
+control doing its job. The script's own output was cross-checked against both hand audits done earlier
+today and reproduces each exactly.
+
+`todo-next.md`: rows 19 and 56 audited — 56 of 91 surfaces, 23,092 of 38,807 lines (59.5%). The const
+sweep's examined split moved 30/81 → 32/79, the first such move caused by an audit rather than by
+prose.
+
 ### 2026-09-02 03:04 UTC — FilesPane read end to end, and 100 comment bodies stranded by extraction
 
 **Runtime impact: NONE.** Comment indentation and a new gate; no shipped markup, style or behaviour
