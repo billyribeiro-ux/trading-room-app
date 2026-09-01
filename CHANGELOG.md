@@ -45,6 +45,89 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 18:09 UTC — the toasts flew in from nowhere, and two pages of this product credit different companies
+
+**Runtime impact: yes.** Toasts fade in the way ngx-toastr fades them instead of sliding 300px from
+the right.
+
+## `@flyInOut` is named for a slide and defines none
+
+ngx-toastr's toast component, decoded at bundle byte 883,657:
+
+```js
+data: { animation: [ mJ("flyInOut", [ WF("inactive", mp({opacity:0})),
+                                      WF("active",   mp({opacity:1})),
+                                      WF("removed",  mp({opacity:0})),
+                                      X4("inactive => active", Q4("{{easeTime}}ms {{easing}}")),
+                                      X4("active => removed",  Q4("{{easeTime}}ms {{easing}}")) ])]}
+```
+
+Three opacity states and two transitions, which the default config immediately above it resolves to
+`easeTime:300`, `easing:"ease-in"`. **That is the entire animation.** This room's toasts flew in
+from `x: 300` — invented, and the one thing on this surface a viewer would notice.
+
+The captured class order came with it: `toastClasses = \`${i.toastType} ${i.config.toastClass}\``, so
+the type is first and `ngx-toastr` second. `cubicIn` stands in for CSS `ease-in` and is named as a
+stand-in rather than left to look exact — Svelte's easing set has no equivalent of
+`cubic-bezier(.42,0,1,1)`.
+
+Both containers were already right, and both are built imperatively upstream rather than from a
+template: `classList.add("overlay-container")` + `aria-live="polite"` at 878,628, and
+`o.id = "toast-container"` + the position class + `"toast-container"` at 879,514. `closeButton` and
+`progressBar` default OFF and are correctly absent — two controls that would be drawn for nobody.
+
+The assertions went into a NEW file rather than into `sound-effects-contract.test.ts`, which already
+holds two about this component: that file is evidence-bound and is dropped from any checkout without
+the captures, and an assertion nobody can run locally goes stale between CI runs.
+
+## `app-room` is pinned — 229 consts, 108 views, the largest surface in the capture
+
+Six values remain and every one is on record: the sidebar's attribution (below), `helpLink` and its
+intercom URL (`RNB-01`, a false gap — `hasSTHelpLink` is `!1` in `app-room`'s own constructor and
+never written), `cssSoundCloudIcon` (const 176 declares `id` twice and Angular keeps the second) and
+`/assets/images/playing.gif` (an asset the four-file capture cannot supply).
+
+**The pin records its own measured limitation, and that is the part worth keeping.** Its file list is
+a glob of eighty-four components, because `app-room` composes the whole page and an explicit list
+would go stale on every extraction. The audit counts a value present if it occurs in ANY listed file,
+so with eighty-four the blind spot is real: a control that changed `{shareScreenText}` in
+`RoomNavbar.svelte` to a hardcoded string — the label really would have moved on screen — **left this
+test green**, because `SHARE_SCREEN_TEXT` still sat in `navbar-labels.ts`. Two controls that DO fire
+are recorded beside it, and the per-component pins above are what catch a value moving files.
+
+## Two pages of this product credit different companies
+
+The reference carries `Powered by: ProTradingRoom.com` at four sites — the login form (byte
+1,179,402), its forgot/change-password arm (1,187,483), the room's sidebar (2,470,674) and the
+closed-session page (2,576,585).
+
+`RoomSidebar.svelte` was rebranded to `TradingRoomApp` on the recorded ground that *"every room this
+product serves credited, and linked out to, a different company."* **That argument applies word for
+word to the login page, and was not applied there** — so a member reads one company on the login page
+and a different one in the room, ninety seconds apart.
+
+**Not changed, and that is the finding rather than a deferral.** Which name a product puts on its own
+login page is the owner's call, and doing it silently on one page is how the two got out of step in
+the first place. What is added is the record at the end that had none: the sidebar has carried its
+reason since it moved, the login page carried nothing.
+`brand-attribution-contract.test.ts` asserts both values, and each failure message names what the
+OTHER site says — so half-resolving it again is a failing test rather than something somebody
+notices. **This one is on the owner's desk, not mine.**
+
+## Verification
+
+Room gate exit 0 — **336 files, 6,035 passed, 1 skipped**; `svelte-check` 1,627 files, 0 errors.
+
+**Five negative controls, four red on target and one that correctly did not fire:** the toast
+entrance restored to `fly`; the class order swapped back; the sidebar attribution reverted (the
+`app-room` const list shrinks by one); `navbar-labels.ts` dropped from `app-room`'s file list (the
+file count moves and three literals reappear). The fifth is the `{shareScreenText}` control above,
+which stayed green for a measured reason and is written into the pin rather than quietly dropped.
+
+`todo-next.md`: **83 of 93 surfaces, 82.3%** — `routes/+page.svelte`, `AlertChatArea.svelte` and
+`ToastHost.svelte` all moved, the first two because they had been read end to end as the roots of
+`app-room` and `app-chat` without the table being updated to say so.
+
 ### 2026-09-01 17:49 UTC — nine gaps on four surfaces nobody had read, one of them markup this room invented
 
 **Runtime impact: yes, on all four.** An alert group gains its name, its divider and four gates it

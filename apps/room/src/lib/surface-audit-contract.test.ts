@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { auditSurface } from '../../gate/audit-surface.mjs';
 
@@ -754,5 +754,92 @@ describe('app-note — audited 2026-09-01', () => {
       never render is a branch that can never be checked."*
     */
     expect(report.textGaps).toEqual(['Loading images...']);
+  });
+});
+
+describe('app-room — audited 2026-09-01, the whole page', () => {
+  /*
+    THE LARGEST SURFACE IN THE CAPTURE: 229 consts and 108 embedded views, the room's own root
+    template. `--all` had reported four gaps at whole-app scope for weeks; scoped to the files that
+    implement it, it reports SIX, and the two the whole-app sweep could not see are the interesting
+    ones — `https://protradingroom.com` and `" ProTradingRoom.com "` occur elsewhere in this
+    application (the login page still renders them), so a search over everything counts them present
+    while they are absent from THIS surface by decision.
+
+    ## The file list is a GLOB, and that is deliberate here and nowhere else
+
+    Every other pin in this file names its files, because a surface is implemented by a handful of
+    components and naming them is what makes a missing one visible. `app-room` is the page: it
+    composes the navbar, the sidebar, the presentation area, the tab strips, every modal and every
+    overlay. An explicit list would be eighty entries that go stale the day a component is
+    extracted — and extraction is a thing this repository does constantly, under the size ratchet.
+
+    So the glob is the list, and the COUNT is asserted beside it: a component added or removed moves
+    the number and this test says so, which is the property the explicit lists are for.
+
+    ## ⚠️ THIS PIN IS WEAKER THAN THE OTHERS, and the measurement that shows it
+
+    The audit counts a value as rendered if it occurs in ANY listed file, and this list is
+    eighty-four of them. A control run on 2026-09-01 changed `{shareScreenText}` in
+    `RoomNavbar.svelte` to a hardcoded `"Share Screens"` — the label really would have moved on
+    screen — and **this test stayed green**, because `SHARE_SCREEN_TEXT = 'Share Screen '` still sat
+    in `navbar-labels.ts`, which is in the list.
+
+    That is the same blind spot `--all` has, narrowed rather than closed: it now spans one page's
+    components instead of the whole application. What this pin therefore asserts is that
+    `app-room`'s 229 consts and 108 views are all accounted for SOMEWHERE on the page, and that the
+    six exceptions are the six named below. The per-component pins above are what catch a value
+    moving to the wrong file, and they are why those keep their explicit lists.
+
+    Two controls that DO fire, and both were run: the sidebar's attribution rebranded back (the
+    const list shrinks by one), and `navbar-labels.ts` dropped from the list (the file count moves
+    and three text literals reappear).
+  */
+  const files = [
+    ...globSync('src/lib/components/*.svelte').filter((path) => !path.includes('Probe')),
+    'src/routes/+page.svelte',
+    /* The two modules that hold label literals the markup only ever renders through a prop. */
+    'src/lib/navbar-labels.ts',
+    'src/lib/screen-share-menu.ts',
+    'src/lib/room-message-chrome.ts'
+  ].sort();
+
+  const report = auditSurface({ selector: 'app-room', files });
+
+  it('reads the component and the files it says it reads', () => {
+    expect(report.region.consts).toBe(229);
+    expect(report.views.resolved).toBe(108);
+    expect(report.views.unresolved).toEqual([]);
+    expect(files.length, 'a component was added or removed from lib/components').toBe(84);
+  });
+
+  it('has five const values left, and every one is on record', () => {
+    /*
+      - `https://protradingroom.com` — the sidebar's attribution, rebranded to
+        `https://www.tradingroom.app` on a reason recorded at that markup. The LOGIN page still
+        renders the captured one, and `brand-attribution-contract.test.ts` pins both ends of that
+        disagreement so it cannot be half-resolved again.
+      - `https://intercom.help/simpler-trading/en/` and `helpLink` — `RNB-01`, a FALSE gap:
+        `hasSTHelpLink` is `!1` in `app-room`'s own constructor and never written, so upstream's
+        room does not render this link either.
+      - `cssSoundCloudIcon` — const 176 declares `id` twice and Angular keeps the second, so both
+        DOMs carry `id="soundcloudDropdown"`.
+      - `/assets/images/playing.gif` — the one genuine blocker, and an ASSET rather than a decision:
+        the capture is four files and none of them is an image.
+
+      `reference-const-coverage-contract.test.ts` holds the measurement behind each of the last
+      four, including the searches that establish `hasSTHelpLink` is never assigned.
+    */
+    expect(report.constGaps.map((gap) => gap.value).sort()).toEqual([
+      '/assets/images/playing.gif',
+      'cssSoundCloudIcon',
+      'helpLink',
+      'https://intercom.help/simpler-trading/en/',
+      'https://protradingroom.com'
+    ]);
+  });
+
+  it('and one text literal, which is the other half of the rebrand', () => {
+    expect(report.textGaps).toEqual([' ProTradingRoom.com ']);
   });
 });

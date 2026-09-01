@@ -531,7 +531,28 @@
             {/if}
           </form>
 
-          <!-- const 38 `login-footer` > 39 `text-center` > 40 the link. -->
+          <!--
+            const 38 `login-footer` > 39 `text-center` > 40 the link.
+
+            ── THIS PAGE AND THE ROOM'S SIDEBAR NOW CREDIT DIFFERENT COMPANIES ────────────────────
+
+            The reference carries this attribution at FOUR sites: here (byte 1,179,402), the
+            forgot/change-password arm of this same component (1,187,483), the room's sidebar
+            (2,470,674) and the closed-session page (2,576,585). All four read
+            `href="https://protradingroom.com"` with the text `ProTradingRoom.com`.
+
+            `RoomSidebar.svelte` was rebranded to `https://www.tradingroom.app` / `TradingRoomApp`
+            on the recorded ground that *"every room this product serves credited, and linked out
+            to, a different company."* **That argument applies word for word to this page**, and it
+            was not applied here — so a member now sees one company on the login page and a
+            different one in the room, ninety seconds apart.
+
+            NOT CHANGED HERE, deliberately: which name a product puts on its own login page is the
+            owner's call and not an audit's, and doing it silently on one page is how the two got
+            out of step in the first place. `brand-attribution-contract.test.ts` pins both sites so
+            the disagreement is a failing test the day either one moves, and the open question is
+            recorded rather than resolved by whoever edits next.
+          -->
           <div class="login-footer">
             <div class="text-center">
               Powered by: <a href="https://protradingroom.com" target="_blank" rel="noreferrer"

@@ -861,7 +861,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Both notes point at the component rather than repeating it, which is the only reason they are
       four and six lines instead of forty.
     */
-    max: 711,
+    /*
+      711 -> 732, 2026-09-01, and every one of the twenty-one lines is a comment recording a
+      DISAGREEMENT this file is one end of.
+
+      The reference credits `ProTradingRoom.com` at four sites — this login footer, its
+      forgot/change-password arm, the room's sidebar and the closed-session page. `RoomSidebar.svelte`
+      was rebranded to `TradingRoomApp` on the recorded ground that *"every room this product serves
+      credited, and linked out to, a different company"*, and that argument applies word for word
+      here. It was not applied here, so a member reads one company on this page and a different one
+      in the room ninety seconds later.
+
+      NOT changed, deliberately: which name a product puts on its own login page is the owner's call.
+      What is added is the record at this end — the sidebar has carried its reason since the day it
+      moved, and this page carried nothing, so a reader here had no way to know the other site said
+      something else. `brand-attribution-contract.test.ts` asserts both values, so half-resolving it
+      again is a failing test rather than a thing somebody notices.
+    */
+    max: 732,
     why: 'the entry door: handoff, token strip and the login form'
   },
   {
@@ -8067,7 +8084,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ToastHost.svelte',
-    max: 65,
+    /*
+      65 -> 86, 2026-09-01. One line of markup changed and twenty are the note.
+
+      `@flyInOut` (bundle byte 883,657) is named for a slide and defines NONE: three opacity states
+      and two `{{easeTime}}ms {{easing}}` transitions, which the defaults beside it resolve to
+      `300ms ease-in`. This room's toasts flew in from 300px to the right, which was invented and
+      was the one visible thing on this surface.
+
+      The note records that, the captured class ORDER (`${toastType} ${toastClass}` — the type
+      first), and that `cubicIn` is a stand-in for CSS `ease-in` rather than an exact match. None of
+      the three is inferable from the line above it, which is the test for whether a comment earns
+      its space.
+    */
+    max: 86,
     why: 'the toast container'
   },
   {
