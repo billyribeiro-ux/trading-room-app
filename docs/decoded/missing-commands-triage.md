@@ -181,7 +181,7 @@ The refuter matched the BUTTON. The brief asked it to match the BEHAVIOUR. A con
 | `muteChat` | src/routes/+page.server.ts (messageAction op 'mute24'), src/lib/server/db/schema.ts (chat_mutes), src/routes/+page.server.ts (enforced in sendMessage), src/routes/+page.server.ts (chatMutedTill), src/ro |
 | `presAreaTabs-videoplayer` | apps/room/src/lib/types.ts; apps/room/src/routes/+page.svelte (tab); apps/room/src/routes/+page.svelte (pane); apps/room/src/lib/components/VideoPlayer.svelte |
 | `refreshRoster` | src/routes/+page.svelte, src/lib/components/ModalHost.svelte, src/lib/server/room-events.ts |
-| `reloadSessionConfig` | apps/room/src/routes/+page.svelte |
+| `reloadSessionConfig` | **CORRECTED 2026-09-01 — it was NOT built.** This row said `+page.svelte`, and what is there is the BUTTON. Its handler raised a confirm, ran a local `reload()` and told the presenter "Session config reloaded...", which describes the room. Now genuinely built: `routes/session-commands.remote.ts` (sender, byte 2166484) and the `cmds` chain in `lib/room/events.svelte.ts` (receiver). |
 | `savedSessionPolls` | src/routes/+page.server.ts (savePoll), src/routes/+page.server.ts (deleteSavedPoll), src/routes/+page.server.ts (loader), src/lib/server/db/schema.ts (saved_polls table), src/lib/components/PollPanel.sv |
 | `setWelcomwMatSessionNote` | src/routes/+page.server.ts (setWelcomeMatNoteTab action, same name as the reference's send), src/lib/server/notes-repository.ts (setWelcomeMatNote, with the exclusivity enforced in a transaction and scoped to the |
 | `startWebcam` | apps/room/src/routes/+page.svelte — `addRemoteWebcam` and `media.on('newProducer', …)`; apps/room/src/lib/media/session.ts (produceWebcam) and apps/room/src/lib/media/signalling.ts (newProducer: Produc |
@@ -231,9 +231,22 @@ Three things follow, and they raise the priority of every row above rather than 
 1. **They all travel on a SEPARATE channel** — `sendAdminCmd` → `socket.transmit("adminCmd", …)`,
    distinct from the ordinary command transport. The reference has a dedicated admin command path,
    which is what an operator toolkit looks like from the client side.
-2. **Six of the wider reset/diagnose family are ALREADY BUILT here** — `hardResetSession`,
+2. **Six of the wider reset/diagnose family are built here** — `hardResetSession`,
    `softResetSession`, `reloadSessionConfig`, `saveAndCloseSession`, `saveCloseMessage` and
-   `refreshRoster`, in `ModalHost.svelte` and `+page.svelte`. So this is not new ground.
+   `refreshRoster`. So this is not new ground.
+
+   **That sentence read "ALREADY BUILT … in `ModalHost.svelte` and `+page.svelte`", and NONE of the
+   six had a command behind it when it was written** — which is worth more than the one row it
+   corrects. Each had a CONTROL in one of those two files: two ran a local `invalidateAll()` behind
+   a sentence promising a send, two wrote a preference and told nobody, one had a handler whose
+   whole body was an alert, and the last ran a local `reload()`. Every one was found separately and
+   built, dated by `git log -S` on `session-commands.remote.ts`: `refreshRoster` and `softReset`
+   2026-08-26; `hardReset`, `openSession` and `saveCloseMessage` 2026-08-27; `reloadSessionConfig`
+   2026-09-01.
+
+   A markup search cannot tell a wired control from an inert one, which is the same lesson this
+   document's own footer draws about PRESENT rows being a floor. This sentence is what it looks like
+   when one is trusted anyway.
 3. **What is missing is REACH, not the commands.** Ours work inside a room, for that room. The
    operator need is to invoke them for a tenant's room from a central console. `/admin` already has
    impersonation, which is half that bridge.

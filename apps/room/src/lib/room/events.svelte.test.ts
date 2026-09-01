@@ -713,6 +713,31 @@ describe('the two receivers reach the page', () => {
     expect(revoked).toEqual(['The session is now open, click here to reload the page and enter']);
   });
 
+  it("a config reload re-reads every client's page data, and says nothing", () => {
+    /*
+      THE FIFTH SESSION CONTROL THAT ANNOUNCED A SERVER ACT AND PERFORMED A LOCAL ONE, and the last
+      of them. Its four siblings were each found and fixed; this one survived because the gate that
+      catches the family could not see its file — `user-action-disposition-contract.test.ts` split
+      branches on a four-space indent and `session-room-commands.ts` is a plain function whose
+      branches sit at two. Widening that split on 2026-09-01 named this one and nothing else.
+
+      SILENCE IS THE ASSERTION HERE, and it is not an omission. `hardReset` and `openSession` above
+      each raise a captured sentence at every recipient because each one ENDS the page. This frame
+      does not: it re-reads data under a room that stays where it is, and the only person upstream
+      tells anything is the presenter who pressed the button, by the alert their own handler raises.
+      A modal on every screen would be this room inventing an interruption the capture has no trace
+      of. So `revoked` staying empty is the contract, not an untested gap.
+    */
+    invalidateAll.mockClear();
+    const { stream, revoked } = make();
+    stream.subscribe();
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'cmds', data: { cmd: 'reloadSessionConfig' } })
+    });
+    expect(invalidateAll).toHaveBeenCalledTimes(1);
+    expect(revoked).toEqual([]);
+  });
+
   it('a room-wide video moves a non-presenter through the tab receiver', () => {
     const { stream, tabs, played } = make();
     stream.subscribe();

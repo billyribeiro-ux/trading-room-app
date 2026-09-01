@@ -45,6 +45,85 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 23:51 UTC — the gate could not see a whole file, and the defect it exists for was in there
+
+`session-reload-config` raised a confirm, ran a LOCAL `deps.reload()` — a refetch of the calling
+presenter's own page — and told them *"Session config reloaded..."*, which describes the room. It is
+the fifth and last of the session controls that announced a server act and performed a local one;
+the other four were each caught by `user-action-disposition-contract.test.ts`, whose failure message
+names this exact defect.
+
+## Why this one survived four rounds of the gate that catches it
+
+That test concatenates SIX source files and splits them into branches on `\n    if (action === '` —
+a FOUR-space indent, which is a method body. Five of the six are classes. `session-room-commands.ts`
+is a plain exported function, so its five branches sit at TWO spaces and **the split never produced a
+chunk for any of them**. `session-reload-config`, `session-refresh-roster`, `session-soft-reset`,
+`session-hard-reset` and `session-open` were scanned by nothing, for the whole life of the assertion.
+
+The vacuity guard did not notice and could not: it counted branches across the whole concatenation,
+and seventeen from one file satisfies *"more than ten"* while a second file contributes zero. **A
+count is not coverage** — that is the reusable half of this, and it is the same failure shape as the
+three fail-open gates found on 2026-08-31.
+
+## What changed, and the two negative controls
+
+The split is widened to two spaces AND the instrument now checks its own coverage: every
+`if (action === '…')` in the concatenation must be either a chunk header or a member of
+`NESTED_TESTS`, which holds exactly one declared name (`session-send-video`, genuinely nested inside
+the `session-send-*` branch). A future file at an indent the regex misses now fails loudly.
+
+Both controls were run and seen RED:
+
+- **The repair, against the unfixed code.** Widening the split turned the assertion red on
+  `session-reload-config` and nothing else — the other four call discovered `.remote` imports and
+  pass. The gate found the real defect on its first honest run.
+- **The self-check, against the old split.** Narrowing back to four spaces fails the new coverage
+  assertion by name, listing all five branches it had been skipping.
+- **The receiver, in `events.svelte.test.ts`.** Renaming the opcode drops `invalidateAll` to zero
+  calls.
+
+## The command
+
+`reloadSessionConfig`, transcribed from the sender at bundle byte 2166484 —
+`sendServerAdminCommand("reloadSessionConfig", {})`, between `done()` and the alert, with no local
+reload anywhere in the handler. The misspelling in *"reload tge session config?"* is upstream's and
+is kept.
+
+**What is NOT evidenced is stated at the code rather than papered over:** the reference's server is
+not in the capture, and `reloadSessionConfig` appears exactly ONCE in the whole 2.89 MB bundle — at
+its sender. There is no upstream receiver to transcribe; that absence was measured, not assumed. So
+the server half is this room's own. Upstream keeps a room's config in its own process and this
+command makes it re-read; this room has no such copy — `room-config-client.ts` caches per REQUEST on
+a `WeakMap` keyed by the request object, so every request already re-reads from the controller.
+Nothing here is stale except the copy each connected client loaded on entry, so the frame is
+broadcast and every client re-runs its load. `chatArchiveChanged` is the same shape.
+
+## A third gate confirmed it independently, and a document was wrong
+
+`feature-coverage-contract.test.ts` went red on its own: `reloadSessionConfig` was no longer absent
+from our source. The name is deleted from that list.
+
+`docs/decoded/missing-commands-triage.md` had it under **"Built under another name"**, citing
+`+page.svelte`. What is in `+page.svelte` is the BUTTON. The same document claimed six commands of
+that family were *"ALREADY BUILT … in `ModalHost.svelte` and `+page.svelte`"*, and **none of the six
+had a command behind it when that was written** — two ran a local `invalidateAll()`, two wrote a
+preference and told nobody, one had a handler whose whole body was an alert, and this one reloaded a
+page. Dated by `git log -S` on `session-commands.remote.ts`: `refreshRoster` and `softReset`
+2026-08-26; `hardReset`, `openSession` and `saveCloseMessage` 2026-08-27; this one today. A markup
+search cannot tell a wired control from an inert one, which is what that document's own footer says
+about PRESENT rows being a floor.
+
+**Runtime impact.** A presenter pressing *Reload Session Config* now changes the room: every
+connected client re-reads the room's settings. Before this, the only page that moved was the
+presenter's own, which is why the control read as working from the one seat that could see it.
+
+**Verified:** `user-action-disposition-contract` 16/16 with both negative controls seen red;
+`events.svelte.test.ts` 36/36 with its control seen red; `feature-coverage-contract` 4/4;
+`source-size-contract` 681/681 after both ceilings were raised with their arguments at the entry;
+`svelte-check` 0 errors 0 warnings; `svelte-autofixer` clean on the modified `.svelte.ts`. Room gate exit 0 — 340 files,
+6124 passed, 1 skipped — at `7391e49`.
+
 ### 2026-09-01 23:24 UTC — re-measuring the refusals, and proving the gate that holds one of them
 
 **Runtime impact: NONE.** Two recorded refusals re-tested against the match-exactly instruction; both

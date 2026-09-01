@@ -159,7 +159,12 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'lockSession',
   'pingPopup',
   'privMsg',
-  'reloadSessionConfig',
+  /*
+    `reloadSessionConfig` LEFT THIS LIST on 2026-09-01, built rather than declared absent — sender at
+    `session-commands.remote.ts`, receiver on the `cmds` chain in `events.svelte.ts`. It is the fifth
+    and last of the session controls that announced a server act and ran a local one; this list is
+    where its absence had been recorded, and the entry is deleted rather than struck through.
+  */
   'resetAllMediaServers',
   'resetAudioBridge',
   'resetAudioBridgeOnServer',
