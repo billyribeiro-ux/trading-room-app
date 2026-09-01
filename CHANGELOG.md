@@ -45,6 +45,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 21:05 UTC — the Svelte MCP came back, and the first thing through it was the card
+
+**Runtime impact: NONE.** One expression changed form; the rendered output is identical.
+
+## The debt this pays
+
+Every commit this session carried the same honest line: *"The Svelte MCP is unavailable, so
+`svelte-autofixer` has NOT run on the components touched."* It became available, and
+`RecordingPreviewCard.svelte` — the one component written from scratch while it was down — went
+through it first.
+
+**It returned NO issues.** The suggestions it did return were the standing "you assign state inside
+an `$effect`" nudges, which this component already argues at length and proves with a test: `shown`
+cannot be a `$derived`, because after `startRec` shows the card, `closePreview()` hides it while
+`roomState.isRecording` is still true, and any expression over the room's state puts it straight
+back.
+
+## Two suggestions answered from the docs, and both answers written at the code
+
+**`armed && panelDragResize(…)` replaces a `NO_GESTURES = () => {}` sentinel.** `svelte/@attach`
+states it directly: *"Falsy values like `false` or `undefined` are treated as no attachment,
+enabling conditional usage."* The sentinel was a symbol whose only purpose was to stand for nothing
+— the shape this repository's own standard forbids by name. `svelte-autofixer` reports no issue on
+either form; the DOCS are what decided it, which is the order CLAUDE.md requires.
+
+**`bind:this` stays**, against the nudge that an attachment replaces it. The node is needed at EVENT
+time — `expandPreview()` reads `getBoundingClientRect()` and writes `style.left`/`top` when the icon
+is pressed — and an attachment whose whole body assigns the node to a local is `bind:this` with a
+layer on top. The attachment beside it is a real one: it does work when the element mounts.
+
+Both are recorded at the code, because a suggestion answered and not written down is a suggestion
+the next reader re-litigates.
+
+## And a pin that was wrong within the hour, caught by its own test
+
+`mechanical-rename-contract`'s corpus was pinned BY NAME at six files. The next run said seven.
+
+`recording-frames.ts` was created in the same session and was still **untracked** when that list was
+measured — `git ls-files` lists tracked files only, so a brand-new module is invisible to it until
+the commit lands. The pin was correct about a tree one `git add` out of date. It matches on
+`deps.media.recordingReminder`, a legitimate property read that the prose sweep excludes twice over.
+
+Recorded at the assertion rather than quietly corrected: anything measured with `git ls-files`
+mid-session carries that hazard, and this is the cheapest possible demonstration of it.
+
+## The backend, measured and reported rather than worked around
+
+`cargo clippy` cannot run over the whole workspace in this container. `tradingroom-media` depends on
+`mediasoup-sys`, whose build script downloads libsrtp from GitHub, and the agent proxy cuts the
+tunnel mid-transfer — `ws_closed_mid_exchange`, `github.com:443`, twice, confirmed at
+`$HTTPS_PROXY/__agentproxy/status`. That is an environment limit, not a code defect, and TLS
+verification was not disabled to get past it.
+
+`tradingroom-api` reaches the same wall under `--all-targets`, because `tradingroom-media` is one of
+its **dev-dependencies** — deliberately, for a cross-crate contract test whose own comment explains
+it: *"a grant this crate mints must be one `tradingroom-media`'s own verifier accepts. Asserting
+against a copy of the SFU's rules would pass forever while the two drifted apart."* Its `--lib
+--bins` targets do lint here.
+
+Two wrong invocations preceded that finding and are recorded because the correction is reusable: the
+crates are named `tradingroom-api` and `tradingroom-media`, NOT their directory names `api` and
+`media`, so `cargo clippy -p api` fails with "packages outside of workspace". Read from
+`cargo metadata`, not guessed.
+
+---
+
 ### 2026-09-01 20:38 UTC — the fifteenth casualty of a rename, found by reading my own diff
 
 **Runtime impact: YES, one sentence.** A member whose browser blocks the recording preview window was

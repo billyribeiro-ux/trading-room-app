@@ -167,11 +167,21 @@ describe('and no sentence carries it either — the sweep the class rule could n
         readFileSync(file, 'utf8').includes('media.recording')
     );
     /*
-      SIX, measured on 2026-09-01, and named rather than counted: `NavbarRecIndicator.svelte` and
-      `RoomNavbar.svelte` name the field in backticks, `recording.ts` reads it, and the three exempt
+      SEVEN, named rather than counted: `NavbarRecIndicator.svelte` and `RoomNavbar.svelte` name the
+      field in backticks, `recording.ts` and `recording-frames.ts` read it, and the three exempt
       files above quote it. An exact list rather than a floor, for the reason `source-size-contract`
       gives about its own numbers — a floor of five would sit green through four of them vanishing,
       and this whole describe block is `toEqual([])` assertions that an unread corpus satisfies.
+
+      **IT WAS PINNED AT SIX AND WAS WRONG WITHIN THE HOUR, and the reason is worth the line.**
+      `recording-frames.ts` was created in the same session and was still UNTRACKED when this list
+      was measured — `git ls-files` lists tracked files only, so a brand-new module is invisible to
+      it until the commit lands. The pin was correct about a tree one `git add` out of date, and the
+      next run caught it. Anything measured with `git ls-files` mid-session carries that hazard.
+
+      (`recording-frames.ts` matches on `deps.media.recordingReminder`, a legitimate property read.
+      The prose sweep below excludes it twice over — the lookbehind rejects the `.` before `media`,
+      the lookahead rejects the `R` after `recording` — so it is corpus, never an offender.)
     */
     expect([...withComments].sort(), 'the corpus this sweep reads').toEqual([
       'src/lib/components/NavbarRecIndicator.svelte',
@@ -179,6 +189,7 @@ describe('and no sentence carries it either — the sweep the class rule could n
       'src/lib/mechanical-rename-contract.test.ts',
       'src/lib/recording-reminder-contract.test.ts',
       'src/lib/room-surface-audit-batch3-contract.test.ts',
+      'src/lib/room/recording-frames.ts',
       'src/lib/room/recording.ts'
     ]);
   });

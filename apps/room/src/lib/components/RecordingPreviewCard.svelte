@@ -120,6 +120,13 @@
    * does, and `src=""` would re-request the page itself.
    */
   let tick = $state(0);
+  /*
+    `bind:this` and NOT an attachment, against `svelte-autofixer`'s standing nudge that the two are
+    interchangeable. They are not here: the node is needed at EVENT time — `expandPreview()` reads
+    `getBoundingClientRect()` and writes `style.left`/`top` when the icon is pressed — and an
+    attachment whose whole body assigns the node to a local is `bind:this` with a layer on top.
+    The attachment above is a real one: it does work when the element mounts.
+  */
   let holder: HTMLDivElement | undefined = $state();
 
   /** `` `${sessData.recPreviewLocation}?${Date.now()}` `` — the cache-buster is the whole point. */
@@ -176,6 +183,13 @@
     exactly as jQuery UI's `.resizable()` does, so an unarmed card would carry eight nodes the
     reference's never has.
 
+    **`armed && …` rather than a ternary onto a no-op**, which is the official form: *"Falsy values
+    like `false` or `undefined` are treated as no attachment, enabling conditional usage"*
+    (`svelte/@attach`, read 2026-09-01). The first draft carried a `NO_GESTURES = () => {}` sentinel
+    for the unarmed arm — a symbol whose only purpose was to stand for nothing, which is the shape
+    this repository's own rule forbids. `svelte-autofixer` reports no issues on either form; the
+    docs are what decided it.
+
     `containment: "window"` is not passed on: `containerRect` already falls back to the viewport
     when no selector is given, and passing the literal string would be a selector that can never
     match — config nothing reads. `persistKey` is not passed either, and that is the capture's own
@@ -183,9 +197,8 @@
     remember where it was put. `cursor: "move"` is the `.recsHolderScreen` rule's, already in the
     generated sheet.
   */
-  const NO_GESTURES = () => {};
   const gestures = $derived(
-    armed ? panelDragResize({ handles: 'n, e, s, w, ne, se, sw, nw', snap: true }) : NO_GESTURES
+    armed && panelDragResize({ handles: 'n, e, s, w, ne, se, sw, nw', snap: true })
   );
 
   /** `closePreview(){ hide(); globals.recPreviewOpen=!1; clearRecTimer() }` — the timer stops via `shown`. */
