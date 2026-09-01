@@ -101,11 +101,46 @@ export class RoomMedia {
   #roomRecordingName = $state('');
 
   /**
-   * `this.recPreviewOpen = !1` in the capture's globals.
+   * `this.recPreviewOpen = !1` in the capture's globals — and it means THE CARD.
    *
    * Ours defaulted to TRUE, so the menu opened saying "Hide Rec Preview" with nothing shown.
+   *
+   * Read by `RecordingPreviewCard`, written by `showRecPreview`/`hideRecPreview` and by the card's
+   * own close icon. It stood for this room's LOCAL preview window until 2026-09-01, which is a
+   * different thing entirely and now has `localPreviewOpen` of its own; the two would have shared
+   * one menu label between two mechanisms.
    */
   #recPreviewOpen = $state(false);
+  /**
+   * OURS: whether the window onto this browser's own finished recording is open.
+   *
+   * No counterpart in the capture, because the capture has no local recorder — see
+   * `RoomRecording.showLocalRecPreview` for the whole argument and for why the two flags are two.
+   */
+  #localPreviewOpen = $state(false);
+  /**
+   * `sessData.recPreviewLocation` — the URL of the SERVER's recording preview frame, and the term
+   * that decides whether the preview exists at all.
+   *
+   * Declared `""` at byte 977,477, beside `recPreviewOpen`, and written in exactly one place: the
+   * `setRecPreview` command (byte 1,023,704), which is the server telling this browser where its
+   * own recording is being written as a still frame. Nothing else in the bundle assigns it.
+   *
+   * It reads as three gates upstream, and all three are transcribed here rather than folded away:
+   *
+   *   * `app-rec-preview`'s own arming test — `!videoOnlyMode && isPresenter && recPreviewLocation
+   *     && preferences.recPreviewWindow` — so a room whose server never sent the command never
+   *     wires the card's timer or its drag;
+   *   * the recording menu's Show/Hide pair, `O(9, roomState.isRecording &&
+   *     sessData.recPreviewLocation ? 9 : -1)` (byte 2,476,180), so the two entries do not render;
+   *   * the 1s timer's own `src`, `${recPreviewLocation}?${Date.now()}`.
+   *
+   * **This room's server does not send `setRecPreview`, so this stays empty and the card stays
+   * dark — which is precisely what the reference does in a room whose server has not sent it.**
+   * That is a matched behaviour, not a missing one, and it is why the card below is transcribed
+   * whole rather than left inert: the gate is the reference's, and it is doing its job.
+   */
+  #recPreviewLocation = $state('');
   #recordedUrl = $state('');
   /** Whether the last recording actually captured the microphone, so the interface can say so. */
   #recordedHasAudio = $state(false);
@@ -268,6 +303,22 @@ export class RoomMedia {
 
   set recPreviewOpen(open: boolean) {
     this.#recPreviewOpen = open;
+  }
+
+  get localPreviewOpen(): boolean {
+    return this.#localPreviewOpen;
+  }
+
+  set localPreviewOpen(open: boolean) {
+    this.#localPreviewOpen = open;
+  }
+
+  get recPreviewLocation(): string {
+    return this.#recPreviewLocation;
+  }
+
+  set recPreviewLocation(url: string) {
+    this.#recPreviewLocation = url;
   }
 
   get recordedUrl(): string {

@@ -133,6 +133,8 @@ const render = (over: Record<string, unknown> = {}) => {
       onrequestreload: count('requestreload'),
       onshowrecpreview: count('showrecpreview'),
       onhiderecpreview: count('hiderecpreview'),
+      onshowlocalrecpreview: count('showlocalrecpreview'),
+      onhidelocalrecpreview: count('hidelocalrecpreview'),
       /*
         The seven that arrived with G04-G07 and G12/G13. Defaults chosen so the BASE render is the
         plainest room there is — no MediaMTX tab, no local screens, the count visible, the sidebar

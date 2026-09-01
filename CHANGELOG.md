@@ -45,6 +45,314 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 20:38 UTC — the fifteenth casualty of a rename, found by reading my own diff
+
+**Runtime impact: YES, one sentence.** A member whose browser blocks the recording preview window was
+told to *"open the downloaded **media.recording** from your Downloads folder"*.
+
+## Where it came from, and why nothing caught it
+
+`mechanical-rename-contract.test.ts` was written for this: a substitution of `recording` ->
+`media.recording` applied before Phase 5 slice 20, correct for the FIELD and wrong everywhere else it
+landed. It found four user-visible casualties — two sentences, a class name and a download filename —
+and pinned each by name.
+
+Its own header explains the gap it left:
+
+> it deliberately does not try to police STRING content in general: "which sentences are
+> user-visible" is not decidable here, and a guard that guesses would either miss the next one or
+> cry wolf.
+
+The caution was right about GUESSING and it left a real defect on screen for months. Found in the
+senior-reviewer pass over this session's own diff, in a method I was already editing.
+
+Ten more sat in comments — *"every media.recording was a silent movie"*, *"a room that is still
+media.recording"*, *"Server-side media.recording needs the media.recording/transcoding workers"* —
+which are not runtime defects but are corrupted prose in a repository whose standard rests on its
+comments being readable. Fourteen repairs in nine files, each applied by name rather than by a
+blanket regex.
+
+## The rule that IS decidable, and is now a gate
+
+The header's caution was about deciding which strings a user reads. This decides nothing of the sort:
+**`media.recording` is only ever correct as a property read.** In an English sentence it is always
+the artefact, and the two are told apart mechanically — a read is preceded by a code character; the
+field NAMED in prose is written in backticks, which is the house style; anything else is the rename.
+
+Zero false positives on the corpus as it stands, which is the bar the class-attribute rule above was
+held to. Three files keep the string and are named rather than pattern-matched: this contract quotes
+the defect to describe it, and two others pin the reminder's real expression as a fixture.
+
+The corpus itself is pinned BY NAME, not by a floor. Every assertion in the block is `toEqual([])`,
+which an unread corpus satisfies while proving nothing — the trap this file's own class sweep already
+guards against with a count, and a floor of five would sit green through four files vanishing.
+
+## Verification
+
+- Four negative controls, four seen RED: the popup sentence restored, a comment restored, a component
+  comment restored, and one that shrinks the sweep's own corpus.
+- The popup sentence is also pinned by name beside the other four casualties. It is NOT asserted
+  against the capture, and that is stated at the test: this room's local-recording window has no
+  upstream counterpart, so the sentence is ours and there is no captured value to check it against.
+  What is asserted is the absence of the substitution, which is the whole of what went wrong.
+- Two more comments lost a quoted Svelte block in the same pass — CLAUDE.md forbids template syntax
+  inside a comment, and `RoomNavbar.svelte` and `recording.ts` each had one. Named branches now.
+
+---
+
+### 2026-09-01 20:14 UTC — `softResetDone` had four subscribers and this room knew about one
+
+**Runtime impact: YES.** A soft reset now clears the recording flag and the reminder banner, and cuts
+the PRESENTER's own microphone and camera — the last of which was a recorded divergence until today.
+
+## What the re-read found
+
+The receiver's entry described one subscriber. Reading every occurrence of `softResetDone` in the
+bundle found **four**, plus a fifth act in the command case itself, and this room had no test for any
+of it.
+
+| site | byte | what it does | here |
+| --- | --- | --- | --- |
+| the `cmds` case | 1,023,810 | emits, then after `3e3 * Math.random()` sends `getMyRepeater` | `restart()` after the same jitter — the one equivalence, since this room has no repeater negotiation |
+| MediaHandler | 1,115,967 | clears `isRecording`; **`isPresenter && (disableMic(), stopCam())`**; drops every webcam; `disconnectAll()` | built, all of it |
+| app-room | 2,501,883 | `isRecording = !1`, `recordingReminder = !1` | built |
+| MtxHandlerService | 1,137,494 | clears `mtxStreams`, refetches after 1s | **measured: nothing to do** |
+| app-screenshare-preview | 2,186,951 | `$("#screenshareLocalPreviewHolder").hide()` | **measured: a no-op here** |
+
+The command case also carries an upstream oddity kept as a citation rather than reproduced:
+`for (let r of this.screenSharingUsers);` — an empty loop body.
+
+## The divergence that is now built
+
+The entry read: *"NOT reproduced: upstream also cuts the PRESENTER'S own mic and camera. That is a
+presenter silencing themselves by pressing a button labelled reset the media state of the room."*
+
+The reasoning was sound and the owner's instruction to match the dump overturns a reasoned
+preference. It is also less surprising than the note assumed — `restart()` rebuilds the session, and
+a producer whose track went with it would come back muted anyway.
+
+Both calls are guarded on not-already-off, exactly as the `mutemic`/`mutecam` receivers are, and the
+guard is load-bearing rather than defensive: `toggleMicrophone` is a TOGGLE and `disableMic()` is
+not, so an unguarded call would switch an already-muted presenter's microphone ON during a reset.
+There is a test for that case.
+
+## The two subscribers with nothing to do, measured rather than assumed
+
+`MtxHandlerService` clears the stream list and refetches after one second. **This room has no
+client-side sender for `getSessionMTXMediaState`** — the list is maintained by a server-side
+reconciler (`#lib/mtx-reconcile.ts`), itself a stated divergence taken because our delivery path is
+weaker than a SocketCluster socket. Clearing without refetching is half the reference's act and the
+worse half: the room would read "No one is streaming right now..." until the next reconcile tick,
+where upstream is dark for one second. Doing nothing is closer.
+
+`app-screenshare-preview` hides `#screenshareLocalPreviewHolder`. That holder is static markup in
+`ModalHost.svelte`, and `app-screenshare-preview .webcamsHolderScreen` carries `display: none` in the
+generated sheet with no writer in this room, so `.hide()` on it is exactly a no-op.
+
+## The extraction, which the ratchet asked for and not for the first time
+
+Three transcribed receivers took `events.svelte.ts` from 1,069 lines to 1,225, and that entry's rule
+is extract rather than raise. `setRecPreview`, `stopRecMsg` and `softResetDone` are now
+`lib/room/recording-frames.ts`, following the seam `for-all-broadcasts.ts` records: a group of `cmds`
+branches lifts out cleanly when they SHARE their collaborators, and these three share `RoomMedia`.
+`SOFT_RESET_JITTER_MS` went with its only reader.
+
+**The router ends the day at 1,057 — below the 1,069 it started at.** That is what "ceilings only go
+down" is supposed to look like when a file grows for a good reason.
+
+## Verification
+
+- `events.svelte.test.ts` +5 cases for `softResetDone`, which had **none at all**: the drop-then-wait
+  ordering under fake timers, the recording flag and the reminder, the presenter's mic and camera,
+  the member who keeps theirs, and the already-muted presenter who is not toggled back on.
+- **Twelve negative controls re-run against the extracted module after the move, twelve seen RED** —
+  including one that disables the router's call entirely, which turns eight cases red and is the
+  check that the extraction is actually wired.
+- Three gate failures fixed, each a tracker the build made stale: `feature-coverage-contract`'s
+  absent-command list, `missing-command-census-contract` (BLOCKED rows 4 -> 3, with the category
+  error written into the docblock that lists them), and `reference-citation-contract`, which caught
+  **two citations of mine off by hundreds of bytes** — `KPe` at 2,474,900 is really 2,475,295, and the
+  `O(9, …)` gate is at 2,476,206 inside `YPe` at 2,475,469. Re-measured with `grep -bo`, not adjusted.
+- `docs/decoded/missing-commands-triage.md` restates its own totals (15 built, 3 blocked) and
+  `NEW-TODO.md`'s copy of that tally with it.
+- `svelte-check`: 1,630 files, 0 errors. Svelte MCP still unavailable; no `.svelte` file changed here.
+  Nothing was opened in a browser.
+
+---
+
+### 2026-09-01 19:52 UTC — `stopRecMsg`, and the sentence that was holding two rows
+
+**Runtime impact: YES.** When a room's server sends `stopRecMsg`, every browser in it now raises the
+toast the reference raises — an error one when the server's wording contains "Stopped", an info one
+otherwise — and a browser notification carrying the same text. This room's server sends no such
+frame, so nothing here changes today.
+
+## One category error, two rows
+
+`TODO.md` row AC was twice re-audited and every measurement in it is exact. Confirmed again by
+reading the bundle rather than the row: three occurrences of `stopRecMsg`, the emitter 35 bytes after
+its own `case` label at 1,014,265, the subscriber at 2,505,283 — an offset the row had itself
+corrected on 2026-08-30 after being wrong by 3,329 bytes.
+
+What the row got wrong is the inference, and it is the same one row X was held by:
+
+> a row that reasons from "our server does not send this frame" to "this cannot be built" has
+> confused a PAYLOAD with a RECEIVER.
+
+The payload really is server-generated prose this repository cannot invent, and it is still not
+invented. The receiver is transcribable regardless, and a receiver nothing triggers is exactly what
+the reference has in a room whose server is quiet.
+
+## Transcribed exactly
+
+```js
+guiEventBus.subscribe("stopRecMsg", i => {
+  -1 != i.data.indexOf("Stopped") ? this.alertsService.error(i.data) : this.alertsService.info(i.data),
+  new Notification(i.data, { body: i.data })
+})
+```
+
+The severity test is kept as it stands: case-sensitive, a substring, on a capital S. Narrowing it to
+a status code or a regular expression would be this room deciding which of the server's sentences
+count as errors.
+
+## Two things done differently, both stated at the code
+
+The toast goes through `RoomToasts`, which sets `enableHtml: false`. ngx-toastr's default is the
+same, so this is a MATCH — but one this room has to make deliberately, because `data` is text off a
+socket frame and a toast rendering it as HTML would be a stored-XSS primitive.
+
+The notification goes through `RoomToasts.notify`, which tests `'Notification' in window` and asks
+permission first. Upstream's raw `new Notification(...)` shows nothing on a browser that has never
+been asked, and throws `Illegal constructor` on several mobile browsers — inside a socket handler,
+where the throw takes the rest of the frame with it. What a permitted browser shows is identical.
+
+`data` is narrowed with `typeof` rather than asserted, for the reason `CmdsFrame` states at the top
+of its own file. Upstream calls `.indexOf` on the payload and throws when there is none.
+
+## A negative control found a hole nothing else could see
+
+`notify` learned to carry NO icon — upstream's `new Notification(i.data, {body: i.data})` sets none,
+and building `avatar/?d=mm&s=50` from an empty hash would put a mystery-man silhouette on a message
+about a recording. Making it build that gravatar again left **every** test in this repository green,
+because every caller-side test records what it PASSES to `notify` and none could see what `notify`
+then constructs.
+
+`toasts.svelte.test.ts` now installs a `Notification` stub and reads the constructor's arguments.
+That also closed an older hole in the same method: `#decodeHtmlEntities` had no test at all, and
+deleting it was green too. It is there because a mention's body arrives HTML-escaped and an OS
+notification is plain text; the decode is through a detached `<textarea>`, whose contents are RCDATA,
+so it cannot execute what it decodes.
+
+## Verification
+
+- `events.svelte.test.ts` +6 cases, driving real frames through the real dispatcher: the severity
+  switch both ways on the capital S, the `enableHtml: false` flag, the notification's arguments, and
+  three malformed payloads that must raise nothing.
+- `toasts.svelte.test.ts` +4 cases on the constructor's arguments.
+- **Twelve negative controls run, twelve seen RED**, including the four that were written only
+  because the first pass of them came back green.
+- Two docs corrected where they named these rows as blocked on a media plane:
+  `MEDIA-PLANE-MEASURED.md`'s restatement table and `OBS-XSPLIT-INGEST.md` §7, which claimed four
+  rows *"become reachable the moment MediaMTX exists, and none of them can be reached before"*. Two
+  of the four were receivers and were never blocked.
+- Two ceilings raised, each argued at its entry.
+- The Svelte MCP is unavailable in this session; no `.svelte` file changed in this entry, so
+  `svelte-autofixer` had nothing to run on. Nothing was opened in a browser.
+
+---
+
+### 2026-09-01 19:30 UTC — `app-rec-preview` was never blocked; the blocker was a command nobody had transcribed
+
+**Runtime impact: YES.** A presenter in a room whose server sends `setRecPreview` now gets the
+reference's recording preview card: it shows on `startRec`, refreshes its frame once a second,
+drags, resizes, expands and closes. In THIS room, whose server sends no such command, nothing on
+screen changes — which is the point, and is argued below.
+
+## The row this closes said "building it would ship a component that cannot run"
+
+`TODO.md` row X, on the books since the settings enumeration, and quoting the very line that
+disproves it:
+
+> The image src is `${sessData.recPreviewLocation}?${Date.now()}` polled every 1000 ms, and
+> `recPreviewLocation` is set by the SERVER on the command channel — `case "setRecPreview":
+> globals.sessData.recPreviewLocation = i.url` (bundle byte 1023704) … Building it would ship a
+> component that cannot run.
+
+Re-measured, and the premise is about the wrong thing. `recPreviewLocation` is not a value this
+repository lacks. It is a value the SERVER SENDS, by one command that had never been transcribed —
+and a command is transcribable. The row treated "our server does not send it" as "we cannot build
+it", and those are different sentences.
+
+What follows from transcribing the command: the whole component is transcribable, and the fact that
+this room's server never sends `setRecPreview` is not a gap. It makes the capture's OWN arming test
+fail — `!videoOnlyMode && isPresenter && recPreviewLocation && preferences.recPreviewWindow` — so the
+card stays dark, which is exactly what a reference room does in the same state. Matching the dump
+means transcribing the gate, not inventing a value to get past it.
+
+## What was built
+
+| piece | reference |
+| --- | --- |
+| `setRecPreview` receiver | byte 1,023,704, the only writer of `recPreviewLocation` in the bundle |
+| `RoomMedia.recPreviewLocation` | `sessData.recPreviewLocation`, declared `""` at byte 977,477 |
+| the card's arming test, six subscriptions, 1s timer, drag and both icons | `app-rec-preview`, byte 2,353,188 |
+| the recording menu's Show/Hide pair with its own divider | `KPe`, byte 2,474,900 |
+| `showRecPreview` / `hideRecPreview` | the capture's three lines each, `isRecording` refusal included |
+
+The card mounted in `ModalHost.svelte` and moved to `RoomOverlays.svelte`, which is the layer for
+things that float over the room and already holds `media`, `prefs` and `isPresenter` — the exact
+terms the gate reads. `ModalHost`'s ceiling went DOWN by the move.
+
+## Two divergences, both stated at the code
+
+**`shown` is `$state` driven by two effects, not a `$derived`,** against CLAUDE.md's usual rule, and
+the capture is what forces it: after `startRec` shows the card, `closePreview()` hides it while
+`roomState.isRecording` is still true, so any expression over the room's state puts it straight back.
+There is a test for exactly that case. `untrack` around each assignment is load-bearing for a second
+reason recorded at it.
+
+**`armed` is `$derived` where Angular reads its terms once, in `ngOnInit`.** Upstream a
+`setRecPreview` arriving one tick after construction leaves the card unwired for the whole session —
+a race, not a design. This diverges by being right and cannot reach a state the reference cannot.
+
+## And one thing kept that upstream does not have
+
+This room records locally, in the presenter's own browser, and had a window onto that recording
+wired to `showRecPreview` — the method the capture uses for its card. The two were one control
+sharing one flag. They are now two: `showLocalRecPreview` / `hideLocalRecPreview` on
+`media.localPreviewOpen`, labelled "Show Local Recording", gated on `recordedUrl`; the capture's pair
+on `media.recPreviewOpen`, gated on `roomRecording && recPreviewLocation`. They cannot both be
+showing — one needs a recording in progress on the server, the other a finished one in this browser.
+
+A third method exists and the split is the reason: `closeRecPreviewWindow()` is the preference's
+UNGUARDED close. `recPreviewWindowOnChange` (byte 2,250,601) emits straight to `closePreview()` with
+no `isRecording` test, so routing the preference through the guarded menu method would strand a card
+on screen exactly when the room's recording had already stopped.
+
+## Verification
+
+- `rec-preview-contract.test.ts` REWRITTEN: it MOUNTS the card and drives it — 26 cases covering the
+  three arming terms through both doors, all four subscriptions, the timer's start/pause/resume/stop,
+  the expand clamp, and the wire at both ends. The file it replaces asserted a conditional over source
+  text; SSR cannot see any of this, because the component is four effects and two handlers.
+- **Sixteen negative controls run, sixteen seen RED — and the first pass found a real hole.**
+  Deleting `armed` from the `recPreviewOpen` effect left all 23 cases GREEN, because every arming
+  test drove `startRec` and none drove `showRecPreview`. Three cases added; the control is red now.
+- `reference-const-coverage-contract`: `app-rec-preview` leaves the residual table by being BUILT.
+  41 components fully covered (was 40), 108 values uncovered (was 110), `stripped - raw` 21 -> 19.
+- `img-dimensions-contract`: the frame catalogued in `UNSIZEABLE`, with why `SIZED_BY_CSS` cannot
+  take it — that catalog verifies a `height` declaration and the captured rule states `max-height`.
+- `slice-anchor-contract` went red on a new inlined `indexOf` and was PAID rather than raised.
+- Nine size ceilings moved, each argued at its entry; two of them DOWN.
+- `svelte-check`: 1,629 files, 0 errors.
+- **The Svelte MCP is unavailable in this session, so `svelte-autofixer` has NOT run on
+  `RecordingPreviewCard.svelte`, `RoomNavbar.svelte`, `RoomOverlays.svelte` or `ModalHost.svelte`.**
+  Reported rather than claimed, as every commit this session has.
+- Nothing was opened in a browser. jsdom is not a renderer: the expand clamp's two thresholds are
+  driven against a stated rect because jsdom gives every element a zero one, and that is said at the
+  test.
+
 ### 2026-09-01 18:49 UTC — all three trackers are down to the owner, an environment, or hardware
 
 **Runtime impact: NONE.** This entry records a position, and every claim in it was re-measured today

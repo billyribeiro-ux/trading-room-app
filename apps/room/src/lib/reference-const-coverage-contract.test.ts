@@ -691,7 +691,7 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     '#discord-settings',
     'presenterStyle.color',
     'presenterStyle.bgColor'
-  ],
+  ]
   /*
     `ACA-06` in `ChatSearchBar.svelte`: the chat toolbar's save control is `K_e` at byte 1,421,929 and
     is not built, while the ALERTS column's twin is (`AlertChatArea.svelte`, "Save alerts messages").
@@ -699,29 +699,34 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     effect is its own presence.
   */
   /*
-    The id and class of the `<img>` inside the reference's IN-PAGE preview card. This room's preview
-    is a separate WINDOW, argued in `room/recording.ts`: upstream points its card at a server-supplied
-    `recPreviewLocation`, there is no such URL here, and the window shows the local recording instead.
+    `app-rec-preview` used to sit here with `['recScreenLocalPreview', 'recPreviewScreen']` and is
+    FULLY COVERED since 2026-09-01.
 
-    ## The clause that used to end this paragraph was false about our own code
+    Those are the id and class of the `<img>` in the reference's in-page preview card, and this entry
+    read: *"This room's preview is a separate WINDOW... upstream points its card at a server-supplied
+    `recPreviewLocation`, there is no such URL here."* Both halves were true and the conclusion drawn
+    from them was not.
 
-    It read *"No card, so no element to carry either name."* There IS a card — `ModalHost.svelte`
-    renders `app-rec-preview` whole — and the two names are absent from INSIDE it, which is a
-    different and smaller claim. Corrected 2026-09-01 rather than made true by deleting the card:
-    removing it turned `captured-css-ancestor-contract` red, because `app-rec-preview` is a scoped
-    host in the generated stylesheet and an absent host leaves its rules matching nothing.
+    `recPreviewLocation` is not a value this repository lacks. It is a value the SERVER sends, by one
+    command — `case "setRecPreview": globals.sessData.recPreviewLocation = i.url`, byte 1,023,704, the
+    only writer of the field in the whole bundle — which had simply never been transcribed. With that
+    receiver in `events.svelte.ts` the card is transcribable end to end, and both names are now on the
+    element the reference puts them on, inside the recording arm of `O(10, isRecording &&
+    !isRecordingPaused ? 10 : 11)`.
 
-    The card is unreachable — `.recsHolderScreen` is `display: none`, the reference's own rule, with
-    no writer in this room — and `rec-preview-contract.test.ts` now fails if it ever becomes
-    reachable while its two icons still have no handlers.
+    The card still shows nothing in THIS room, because this room's server sends no `setRecPreview`,
+    so the capture's own arming test fails and the card stays dark. That is the reference's behaviour
+    in a room whose server has not sent it — a matched state, not a gap — and it is the distinction
+    the old entry missed. `rec-preview-contract.test.ts` mounts the component and drives every one of
+    the four subscriptions.
 
-    Found by `gate/audit-surface.mjs`, which reports THREE gaps here rather than these two —
-    `fa-compress-arrows-alt` as well, the icon the expand control swaps to under
-    `O(8, expandRecPreview ? 8 : 9)`. It is absent from this list because the sweep searches the whole
-    application and the icon is used elsewhere; scoped to this surface it was missing, which is the
-    difference between the two measurements and the reason both exist.
+    (`fa-compress-arrows-alt` is covered by the same change: `gate/audit-surface.mjs` reported it as a
+    third gap here, scoped to this surface, and the expand icon now swaps to it under
+    `O(8, expandRecPreview ? 8 : 9)`.)
+
+    Left as a comment with no entry beneath it, for the reason `app-screenshare-view` below gives: a
+    closed gap whose argument is deleted is a gap that gets reopened by the next reader.
   */
-  'app-rec-preview': ['recScreenLocalPreview', 'recPreviewScreen']
   /*
     `fullScreen()` is the value of `data-ng-dblclick` — an ANGULARJS 1 attribute left in an Angular 17
     template. No runtime in the reference reads it and the browser does not either, because the
@@ -778,22 +783,29 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: forty components fully covered, one hundred and ten values not', () => {
+  it('holds the ratchet: forty-one components fully covered, one hundred and eight values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
       edits the table without knowing which way they moved it.
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
-    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(40);
     /*
-      115 -> 111 -> 110 on 2026-09-01. The four were `app-session-login`'s loading view — consts 1
+      40 -> 41, 2026-09-01. `app-rec-preview` joined by being BUILT: `setRecPreview` transcribed in
+      `events.svelte.ts`, and the card with it, so `recScreenLocalPreview` and `recPreviewScreen` are
+      on the element the reference puts them on. See the closed-gap note above the `RESIDUALS` table.
+    */
+    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(41);
+    /*
+      115 -> 111 -> 110 -> 108 on 2026-09-01. The last two are `app-rec-preview`'s pair, and they left
+      the way the ratchet is meant to be paid: the recorded blocker was re-measured and turned out to
+      be about the wrong thing — not a value we lack, but a command we had never transcribed. The four were `app-session-login`'s loading view — consts 1
       and 3 of the root swap, built. The one after them is `app-note`'s `modal-basic-title`, which
       left by being BUILT rather than re-argued: `GIF-07` gave that mount the modal chrome its
       capture opens it in, and the id came with it. `app-note` becomes the fortieth fully covered
       component. The ratchet only goes down.
     */
-    expect(residuals).toBe(110);
+    expect(residuals).toBe(108);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -1008,8 +1020,8 @@ describe('how much of the gap has already been written about', () => {
     measured against stripped source. The two siblings (`#navbarsExampleDefault` and the bare id) did
     NOT move, because the reason they already carried named them literally.
   */
-  it('splits the 110 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(110);
+  it('splits the 108 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(108);
     /*
       34 -> 38 -> 37, 2026-09-01, and the two steps are the two different events this note keeps
       separating.
@@ -1031,7 +1043,12 @@ describe('how much of the gap has already been written about', () => {
       split working; none of the six left `all`, because only rendering does that, and the
       unexamined side fell by exactly six.
     */
-    expect(all.filter(mentioned)).toHaveLength(43);
+    /*
+      43 -> 41, 2026-09-01: `app-rec-preview`'s pair left `all` entirely by being BUILT, and they were
+      on the EXAMINED side, so the whole move lands here. The unexamined count below is unchanged,
+      which is the check that this was a build and not a re-argument.
+    */
+    expect(all.filter(mentioned)).toHaveLength(41);
     /*
       85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
       means work: the four were `app-session-login`'s loading view and they left `all` by being
@@ -1172,7 +1189,11 @@ describe('the comment stripping is load-bearing', () => {
       The drop back to 21 is the opposite event and is equally healthy: `modal-basic-title` was one
       of the values only the stripped read called a gap, and `GIF-07` BUILT it, so it is now absent
       from both reads rather than from one.
+
+      21 -> 19 the same day, by the same healthy mechanism twice over: `recScreenLocalPreview` and
+      `recPreviewScreen` were both quoted in docblocks AND absent from markup, so only the stripped
+      read called them gaps; the card was BUILT, and they are now absent from both reads.
     */
-    expect(stripped - raw).toBe(21);
+    expect(stripped - raw).toBe(19);
   });
 });

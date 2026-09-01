@@ -6,7 +6,6 @@
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
   import { downscaledSize } from '#lib/profile-picture-downscale.js';
   import { shortWhen } from '#lib/short-when.js';
-  import RecordingPreviewCard from './RecordingPreviewCard.svelte';
   import CloseSessionPane from './CloseSessionPane.svelte';
   import ReplyModal from './ReplyModal.svelte';
   import SessionHistoryPane from './SessionHistoryPane.svelte';
@@ -5290,7 +5289,6 @@
     <div class="ui-resizable-handle ui-resizable-nw" style="z-index: 90;"></div>
   </div>
 </app-screenshare-preview>
-<RecordingPreviewCard />
 <app-followed-users-modal>
   <Modal
     id="followedUsersModal"

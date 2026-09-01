@@ -771,7 +771,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       mounting a page or a network, and one of those controls found a case of mine that passed for
       the wrong reason.
     */
-    max: 1889,
+    /*
+      1,889 -> 1,891, 2026-09-01. Two lines: `onshowlocalrecpreview` and `onhidelocalrecpreview`,
+      the renamed local-recording window handlers, beside the capture's pair which keeps the
+      unqualified name.
+    */
+    max: 1891,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   /*
@@ -1081,7 +1086,36 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the two subscribers at 1,117,020. There is nothing to extract — a router gaining a route is the
       router doing its job, and the alternative is a module holding one boolean assignment.
     */
-    max: 1069,
+    /*
+      1,069 -> 1,099, 2026-09-01. The `setRecPreview` receiver — byte 1,023,704, the ONLY writer of
+      `recPreviewLocation` in the whole bundle, and the command that arms `app-rec-preview`.
+
+      Four lines of handler and twenty-six of citation, and the citation is where the work is: what
+      the value arms, why `typeof` rather than a cast, why the value is safe to put in an `<img
+      src>` and nowhere else, and why upstream's `console.log` is deliberately not transcribed.
+    */
+    /*
+      1,099 -> 1,162 the same day, for the SECOND receiver a tracker had held as unbuildable.
+
+      `stopRecMsg` — byte 1,014,265, subscriber at 2,505,283 — is `TODO.md` row AC, and it was held
+      by the identical category error as row X above: the row reasoned from "our server sends no such
+      frame" to "this cannot be built". Its measurements were exact and were confirmed again by
+      reading the bundle; only the inference was wrong.
+
+      Eight lines of handler and fifty-five of citation. The citation is what stops the next reader
+      re-deriving the row's conclusion: what the reference does with the payload, why the
+      case-sensitive `indexOf("Stopped")` is kept exactly as a substring test, and why the two things
+      done differently — a toast through `RoomToasts` and a notification through its permission-aware
+      `notify` — are a match and a fix rather than an invention.
+    */
+    /*
+      1,162 -> 1,057, and the direction is the whole point. The two raises above were real work —
+      `setRecPreview`, `stopRecMsg` and `softResetDone`, three receivers and their citations — and
+      this entry's own rule is extract rather than raise, so on 2026-09-01 all three left for
+      `recording-frames.ts`. The router is now BELOW where it started the day (1,069), which is what
+      "ceilings only go down" is supposed to look like when a file grows for a good reason.
+    */
+    max: 1057,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1360,7 +1394,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       something already open does nothing at all on the next session, which is the defect being
       fixed rather than a shape to reproduce.
     */
-    max: 423,
+    /*
+      423 -> 472, 2026-09-01. `showRecPreview`/`hideRecPreview` are the CAPTURE'S now — three lines
+      each — and the local-recording window they used to be is `showLocalRecPreview` /
+      `hideLocalRecPreview` beside them, with `closeRecPreviewWindow` as the unguarded close the
+      preference-off path needs.
+
+      The growth is the separation and its argument. One method was doing two unrelated jobs: the
+      reference's menu entry, which drives a card fed by the server's `recPreviewLocation`, and this
+      room's window onto a blob its own `MediaRecorder` produced. They have different gates,
+      different flags and different lifetimes, and the entry that recorded them as one is what let
+      the card stay inert for as long as it did.
+    */
+    max: 472,
     why: 'MediaRecorder, the preview window, the room-wide broadcast, the two speech calls and auto-record'
   },
   {
@@ -2107,7 +2153,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1,184 -> 1,185, 2026-09-01. Two attributes forwarding the radio prompt's `options` and
       `message`, minus the `message=""` they replace.
     */
-    max: 1185,
+    /*
+      1,185 -> 1,199, 2026-09-01. `RecordingPreviewCard` mounted here, out of `ModalHost`, whose
+      ceiling drops by the same move.
+
+      Fourteen lines: an import, a three-prop call site, and ten of comment saying why the card is
+      not a modal and why this is the layer that can feed it — `media`, `prefs` and `isPresenter`
+      are already props here and are exactly the terms the capture's arming test reads.
+    */
+    max: 1199,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -3846,7 +3900,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       AND on unmount — strictly more than the line covered — so it was deleted rather than forwarded.
       A second teardown for state this file no longer holds is a call that can only ever be wrong.
     */
-    max: 6069,
+    /*
+      6,069 -> 6,066, 2026-09-01, and DOWN — which is the direction this file's entry has moved
+      every time. `RecordingPreviewCard` left for `RoomOverlays`: it is not a modal, and this host
+      has neither `media` nor `prefs`, so it could not have fed the card the state its gate reads.
+    */
+    max: 6066,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -4182,7 +4241,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       is the fact that retired this room's refusal to build the branch. It belongs beside
       `talkingUsers` because the whole point of the measurement is that the two are different signals.
     */
-    max: 413,
+    /*
+      413 -> 464, 2026-09-01. Two fields: `recPreviewLocation`, the server's preview frame URL
+      (`sessData`, byte 977,477), and `localPreviewOpen`, ours.
+
+      Forty of the fifty-one lines are the citation on `recPreviewLocation`, and it earns them: the
+      field reads as three separate gates in the capture — the card's arming test, the recording
+      menu's Show/Hide pair, and the 1s timer's own `src` — and the reason this room's copy stays
+      empty is the reason the card stays dark, which is a matched behaviour rather than a missing
+      one. `recPreviewOpen`'s own note is rewritten in the same pass to say which preview it means,
+      because it meant the other one until today.
+    */
+    max: 464,
     why: 'every media flag the interface renders from; STATE, never transport'
   },
   {
@@ -4483,7 +4553,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   */
   {
     file: 'lib/room/toasts.svelte.ts',
-    max: 184,
+    /*
+      184 -> 196, 2026-09-01. `notify` learned to carry NO icon.
+
+      Twelve lines, eleven of them the reason. Both original callers name a person, so a gravatar
+      fallback is right for them; `stopRecMsg` has no sender, and upstream's `new Notification(i.data,
+      {body: i.data})` sets no icon at all — building `avatar/?d=mm&s=50` from an empty hash would put
+      a mystery-man silhouette on a message about a recording.
+
+      A NEGATIVE CONTROL is what made this a real case rather than a defensive one: nothing in this
+      repository could see what `notify` constructs, because every caller-side test records only what
+      it PASSES IN. `toasts.svelte.test.ts` now installs a `Notification` stub and reads the
+      constructor's arguments, which also closed an older hole — `#decodeHtmlEntities` had no test.
+    */
+    max: 196,
     why: 'the toast queue, its timers, the duplicate guard and the browser notification'
   },
   {
@@ -4653,7 +4736,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       objects' offsets because all three default ON, and an unset preference silencing a
       notification is the polarity that would be wrong in the expensive direction.
     */
-    max: 759,
+    /*
+      759 -> 764, 2026-09-01. `recPreviewWindow`'s docblock said it was read in TWO places and it is
+      now read in THREE — the card's own arming test is the reference's read and had never existed
+      here, because the card had no behaviour to arm. The count is what makes this a preference
+      rather than a stored click, so it is stated rather than left to be recounted; the five lines
+      are the third bullet and the split of the other two.
+    */
+    max: 764,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -5694,6 +5784,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'saves the close message, then closes only if the save succeeded'
   },
   {
+    file: 'lib/room/recording-frames.ts',
+    /*
+      NEW 2026-09-01, and capped at what it landed at.
+
+      The three `cmds` frames about what is being RECORDED and what happens when the media plane is
+      reset: `setRecPreview` (byte 1,023,704), `stopRecMsg` (1,014,265, subscriber 2,505,283) and
+      `softResetDone` (1,023,810, four subscribers). Twenty-five lines of receiver and the rest
+      citation, which is the ratio this repository asks for and the reason they are not in the
+      router: transcribing all three took `events.svelte.ts` from 1,069 to 1,225, and that entry's
+      rule is extract rather than raise.
+
+      The seam is `for-all-broadcasts.ts`'s and is real rather than cut to fit: these three SHARE
+      `RoomMedia`, and two of them share `RoomMediaTransport`. The rest of that chain routes
+      somewhere different per branch, which is why the chain is a chain.
+
+      If this climbs, the question is whether a FOURTH recording frame arrived — `startRec`/`stopRec`
+      are a table in `recording-commands.ts` and belong there — or whether one of these three grew a
+      collaborator, which would mean the shared-`RoomMedia` seam had stopped being the reason.
+    */
+    max: 254,
+    why: 'the recording and media-reset frames - setRecPreview, stopRecMsg, softResetDone'
+  },
+  {
     file: 'lib/room/for-all-broadcasts.ts',
     /*
       THE EIGHT "FOR ALL" RECEIVERS, extracted 2026-08-27 and capped in the same commit.
@@ -5818,7 +5931,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       server rather than relayed from a client, and a note's tab name is already drawn for anyone
       who can see the pane. The body is deliberately not sent.
     */
-    max: 77,
+    /*
+      77 -> 84, 2026-09-01. `url` grew a docblock: `setRecPreview` reads `i.url` from the same
+      switch as `playMP3ForAll`, so one key on this frame now has two consumers and the type says
+      so. No new field — inventing `recPreviewUrl` would have been a second declaration of a key the
+      reference sends once.
+    */
+    max: 84,
     why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
   },
   {
@@ -7660,7 +7779,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the third seam this bar has produced, after `NavbarRecIndicator` and `NavbarSoundCloud`, and the
       third time the refusal produced the better arrangement rather than a smaller comment.
     */
-    max: 1094,
+    /*
+      1,094 -> 1,132, 2026-09-01. The recording dropdown now carries the capture's OWN preview pair
+      (`KPe`, byte 2,475,295) beside this room's local-recording one.
+
+      Forty lines: the transcribed block with its divider and its two-term gate, the decoded const
+      citation that argues every class on it, and the note on why the two blocks are two and can
+      never both be showing — the capture's needs a recording in progress on the SERVER, ours a
+      finished one in THIS BROWSER.
+
+      The last two are a self-review's: the preserved half of that note quoted a Svelte block inside
+      an HTML comment, which CLAUDE.md forbids by name — prose to a human, an unclosed block to any
+      parser reading the file. The branch is named rather than quoted now, and the reason is at it.
+    */
+    max: 1134,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {
@@ -7772,7 +7904,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       whether it has grown a HANDLER, which would mean the card became reachable and the whole
       argument here needs rewriting rather than extending.
     */
-    max: 61,
+    /*
+      61 -> 290, 2026-09-01, AND THIS ENTRY'S OWN PREDICTION IS WHAT CAME TRUE.
+
+      It said: *"If this file climbs, the question is whether it has grown a HANDLER, which would
+      mean the card became reachable and the whole argument here needs rewriting rather than
+      extending."* It has grown two handlers, three effects and an arming test, and the argument is
+      rewritten rather than extended — in the component, in `rec-preview-contract.test.ts`, and here.
+
+      What changed is not the card, it is the blocker. `recPreviewLocation` was recorded as a value
+      this room does not have; it is really a value the SERVER sends, by one command
+      (`setRecPreview`, byte 1,023,704) that had never been transcribed. With that command in place
+      the whole of `app-rec-preview` is transcribable, and the arming gate doing nothing in a room
+      whose server never sends it is the reference's behaviour rather than a gap in ours.
+
+      The 229 lines are 60 of markup, script and handlers, and 169 of citation: the arming test with
+      the one term this room does not implement and why, the six subscriptions and how they collapse
+      into three effects, the `untrack` that is load-bearing, and the transcribed quirk where
+      `startRec` shows the card without flipping the flag the menu reads. This is the ratio CLAUDE.md
+      asks for — *"the reason and the test that enforces it — that pair is the unit of work here"* —
+      and the prose is not trimmable to a number.
+
+      If this climbs again, the question is whether the CARD grew or the CITATIONS did. A second
+      captured component appearing in this file would be the signal to split; more `why` for the one
+      component here is what this file is.
+    */
+    max: 290,
     why: 'the recording preview card - app-rec-preview, transcribed, unreachable, and argued'
   },
   {

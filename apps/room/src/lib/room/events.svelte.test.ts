@@ -87,7 +87,15 @@ afterEach(() => {
   (globalThis as { EventSource?: unknown }).EventSource = originalEventSource;
 });
 
-const make = (mediaTransport: Record<string, unknown> = {}) => {
+const make = (
+  mediaTransport: Record<string, unknown> = {},
+  /*
+    `softResetDone` is the first receiver here whose behaviour BRANCHES on the viewer's role, so the
+    role became a parameter rather than the hard-coded `false` it had been. Defaulted, so every case
+    written before this one is unchanged.
+  */
+  over: { isPresenter?: boolean; micMuted?: boolean; camMuted?: boolean } = {}
+) => {
   const missed: true[] = [];
   const tabs: string[] = [];
   const played: string[] = [];
@@ -107,6 +115,22 @@ const make = (mediaTransport: Record<string, unknown> = {}) => {
   const chatMuted: string[] = [];
   const chatNotices: string[] = [];
   const audioReconnects: boolean[] = [];
+  /*
+    The two receivers added on 2026-09-01 write outside the class, so what they write is recorded
+    rather than stubbed away. `toasts` keeps every notice WITH its kind and its `enableHtml`, because
+    `stopRecMsg`'s whole behaviour is a severity switch and its one hardening is that flag; `media`
+    keeps `recPreviewLocation` because `setRecPreview` is the only thing in the room that sets it.
+  */
+  const toasted: { kind: string; message: string; enableHtml: boolean }[] = [];
+  const notified: { title: string; body: string; icon: string | null; hash: string }[] = [];
+  const recordingStops: true[] = [];
+  const mediaState = {
+    recPreviewLocation: '',
+    recordingReminder: true,
+    micMuted: over.micMuted ?? false,
+    camMuted: over.camMuted ?? false,
+    roomRecordingStopped: () => recordingStops.push(true)
+  };
   const chatMute = new RoomChatMute({
     commands: {
       muteChat: () => Promise.resolve(null),
@@ -120,8 +144,16 @@ const make = (mediaTransport: Record<string, unknown> = {}) => {
   });
   const stream = new RoomEventStream<{ id: number }>({
     prefs: { doNotDisturbOn: false } as never,
-    toasts: { show: () => null } as never,
-    media: {} as never,
+    toasts: {
+      show: (notice: { kind: string; message: string; enableHtml: boolean }) => (
+        toasted.push(notice),
+        null
+      ),
+      info: (message: string) => toasted.push({ kind: 'info', message, enableHtml: false }),
+      notify: (title: string, body: string, icon: string | null, hash: string) =>
+        notified.push({ title, body, icon, hash })
+    } as never,
+    media: mediaState as never,
     // The broadcast receivers the video/YouTube/mp3 commands call, recorded so the dispatch can
     // be asserted to reach the right one.
     broadcasts: { videoStarted: (url: string) => played.push(url) } as never,
@@ -131,7 +163,7 @@ const make = (mediaTransport: Record<string, unknown> = {}) => {
     privateChat: { ingest: () => {} },
     userActions: { followedUsers: {} },
     session: () => ({ room: { shortCode: 'abc' }, user: { id: 1 }, sessData: null }),
-    isPresenter: () => false,
+    isPresenter: () => over.isPresenter ?? false,
     appHasFocus: () => true,
     restartMediaSession: () => null,
     showTab: (tab) => tabs.push(tab),
@@ -175,7 +207,11 @@ const make = (mediaTransport: Record<string, unknown> = {}) => {
     revoked,
     chatMuted,
     chatNotices,
-    audioReconnects
+    audioReconnects,
+    toasted,
+    notified,
+    mediaState,
+    recordingStops
   };
 };
 
@@ -688,5 +724,212 @@ describe('the two receivers reach the page', () => {
     });
     expect(played).toEqual(['https://example.test/v.mp4']);
     expect(tabs).toEqual(['videoplayer']);
+  });
+});
+
+describe('the two receivers the trackers held as unbuildable', () => {
+  /*
+    `TODO.md` rows X and AC, both closed on 2026-09-01 by the same correction.
+
+    Each row reasoned from *"our server does not send this frame"* to *"this cannot be built"*, and
+    those are different sentences. A RECEIVER is transcribable whatever any server sends, and a
+    receiver nothing triggers is what the reference itself has in a room whose server is quiet. What
+    could not be invented — the frame URL, the recording message's wording — is still not invented
+    here; what is transcribed is what the reference DOES with them when they arrive.
+  */
+  const send = (data: unknown) =>
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'cmds', data })
+    });
+
+  it('`setRecPreview` stores the frame URL the card interpolates', () => {
+    /* `case "setRecPreview": … globals.sessData.recPreviewLocation = i.url` — byte 1,023,704. */
+    const { stream, mediaState } = make();
+    stream.subscribe();
+    send({ cmd: 'setRecPreview', url: 'https://rec.example.test/room-42.jpg' });
+    expect(mediaState.recPreviewLocation).toBe('https://rec.example.test/room-42.jpg');
+  });
+
+  it('and a frame with no usable url leaves a location the server already sent alone', () => {
+    /*
+      The one place this differs from the capture, and it differs by refusing to act. Upstream
+      assigns `i.url` unconditionally, so a frame without one replaces a working URL with
+      `undefined` — the card then requests `undefined?1756…` once a second. `CmdsFrame` types every
+      field optional precisely so a handler must decide, and this one decides to keep what it has.
+    */
+    const { stream, mediaState } = make();
+    stream.subscribe();
+    send({ cmd: 'setRecPreview', url: 'https://rec.example.test/room-42.jpg' });
+    send({ cmd: 'setRecPreview' });
+    send({ cmd: 'setRecPreview', url: 42 });
+    expect(mediaState.recPreviewLocation).toBe('https://rec.example.test/room-42.jpg');
+  });
+
+  it('`stopRecMsg` raises an ERROR toast when the server’s wording contains "Stopped"', () => {
+    /*
+      `-1 != i.data.indexOf("Stopped") ? this.alertsService.error(i.data) : …` — byte 2,505,283.
+      Case-sensitive and a substring, both the reference's; narrowing it here would be this room
+      deciding which of the server's sentences count as errors.
+    */
+    const { stream, toasted, notified } = make();
+    stream.subscribe();
+    send({ cmd: 'stopRecMsg', data: 'Recording Stopped by the server.' });
+    expect(toasted).toEqual([
+      { kind: 'error', message: 'Recording Stopped by the server.', enableHtml: false }
+    ]);
+    /* `new Notification(i.data, { body: i.data })` — the same string twice, and NO icon. */
+    expect(notified).toEqual([
+      {
+        title: 'Recording Stopped by the server.',
+        body: 'Recording Stopped by the server.',
+        icon: null,
+        hash: ''
+      }
+    ]);
+  });
+
+  it('and an INFO toast for anything else, on the same capital S', () => {
+    const { stream, toasted } = make();
+    stream.subscribe();
+    send({ cmd: 'stopRecMsg', data: 'Recording started.' });
+    /* Lower case, deliberately: the reference tests "Stopped", not "stopped". */
+    send({ cmd: 'stopRecMsg', data: 'the recording stopped early' });
+    expect(toasted.map((toast) => toast.kind)).toEqual(['info', 'info']);
+  });
+
+  it('never renders the payload as HTML, which upstream’s toastr also does not', () => {
+    /*
+      `data` is text off a socket frame. `enableHtml: true` would make this receiver a stored-XSS
+      primitive fed by whatever produced the recording message — the one hardening in this handler
+      that is a MATCH rather than a divergence, since ngx-toastr's own default is the same.
+    */
+    const { stream, toasted } = make();
+    stream.subscribe();
+    send({ cmd: 'stopRecMsg', data: '<img src=x onerror="alert(1)">' });
+    expect(toasted).toHaveLength(1);
+    expect(toasted[0].enableHtml).toBe(false);
+    expect(toasted[0].message).toBe('<img src=x onerror="alert(1)">');
+  });
+
+  it('and raises nothing at all on a frame with no message', () => {
+    /*
+      Upstream calls `.indexOf` on the payload and throws when there is none — inside a socket
+      handler, taking the rest of the frame with it. Narrowed rather than asserted, for the reason
+      `CmdsFrame` gives at the top of its own file.
+    */
+    const { stream, toasted, notified } = make();
+    stream.subscribe();
+    send({ cmd: 'stopRecMsg' });
+    send({ cmd: 'stopRecMsg', data: '' });
+    send({ cmd: 'stopRecMsg', data: { text: 'Stopped' } });
+    expect(toasted).toEqual([]);
+    expect(notified).toEqual([]);
+  });
+});
+
+describe('softResetDone — four subscribers, re-read whole', () => {
+  /*
+    The receiver carried ONE subscriber's behaviour and a recorded divergence until 2026-09-01. Reading
+    every occurrence of the name in the bundle found four subscribers and a fifth act in the command
+    case itself, and had no coverage at all here — which is how a receiver keeps a stale shape.
+
+    Fake timers throughout, because the jitter is the feature: `let oe = 3e3 * Math.random()`.
+  */
+  const send = () =>
+    FakeEventSource.last?.fire('message', {
+      data: JSON.stringify({ channel: 'cmds', data: { cmd: 'softResetDone' } })
+    });
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('drops remote media IMMEDIATELY and rebuilds only after the jitter', () => {
+    /*
+      The ordering is the whole design: the local half costs the media plane nothing and happens now;
+      the rebuild is what waits, so a full room does not come back as one burst.
+    */
+    const order: string[] = [];
+    const { stream } = make({
+      dropRemoteMedia: () => order.push('drop'),
+      restart: () => (order.push('restart'), Promise.resolve())
+    });
+    stream.subscribe();
+    send();
+    expect(order, 'the rebuild must NOT have run yet').toEqual(['drop']);
+
+    vi.advanceTimersByTime(3000);
+    expect(order).toEqual(['drop', 'restart']);
+  });
+
+  it('clears the recording flag and the reminder banner — app-room, byte 2,501,883', () => {
+    const { stream, mediaState, recordingStops } = make({
+      dropRemoteMedia: () => {},
+      restart: () => Promise.resolve()
+    });
+    stream.subscribe();
+    send();
+    expect(recordingStops, 'roomState.isRecording = !1').toEqual([true]);
+    expect(mediaState.recordingReminder).toBe(false);
+  });
+
+  it('cuts the PRESENTER’s own mic and camera — MediaHandler, byte 1,115,967', () => {
+    /*
+      `this.globals.isPresenter && (this.mediaSoupService.disableMic(), this.mediaSoupService.stopCam())`.
+
+      This was a RECORDED DIVERGENCE until today — "a presenter silencing themselves by pressing a
+      button labelled reset the media state of the room" — and the owner's instruction to match the
+      dump overturns a reasoned preference. `toggleMicrophone`/`toggleWebcam` are what this room calls
+      `disableMic()`/`stopCam()`; the toolbar's own mute branch is `disableMic()`, which is recorded at
+      those methods.
+    */
+    const cut: string[] = [];
+    const { stream } = make(
+      {
+        dropRemoteMedia: () => {},
+        restart: () => Promise.resolve(),
+        toggleMicrophone: () => (cut.push('mic'), Promise.resolve()),
+        toggleWebcam: () => (cut.push('cam'), Promise.resolve())
+      },
+      { isPresenter: true }
+    );
+    stream.subscribe();
+    send();
+    expect(cut).toEqual(['mic', 'cam']);
+  });
+
+  it('and leaves a MEMBER’s mic and camera alone', () => {
+    /* The `isPresenter &&` half of the same statement, which is the half a member observes. */
+    const cut: string[] = [];
+    const { stream } = make({
+      dropRemoteMedia: () => {},
+      restart: () => Promise.resolve(),
+      toggleMicrophone: () => (cut.push('mic'), Promise.resolve()),
+      toggleWebcam: () => (cut.push('cam'), Promise.resolve())
+    });
+    stream.subscribe();
+    send();
+    expect(cut).toEqual([]);
+  });
+
+  it('and does not "cut" what is already off, which would turn it back ON', () => {
+    /*
+      `toggleMicrophone` is a TOGGLE and `disableMic()` is not. Calling it on an already-muted
+      presenter would unmute them — a soft reset that switches a muted presenter's microphone on is
+      the opposite of what the reference does, and it is the reason both calls are guarded exactly as
+      the `mutemic`/`mutecam` receivers are.
+    */
+    const cut: string[] = [];
+    const { stream } = make(
+      {
+        dropRemoteMedia: () => {},
+        restart: () => Promise.resolve(),
+        toggleMicrophone: () => (cut.push('mic'), Promise.resolve()),
+        toggleWebcam: () => (cut.push('cam'), Promise.resolve())
+      },
+      { isPresenter: true, micMuted: true, camMuted: true }
+    );
+    stream.subscribe();
+    send();
+    expect(cut).toEqual([]);
   });
 });

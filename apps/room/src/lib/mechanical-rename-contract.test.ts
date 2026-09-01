@@ -105,6 +105,106 @@ describe('no class name carries the fingerprint of a mechanical rename', () => {
   });
 });
 
+describe('and no sentence carries it either — the sweep the class rule could not do', () => {
+  /*
+    ## The fifteenth casualty, found on 2026-09-01 — fourteen months after the other four
+
+    This file's own header says it *"deliberately does not try to police STRING content in general:
+    which sentences are user-visible is not decidable here, and a guard that guesses would either
+    miss the next one or cry wolf."*
+
+    That was the right call about GUESSING and it left a real defect on screen. `RoomRecording`'s
+    popup-blocked alert read:
+
+    > "Allow pop-ups for this site, or open the downloaded **media.recording** from your Downloads
+    > folder."
+
+    A member reads that sentence at the exact moment something already went wrong, and it is the
+    same substitution as the other four. Ten more sat in comments — *"every media.recording was a
+    silent movie"*, *"a room that is still media.recording"* — which are not runtime defects but are
+    corrupted prose in a repository whose whole standard rests on its comments being readable.
+
+    ## The rule that IS decidable
+
+    The header's caution was about deciding which strings a user reads. This rule decides nothing of
+    the sort: **`media.recording` is only ever correct as a property read.** In prose it is always
+    the artefact, and the two are told apart mechanically —
+
+      * a property read is preceded by an identifier character, `#`, `!`, `(`, `.` or a space in an
+        expression, and is what the 22 legitimate sites look like;
+      * the FIELD named in prose is written in backticks, the house style for naming code in a
+        comment, and stays;
+      * anything else — `media.recording` bare, in an English sentence — is the rename.
+
+    So the sweep looks for the bare form outside backticks and outside code, and every legitimate
+    site already satisfies it. Zero false positives on the corpus as it stands, which is the same
+    bar the class-attribute rule above was held to.
+
+    ## The three files that must keep it
+
+    This one quotes the defect to describe it, and `recording-reminder-contract.test.ts` and
+    `room-surface-audit-batch3-contract.test.ts` pin the reminder's real `{#if}` expression as a
+    fixture. Naming them is the point: an allow-list of three is a fact a reader can check, where a
+    cleverer regex would be a rule nobody can.
+  */
+  const EXEMPT = new Set([
+    'src/lib/mechanical-rename-contract.test.ts',
+    'src/lib/recording-reminder-contract.test.ts',
+    'src/lib/room-surface-audit-batch3-contract.test.ts'
+  ]);
+
+  /** `media.recording` in prose: no backtick either side, and no code character before it. */
+  const PROSE = /(?<![`\w.#!(])media\.recording(?![\w`])/g;
+
+  it('finds prose to inspect, so an empty result means clean rather than broken', () => {
+    /*
+      The floor. Every assertion below is `toEqual([])`, which an unread corpus satisfies while
+      proving nothing — the same trap this file's own class sweep guards against with a count.
+    */
+    const withComments = tracked.filter(
+      (file) =>
+        (file.endsWith('.ts') || file.endsWith('.svelte')) &&
+        readFileSync(file, 'utf8').includes('media.recording')
+    );
+    /*
+      SIX, measured on 2026-09-01, and named rather than counted: `NavbarRecIndicator.svelte` and
+      `RoomNavbar.svelte` name the field in backticks, `recording.ts` reads it, and the three exempt
+      files above quote it. An exact list rather than a floor, for the reason `source-size-contract`
+      gives about its own numbers — a floor of five would sit green through four of them vanishing,
+      and this whole describe block is `toEqual([])` assertions that an unread corpus satisfies.
+    */
+    expect([...withComments].sort(), 'the corpus this sweep reads').toEqual([
+      'src/lib/components/NavbarRecIndicator.svelte',
+      'src/lib/components/RoomNavbar.svelte',
+      'src/lib/mechanical-rename-contract.test.ts',
+      'src/lib/recording-reminder-contract.test.ts',
+      'src/lib/room-surface-audit-batch3-contract.test.ts',
+      'src/lib/room/recording.ts'
+    ]);
+  });
+
+  it('no sentence in the room says "media.recording"', () => {
+    const offenders: string[] = [];
+    for (const file of tracked) {
+      if (EXEMPT.has(file)) continue;
+      if (!file.endsWith('.ts') && !file.endsWith('.svelte')) continue;
+      const source = readFileSync(file, 'utf8');
+      source.split('\n').forEach((line, index) => {
+        if (PROSE.test(line)) offenders.push(`${file}:${index + 1} — ${line.trim().slice(0, 110)}`);
+        PROSE.lastIndex = 0;
+      });
+    }
+
+    expect(
+      offenders,
+      `${offenders.join('\n')}\n\n\`media.recording\` is only ever correct as a property read. ` +
+        'In an English sentence it is the `recording` -> `media.recording` substitution that ' +
+        'shipped "You are not media.recording!" to the screen. Write `recording`, or put the ' +
+        'field in backticks if the field is what you mean.'
+    ).toEqual([]);
+  });
+});
+
 describe('the strings that were corrupted are back to what the capture says', () => {
   /*
     Pinned by NAME rather than left to the sweep above, because a class-attribute rule cannot see a
@@ -130,6 +230,18 @@ describe('the strings that were corrupted are back to what the capture says', ()
     expect(stylesheet, 'the captured rule').toContain('.recording-reminder');
     expect(navbar, 'and the markup that must match it').toContain('class="recording-reminder"');
     expect(navbar).toContain('class="recording-reminder-arrow"');
+  });
+
+  it('the popup-blocked alert reads as English — the FIFTEENTH casualty, found 2026-09-01', () => {
+    /*
+      Not in the capture: this room's local-recording window has no upstream counterpart, so the
+      sentence is ours and there is no captured value to assert it against. What IS asserted is the
+      absence of the substitution, which is the whole of what went wrong with it.
+    */
+    expect(recording).toContain('open the downloaded recording from your Downloads folder');
+    expect(recording, 'the corrupted form must not come back').not.toContain(
+      'downloaded media.recording'
+    );
   });
 
   it('a presenter downloading their recording gets a sane filename', () => {

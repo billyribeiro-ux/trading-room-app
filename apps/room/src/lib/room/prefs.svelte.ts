@@ -246,7 +246,7 @@ export class RoomPrefs {
 
     /**
      * `preferences.recordingStartSound` / `recordingStopSound` - whether this listener hears the room
-     * start and stop media.recording. Both default ON: the capture's checks are
+     * start and stop recording. Both default ON: the capture's checks are
      * `!doNotDisturbOn && preferences.recordingStartSound && ...`, so an unset preference would
      * silence a cue the room is meant to give everyone.
      */
@@ -543,10 +543,15 @@ export class RoomPrefs {
   }
 
   /**
-   * USM-12. Read in TWO places, which is what makes it a preference rather than a stored click:
-   * `RoomRecording.showRecPreview` refuses when it is off, and `create-room`'s `onSideEffect` closes
-   * an open preview the moment it is switched off — the reference's own
-   * `guiEventBus.emit("closeRecPreviewWindow")` at byte 2,250,601.
+   * USM-12. Read in THREE places, which is what makes it a preference rather than a stored click:
+   *
+   *  * `RecordingPreviewCard`'s arming test — the capture's own
+   *    `!preferences.recPreviewWindow || (…subscribe…)`, so an unticked box leaves the card wired to
+   *    nothing. This is the reference's OWN read and it arrived on 2026-09-01 with the card;
+   *  * `create-room`'s `onSideEffect`, which closes an open preview the moment the box is unticked —
+   *    the reference's `guiEventBus.emit("closeRecPreviewWindow")` at byte 2,250,601;
+   *  * `RoomRecording.showLocalRecPreview`, which refuses to open OUR local-recording window while it
+   *    is off. That third read is this room's own and is argued at the method.
    */
   get recPreviewWindow() {
     return this.#recPreviewWindow;

@@ -113,16 +113,16 @@ export class RoomRecording {
    * SERVER-side - `mediaSoupService.startRec(muser)` and
    * `sendServerAdminCommand('startRecMtx', {streams})`, with the server pushing back a `recName`
    * - and the whole bundle contains exactly ONE `new MediaRecorder`, which is the microphone test
-   * in the AV settings modal. The original never writes a session media.recording to your computer.
-   * Server-side media.recording needs the media.recording/transcoding workers that the deployment plan defers,
+   * in the AV settings modal. The original never writes a session recording to your computer.
+   * Server-side recording needs the recording/transcoding workers that the deployment plan defers,
    * so this records in the browser instead.
    *
    * Three things were wrong with it:
    *
    *   1. SILENT. `getDisplayMedia({ audio: false })` means `screenStream` carries video only, so
-   *      every media.recording was a silent movie. The presenter's microphone is mixed in below.
+   *      every recording was a silent movie. The presenter's microphone is mixed in below.
    *   2. UNREACHABLE. `media.recordedUrl` is only set by the recorder's `stop` event, which also
-   *      sets `media.recording = false` - and the menu item that exposed it sat inside `{#if media.recording}`.
+   *      sets `media.recording` false - and the menu item that exposed it sat inside that branch.
    *      It existed only at the moment it became invisible.
    *   3. NEVER SAVED. A blob URL was created and nothing ever downloaded it.
    */
@@ -156,7 +156,7 @@ export class RoomRecording {
     const recordingOptions = chooseRecordingOptions();
     this.#screenRecorder = new MediaRecorder(recordedStream, {
       // Omitted entirely when nothing is supported: passing an unsupported `mimeType` THROWS, and a
-      // media.recording that fails to start is worse than one at the browser's default.
+      // A recording that fails to start is worse than one at the browser's default.
       ...(recordingOptions.mimeType ? { mimeType: recordingOptions.mimeType } : {}),
       videoBitsPerSecond: recordingOptions.videoBitsPerSecond,
       audioBitsPerSecond: recordingOptions.audioBitsPerSecond
@@ -231,7 +231,7 @@ export class RoomRecording {
     if (this.#screenRecorder && this.#screenRecorder.state !== 'inactive')
       this.#screenRecorder.stop();
     // Only announce a stop we actually made: `stopScreenSharing()` calls this unconditionally, and
-    // a stop broadcast with no start would clear the badge for a room that is still media.recording.
+    // a stop broadcast with no start would clear the badge for a room that is still recording.
     if (wasRecording) void this.#broadcastRecordingState('stopRec');
     this.#media.recording = false;
     this.#media.recordingPaused = false;
@@ -257,7 +257,7 @@ export class RoomRecording {
   }
 
   /**
-   * Writes the finished media.recording to the user's Downloads folder.
+   * Writes the finished recording to the user's Downloads folder.
    *
    * Called automatically when the recorder stops, and again from the menu if they want another
    * copy. The extension follows the container the browser actually chose - Chrome gives
@@ -304,35 +304,84 @@ export class RoomRecording {
   }
 
   /**
-   * `showRecPreview()` / `hideRecPreview()`, which in the capture are:
+   * `showRecPreview()` / `hideRecPreview()` — the recording menu's pair, transcribed.
    *
    * ```js
-   * showRecPreview(){ if(!roomState.isRecording) return !1;
-   *   globals.recPreviewOpen = !0; guiEventBus.emit("reopenRecPreviewWindow") }
-   * hideRecPreview(){ if(!roomState.isRecording) return !1;
-   *   globals.recPreviewOpen = !1; guiEventBus.emit("closeRecPreviewWindow") }
+   * showRecPreview(){ if(!this.appService.globals.roomState.isRecording) return !1;
+   *   this.appService.globals.recPreviewOpen = !0;
+   *   this.appService.guiEventBus.emit("reopenRecPreviewWindow") }
+   * hideRecPreview(){ if(!this.appService.globals.roomState.isRecording) return !1;
+   *   this.appService.globals.recPreviewOpen = !1;
+   *   this.appService.guiEventBus.emit("closeRecPreviewWindow") }
    * ```
    *
-   * There the preview is a separate WINDOW pointed at a server-supplied URL - the server sends
-   * `setRecPreview` and the client stores `sessData.recPreviewLocation = i.url`. We have no
-   * server-side media.recording and therefore no such URL, so the window shows the local media.recording
-   * instead. The window model itself is the capture's.
+   * The emit is not transcribed as a second act because it never is one: `RecordingPreviewCard`
+   * reacts to `media.recPreviewOpen`, and upstream the flag and the emit are written in adjacent
+   * statements with nothing between them and no other emitter. Its docblock carries the argument.
    *
-   * The toggle previously flipped `media.recPreviewOpen` and nothing read it anywhere else in the app:
-   * a control that changed its own label and did nothing.
+   * **`roomRecording`, not `recording`.** The guard is `roomState.isRecording` — what the SERVER
+   * says the ROOM is doing, which is what the preview frame is a picture of — and not this
+   * browser's own `MediaRecorder`. The two are different facts and this class writes only the
+   * second one.
+   *
+   * The `return !1` arms are refusals, not results: nothing upstream reads the value back.
    */
   showRecPreview() {
+    if (!this.#media.roomRecording) return;
+    this.#media.recPreviewOpen = true;
+    this.#menus.set('recording', false);
+  }
+
+  hideRecPreview() {
+    if (!this.#media.roomRecording) return;
+    this.#media.recPreviewOpen = false;
+    this.#menus.set('recording', false);
+  }
+
+  /**
+   * `guiEventBus.emit("closeRecPreviewWindow")` as `recPreviewWindowOnChange` emits it — UNGUARDED.
+   *
+   * The distinction from `hideRecPreview()` is the whole reason this is a second method. That one
+   * is the MENU ENTRY and carries the capture's `if(!isRecording) return !1` refusal; this is the
+   * PREFERENCE going off (byte 2,250,601), which reaches `closePreview()` through the bus without
+   * passing any such guard. Routing the preference through the guarded method would leave a card on
+   * screen whenever the room's recording had already stopped — which is exactly when a presenter is
+   * most likely to be turning the setting off.
+   *
+   * It closes this room's local preview window too, because that window is ours and the preference
+   * is the same one: see `showLocalRecPreview`, which refuses to open while it is off.
+   */
+  closeRecPreviewWindow() {
+    this.#media.recPreviewOpen = false;
+    this.hideLocalRecPreview();
+  }
+
+  /**
+   * OURS, and it has no counterpart upstream: a window onto the recording THIS BROWSER just made.
+   *
+   * The reference has one preview and it is the server's — `recPreviewLocation`, a still frame the
+   * recording host writes, shown in the card above. This room also records locally, in the member's
+   * own browser, and `media.recordedUrl` is the resulting blob; that recording is invisible to the
+   * server and so has no `recPreviewLocation` and no card.
+   *
+   * It sits beside the transcription rather than replacing it, and the two cannot collide: the
+   * card's menu entries are gated on `roomRecording && recPreviewLocation` — a recording in
+   * progress on the server — and this one on `recordedUrl`, which the recorder's `stop` handler
+   * sets after a local recording has finished. `localPreviewOpen` is its own flag for the same
+   * reason: `recPreviewOpen` is the capture's `globals.recPreviewOpen` and means the CARD.
+   */
+  showLocalRecPreview() {
     if (!this.#media.recordedUrl) return;
     /*
       USM-12's second read. `recPreviewWindow` is the viewer's own "may this open a window at all",
       and it had no reader anywhere in this room until 2026-08-30 — the checkbox that writes it was
       missing from `updateSettingCheck`'s table, which has no fallback, so it persisted nothing.
 
-      Upstream reads the preference only to seed its own checkbox and to close on the way off
-      (`recPreviewWindowOnChange`, byte 2,250,601). Refusing to OPEN is a divergence and a
-      deliberate one: a preference whose only effect is closing something already open is one that
-      does nothing at all on the next session, which is the defect this row is about rather than a
-      shape to reproduce.
+      Upstream reads the preference to arm the card (`RecordingPreviewCard`, the `ngOnInit` gate)
+      and to close it on the way off (`recPreviewWindowOnChange`, byte 2,250,601). Refusing to OPEN
+      is this path's own rule and a deliberate one: this window has no arming step to be refused at,
+      so a preference whose only effect were closing something already open would do nothing at all
+      on the next session.
     */
     if (!this.#prefs.recPreviewWindow) {
       this.#dialogs.alert =
@@ -352,18 +401,18 @@ export class RoomRecording {
     // would claim a window that is not there, and staying silent looks like a dead button - which
     // is what the control already was. Say what happened; the file is still on disk either way.
     if (!this.#recPreviewWindow) {
-      this.#media.recPreviewOpen = false;
+      this.#media.localPreviewOpen = false;
       this.#dialogs.alert =
-        'Your browser blocked the preview window. Allow pop-ups for this site, or open the downloaded media.recording from your Downloads folder.';
+        'Your browser blocked the preview window. Allow pop-ups for this site, or open the downloaded recording from your Downloads folder.';
       return;
     }
-    this.#media.recPreviewOpen = true;
+    this.#media.localPreviewOpen = true;
   }
 
-  hideRecPreview() {
+  hideLocalRecPreview() {
     this.#recPreviewWindow?.close();
     this.#recPreviewWindow = null;
-    this.#media.recPreviewOpen = false;
+    this.#media.localPreviewOpen = false;
     this.#menus.set('recording', false);
   }
 

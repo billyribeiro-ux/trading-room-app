@@ -141,11 +141,22 @@ describe('the triage document tells the truth about what is built', () => {
 
       `NOT BUILT` meant one thing to this file — the command name does not occur in `apps/room/src` —
       and something else entirely to a reader: WORK. Six rows carried it, and only two of them were
-      work. The other four cannot be built here at all, each for a different and specific reason:
+      work. The other four could not be built here at all, each for a different and specific reason.
+
+      **THREE, since 2026-09-01, and the fourth is the lesson this paragraph now carries.**
+      `stopRecMsg` sat in the list below reading *"the reference's server does not send it; it needs
+      a recorder"*. Every word of that is true and it is a fact about the PAYLOAD, not about the
+      receiver. A receiver is transcribable whatever any server sends, and a receiver nothing
+      triggers is exactly what the reference has in a room whose server is quiet — so the row was
+      BLOCKED on a category error, and it is BUILT (`recording-frames.ts`, from the subscriber at
+      byte 2,505,283). Nothing about its payload changed; nothing invents the wording.
+
+      That is the shape to test the remaining three against. Each survives it, and each says why in
+      its own terms: an absent SERVICE, a branch that does not render, and a claim nothing mints —
+      none of them "a frame our server does not send".
 
         `presAreaTabs-recordings`  there is no archive service and zero archive tables in either
                                    database, so the tab has nothing to point at
-        `stopRecMsg`               the reference's server does not send it; it needs a recorder
         `stopOBStream`             its Start/Stop pair renders under `O(1, e.useMTX ? -1 : 1)` at
                                    bundle byte 2,145,988 — only when MTX is OFF, and this
                                    deployment is MTX
@@ -155,8 +166,8 @@ describe('the triage document tells the truth about what is built', () => {
                                    `room-handoff.ts` carries `type`, `issued`, `iat`, `exp` and the
                                    identity, and `isPTRPlayer` occurs ZERO times in either app.
 
-      A tracker that files four unbuildable things beside two buildable ones under one word is a
-      tracker that costs somebody a day finding out which is which. That has already happened here
+      A tracker that files unbuildable things beside buildable ones under one word is a tracker that
+      costs somebody a day finding out which is which. That has already happened here
       twice, in the other direction, and the cost was the same.
 
       ## AND WHY IT IS MACHINE-CHECKED
@@ -167,7 +178,7 @@ describe('the triage document tells the truth about what is built', () => {
       which is the same rule `INERT_ACTIONS` and `ORPHANS` are held to.
     */
     const blocked = table.filter((row) => row.status === 'BLOCKED');
-    expect(blocked.length, 'the BLOCKED rows have gone; is the census still measuring?').toBe(4);
+    expect(blocked.length, 'the BLOCKED rows have gone; is the census still measuring?').toBe(3);
 
     /*
       Deliberately a VOCABULARY and not a free-text check. "Blocked" with a reason nobody can act on

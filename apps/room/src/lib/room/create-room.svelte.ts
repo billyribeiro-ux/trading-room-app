@@ -314,7 +314,7 @@ export function createRoom(deps: RoomDeps) {
     onSideEffect: preferenceSideEffects({
       mergeGlobalChatStyle: (patch) => deps.mergeGlobalChatStyle(patch),
       setSplitDirection: (direction) => split.setDirection(direction, settingsSplitPair),
-      hideRecordingPreview: () => recording.hideRecPreview(),
+      hideRecordingPreview: () => recording.closeRecPreviewWindow(),
       beginSpeechRecognition: () => recording.beginSpeechRecognition(),
       endSpeechRecognition: () => recording.endSpeechRecognition()
     })
@@ -366,7 +366,7 @@ export function createRoom(deps: RoomDeps) {
   /*
     The room's media STATE, in `#lib/room/media.svelte.ts`.
 
-    Every flag the interface renders from — mic, camera, screen, this browser's media.recording and the
+    Every flag the interface renders from — mic, camera, screen, this browser's recording and the
     ROOM's, who has a microphone open, and whether this member has been handed limited-presenter
     status. Not the transport: the `MediaStream`s, the `MediaRecorder`, the producer ids and the
     preview window stay as plain `let`s below, because nothing renders from a handle and a class

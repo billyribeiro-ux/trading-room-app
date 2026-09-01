@@ -111,7 +111,12 @@ Every gap below was confirmed with an occurrence count against `+page.svelte`, n
     the panel opening; everyone else gets the panel plus the `pling` sound.
 21. **Recording sound effects** — `full.js:2045-2070`. Gated on DND, the specific preference, and
     `!videoOnlyMode`.
-22. **`stopRecMsg` raises a `new Notification(...)`** — `full.js:2071-2076`.
+22. **`stopRecMsg` raises a `new Notification(...)`** — `full.js:2071-2076`. **CLOSED 2026-09-01**,
+    and it is the only row here that closed by a re-reading rather than by new capability. It had
+    also become `TODO.md` row AC, which held it as blocked on the reference server's wording; that is
+    a fact about the PAYLOAD and says nothing about the receiver. Built in
+    `apps/room/src/lib/room/recording-frames.ts` from the subscriber at bundle byte 2,505,283, with
+    the case-sensitive `indexOf("Stopped")` severity switch intact. Nothing invents the wording.
 23. **`reconnectedSocket` flashes `#connectedMsg` for 3s** — `full.js:2035-2041`; `recStarting` sets
     a 5s auto-clearing flag — `2023-2028`.
 24. **`calculateDuplicates()`** — `full.js:2420-2426`. **0**.
@@ -191,10 +196,14 @@ exists.
 
 ### `app-room` is CLOSED in both directions
 
-Reference side: all 8,231 lines. Our side: all 9,947 lines. 15 items matched, 24 gaps (13 now
-implemented on PR #3), 16 divergences — every one declared in the code with its reasoning.
+Reference side: all 8,231 lines. Our side: all 9,947 lines. 15 items matched, 24 gaps (14 now
+implemented — 13 on PR #3, and behaviour gap 22 on 2026-09-01), 16 divergences — every one declared
+in the code with its reasoning.
 
-Nothing further is outstanding for this component. Next: `app-presentationarea`, then
+**"CLOSED" means the READ is complete, not that every gap is unbuildable**, and gap 22 is the entry
+that proves the distinction is worth keeping: it sat closed and unbuilt for weeks on a reason that
+was about the payload rather than the receiver. A closed section is a section nobody has to re-read;
+its gap rows are still work. Next: `app-presentationarea`, then
 `app-screenshare-view` (both have anchored const mappings from the viewer-only work), then the
 remaining 49.
 
