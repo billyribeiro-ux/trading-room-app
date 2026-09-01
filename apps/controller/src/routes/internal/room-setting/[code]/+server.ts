@@ -67,12 +67,36 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
     error(401, 'Unauthorized.');
   }
 
-  let payload: { name?: unknown; value?: unknown };
+  /*
+    `request.json()` RESOLVING is not the same as a body this handler can read, and the gap was one
+    specific body: `null`.
+
+    `JSON.parse` accepts every JSON value, not only objects — `null`, `123` and `"a string"` all
+    parse successfully and none of them reaches the `catch` below. Two of the three are harmless
+    here, because reading `.name` off a number or a string is merely `undefined` and falls into the
+    deny-by-default refusal a few lines down. `null` is not: `payload.name` throws a TypeError,
+    which SvelteKit turns into a 500 "Internal Error" for what is plainly a malformed request.
+
+    Nothing was unsafe about that — the write never happened, and only a holder of a valid
+    `config-write` capability can reach this line at all — but a 500 is this application saying "I
+    broke", and it must not be the answer to input. The 400 below already exists and already says
+    the right thing; it was simply unreachable for that one body.
+
+    `body && typeof body === 'object'` is not a rule invented here: `/api/mobile/pair`, the other
+    JSON door in this application, already guards its own parse with exactly that test before it
+    hands the value to `validatePairRequest`. This is the sibling's rule applied to the sibling
+    route rather than a second convention. An ARRAY passes it, deliberately — `[].name` is
+    `undefined`, so an array lands on the same 403 as any other body naming no writable setting,
+    which is the deny-by-default arm rather than a special case worth a branch of its own.
+  */
+  let body: unknown;
   try {
-    payload = (await request.json()) as { name?: unknown; value?: unknown };
+    body = await request.json();
   } catch {
     error(400, 'A JSON body is required.');
   }
+  if (!body || typeof body !== 'object') error(400, 'A JSON body is required.');
+  const payload = body as { name?: unknown; value?: unknown };
 
   const name = typeof payload.name === 'string' ? payload.name : '';
   if (!isRoomWritableSetting(name)) {

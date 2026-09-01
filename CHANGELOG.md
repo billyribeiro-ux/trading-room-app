@@ -45,6 +45,63 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 22:12 UTC — a stored-XSS fix that had no test, and I committed an agent's scratch file
+
+**Runtime impact: NONE from this entry.** The fix it guards already shipped; what lands here is the
+test, and two sweeps that could crash a gate.
+
+## An upload could become a document in the room's own origin
+
+`shared_files.content_type` is `file.type` straight from the uploader's browser, written unvalidated.
+`uploadComposerImage` narrows it to `image/`, which still admits `image/svg+xml`, and it is reachable
+by an ORDINARY PARTICIPANT whenever `userUploads` is on. Served back as `Content-Disposition: inline`,
+a member could upload `<svg><script>…</script></svg>`, post the link in chat, and have every reader
+who followed it run the uploader's script as a document in the room's origin, with the room session
+cookie. `nosniff` does not help: nothing is being sniffed — the type is being ASSERTED by the
+attacker.
+
+The fix — a deny-by-default allow-list of types a browser renders and cannot execute, everything else
+`attachment` plus `default-src 'none'; sandbox` — came from the whole-project audit and is right. The
+controller already refuses SVG on badge upload in as many words.
+
+**Its only test was a scratch file called `zz-tmp-upload-disposition.test.ts`, and the agent deleted
+it.** A stored-XSS control with no test is one refactor from gone. `upload-disposition-contract.test.ts`
+drives the REAL handler over REAL rows across ten content types — including `text/xsl`, the one a
+deny-list always forgets — and asserts the sandbox CSP, `nosniff` on both branches, the deliberate
+ABSENCE of a CSP on the inline branch, and the 404 for another room's file. **Six negative controls,
+six seen red**, the first admitting SVG to the allow-list again.
+
+## I committed that scratch file
+
+`768e713` carries 69 lines of an agent's temp probe, because I used `git add -A` without reading a
+NEW file. I had been reviewing agent EDITS line by line and let an added file through unread. Its
+deletion lands here.
+
+## `git ls-files` bit me twice in one day, in opposite directions
+
+The index is not the filesystem:
+
+* A file that is **new and uncommitted** is on disk and NOT listed — which made
+  `mechanical-rename-contract`'s corpus pin wrong within the hour of being written.
+* A file that is **deleted and uncommitted** is listed and NOT on disk — which threw `ENOENT` out of
+  `readFileSync` and **took the whole room gate down**, in two files, over that scratch file.
+
+Neither state is unusual; both happen during any ordinary edit, rebase or stash. Both sweeps now
+carry an `existsSync` guard — `existsSync` and not a `try`/`catch`, so a permissions error or a
+truncated read still fails loudly rather than being quietly counted as "not present". The lesson is
+written at the guard, because the next sweep built on `git ls-files` will need it too.
+
+## One more from the audit, kept for its calibration as much as its fix
+
+`internal/room-setting` called `request.json()` and then read `.name` off the result. `JSON.parse`
+accepts every JSON value: `null` parses fine and then throws a TypeError, which SvelteKit turns into
+a 500 for what is plainly a malformed request. The comment states the severity honestly — *"Nothing
+was unsafe about that: the write never happened, and only a holder of a valid `config-write`
+capability can reach this line. But a 500 is this application saying 'I broke', and it must not be
+the answer to input."* The 400 already existed; it was unreachable for that one body.
+
+---
+
 ### 2026-09-01 22:00 UTC — a client-supplied field was ordered ahead of the authenticated session
 
 **Runtime impact: YES.** The email that decides who enters a room, which room rules apply to them,

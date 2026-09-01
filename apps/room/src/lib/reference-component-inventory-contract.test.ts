@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
@@ -116,6 +116,20 @@ const tracked = execSync("git ls-files 'src'", { encoding: 'utf8' }).trim().spli
 const rendered = new Set<string>();
 for (const file of tracked) {
   if (!file.endsWith('.svelte') && !file.endsWith('.ts')) continue;
+  /*
+    SKIPPED IF IT IS NOT ON DISK, and this is a fix rather than defensiveness.
+
+    `git ls-files` lists what the INDEX holds, which is not the same set as what the filesystem
+    holds: a file deleted but not yet committed is tracked and absent, and so is every file during a
+    rebase, a stash or a half-applied patch. The first draft called `readFileSync` on the list
+    directly and took the WHOLE GATE down with `ENOENT` the first time that happened — a normal
+    working state crashing a check that has nothing to do with it.
+
+    `existsSync` and not a `try`/`catch`: a catch here would also swallow a permissions error or a
+    truncated read, which are real failures this file should not hide. This skips exactly the one
+    state that is legitimate.
+  */
+  if (!existsSync(file)) continue;
   const source = readFileSync(file, 'utf8');
   for (const name of ours) if (source.includes(`<${name}`)) rendered.add(name);
 }
