@@ -111,14 +111,33 @@ describe('the PREMISE that makes those ids safe, measured rather than believed',
   });
 });
 
-describe('the third id stays instance-suffixed, and the count is why', () => {
-  it('GiphyPicker is mounted at FOUR sites, so a literal id would appear four times', () => {
+describe('the third id is transcribed too, and the count was the wrong measurement', () => {
+  it('GiphyPicker is mounted at FOUR sites, which is what made the id look impossible', () => {
     /*
-      The sharper answer the blanket reason was hiding. `modal-basic-title` is not reproducible here
-      and the other two are, and the difference is a number rather than a preference.
+      THE PREMISE THIS BLOCK USED TO ASSERT WAS WRONG, and it was wrong in an instructive way.
 
-      Asserted as a floor with the four named: a fifth surface is fine and does not weaken the point,
-      but dropping to one would mean this id COULD be transcribed and this file should say so.
+      It read: *"`modal-basic-title` is not reproducible here and the other two are, and the
+      difference is a number rather than a preference"* — four mount sites, so a literal id would
+      appear four times.
+
+      The number is right and it is a fact about the wrong element. `modal-basic-title` is not the
+      PICKER's id; it is the id of the MODAL TITLE that upstream's note mount is opened inside:
+
+          opengifSerachModal(){this.modalService.open(this.giphySearchPopOver,
+            {ariaLabelledBy:"modal-basic-title"})}                    // byte 1,482,730
+          d(0,"div",26)(1,"h4",82),v(2,"Giphy Search")                // L0e, byte 1,467,000
+          82  ["id","modal-basic-title",1,"modal-title"]
+
+      The other three mounts are ng-bootstrap POPOVERS. They have no `modal-header`, no
+      `modal-title`, and nothing labelled by that id at all — so it was never going to appear four
+      times. The count measured the picker; the id belongs to the dialog around one of them.
+
+      `GIF-07` separated the two: `GiphyPicker` renders the popover chrome only under
+      `variant="popover"`, and `notes/NoteEditor.svelte` supplies the modal chrome for the fourth.
+      The id is now literal, on the one mount whose capture has it.
+
+      The four-site floor stays asserted, because it is still the reason the PICKER carries no
+      document-unique id of its own.
     */
     const mounts = mountsOf('GiphyPicker');
     expect(mounts.length).toBeGreaterThanOrEqual(4);
@@ -128,10 +147,31 @@ describe('the third id stays instance-suffixed, and the count is why', () => {
     expect(mounts).toContain('src/lib/components/PrivateChatComposer.svelte');
   });
 
-  it('and it carries an instance id already, for that reason', () => {
+  it('the note mount labels its dialog with the captured id, verbatim', () => {
     const editor = svelteCodeOf(
       readFileSync(new URL('./components/notes/NoteEditor.svelte', import.meta.url), 'utf8')
     );
-    expect(editor).toContain('popoverId={`${componentId}-note-giphy`}');
+    expect(editor).toContain('ariaLabelledby="modal-basic-title"');
+    expect(editor).toContain('titleId="modal-basic-title"');
+    expect(editor).toContain('titleClass="modal-title"');
+    /* Const 82 opens under `d(1,"h4",82)`, so the level is transcribed with the id. */
+    expect(editor).toContain('titleTag="h4"');
+  });
+
+  it('and the three popover mounts still pass an instance id, because they are four', () => {
+    /*
+      The half of the old premise that survives: the POPOVER window needs a document-unique id for
+      `aria-describedby` to point at, and there are three of them on one page. Each passes
+      `${componentId}-…`, and `NoteEditor` no longer passes one at all — its picker has no popover.
+    */
+    const editor = svelteCodeOf(
+      readFileSync(new URL('./components/notes/NoteEditor.svelte', import.meta.url), 'utf8')
+    );
+    expect(editor).not.toContain('popoverId={`${componentId}-note-giphy`}');
+
+    const chat = svelteCodeOf(
+      readFileSync(new URL('./components/AlertChatArea.svelte', import.meta.url), 'utf8')
+    );
+    expect(chat).toContain('popoverId=');
   });
 });

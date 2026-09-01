@@ -12,6 +12,7 @@
   import BootboxDialog from '#lib/components/BootboxDialog.svelte';
   import EmojiPicker from '#lib/components/EmojiPicker.svelte';
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
+  import Modal from '#lib/components/Modal.svelte';
   import { FONT_FAMILIES, FONT_SIZES, LINE_HEIGHTS, NOTE_PALETTE_ROWS } from '#lib/note-palette.js';
   import type { NoteVersion } from '#lib/types.js';
   import type { SessionImageFile } from '#lib/session-image-files.js';
@@ -1256,7 +1257,8 @@
           type="button"
           class="note-btn"
           aria-label="Insert a gif"
-          aria-describedby={giphyOpen ? `${componentId}-note-giphy` : undefined}
+          aria-haspopup="dialog"
+          aria-expanded={giphyOpen}
           disabled={!giphyApiKey}
           onclick={() => {
             openMenu = null;
@@ -1273,19 +1275,50 @@
       </div>
       {#if giphyApiKey && giphyOpen}
         <!--
+          A MODAL, not a popover — `GIF-07`, and the chrome is the capture's.
+
+          `opengifSerachModal()` at bundle byte 1,482,730 is
+          `modalService.open(this.giphySearchPopOver, {ariaLabelledBy:"modal-basic-title"})`, and
+          `L0e` at 1,467,000 draws const 26 `modal-header`, const 82
+          `["id","modal-basic-title",1,"modal-title"]` under an `h4`, const 83
+          `[1,"modal-body","modal-lg",2,"max-height","77vh","overflow-y","auto"]`, const 40
+          `modal-footer` and const 41 `btn btn-outline-dark` reading ` Close `. Every one of those
+          five is here.
+
+          Until 2026-09-01 this mount rendered `GiphyPicker`'s POPOVER shell, which portals itself to
+          `<body>` at `inset: auto auto 0px 0px` — bottom-left of the viewport, detached from the
+          editor it belongs to. `GIF-04` corrected the three chrome CLASSES on this mount the same
+          day without noticing that the chrome around them was the wrong kind.
+
           `hint` is passed because `app-note` is the ONE surface of the four whose wording differs:
           `*Double click an image to insert it` at byte 1,467,154, against `select it` at the other
           three. In a note the double-click puts the GIF straight into the document; everywhere else
           it selects one to confirm and send. See the prop's own note.
         -->
-        <GiphyPicker
-          variant="modal"
-          hint="*Double click an image to insert it"
-          apiKey={giphyApiKey}
-          popoverId={`${componentId}-note-giphy`}
+        <Modal
+          id={`${componentId}-note-giphy`}
+          ariaLabelledby="modal-basic-title"
+          open={giphyOpen}
           onclose={() => (giphyOpen = false)}
-          onselect={insertGif}
-        />
+          title="Giphy Search"
+          titleId="modal-basic-title"
+          titleClass="modal-title"
+          titleTag="h4"
+          bodyClass="modal-lg"
+          bodyStyle="max-height: 77vh; overflow-y: auto;"
+        >
+          <GiphyPicker
+            variant="modal"
+            hint="*Double click an image to insert it"
+            apiKey={giphyApiKey}
+            onselect={insertGif}
+          />
+          {#snippet footer()}
+            <button type="button" class="btn btn-outline-dark" onclick={() => (giphyOpen = false)}>
+              Close
+            </button>
+          {/snippet}
+        </Modal>
       {/if}
     </div>
 

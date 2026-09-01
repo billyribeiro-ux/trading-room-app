@@ -45,6 +45,94 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 17:17 UTC — GIF-07: the note editor's GIF picker was the wrong KIND of thing, and a counter could not read an arrow function
+
+**Runtime impact: yes.** Opening GIFs from a note now raises the dialog the capture raises, in the
+middle of the screen, instead of a popover pinned to the bottom-left corner of the viewport.
+
+## The finding
+
+The bundle builds this picker four times. Three are ng-bootstrap POPOVERS. The fourth is a MODAL:
+
+```js
+opengifSerachModal(){this.modalService.open(this.giphySearchPopOver,
+  {ariaLabelledBy:"modal-basic-title"}).result.then(e=>{},e=>{})}       // byte 1,482,730
+```
+
+— const 2 is `["giphySearchPopOver",""]`, a template reference variable, so the whole picker is an
+`<ng-template>` handed to the modal service. `L0e` at byte 1,467,000 draws const 26 `modal-header`,
+const 82 `["id","modal-basic-title",1,"modal-title"]` under an `h4`, const 83
+`[1,"modal-body","modal-lg",2,"max-height","77vh","overflow-y","auto"]`, const 40 `modal-footer` and
+const 41 `btn btn-outline-dark` reading ` Close `. **There is no `giphy-search` const in `app-note`
+at all** — that class appears only in the component's own `styles:[…]`, where its three rules style
+nothing.
+
+`GiphyPicker.svelte` rendered its popover shell on all four mounts, and that shell portals itself to
+`<body>` with `inset: auto auto 0px 0px`. So the note editor's picker opened at the bottom-left of
+the viewport, detached from the editor it belongs to. **`GIF-04` corrected the three chrome CLASSES
+on this mount earlier the same day without noticing that the chrome around them was the wrong kind.**
+
+## The fix, and why it stays one component
+
+The hint, the form and the grid are two snippets now, rendered by whichever chrome the `variant`
+prop selects — the popover splits them across its `giphy-header` and the modal does not, so a single
+shared block would not have worked. Splitting into two components instead would either duplicate the
+snippets or need a third file to pass them through, and the four call sites would then have to know
+which of two components to import — which is the decision `variant` exists to take for them.
+
+`popoverId` and `onclose` become optional and are documented as POPOVER CHROME ONLY: the modal mount
+has no popover to id or to close, and requiring them would mean passing an id nothing renders.
+
+## A recorded reason that was right about a number and wrong about the element
+
+`note-editor-modal-labelling-contract.test.ts` said `modal-basic-title` could not be transcribed:
+
+> it names the Giphy modal, and `GiphyPicker` is mounted at FOUR sites, so a literal id there really
+> would appear four times in one document.
+
+The count is correct. **It is a fact about the picker, and the id belongs to the dialog around one
+of them** — the other three mounts have no `modal-header`, no `modal-title` and nothing labelled by
+that id, so it was never going to appear four times. `app-note` was the last surface holding a
+residual for it, and it is now the fortieth fully covered component in
+`reference-const-coverage-contract.test.ts` (111 residual values → 110).
+
+**Twelfth recorded reason this week to fail re-measurement.**
+
+## And the counter that had been returning plausible numbers for weeks
+
+`alert-report-modal-contract.test.ts` counts `<Modal>` call sites with `/<Modal\b[^>]*>/gs` — which
+stops at the first `>` in the source, and **an arrow function in any prop value contains one**.
+`onclose={() => (giphyOpen = false)}` cut this new dialog off three props early, so the counter saw
+its `id=` and never saw its `titleId=`, and filed a named dialog as a self-referential one.
+
+Every earlier call site happened to order its props the other way. The fix is a brace-depth scan —
+the tag ends at the first `>` not inside a `{…}` expression, which is a rule about the language
+rather than about which characters people happen to use. The re-count is 23 dialogs, 10 named, 10
+self-referential; the ten did not move, which is the evidence that nothing else had been truncated.
+
+## `app-note` is now audited end to end
+
+94 consts, 17 embedded views, **zero absent const values**. The one absent text literal is a recorded
+refusal: `"Loading images..."` is upstream's fetch-in-flight arm, and `openFileBrowser(e)` at byte
+1,477,053 sets `fileBrowserLoading = !0` and THEN POSTs `getSessionFiles`. Here `sessionImages` is a
+page-load prop, so there is no moment between opening the browser and holding the list —
+`session-image-files.ts` already carried that measurement.
+
+## Verification
+
+Room gate exit 0 — **332 files, 5,996 passed, 1 skipped**; `svelte-check` 1,624 files, 0 errors.
+
+**Two negative controls, both red naming the value they guard, both restored:** the `77vh` body
+style removed (`expected [ { value: '77vh', consts: [ 83 ] } ] to deeply equal []`) and
+`bodyClass="modal-lg"` removed. A third control — renaming `titleClass` — did NOT fire, correctly:
+`modal-title` is also rendered by `ImageUploadDialog.svelte`, which is in this surface's file list,
+so the value is present whatever this mount does. Recorded because a control that does not fire is
+only acceptable when the reason is measured.
+
+`GiphyPicker` 255 → 316, `Modal` 189 → 191, both argued at their ratchet entries. `todo-next.md`: 76
+of 93 surfaces, 72.1%. The Svelte MCP has been unavailable for this entire session, so
+`svelte-autofixer` has NOT been run on the three components touched.
+
 ### 2026-09-01 16:55 UTC — the typing dots were refused on a reason that was half right, and an id prefix cost two rules
 
 **Runtime impact: yes, twice.** The three blinking dots beside "[2] alice,bob" are drawn in both chat

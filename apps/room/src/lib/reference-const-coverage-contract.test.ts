@@ -543,12 +543,21 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     `NoteEditor` behind `editingNoteId === note.id`, a single value, and says *"a second instance
     could never be reached"*.
 
-    `modal-basic-title` stays, and the difference is a measurement rather than a preference: it names
-    the Giphy modal, and `GiphyPicker` is mounted at FOUR sites, so a literal id there really would
-    appear four times in one document. It already carries an instance-suffixed `popoverId`.
-    `note-editor-modal-labelling-contract.test.ts` asserts both mount counts.
+    `modal-basic-title` used to stay, on this reason: *"it names the Giphy modal, and `GiphyPicker`
+    is mounted at FOUR sites, so a literal id there really would appear four times in one
+    document."* **The count was right and it was a fact about the wrong element**, which is the
+    twelfth recorded reason this week to fail re-measurement.
+
+    That id is not the picker's. It is the id of the MODAL TITLE upstream opens the note mount
+    inside — `modalService.open(this.giphySearchPopOver,{ariaLabelledBy:"modal-basic-title"})` at
+    byte 1,482,730, `d(1,"h4",82)` in `L0e` — and the other three mounts are POPOVERS with no
+    `modal-header` and no `modal-title` at all, so it was never going to appear four times.
+
+    `GIF-07` separated the chromes: `GiphyPicker` renders the popover shell only under
+    `variant="popover"`, and `notes/NoteEditor.svelte` wraps the fourth in `Modal.svelte` with the
+    captured `modal-lg` body and its `max-height: 77vh`. The id is literal now, on the one mount
+    whose capture has it, and **`app-note` has no entry in this table at all any more.**
   */
-  'app-note': ['modal-basic-title'],
 
   /*
     FOUR — GAPS ON SURFACES THAT ARE OTHERWISE BUILT.
@@ -769,19 +778,22 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: thirty-nine components fully covered, one hundred and eleven values not', () => {
+  it('holds the ratchet: forty components fully covered, one hundred and ten values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
       edits the table without knowing which way they moved it.
     */
     const residuals = ROWS.reduce((total, row) => total + row.residuals.length, 0);
-    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(39);
+    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(40);
     /*
-      115 -> 111 on 2026-09-01. The four are `app-session-login`'s loading view — consts 1 and 3 of
-      the root swap, built, with the reason recorded at that entry. The ratchet only goes down.
+      115 -> 111 -> 110 on 2026-09-01. The four were `app-session-login`'s loading view — consts 1
+      and 3 of the root swap, built. The one after them is `app-note`'s `modal-basic-title`, which
+      left by being BUILT rather than re-argued: `GIF-07` gave that mount the modal chrome its
+      capture opens it in, and the id came with it. `app-note` becomes the fortieth fully covered
+      component. The ratchet only goes down.
     */
-    expect(residuals).toBe(111);
+    expect(residuals).toBe(110);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -996,19 +1008,23 @@ describe('how much of the gap has already been written about', () => {
     measured against stripped source. The two siblings (`#navbarsExampleDefault` and the bare id) did
     NOT move, because the reason they already carried named them literally.
   */
-  it('splits the 111 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(111);
+  it('splits the 110 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(110);
     /*
-      34 -> 38, 2026-09-01, and all four moved by the same mechanism the note above describes: a
-      reason was written for them. They came from two per-surface audits pinned that day in
-      `surface-audit-contract.test.ts` — `app-alert-send-report-modal`, whose forty-six absent
-      values are one refusal and are now listed by name with the section of the report each belongs
-      to, and `app-typing-indicator-dots`.
+      34 -> 38 -> 37, 2026-09-01, and the two steps are the two different events this note keeps
+      separating.
 
-      Which is the split working. None of the four left `all`, because only RENDERING does that, and
-      the unexamined side fell by exactly four — the side that means work.
+      The four that ARRIVED moved by the mechanism described above: a reason was written for them,
+      by two per-surface audits pinned the same day in `surface-audit-contract.test.ts` —
+      `app-alert-send-report-modal`, whose forty-six absent values are one refusal and are now
+      listed by name with the section of the report each belongs to, and
+      `app-typing-indicator-dots`. None of the four left `all`, because only RENDERING does that.
+
+      The one that LEFT is `modal-basic-title`, and it left `all` entirely: `GIF-07` built it. So
+      the examined side is 37 rather than 38, the unexamined side is untouched at 73, and the total
+      is 110 rather than 111.
     */
-    expect(all.filter(mentioned)).toHaveLength(38);
+    expect(all.filter(mentioned)).toHaveLength(37);
     /*
       85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
       means work: the four were `app-session-login`'s loading view and they left `all` by being
@@ -1140,11 +1156,16 @@ describe('the comment stripping is load-bearing', () => {
     const stripped = ROWS.reduce((total, row) => total + row.residuals.length, 0);
     expect(raw).toBeLessThan(stripped);
     /*
-      19 -> 20 on 2026-09-01. The twentieth is `closed-container`: the `app-closed-session-page`
-      re-measurement quotes the const it belongs to, so an UNSTRIPPED read of our source now finds
-      that string in a docblock and calls the gap closed. Which is the exact failure this case
-      exists to prove is still being avoided — the gap is open, and only the stripped read says so.
+      19 -> 20 -> 22 -> 21 on 2026-09-01. The twentieth was `closed-container`: the
+      `app-closed-session-page` re-measurement quotes the const it belongs to, so an UNSTRIPPED read
+      of our source now finds that string in a docblock and calls the gap closed. Which is the exact
+      failure this case exists to prove is still being avoided — the gap is open, and only the
+      stripped read says so.
+
+      The drop back to 21 is the opposite event and is equally healthy: `modal-basic-title` was one
+      of the values only the stripped read called a gap, and `GIF-07` BUILT it, so it is now absent
+      from both reads rather than from one.
     */
-    expect(stripped - raw).toBe(22);
+    expect(stripped - raw).toBe(21);
   });
 });

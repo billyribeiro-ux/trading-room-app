@@ -6877,7 +6877,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this climbs, the question is whether a THIRD chrome has appeared. There are two, and a
       variant that is not one of them is a surface the capture does not contain.
     */
-    max: 255,
+    /*
+      255 -> 316, 2026-09-01 — `GIF-07`, and the raise buys a SECOND CHROME rather than more of the
+      first.
+
+      `app-note` does not open this picker in a popover. `opengifSerachModal()` at bundle byte
+      1,482,730 is `modalService.open(this.giphySearchPopOver,{ariaLabelledBy:"modal-basic-title"})`,
+      and `L0e` draws `modal-header`, `modal-title`, `modal-body modal-lg` at `max-height: 77vh`, a
+      `modal-footer` and a `btn btn-outline-dark` reading ` Close `. There is no `giphy-search` const
+      in that component at all. This file rendered the popover shell on all four mounts, so the note
+      editor's picker was portaled to `<body>` at `inset: auto auto 0px 0px`.
+
+      The extraction the ratchet asks for is INSIDE the file and is what makes the raise small: the
+      hint, the form and the grid are two snippets, rendered by both branches, because the popover
+      splits them across its `giphy-header` and the modal does not. Splitting the two chromes into
+      two components instead would duplicate those snippets or add a third file to pass them
+      through — and the four call sites would then have to know which of two components to import,
+      which is the decision this component's `variant` prop exists to take for them.
+
+      Of the sixty-one lines, forty-three are the decode: the const table, what the two chromes
+      disagree on, and why the popover's own id and close handler are now optional props.
+    */
+    max: 316,
     why: 'the GIF search grid, its search and clear pair, and the one word that varies by surface'
   },
   {
@@ -6924,7 +6945,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       decline with its reason at the code is what stops the next reader, holding the same three
       suggestions, "fixing" it.
     */
-    max: 189,
+    /*
+      189 -> 191, 2026-09-01. Two lines: `titleTag` gains `'h4'` and a comment saying which captured
+      dialog wants each of the three levels. `app-note`'s Giphy modal opens its title with
+      `d(1,"h4",82)`, and this primitive is the only place a heading level is decided for all
+      twenty-three dialogs in the room.
+    */
+    max: 191,
     why: 'the modal shell every captured modal is rendered through'
   },
   {

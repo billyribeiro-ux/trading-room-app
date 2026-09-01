@@ -13,7 +13,9 @@
     title?: string;
     titleId?: string;
     titleClass?: string;
-    titleTag?: 'h3' | 'h5';
+    /* The levels the CAPTURE writes: `h5` mostly, `h3` for the YouTube dialog, and `h4` for
+       `app-note`'s Giphy modal (`d(1,"h4",82)`). A union, so an unattested level cannot be passed. */
+    titleTag?: 'h3' | 'h4' | 'h5';
     header?: Snippet;
     beforeBody?: Snippet;
     footer?: Snippet;

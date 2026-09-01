@@ -703,3 +703,56 @@ describe('app-typing-indicator-dots — audited 2026-09-01', () => {
     expect(report.textGaps).toEqual([]);
   });
 });
+
+describe('app-note — audited 2026-09-01', () => {
+  /*
+    The note editor and everything it opens: the Giphy dialog, the carousel builder, the file
+    browser, the version history. 94 consts and 17 embedded views, the third-largest surface pinned
+    here.
+
+    `GIF-07` closed the last const gap. `modal-basic-title`, `modal-lg` and `77vh` all belong to the
+    ng-bootstrap MODAL `opengifSerachModal()` opens the picker inside — and this room had been
+    rendering `GiphyPicker`'s POPOVER shell on that mount, portaled to `<body>` at
+    `inset: auto auto 0px 0px`. The dialog is `Modal.svelte` now, with the captured id, `h4` title,
+    `modal-lg` body and `max-height: 77vh`.
+  */
+  const report = auditSurface({
+    selector: 'app-note',
+    files: [
+      'src/lib/components/notes/NoteEditor.svelte',
+      'src/lib/components/notes/NoteTabContent.svelte',
+      'src/lib/components/notes/NotesPane.svelte',
+      'src/lib/components/notes/CarouselDialog.svelte',
+      'src/lib/components/notes/note-image.ts',
+      'src/lib/components/notes/carousel.ts',
+      'src/lib/components/notes/note-tab-chrome.ts',
+      'src/lib/components/GiphyPicker.svelte',
+      'src/lib/components/ImageUploadDialog.svelte',
+      'src/lib/components/Modal.svelte'
+    ]
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(94);
+    expect(report.views.resolved).toBe(17);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('renders every const value the reference does', () => {
+    expect(report.constGaps).toEqual([]);
+  });
+
+  it('and the one absent literal is a state that cannot arise here', () => {
+    /*
+      `A0e` — `"Loading images..."`, the file browser's fetch-in-flight arm. Upstream's
+      `openFileBrowser(e)` at byte 1,477,053 sets `fileBrowserLoading = !0`, opens the dialog, THEN
+      POSTs `getSessionFiles`. Here `sessionImages` is a page-load prop derived once in
+      `PresentationArea.svelte` from `data.files`, and every upload path calls `invalidateAll()` —
+      so there is no moment between opening the browser and holding the list.
+
+      `session-image-files.ts` carries the measurement and says exactly this: *"a branch that can
+      never render is a branch that can never be checked."*
+    */
+    expect(report.textGaps).toEqual(['Loading images...']);
+  });
+});
