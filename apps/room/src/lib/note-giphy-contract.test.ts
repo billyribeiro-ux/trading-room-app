@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
+
+import GiphyPicker from './components/GiphyPicker.svelte';
 
 import { codeOf } from './source-comments.js';
 
@@ -44,10 +47,31 @@ describe('the search button', () => {
       clear span was here, so a search could be started only by pressing Enter in the field — with a
       visible affordance beside it that did the opposite.
     */
-    expect(PICKER).toContain('<i class="fa fa-2x fa-search"></i>');
-    expect(PICKER).toContain('<i class="fa fa-2x fa-times"></i>');
-    const spans = [...PICKER.matchAll(/class="input-group-text text-white"/g)];
-    expect(spans, 'the pair, and nothing else').toHaveLength(2);
+    /*
+      ── REWRITTEN 2026-09-01, AND THE OLD FORM WAS ASSERTING THE WRONG THING ──────────────────
+
+      It read the SOURCE for `<i class="fa fa-2x fa-search">` and for two spans spelled
+      `input-group-text text-white`. Both literals are gone: `GIF-04` found that the picker serves
+      TWO chromes — three popover hosts and `app-note`'s modal — whose classes differ, so all three
+      are `$derived` from a `variant` prop now and appear nowhere in the markup as text.
+
+      The subject of this case was never the spelling. It is that the pair EXISTS, because the search
+      half shipped missing and the clear half was doing the opposite of what the icon beside it
+      suggested. So it is asserted on the RENDERED output, in both chromes — which is also the
+      stronger form: a source assertion passes on a ternary regardless of which arm it takes.
+
+      The citation above is the modal's consts and stays as it is; `giphy-picker-v4-contract.test.ts`
+      holds the popover column and the count that says three hosts share it.
+    */
+    for (const variant of ['popover', 'modal'] as const) {
+      const body = render(GiphyPicker, {
+        props: { apiKey: 'k', popoverId: 'p', onclose: () => {}, onselect: () => {}, variant }
+      }).body;
+      expect(body, `${variant}: the search half`).toContain('fa-search');
+      expect(body, `${variant}: the clear half`).toContain('fa-times');
+      const spans = [...body.matchAll(/class="input-group-text text-(?:white|dark)"/g)];
+      expect(spans, `${variant}: the pair, and nothing else`).toHaveLength(2);
+    }
   });
 
   it('is reachable from a keyboard, which the capture s bare span is not', () => {

@@ -158,6 +158,101 @@ const CLEAN: readonly {
     ]
   },
   {
+    /*
+      The two message components, and the largest clean pair in this file: 74 and 77 consts, 53 and
+      51 embedded views. They are `RoomMessage` and `CompactMessageRow` here, plus the menu both
+      share — which is why `MessageMenu.svelte` is in both file lists rather than one.
+    */
+    selector: 'app-st-message',
+    consts: 74,
+    views: 53,
+    files: [
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/MessageMenu.svelte',
+      'src/lib/components/ModeratorMessage.svelte',
+      'src/lib/message-formatters.ts',
+      'src/lib/room-message-chrome.ts',
+      'src/lib/message-behavior.ts'
+    ]
+  },
+  {
+    selector: 'app-st-compactmessage',
+    consts: 77,
+    views: 51,
+    files: [
+      'src/lib/components/CompactMessageRow.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/MessageMenu.svelte',
+      'src/lib/message-formatters.ts',
+      'src/lib/room-message-chrome.ts',
+      'src/lib/compact-message-time.ts',
+      'src/lib/message-behavior.ts'
+    ]
+  },
+  {
+    selector: 'app-screenshare-view',
+    consts: 20,
+    views: 7,
+    files: [
+      'src/lib/components/ScreenTabs.svelte',
+      'src/lib/components/ScreenPane.svelte',
+      'src/lib/components/ScreenPaneStatus.svelte',
+      'src/lib/components/ScreenZoomControls.svelte',
+      'src/lib/components/ScreenVolumeControl.svelte',
+      'src/lib/components/PresentationArea.svelte'
+    ]
+  },
+  {
+    selector: 'app-alerts',
+    consts: 54,
+    views: 13,
+    files: [
+      'src/lib/components/AlertChatArea.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/ChatTabStrip.svelte',
+      'src/lib/components/ChatSearchBar.svelte',
+      'src/lib/components/MessageMenu.svelte'
+    ]
+  },
+  {
+    selector: 'app-roomscroller',
+    consts: 4,
+    views: 10,
+    files: [
+      'src/lib/components/AlertChatArea.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/CompactMessageRow.svelte'
+    ]
+  },
+  {
+    selector: 'app-room-roster',
+    consts: 24,
+    views: 11,
+    files: [
+      'src/lib/components/RoomSidebar.svelte',
+      'src/lib/roster-gates.ts',
+      'src/lib/components/AvatarOptionsMenu.svelte',
+      /* The roster's badges are drawn by the message row and the user modal, not by the sidebar. */
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/ModalHost.svelte'
+    ]
+  },
+  {
+    selector: 'app-ytplayer',
+    consts: 5,
+    views: 1,
+    files: [
+      'src/lib/components/YoutubePlayerOverlay.svelte',
+      'src/lib/components/RoomOverlays.svelte'
+    ]
+  },
+  {
+    selector: 'app-screenshare-preview',
+    consts: 11,
+    views: 1,
+    files: ['src/lib/components/ModalHost.svelte', 'src/lib/components/ScreenPane.svelte']
+  },
+  {
     /* Two consts and no embedded views — a thin container, and the numbers say so. */
     selector: 'app-positions-container',
     consts: 2,

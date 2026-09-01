@@ -5308,6 +5308,13 @@
     {/snippet}
   </Modal>
 </app-followed-users-modal>
+<!--
+  A SHELL: `name === 'scheduled'` is never set, and that is a recorded decision rather than a missing
+  door. The half this room built is the INLINE table in `ScheduledAlerts.svelte`, which argues the
+  split; this block stays because `app-scheduled-alerts-modal` is a scoped host in the generated
+  stylesheet. The measurement, and the gate that fails if it ever gains a door, are in
+  `modal-reachability-contract.test.ts` — recorded once, there, rather than twice.
+-->
 <app-scheduled-alerts-modal>
   <Modal
     id="scheduledAlertsModal"

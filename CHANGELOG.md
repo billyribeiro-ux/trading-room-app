@@ -33,6 +33,195 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 07:05 UTC — two session-control refusals that had no reason written down
+
+**Runtime impact: NONE.** Neither control was built before and neither is built now. What changed is
+that both are decisions with premises a test re-reads, instead of absences nobody had looked at.
+
+## The finding
+
+`gate/audit-surface.mjs` measured `app-session-control-modal` against the eight files that implement
+it — 135 consts, 32 embedded views — and reported five absent text literals. Three were already
+argued (the WHIP pair at `ModalHost.svelte`, the Player Link readout in
+`stream-player-blocked-contract.test.ts`). **Two had no reason recorded anywhere**, and an unrecorded
+absence is the state this repository treats as worse than a gap: it reads as something nobody has
+looked at, and the next reader either rebuilds it or leaves it another month.
+
+**Swap Primary and Backup Media Servers** (`lDe`, byte 2,140,840) has two independent blockers, and
+either alone is enough. Its GATE is `O(36, sessData.backupClusterID ? 36 : -1)` — a second MediaMTX
+cluster, and `backupClusterID` is `wired: false`, so the gate is false for every room this repository
+can produce. Its ACTION, `switchToBackup()` at byte 2,173,860, opens a prompt and compares what is
+typed against `sessData.deleteAlertPW` **in the browser** — which would require shipping one of the
+seven controller-only credentials to every presenter's page.
+
+**Admin Dashboard Login** (`cDe`, byte 2,141,013) is the sharper one, because the problem is the gate
+itself: `O(69, isPresenter && sessData.modAdminLoginList ? 69 : -1)`. `modAdminLoginList` is one of
+the seven credentials that never cross to the room. Rendering the button when the list is non-empty
+would leak, one bit at a time, whether a room HAS an admin access list — precisely the oracle the
+guard exists to close. And what it opens is a CONTROLLER surface:
+`POST ${apiROOT}/sessions/v2/loginToAdminFromRoom`, then `window.open` on the URL it answers with.
+
+## Why a test rather than a comment
+
+A comment saying "we did not build these" cannot fail. What CAN change is the premise: a gate that is
+a credential today could be re-modelled, and a cluster that does not exist could be provisioned. So
+the gates are read from the pinned bundle, the two `wired: false` entries from the controller's
+settings schema, and the seven credential names from `room-credential-prompt.ts`, on every run.
+
+## Two negative controls were wrong before they were right
+
+Renaming `modAdminLoginList` to `modAdminLoginListX` left the run GREEN, because `toContain` is
+satisfied by a longer name that contains the old one — **the ninth substring failure this repository
+has recorded**, after `js` inside `json`, `pmToolbar` inside `pmToolbarZZ`, and `form-select` inside
+`form-select-sm` earlier the same day. The assertion is whole-word now and the control is red.
+
+The other control added the credential name in an HTML COMMENT and passed — correctly: the source is
+read through `codeOf`, so a mention in prose is not the room holding the value. Re-run as real markup
+it is red.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 332 files, 5,959 passed, 1 skipped; `svelte-check` 1,622
+files, 0 errors, 0 warnings.
+
+Three negative controls, all red on target once corrected: the room holding a credential, the
+credential list losing an entry, and `backupClusterID` becoming wired.
+
+`todo-next.md`: **73 of 92 surfaces, 26,292 of 38,904 lines (67.6%)**.
+
+### 2026-09-02 06:25 UTC — GIF-04: the Giphy picker wore the wrong chrome in the note editor
+
+**Runtime impact: YES, visible.** The note editor's Giphy search and clear icons were `text-white` on
+a light modal body. They are `text-dark` there now, as the capture has them, and the input loses a
+`border` the modal does not carry.
+
+## The finding
+
+`gate/audit-surface.mjs`, scoped to `app-note` and the nine files that implement it, reported
+`text-dark` absent. Decoding the four Giphy templates by value shows why:
+
+| | popover ×3 | note modal |
+| --- | --- | --- |
+| input | `form-control border` | `form-control` |
+| icon span | `input-group-text text-white` | `input-group-text text-dark` |
+| icons | `fa fa-2x fa-times` | `fa fa-search`, `fa fa-times` |
+
+They vary together because the GROUNDS differ: a popover paints its own dark panel, the modal body
+does not. One shared `GiphyPicker` serves all four mounts and hardcoded the popover column.
+
+**`GIF-03` had already read three of the four tables and concluded *"this component matches its
+capture exactly and always did"*.** That is true of the three popovers and false of the fourth, and
+the fourth is the one where it shows. A whole-application search finds `text-dark` somewhere and
+stops; only scoping the search to one surface's own files can see it — which is the measurement this
+session built the tool for.
+
+## The fix, and why it is one prop
+
+`variant: 'popover' | 'modal'`, defaulting to the majority, driving all three values through
+`$derived`. Not three booleans: upstream has two CHROMES, and three independent flags would let a
+caller build a combination the capture has never had. It is the third time this component has needed
+exactly this shape — `hint` and `panelHeight` are the other two — and each says so at its own prop.
+
+`{@const}` was the first attempt and Svelte refused it: it is allowed only as the immediate child of
+a block or component, and these sit inside a plain `<div>`. `$derived` in the script is both the legal
+and the better place — it is where a reader looks for "what does this prop change".
+
+## Two contracts had to change with it, and one was asserting the wrong thing
+
+`note-giphy-contract.test.ts` read the SOURCE for `<i class="fa fa-2x fa-search">` and for two spans
+spelled `text-white`. Both literals are gone. Its subject was never the spelling — it is that the
+PAIR exists, because the search half once shipped missing and the clear half sat beside an icon
+suggesting the opposite. It is asserted on rendered output in BOTH chromes now, which is also the
+stronger form: a source assertion passes on a ternary regardless of which arm it takes.
+
+## Also this run
+
+`app-st-message` (74 consts, 53 views) and `app-st-compactmessage` (77/51) — the two largest message
+surfaces — measured **CLEAN**, along with `app-screenshare-view`, `app-alerts`, `app-roomscroller`,
+`app-room-roster`, `app-ytplayer` and `app-screenshare-preview`. All eight pinned.
+
+They were not clean until one more decoder went in: the kebab glyph is `'\u2807 '` in
+`MessageMenu.svelte` and `"\u2807 "` in the bundle — the same escape on both sides, and only the
+reference's was being decoded. Unescaping ours too can only make a match more likely, so the risk it
+adds is a false negative rather than a false alarm, and it takes a literal backslash-u in source to
+cause one.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 331 files, 5,943 passed, 1 skipped; `svelte-check` 1,621
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+**Four negative controls, all red on target**: the modal mount losing its variant (the shipped
+defect), the two chromes collapsed back into one, only the span switching while the icons do not, and
+a popover mount starting to pass the modal chrome.
+
+`todo-next.md`: **70 of 92 surfaces, 25,938 of 38,904 lines (66.7%)**, from 51 of 89 when the session
+began.
+
+### 2026-09-02 05:40 UTC — two modals behind a condition that is always false
+
+**Runtime impact: NONE.** Neither modal could be opened before this change or after it. What changed
+is that both are now measured decisions with a gate, instead of markup nobody had looked at.
+
+## The finding
+
+`gate/audit-surface.mjs` reported one word missing from `app-av-settings-modal` — `speakers-device`.
+Reading it found the word inside a **modal nothing can open**. `'av'` occurs exactly twice in the
+whole application: in the `ModalName` union and in the `open={name === 'av'}` that would show it.
+Nothing calls `modals.open('av')`. A hundred and thirty-nine lines of markup with six controls — a
+Speakers select with two invented device names, a Test button, two empty device selects, Change
+Devices, Save — sit behind a condition that is always false.
+
+Building the gate to prove it found a **second**: `'scheduled'`, the Manage Scheduled Alerts modal,
+whose `<tbody>` is empty and whose door was never wired either.
+
+## Both stay, and the reasons are three measurements each rather than a preference
+
+**`av`.** `#av-settings-modal` occurs twice in the 2,891,205-byte bundle and both are inside the
+component's own `styles:` array — there is no `data-bs-target` for it anywhere, so **the reference
+ships this modal unreachable too** and reproducing that is a match. The feature is built and better:
+`AvDevicePane.svelte` enumerates real devices, filters the virtual and duplicate entries upstream's
+`loadDevices()` filters, persists `audioDeviceID`/`videoDeviceID`, and is mounted at two reachable
+sites. Wiring a door here would put a second, inert device picker in front of members.
+
+**`scheduled`.** Upstream this one IS reachable — `XTe`'s "See Scheduled Alerts" carries
+`data-bs-target="#scheduledAlertsModal"` and calls `manageScheduledAlerts()`. This room's button
+carries the same const and calls `toggleManage()`, opening an INLINE table instead, and
+`ScheduledAlerts.svelte` argues why: *"both halves ask one question — what is already scheduled — so
+two components would refetch the same list and disagree about it after a removal."* The shell is the
+half that was not built.
+
+Neither was deleted, and the reason is the one that put `RecordingPreviewCard` back an hour earlier:
+both are scoped hosts in the generated stylesheet, and an absent host leaves its rules matching
+nothing. `ScheduledAlertsTable.svelte` carries both of its captured rules in its own `<style>` block,
+so the real table does not depend on the shell to be styled — measured, not assumed.
+
+## The gate
+
+`modal-reachability-contract.test.ts` asserts that the SET of doorless modals is exactly the recorded
+one. A twenty-fifth modal added without a door fails it; `'av'` gaining one fails it; a recorded
+reason outliving its subject fails it. The `av` entry's three premises are each re-read against the
+bundle and the source, so the decision cannot quietly stop being true.
+
+**Its opener matcher had to be generalised before it was right.** The first version listed `open(`,
+`openModal(` and two assignment shapes, and reported NINE live modals dead — `onopenmodal('connectivity')`
+from the sidebar, `onopenalertfilter` from the overlays. A hand-kept list of callee names is exactly
+the failure this file guards one level up, so it matches any call whose name contains `open` or
+`modal`. The callee filter is what keeps it from being a string search: `emoji-data.ts` contains
+`'user'`, `'poll'` and `'qa'` as ordinary data.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 330 files, 5,940 passed, 1 skipped; `svelte-check` 1,621
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+Four negative controls, all red on target: a new modal name with no door, a door removed from a live
+modal, a recorded reason that has outlived its subject, and the reference-premise case run alone.
+
+The docblock at the shell POINTS at the contract rather than repeating it — `ModalHost.svelte` was
+refused the twenty-two lines by `source-size-contract`, and two places recording one thing is how one
+of them goes stale.
+
 ### 2026-09-02 04:55 UTC — seven surfaces measured clean and pinned, and a template slice that read the wrong component
 
 **Runtime impact: NONE.** Contract coverage and tracker rows only.

@@ -52,9 +52,34 @@
      * majority default would have silently taken a control off the one surface whose capture has it.
      */
     searchButton?: boolean;
+    /**
+     * Which of the reference's TWO Giphy chromes this mount is — GIF-04.
+     *
+     * The bundle builds this picker four times and they are not one design: three POPOVER hosts
+     * (`app-privchat`, `app-chat`, `app-extra-chat`) share one set of consts, and `app-note`'s MODAL
+     * has its own. Decoded by value, the three differences are:
+     *
+     * | | popover ×3 | note modal |
+     * | --- | --- | --- |
+     * | input | `form-control border` (83/…) | `form-control` (87) |
+     * | icon span | `input-group-text text-white` (84/…) | `input-group-text text-dark` (88) |
+     * | icons | `fa fa-2x fa-times` (85/…) | `fa fa-search`, `fa fa-times` (89, 90) |
+     *
+     * They vary together because the GROUNDS differ: a popover paints its own dark panel, and the
+     * note modal's body does not. This component hardcoded the popover column, so on the one modal
+     * surface the search and clear icons were rendered `text-white` on a light body.
+     *
+     * ONE prop rather than three, because upstream does not choose these independently — it has two
+     * chromes. Three booleans would let a caller build a combination the capture has never had.
+     *
+     * The default is `'popover'`, the majority, for the reason `hint` gives above: the three surfaces
+     * that are already right stay right without being touched, and the one that differs says so.
+     */
+    variant?: 'popover' | 'modal';
   }
 
   let {
+    variant = 'popover',
     apiKey,
     popoverId,
     onclose,
@@ -63,6 +88,20 @@
     panelHeight = '700px',
     searchButton = true
   }: Props = $props();
+
+  /*
+    The three values the two chromes disagree on, derived once — see the `variant` docblock for the
+    table they correspond to, and check them against it rather than walking the markup.
+
+    `$derived` in the script rather than `{@const}` in the template: Svelte 5 allows `{@const}` only
+    as the immediate child of a block or component, and these sit inside a plain `<div>`. Deriving
+    them here is also where a reader looks for "what does this prop change".
+  */
+  const inputClass = $derived(variant === 'modal' ? 'form-control' : 'form-control border');
+  const spanClass = $derived(
+    variant === 'modal' ? 'input-group-text text-dark' : 'input-group-text text-white'
+  );
+  const iconSize = $derived(variant === 'modal' ? 'fa' : 'fa fa-2x');
   let query = $state('');
   let results = $state.raw<GiphyResult[]>([]);
 
@@ -123,7 +162,7 @@
                 name="giphy"
                 aria-label="Sizing example input"
                 aria-describedby="inputGroup-sizing-sm"
-                class="form-control border"
+                class={inputClass}
                 bind:value={query}
               />
               <!--
@@ -148,7 +187,7 @@
               -->
               {#if searchButton}
                 <span
-                  class="input-group-text text-white"
+                  class={spanClass}
                   role="button"
                   tabindex="0"
                   aria-label="Search Giphy"
@@ -157,11 +196,11 @@
                     if (event.key === 'Enter' || event.key === ' ') void search();
                   }}
                 >
-                  <i class="fa fa-2x fa-search"></i>
+                  <i class="{iconSize} fa-search"></i>
                 </span>
               {/if}
               <span
-                class="input-group-text text-white"
+                class={spanClass}
                 role="button"
                 tabindex="0"
                 aria-label="Clear the Giphy search"
@@ -170,7 +209,7 @@
                   if (event.key === 'Enter' || event.key === ' ') clearSearch();
                 }}
               >
-                <i class="fa fa-2x fa-times"></i>
+                <i class="{iconSize} fa-times"></i>
               </span>
             </div>
           </div>

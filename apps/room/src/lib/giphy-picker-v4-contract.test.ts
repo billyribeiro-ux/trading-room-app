@@ -93,6 +93,22 @@ describe('the four hosts, and the two ways they differ', () => {
   /**
    * GIF-03 — `text-white` and `fa-2x` are the popover hosts' OWN values, not a divergence from the
    * capture. The claim they were is what this asserts against, in both directions.
+   *
+   * ## GIF-04, 2026-09-01 — and it is the half GIF-03 did not finish
+   *
+   * GIF-03's conclusion was *"this component matches its capture exactly and always did"*, and that
+   * is true of the three POPOVER mounts and false of the fourth. `NoteEditor.svelte` mounts this same
+   * component inside `app-note`'s MODAL, where the capture's three values are the other column —
+   * `form-control` without `border`, `input-group-text text-dark`, and plain `fa-search`/`fa-times`.
+   * Hardcoding the popover column rendered the search and clear icons `text-white` on a light modal
+   * body.
+   *
+   * Found by `gate/audit-surface.mjs` scoping `app-note` to the files that implement it, which is the
+   * measurement GIF-03 could not make: a whole-app search finds `text-dark` somewhere and stops.
+   *
+   * The fix is one `variant` prop, not three booleans, because upstream has two CHROMES rather than
+   * three independent choices — and the cases below assert both columns render, so a future edit
+   * cannot collapse them back into one.
    */
   it.each([
     [
@@ -143,6 +159,60 @@ describe('what the picker renders', () => {
     const body = render(GiphyPicker, { props }).body;
     expect(body).toContain('height: 700px');
     expect(body).toContain('fa-2x fa-search');
+  });
+
+  it('GIF-04 — the POPOVER chrome, which is the default and the majority', () => {
+    /*
+      Rendered rather than read from source, because what is being asserted is the OUTPUT of a
+      conditional: a source assertion would pass on the ternary regardless of which arm it takes.
+    */
+    const body = render(GiphyPicker, { props }).body;
+    expect(body).toContain('class="form-control border"');
+    expect(body).toContain('input-group-text text-white');
+    expect(body).toContain('fa fa-2x fa-search');
+    expect(body).toContain('fa fa-2x fa-times');
+    expect(body).not.toContain('text-dark');
+  });
+
+  it('GIF-04 — the MODAL chrome, all three values, none of the popover ones', () => {
+    const body = render(GiphyPicker, { props: { ...props, variant: 'modal' } }).body;
+    expect(body).toContain('class="form-control"');
+    expect(body).toContain('input-group-text text-dark');
+    expect(body).toContain('fa fa-search');
+    expect(body).toContain('fa fa-times');
+    /*
+      The negative half, and it is the half that matters: the defect was the popover column appearing
+      on the modal surface, so asserting the modal column is present would pass with both.
+    */
+    expect(body).not.toContain('text-white');
+    expect(body).not.toContain('fa-2x');
+    expect(body).not.toContain('form-control border');
+  });
+
+  it('and the note editor is the one mount that asks for it', () => {
+    /*
+      The call site, because a variant nothing passes is a branch nothing reaches. Three popover
+      mounts take the default and are asserted NOT to pass it, so the split cannot quietly become
+      four-of-a-kind again.
+    */
+    const editor = readFileSync(
+      new URL('./components/notes/NoteEditor.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(editor).toContain('variant="modal"');
+    for (const mount of [
+      'components/AlertChatArea.svelte',
+      'components/ExtraChatPane.svelte',
+      'components/PrivateChatComposer.svelte'
+    ]) {
+      const source = readFileSync(new URL(`./${mount}`, import.meta.url), 'utf8');
+      const at = source.indexOf('<GiphyPicker');
+      expect(at, `${mount} must still mount the picker`).toBeGreaterThan(-1);
+      const end = source.indexOf('/>', at);
+      expect(end, `${mount}'s picker tag must be closed`).toBeGreaterThan(at);
+      const tag = source.slice(at, end);
+      expect(tag, `${mount} is a popover and must take the default`).not.toContain('variant');
+    }
   });
 
   it('takes the private chat s 400px and drops the search span when asked', () => {
