@@ -21,7 +21,8 @@ const ARCHIVE: ChatArchiveView = Object.freeze({
   channel: 'main',
   olderThan: Date.UTC(2026, 7, 1),
   archivedAt: Date.UTC(2026, 7, 30, 14, 5),
-  messageCount: 3
+  messageCount: 3,
+  archivedBy: 'Dana Presenter'
 });
 
 const message = (id: number, senderName: string, body: string) => ({

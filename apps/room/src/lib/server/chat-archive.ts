@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, lt } from 'drizzle-orm';
 import { db } from './db/index.js';
-import { chatArchives, messages } from './db/schema.js';
+import { chatArchives, messages, users } from './db/schema.js';
 
 /**
  * `archiveLogs` / `getArchiveList` / `unarchiveLogs` — the chat half.
@@ -71,6 +71,26 @@ export interface ChatArchiveView {
   readonly olderThan: number;
   readonly archivedAt: number;
   readonly messageCount: number;
+  /**
+   * WHO swept it — the reference's `By:` line, and the reason `archived_by_user_id` was recorded.
+   *
+   * The capture's row (`vxe` @ bundle byte 2,301,700) is three labelled lines, and the middle one is
+   * `<strong class="fw-bold">By:&nbsp;</strong><i>{{ createdBy }}</i>`. This column has held the
+   * answer since the table was added — the schema comment beside it says *"an administrative act on
+   * everybody's data, and the one question an incident asks first"* — and until 2026-09-01 nothing
+   * read it, so the browser could not answer the question the column exists to answer.
+   *
+   * A display name and never the id: the row is read by a person, and an integer is a lookup they
+   * cannot perform. The join is `innerJoin` because the column is `notNull` and
+   * `foreign_keys = ON` (`db/index.ts:12`), which is the same shape `chat-log.ts` and
+   * `user-notes.ts` use for their author joins.
+   *
+   * What it costs: one primary-key seek per row returned, and the rows returned are bounded by
+   * `ARCHIVE_LIST_LIMIT` — so 200 seeks at ten thousand archives, not ten thousand. The email on
+   * the joined row is never projected; `chat-archive-read.test.ts` asserts its absence, because a
+   * projection widened by one field is how an address leaves.
+   */
+  readonly archivedBy: string;
 }
 
 /**
@@ -115,9 +135,11 @@ export function listChatArchivesFor(room: string): ChatArchiveView[] {
       channel: chatArchives.channel,
       olderThan: chatArchives.olderThan,
       archivedAt: chatArchives.archivedAt,
-      messageCount: chatArchives.messageCount
+      messageCount: chatArchives.messageCount,
+      archivedBy: users.displayName
     })
     .from(chatArchives)
+    .innerJoin(users, eq(chatArchives.archivedByUserId, users.id))
     .where(eq(chatArchives.roomShortCode, room))
     .orderBy(desc(chatArchives.archivedAt), desc(chatArchives.id))
     .limit(ARCHIVE_LIST_LIMIT)
@@ -146,9 +168,11 @@ export function chatArchiveById(room: string, archiveId: number): ChatArchiveVie
       channel: chatArchives.channel,
       olderThan: chatArchives.olderThan,
       archivedAt: chatArchives.archivedAt,
-      messageCount: chatArchives.messageCount
+      messageCount: chatArchives.messageCount,
+      archivedBy: users.displayName
     })
     .from(chatArchives)
+    .innerJoin(users, eq(chatArchives.archivedByUserId, users.id))
     .where(and(eq(chatArchives.id, archiveId), eq(chatArchives.roomShortCode, room)))
     .get();
   if (!row) return null;

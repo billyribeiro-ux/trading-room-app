@@ -1693,8 +1693,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       on. Nothing here is separable: a list pane whose rows are not clickable is the pane that was
       already here, and the log it opens is its own component.
     */
-    max: 170,
-    why: 'the chat archives browser - a date, a channel picker, two sweeps, and a row that opens its log'
+    /*
+      170 -> 206, 2026-09-01. A raise, argued, and the extraction was considered and rejected.
+
+      The capture's row (`vxe` @ bundle byte 2,301,700) is THREE labelled lines — a date, `By:` with
+      the archiver's name, and `Channel:` — and this room drew one compressed line with no `By:` at
+      all. Transcribing it costs THREE more lines of markup than the compressed row it replaces;
+      the other thirty-four of the thirty-seven are the const listing they were read from, the
+      paragraph saying which of this room's two dates stands where the reference has one, and the
+      paragraph saying why the row's Unarchive needs no `isPresenter` gate of its own. Those are
+      the comments this repository exists to keep, not padding to trim.
+
+      The separable thing here is the SWEEP FORM — the date input, the channel picker and the two
+      archive buttons — which upstream really does keep apart from the browser (`archiveOptions()` is
+      a bootbox dialog raised from the chat toolbar; `app-chat-logs-modal` is the list). Pulling it
+      out does not pay: the only parent that could hold it beside this pane is
+      `LogArchiveModals.svelte`, which is AT its own ceiling, so the four sweep props would either
+      thread through this file anyway — leaving it the same size minus the markup — or grow the
+      capped file above it. That is the exact trade the entry above records the ratchet refusing.
+    */
+    max: 206,
+    why: "the chat archives browser - a date, a channel picker, two sweeps, and the capture's three-line row"
   },
   {
     file: 'lib/components/ChatArchiveLogPane.svelte',
