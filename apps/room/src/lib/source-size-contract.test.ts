@@ -7929,7 +7929,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       captured component appearing in this file would be the signal to split; more `why` for the one
       component here is what this file is.
     */
-    max: 290,
+    /*
+      290 -> 303, 2026-09-01, and every one of the thirteen is CITATION rather than code — the file's
+      code shrank by one line in the same edit.
+
+      The Svelte MCP came back mid-session after being unavailable for all of it, and this component
+      was the first thing put through `svelte-autofixer`. It returned NO issues. Two of its
+      suggestions were answered from the official docs and both answers are written at the code,
+      because the next reader will get the same two nudges:
+
+        * `armed && panelDragResize(...)` replaced a `NO_GESTURES = () => {}` sentinel. `svelte/@attach`
+          states it directly — *"Falsy values like `false` or `undefined` are treated as no
+          attachment, enabling conditional usage"* — and the sentinel was a symbol whose only purpose
+          was to stand for nothing.
+        * `bind:this` STAYS, against the standing nudge that an attachment replaces it. The node is
+          needed at EVENT time, and an attachment whose whole body assigns the node to a local is
+          `bind:this` with a layer on top.
+
+      A suggestion answered and not recorded is a suggestion the next person re-litigates.
+    */
+    max: 303,
     why: 'the recording preview card - app-rec-preview, transcribed, unreachable, and argued'
   },
   {
