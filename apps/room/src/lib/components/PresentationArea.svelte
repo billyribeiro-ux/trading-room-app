@@ -1015,6 +1015,7 @@
                   -->
         <YoutubePlayerOverlay
           url={broadcasts.youtubeForAllUrl}
+          startSeconds={broadcasts.youtubeStartSeconds}
           {isPresenter}
           muted={doNotDisturbOn}
           onstop={() => void broadcasts.stopYoutubeForAll()}

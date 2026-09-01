@@ -50,6 +50,7 @@ export class RoomBroadcasts {
   readonly #setSoundCloudPlaying: (playing: boolean) => void;
   readonly #commands: RoomBroadcastCommands;
   #youtubeForAllUrl;
+  #youtubeStartSeconds;
   #videoPlayerUrl;
   #hideVideoPlayer;
   #scheduledVideoForAll;
@@ -82,6 +83,8 @@ export class RoomBroadcasts {
     this.#setSoundCloudPlaying = options.setSoundCloudPlaying;
 
     this.#youtubeForAllUrl = $state('');
+    /** `this.startTime = 0` in the overlay's constructor, byte 1,503,354. */
+    this.#youtubeStartSeconds = $state(0);
 
     /**
      * `videoPlayerUrl` / `hideVideoPlayer` / `scheduledVideo` — the VideoPlayer tab, for the ROOM.
@@ -167,6 +170,11 @@ export class RoomBroadcasts {
     return this.#youtubeForAllUrl;
   }
 
+  /** `playYTURL(e, i = 0)`'s `i` — seconds into the video, non-zero only on a late-join replay. */
+  get youtubeStartSeconds() {
+    return this.#youtubeStartSeconds;
+  }
+
   get videoPlayerUrl() {
     return this.#videoPlayerUrl;
   }
@@ -216,14 +224,37 @@ export class RoomBroadcasts {
     this.#hideVideoPlayer = false;
   }
 
-  /** `playYTForAll`. The seek offset is derived and never sent — see `playYoutubeForAll`. */
-  youtubeStarted(url: string) {
+  /**
+   * `playYTForAll` — and the SECOND argument is the late-join seek, in seconds.
+   *
+   * ```js
+   * subscribe("playYTForAll", e => { let i = 0;
+   *   if (e.startTime) { let o = Number(e.startTime), s = Date.now();
+   *     i = Math.round((s - o) / 1e3), this.startTime = i } else this.startTime = 0;
+   *   this.ytURL = e.url })                                                   // byte 1,964,799
+   * ```
+   *
+   * Zero for every live play, because the live command carries `url` alone (byte 1,024,137) and the
+   * `else` branch is what runs. It is non-zero only on the replay a member gets when they JOIN a
+   * room that is already playing, which is where `startTime` rides.
+   *
+   * The seconds are computed by the CALLER, not here, because the derivation reads `Date.now()` and
+   * a store that reads the clock is a store whose value depends on when you look at it.
+   */
+  youtubeStarted(url: string, startSeconds = 0) {
     this.#youtubeForAllUrl = url;
+    this.#youtubeStartSeconds = startSeconds;
   }
 
   /** `stopYTForAll`. No payload is read: the reference's own dispatch forwards none. */
   youtubeStopped() {
     this.#youtubeForAllUrl = '';
+    /*
+      The offset goes with the url. Leaving it behind would seek the NEXT video to wherever the last
+      one had reached — the overlay's setter rebuilds the embed from `_ytURL` and `startTime`
+      together (byte 1,503,095), so a stale offset is a real wrong position rather than dead state.
+    */
+    this.#youtubeStartSeconds = 0;
   }
 
   /** `playMP3ForAll` — room-wide, so unlike `giveMicScreen` there is no target to match on. */
@@ -342,6 +373,8 @@ export class RoomBroadcasts {
    */
   closeYoutubeFrame() {
     this.#youtubeForAllUrl = '';
+    /* Same reason as `youtubeStopped`: the offset is part of the frame, not part of the room. */
+    this.#youtubeStartSeconds = 0;
   }
 
   /**

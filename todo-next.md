@@ -75,12 +75,12 @@ guessed.
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,068 | no |
-| 2 | `routes/+page.svelte` | 1,837 | no |
+| 2 | `routes/+page.svelte` | 1,856 | no |
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,532 | no |
 | 5 | `lib/components/RoomMessage.svelte` | 1,254 | no |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,093 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
-| 7 | `lib/components/PresentationArea.svelte` | 1,107 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
+| 7 | `lib/components/PresentationArea.svelte` | 1,108 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,183 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
 | 9 | `lib/components/notes/CarouselDialog.svelte` | 946 | `## CarouselDialog.svelte` in the v4 register — 8 rows. |
 | 10 | `lib/components/EmojiPicker.svelte` | 858 | `## EmojiPicker.svelte` in the v4 register — Seven rows, read end to end on 2026-08-31 against |
@@ -153,7 +153,7 @@ guessed.
 | 73 | `lib/components/ModeratorMessage.svelte` | 73 | no |
 | 74 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
 | 75 | `lib/components/ToastHost.svelte` | 64 | no |
-| 76 | `lib/components/YoutubePlayerOverlay.svelte` | 61 | no |
+| 76 | `lib/components/YoutubePlayerOverlay.svelte` | 88 | no |
 | 77 | `lib/components/PollSavedList.svelte` | 59 | no |
 | 78 | `lib/components/NavbarTipButton.svelte` | 58 | §NAV — born 2026-08-31 out of `RoomNavbar`; RS-09 s navbar copy and its `noopener` refusal. |
 | 79 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
@@ -164,7 +164,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 106 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**51 of 89 surfaces audited · 21,019 of 38,194 lines · 55.0%.**
+**51 of 89 surfaces audited · 21,020 of 38,241 lines · 55.0%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

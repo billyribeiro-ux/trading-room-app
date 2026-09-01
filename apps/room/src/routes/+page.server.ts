@@ -107,6 +107,7 @@ import type { ActivePoll } from '#lib/types.js';
 // `MAX_MESSAGE_BODY` and `MAX_ALERT_BODY` left for `#lib/message-bounds.ts`, which exists because a
 // `.remote.ts` file cannot export a constant and three commands across two modules need them.
 import type { PageServerLoad } from './$types';
+import { roomMediaState } from '#lib/server/room-media-state.js';
 
 /*
   `refuseSwingAlert`, `refuseDayTradeAlert`, `swingAlertFieldsFrom` and `dayTradeAlertFieldsFrom`
@@ -562,6 +563,20 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         .from(roomState)
         .where(eq(roomState.roomShortCode, requireRoomShortCode(locals)))
         .get()?.chatMode ?? 'g',
+    /*
+      WHAT THE ROOM IS PLAYING, so a member who joins mid-video gets what everyone else is watching.
+
+      The reference replays from server state on CONNECT — `roomState.videoURL && …` at byte
+      1,967,330 and `roomState.ytURL && emit("playYTForAll", {…, startTime: roomState.ytStartTime})`
+      at 1,965,054 — rather than from a broadcast, because a broadcast only reaches whoever was
+      already there. Read here for exactly that reason: this is the connect.
+
+      Room state, so it comes from the row and never from the client. The gate that decides whether
+      to SHOW it (`videoUrl && !videoPlayTime`) is applied on the page, because it is the same rule
+      the reference applies in its own component and splitting it would give this room two answers to
+      one question.
+    */
+    roomMedia: roomMediaState(requireRoomShortCode(locals)),
     /*
       What a member is told when the room is closed, so the presenter's editor opens on what is
       actually stored rather than on an empty box.

@@ -67,6 +67,7 @@
   } from '#lib/sound-effects.js';
   import type { FollowChatStyle, MainTab, Theme } from '#lib/types.js';
   import type { PageProps } from './$types';
+  import { mediaReplay } from '#lib/room/media-replay.js';
 
   let { data }: PageProps = $props();
 
@@ -1024,6 +1025,24 @@
       `connect` returns its own teardown, which is what makes the pairing checkable. The two halves
       used to sit 240 lines apart here, and the review of 2026-08-11 found the gap between them.
     */
+    /*
+      ── THE LATE-JOIN REPLAY — what the room is already playing ──────────────────────────────────
+
+      The DECISION is `#lib/room/media-replay.ts`, which reads the capture's three rules out of
+      server state and the clock; this is the acting half, because what it changes — the broadcast
+      model and the visible tab — is the page's to own.
+
+      In `onMount` for two different reasons. The video half MOVES THE TAB, which is a navigation
+      and must not happen during SSR. The YouTube half derives its offset from the clock, which on
+      the server would be the moment the HTML was rendered rather than the moment this member's
+      browser started playing — so every cached or prerendered response would seek to the wrong
+      place.
+    */
+    const replay = mediaReplay(data.roomMedia, { isPresenter, now: Date.now() });
+    if (replay.videoUrl) broadcasts.videoStarted(replay.videoUrl);
+    if (replay.showVideoTab) mainTab = 'videoplayer';
+    if (replay.ytUrl) broadcasts.youtubeStarted(replay.ytUrl, replay.ytStartSeconds);
+
     const stopMedia = mediaTransport.connect();
     if (!document.hidden) roomRefresh.start();
 

@@ -731,7 +731,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that the `<audio id="webcam">` sink stays OUTSIDE the branch because `app-root`'s own template
       makes it a sibling of the switch (byte 2,602,869).
     */
-    max: 1838,
+    /*
+      RAISED 1,838 -> 1,857 on 2026-09-01, for the LATE-JOIN REPLAY, and the raise is nineteen lines
+      because the DECISION was extracted rather than left here.
+
+      The first draft was fifty-two lines in `onMount` and this ceiling refused them. What sits here
+      now is the ACTING half — three statements applying a result — because the two things it changes,
+      the broadcast model and the visible tab, are the page's to own. The rules are
+      `#lib/room/media-replay.ts`.
+
+      The extraction bought more than a line count, which is the test this rule's own entries apply to
+      a split: the derivation reads a clock, and until it moved there was no way to test it that did
+      not involve mounting a page and stubbing time. `room/media-replay.test.ts` is ten cases and
+      four negative controls, one of which — inverting the presenter gate — fails three of them.
+
+      It stays in `onMount` for two different reasons and both are recorded at the call: the video
+      half MOVES THE TAB, which must not happen during SSR; and the YouTube half reads the clock,
+      which on the server would be render time rather than this member's arrival.
+    */
+    max: 1857,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   {
@@ -913,6 +931,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 1069,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
+  },
+  {
+    file: 'lib/room/media-replay.ts',
+    /*
+      Created 2026-09-01 and capped at what it landed at — the LATE-JOIN REPLAY's three rules,
+      extracted from `+page.svelte`'s `onMount` when that file went past its ceiling.
+
+      A better module than it is a line count, which is the test this rule asks of a split. It
+      DECIDES and does not act, so it is a pure function of server state and a moment; and `now` is a
+      PARAMETER rather than a `Date.now()` call, which is the whole reason the derivation is testable
+      at all. Ten cases and four negative controls in `media-replay.test.ts`; the page kept three
+      statements.
+
+      `#lib/server/room-media-state.ts` is its other half and takes NO entry here, deliberately: this
+      file's discovery cases sweep `lib/components/` and `lib/room/`, and a lone `lib/server/` row
+      that nothing discovers is a permission the next person inherits by accident.
+
+      If this climbs, the question is whether it has started ACTING. It must not: applying the result
+      belongs to the page, because the broadcast model and the visible tab are the page's.
+    */
+    max: 114,
+    why: 'the three rules of the late-join replay, decoded from the reference constructor'
   },
   {
     file: 'lib/room/webcams.ts',
@@ -3638,7 +3678,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       went, stayed. `remote-call-sites-contract.test.ts` asserts this file exports NO actions now,
       which is a stronger statement than the list it used to pin.
     */
-    max: 1003,
+    /*
+      RAISED 1,003 -> 1,018 on 2026-09-01. One `load` key and its paragraph: `roomMedia`, read from
+      `#lib/server/room-media-state.js` so a member joining mid-play gets what the room is watching.
+
+      The reference replays from server state on CONNECT (bytes 1,967,330 and 1,965,054) rather than
+      from a broadcast, because a broadcast only reaches whoever was already there — which is the
+      whole defect. This file is the connect, so this is where the read belongs; everything else about
+      it, including the gate that decides whether to SHOW it, is elsewhere.
+    */
+    max: 1018,
     why: 'the loader, plus `logout`; 3,233 before the remote-function conversions began'
   },
   /*
@@ -4241,7 +4290,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       thing for a reader to "fix" into a bug. The prose was tightened twice before this number moved.
       The CODE backstop is unaffected.
     */
-    max: 484,
+    /*
+      RAISED 484 -> 517 on 2026-09-01, for the YouTube seek offset the late-join replay carries.
+
+      One field, one getter, one extra parameter and two clears — and the rest is the reason. Two of
+      those lines are the ones worth the entry: `youtubeStopped` and `closeYoutubeFrame` BOTH reset
+      the offset, because the overlay rebuilds its embed from url and startTime together (byte
+      1,503,095), so a stale offset seeks the NEXT video to wherever the last one had reached. That
+      is a real wrong position rather than dead state.
+
+      The derivation is NOT here: this store takes seconds from its caller and reads no clock, which
+      `for-all-broadcast-contract` asserts on the METHOD body rather than the file —
+      `scheduleVideoForAll` legitimately reads the clock to size its own timer.
+    */
+    max: 517,
     why: 'the video, YouTube and mp3 broadcasts; receivers rather than setters, so a stop cannot be half-applied'
   },
   {
@@ -7502,7 +7564,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/YoutubePlayerOverlay.svelte',
-    max: 62,
+    /*
+      RAISED 62 -> 89 on 2026-09-01. `(i?`start=${i}`:"")`, byte 1,503,354 — the seek the reference
+      appends to a late joiner's embed, and which this room could not build until room media state
+      existed to derive it from.
+
+      Twenty-seven lines for one conditional, and twenty-four of them are why: it goes on the
+      VIDEO-ID form only (a playlist seek would be a seek into whichever item is first, which nobody
+      asked for), and it is `i ? … : ""` rather than `start=0`, so the request every member present
+      at a live play makes is unchanged. Both are the capture's choices and both are the kind a
+      cleanup normalises away.
+    */
+    max: 89,
     why: 'the YouTube-for-all overlay'
   },
   {

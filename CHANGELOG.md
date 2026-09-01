@@ -33,6 +33,92 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 15:05 UTC — the late-join replay, and two of three consequences closed
+
+**Runtime impact: YES** — a member who joins a room mid-video now sees the video, and a late joiner
+drops into the middle of a YouTube video instead of starting it over.
+
+`TODO.md` carried this as an evidence gap for weeks, and its closing line was *"a decision, not
+evidence — whether this room persists playing-media state, or stays process-local"*. The decision is
+to match the reference, and the reference is unambiguous at three sites:
+
+    roomState.videoURL && !roomState.videoPlayTime && (…)                  byte 1,967,330
+    roomState.ytURL && emit("playYTForAll", {…, startTime: ytStartTime})    byte 1,965,054
+    subscribe("playYTForAll", e => { … i = Math.round((s - o) / 1e3) … })   byte 1,964,799
+
+`room_state` gains `video_url`, `video_play_time`, `yt_url`, `yt_start_time`;
+`#lib/server/room-media-state.ts` writes them; `#lib/room/media-replay.ts` decides what an arriving
+member is shown; the page applies it.
+
+## Three things the capture decides that a reasonable design gets wrong
+
+**The video replay is gated on `!videoPlayTime`.** A play SCHEDULED for later has a url in the row and
+nothing on screen, so replaying it would drop an arriving member onto an empty VideoPlayer tab minutes
+before the video exists — worse than the gap being closed, because at least "nothing" is honest.
+
+**The YouTube seek is DERIVED, never sent.** `ytStartTime` is a start MOMENT; the subscriber turns it
+into elapsed seconds itself. It occurs once in 2,891,205 bytes, in the replay. So the server stores a
+moment and computes nothing, because the answer is different for every member and depends on when
+each of them arrives.
+
+**There is no scheduled case for YouTube.** The modal has no Play-later button, so there is no
+`ytPlayTime` to mirror `videoPlayTime`. A symmetric design would have invented one, and a column
+nothing writes is the dead scaffolding this repository forbids.
+
+Two more, at the `start=`: it goes on the VIDEO-ID form only (a playlist seek would be a seek into
+whichever item is first), and it is `i ? … : ""` rather than `start=0`, so the request every member
+present at a live play makes is unchanged.
+
+## What is NOT closed, said plainly
+
+**The presenter's own `setTimeout` is still the scheduler for a "play later" video, so closing that
+tab still cancels the play.** Upstream posts the pair the moment Send is pressed and its server
+broadcasts when it fires. Persisting the url does not fix that, and a contract case —
+`does NOT claim the scheduled play moved to the server` — exists so two-of-three cannot be read as
+done. Every play this room sends records `videoPlayTime: null`, the reference's own "Play now" value:
+an honest record of what we do rather than a column pretending to hold a schedule.
+
+## The rule that survives, re-asserted where building this could have broken it
+
+**The LIVE wire still carries no `startTime`.** The old case asserted `startTime` appears NOWHERE, on
+the reasoning that *"this room has no persisted video state to compute one from"*. It has one now, and
+the reference has always had one; what was never true upstream is a `startTime` on the live command.
+So the rule was NARROWED to the wire — the remote functions that publish, the receivers that read a
+frame, and the union that types the channel — rather than deleted, and it is asserted on the far side
+of the change that could have broken it.
+
+## The ratchet forced a better module, not just a smaller file
+
+The replay was fifty-two lines in `onMount` and `+page.svelte` refused them. `#lib/room/media-replay.ts`
+takes the DECISION; the page kept three statements applying it. The extraction bought more than a line
+count: `now` is a PARAMETER rather than a `Date.now()` call, so the derivation is testable without
+mounting a page and stubbing time. Ten cases, four negative controls — inverting the presenter gate
+fails three of them.
+
+Four ceilings raised and argued at their entries; `room-media-state.ts` takes NO entry, deliberately,
+because that file's discovery cases sweep `lib/components/` and `lib/room/` and a lone `lib/server/`
+row nothing discovers is a permission the next person inherits by accident.
+
+## Verification
+
+Seven negative controls, each seen RED then restored. Three on the store: an over-wide `set` that
+clears the other medium (two cases red), a stop that forgets the schedule, an upsert on a stop that
+should write nothing. Four on the replay rules: drop the `!videoPlayTime` term, invert the presenter
+gate, truncate instead of round, remove the clamp.
+
+**One of them did not apply on the first attempt** — the shell split my substitution on a colon, so
+the presenter-gate control silently ran against unmodified source and reported ten passing. Re-run
+properly it fails three cases. A control that does not apply is a control that has not been run, and
+reporting the first result would have been reporting a green as evidence.
+
+Two gates caught real work: `page-load-contract`'s key snapshot (the new `roomMedia` key), and
+`slice-anchor-contract`, which refused three inline `indexOf` bounds I had written — two of them are
+now the file's own `functionBody` helper, which already existed.
+
+Room gate exit 0: `svelte-check` 1,601 files / 0 errors / 0 warnings. **Not opened in a browser**, and
+for this row that matters: two browsers, one room, a video started in the first and the second joined
+after it, is the test nothing here has run.
+
 ### 2026-09-01 13:40 UTC — `SP2-04` BUILT, `RNB-01` reclassified, and a sweep defect the new text exposed
 
 **Runtime impact: YES** — a presenter sharing a screen now sees the reference's invitation instead of

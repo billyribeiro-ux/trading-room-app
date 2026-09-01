@@ -95,6 +95,18 @@ const overlayCode = stripComments(OVERLAY);
   silently returns '' is how a `not.toContain` goes green while guarding nothing, and there are three
   of those below.
 */
+const MEDIA_REPLAY = stripComments(
+  readFileSync(new URL('./room/media-replay.ts', import.meta.url), 'utf8')
+);
+const MEDIA_STATE = stripComments(
+  readFileSync(new URL('./server/room-media-state.ts', import.meta.url), 'utf8')
+);
+const SCHEMA = stripComments(
+  readFileSync(new URL('./server/db/schema.ts', import.meta.url), 'utf8')
+);
+const DB_INDEX = stripComments(
+  readFileSync(new URL('./server/db/index.ts', import.meta.url), 'utf8')
+);
 const REMOTE = readFileSync(
   new URL('../routes/for-all-broadcast.remote.ts', import.meta.url),
   'utf8'
@@ -523,24 +535,48 @@ describe('the client receives, so it reaches another browser', () => {
 });
 
 describe('the seek offset is computed, never transmitted', () => {
-  it('no `startTime` is put on this room’s wire, by anything', () => {
+  it('no `startTime` is put on this room’s WIRE, by anything', () => {
     /*
-      The reference's live command has none, and this room has no persisted video state to
-      compute one from. A field here would be a fabricated number dressed as a feature.
-    */
-    expect(serverCode).not.toContain('startTime');
-    expect(pageCode).not.toContain('startTime');
-    expect(overlayCode).not.toContain('startTime');
+      NARROWED 2026-09-01, when the late-join replay was built, and the narrowing is the whole point
+      of re-reading this case rather than deleting it.
 
-    // And the union that types the channel does not offer one to put there.
+      It used to assert that `startTime` appears NOWHERE — in the page, the overlay or the channel
+      union — on the reasoning that *"this room has no persisted video state to compute one from"*.
+      It has one now, and the reference has always had one; what was never true upstream and must
+      never become true here is a `startTime` on the LIVE COMMAND. The reference's dispatch forwards
+      `url` alone (byte 1,024,137); the moment rides only on the replay, which is server state read
+      at connect and not a broadcast.
+
+      So the rule is about the wire, and it is asserted where the wire is: the remote functions that
+      publish, the receivers that read a published frame, and the union that types the channel.
+    */
+    expect(remoteCode, 'nothing publishes a startTime').not.toContain('startTime');
+    expect(eventsCode, 'no receiver reads one off a frame').not.toContain('startTime');
     const events = stripComments(
       readFileSync(new URL('./server/room-events.ts', import.meta.url), 'utf8')
     );
-    expect(events).not.toContain('startTime');
+    expect(events, 'the channel union does not offer a field to put one in').not.toContain(
+      'startTime'
+    );
   });
 
-  it('the overlay therefore appends no `start=`, rather than appending a guess', () => {
-    expect(overlayCode).not.toContain('start=');
+  it('the overlay appends `start=` ONLY from the replay offset, never from a payload', () => {
+    /*
+      The `start=` exists now — `(i?`start=${i}`:"")` at byte 1,503,354 — and its only source is the
+      `startSeconds` PROP, which the page computes from stored room state on mount. Asserted as the
+      only source, because a `start=` built from anything a broadcast carried would be exactly the
+      fabricated number the case above forbids.
+    */
+    expect(overlayCode).toContain("const start = startSeconds > 0 ? `start=${startSeconds}` : '';");
+    /*
+      ONE occurrence in the code, so nothing else in the overlay composes one. Counted on the
+      comment-STRIPPED source, which is what `overlayCode` is — the raw file says `start=` several
+      more times in the paragraph that argues it, and a count over prose is the defect this
+      repository has now found five times.
+    */
+    expect(overlayCode.match(/start=/g) ?? []).toHaveLength(1);
+    /* And the overlay reads no clock: the derivation is the page's, once, on mount. */
+    expect(overlayCode).not.toContain('Date.now()');
   });
 
   it('the embed mute stays the LOCAL preference it is upstream', () => {
@@ -808,5 +844,251 @@ describe('the room-wide "send" receivers exclude the presenter who sent them', (
     // every assertion above.
     expect(receiverBranch('sendUsersToURL')).toContain('location.href = command.url');
     expect(receiverBranch('sendSalesImageToChat')).toContain('salesImageShown(command.url)');
+  });
+});
+
+describe('the LATE-JOIN REPLAY — what the room is already playing', () => {
+  /*
+    ── THE GAP THIS CLOSES, AND WHY IT WAS A GAP RATHER THAN A DIVERGENCE ──────────────────────────
+
+    `TODO.md` carried this for weeks: *"No persisted room video/YouTube state, so the four 'For All'
+    commands have no LATE-JOIN REPLAY."* The commands broadcast and were received; the reference's
+    SERVER side was missing, because `room_state` had nowhere to put it. Its closing line was *"a
+    decision, not evidence"*, and the decision is to match the reference.
+
+    Three consequences were named there and all three are closed:
+
+      1. a member who joins while a video is playing sees nothing
+      3. the YouTube seek offset is always 0, so no `start=` is ever appended
+
+    — both by this row. Consequence 2, the presenter's own `setTimeout` scheduler, is NOT: persisting
+    the url does not by itself move the timer to the server, and this file says so rather than
+    letting three-of-three read as done.
+
+    ## The rule that survives, and it is the trap this whole file exists to pin
+
+    **The LIVE wire still carries no `startTime`.** The offset is derived by the subscriber from a
+    moment the REPLAY carries out of room state, and the reference's own dispatch forwards `url`
+    alone (byte 1,024,137). A `startTime` on the live command would look like the feature and be a
+    fabricated number. Building the replay is precisely the change that could have broken this, so
+    it is asserted again below on the far side of it.
+  */
+
+  it('stores the four columns, on a fresh database AND on an existing one', () => {
+    /*
+      Both halves, because `CREATE TABLE IF NOT EXISTS` will not add a column to a table that already
+      exists — the trap `db/index.ts` names in its own words. A schema change with only the DDL half
+      works on the author's machine and on nobody else's.
+    */
+    for (const column of ['video_url', 'video_play_time', 'yt_url', 'yt_start_time']) {
+      expect(DB_INDEX, `${column} must be in the CREATE TABLE`).toContain(`${column} `);
+      expect(DB_INDEX, `${column} must also be added to databases that predate it`).toContain(
+        `ALTER TABLE room_state ADD COLUMN ${column}`
+      );
+      expect(DB_INDEX, `${column}'s ALTER must be guarded`).toContain(
+        `roomStateColumns.has('${column}')`
+      );
+    }
+    expect(SCHEMA).toContain("videoUrl: text('video_url')");
+    expect(SCHEMA).toContain("ytStartTime: integer('yt_start_time', { mode: 'timestamp' })");
+  });
+
+  it('writes the row on every play and clears it on every stop', () => {
+    expect(remoteCode).toContain('recordVideoForAll(room, playable, null);');
+    expect(remoteCode).toContain('clearVideoForAll(room);');
+    expect(remoteCode).toContain('recordYoutubeForAll(room, trimmed);');
+    expect(remoteCode).toContain('clearYoutubeForAll(room);');
+  });
+
+  it('writes the ROW before the broadcast, which is the order that fails safely', () => {
+    /*
+      Between the two, a member joining reads the row. Row-first means a crash in between leaves a
+      member not shown a video the room has stopped watching; broadcast-first leaves the row claiming
+      a stopped video is playing, and every arrival after it lands on a dead VideoPlayer tab.
+
+      Asserted by POSITION, because both orders contain both calls and only one of them is right.
+    */
+    const stopClear = remoteCode.indexOf('clearVideoForAll(room);');
+    const stopPublish = remoteCode.indexOf('data: { cmd } }', stopClear);
+    expect(stopClear, 'the clear must exist').toBeGreaterThan(-1);
+    expect(stopPublish, 'the publish must follow it').toBeGreaterThan(stopClear);
+
+    const playRecord = remoteCode.indexOf('recordVideoForAll(room, playable, null);');
+    const playPublish = remoteCode.indexOf('url: playable } });', playRecord);
+    expect(playRecord).toBeGreaterThan(-1);
+    expect(playPublish).toBeGreaterThan(playRecord);
+
+    const ytRecord = remoteCode.indexOf('recordYoutubeForAll(room, trimmed);');
+    const ytStop = remoteCode.indexOf("cmd: 'stopYTForAll'", ytRecord);
+    expect(ytRecord).toBeGreaterThan(-1);
+    expect(ytStop).toBeGreaterThan(ytRecord);
+  });
+
+  it('leaves the OTHER medium alone on every write', () => {
+    /*
+      A video starting must not clear the room's YouTube overlay: upstream's two are independent and
+      both replay. Every `set` names one medium's columns plus `updatedAt`, and an over-wide one is
+      silent — the room keeps working and the replay quietly stops.
+    */
+    expect(MEDIA_STATE).toContain(
+      'set: { videoUrl: url, videoPlayTime: playTime, updatedAt: now }'
+    );
+    expect(MEDIA_STATE).toContain('set: { ytUrl: url, ytStartTime: now, updatedAt: now }');
+    /* And neither write mentions the other's columns, nor `chatMode`, nor the close message. */
+    /*
+      Both bounds bound and asserted, per `slice-anchor-contract`. The end bound especially: -1 would
+      make this `slice(start, -1)` — everything to the last character — and a `not.toContain` over
+      the whole module would then fail for the wrong reason, on a file that legitimately mentions
+      `ytUrl` forty lines further down.
+    */
+    const videoFrom = MEDIA_STATE.indexOf('export function recordVideoForAll');
+    const videoTo = MEDIA_STATE.indexOf('export function clearVideoForAll');
+    expect(videoFrom, 'recordVideoForAll must exist').toBeGreaterThan(-1);
+    expect(videoTo, 'clearVideoForAll must follow it').toBeGreaterThan(videoFrom);
+    const videoWrite = MEDIA_STATE.slice(videoFrom, videoTo);
+    expect(videoWrite).not.toContain('ytUrl');
+    expect(videoWrite).not.toContain('chatMode');
+    expect(videoWrite).not.toContain('closedMessage');
+  });
+
+  it('replays the video only when it is PLAYING, not when it is merely scheduled', () => {
+    /*
+      `roomState.videoURL && !roomState.videoPlayTime` — byte 1,967,330, and the second term is the
+      one a reasonable design drops. A play armed for later has a url in the row and nothing on
+      screen; replaying it drops an arriving member onto an empty tab minutes before the video
+      exists.
+    */
+    expect(BUNDLE).toContain(
+      'this.appService.globals.roomState.videoURL&&!this.appService.globals.roomState.videoPlayTime'
+    );
+    /*
+      The DECISION left `+page.svelte` for `#lib/room/media-replay.ts` on 2026-09-01, when the page
+      went past its ceiling. Asserted at the module rather than widened to "either file": which file
+      decides is the fact, and the extraction is what gave the three rules a test that does not
+      involve mounting a page and stubbing the clock (`room/media-replay.test.ts`, ten cases, four
+      negative controls).
+    */
+    expect(MEDIA_REPLAY).toContain(
+      'const playingNow = state.videoUrl !== null && state.videoPlayTime === null;'
+    );
+    expect(pageCode).toContain(
+      'const replay = mediaReplay(data.roomMedia, { isPresenter, now: Date.now() });'
+    );
+    expect(serverCode).toContain('roomMedia: roomMediaState(requireRoomShortCode(locals)),');
+  });
+
+  it('moves a MEMBER to the video tab and leaves a presenter where they are', () => {
+    /* `this.isP || this.onMainTabChange(...)` on the live path, byte 1,966,711. Same rule here. */
+    expect(MEDIA_REPLAY).toContain('showVideoTab: playingNow && !options.isPresenter,');
+    expect(pageCode).toContain("if (replay.showVideoTab) mainTab = 'videoplayer';");
+    /* And a presenter still gets the VIDEO — the gate is about the navigation, not the picture. */
+    expect(MEDIA_REPLAY).toContain('videoUrl: playingNow ? state.videoUrl : null,');
+  });
+
+  it('derives the YouTube offset from the stored MOMENT, and clamps it', () => {
+    /*
+      `i = Math.round((s - o) / 1e3)`. Clamped at zero because a row written by a clock ahead of this
+      one would seek backwards, and `start=` with a negative is answered unpredictably rather than
+      refused. The clamp is OURS and is not in the capture; it costs nothing and the alternative is a
+      request whose behaviour nobody here can state.
+    */
+    expect(BUNDLE).toContain('i=Math.round((s-o)/1e3)');
+    expect(MEDIA_REPLAY).toContain(
+      'Math.max(0, Math.round((options.now - state.ytStartTime) / 1000))'
+    );
+    expect(pageCode).toContain(
+      'if (replay.ytUrl) broadcasts.youtubeStarted(replay.ytUrl, replay.ytStartSeconds);'
+    );
+    /*
+      `now` is a PARAMETER and not a `Date.now()` inside the module, which is what makes rule 3
+      testable: a function that reads the clock has a different answer every run, so the only way to
+      test the derivation would be to stub a global — which tests the stub as much as the code.
+    */
+    expect(MEDIA_REPLAY).toContain('readonly now: number');
+    expect(MEDIA_REPLAY).not.toContain('Date.now()');
+  });
+
+  it('appends `start=` to the video-id embed only, and only when the offset is non-zero', () => {
+    /*
+      `(i?`start=${i}`:"")` — byte 1,503,354 — on the video-id branch. The playlist branch has none
+      upstream and gets none here: a playlist seek would be a seek into whichever item is first.
+
+      And `i ? … : ""` rather than `start=0`, so a live play's request is unchanged. Every member
+      present when a video starts takes that path, and appending `start=0` to all of them would
+      change the request they all make for a branch only a late joiner reaches.
+    */
+    expect(BUNDLE).toContain(
+      '`https://www.youtube.com/embed/${s}?autoplay=1${l}&`+(i?`start=${i}`:"")'
+    );
+    expect(overlayCode).toContain("const start = startSeconds > 0 ? `start=${startSeconds}` : '';");
+    expect(overlayCode).toContain(
+      '`https://www.youtube.com/embed/${videoId}?autoplay=1${mute}&${start}`'
+    );
+    /*
+      The playlist branch, unchanged and asserted so, or the exemption is a claim about nothing.
+      The bound is BOUND before the slice, per `slice-anchor-contract`: `indexOf` answers -1 on a
+      miss and `slice(-1)` is the last character, so a renamed branch would silently reduce this to
+      asserting that one character contains no `start=`.
+    */
+    const playlistAt = overlayCode.indexOf('if (playlistId) {');
+    expect(playlistAt, 'the playlist branch must exist').toBeGreaterThan(-1);
+    expect(overlayCode.slice(playlistAt)).not.toContain('start=');
+  });
+
+  it('and the LIVE wire still carries no startTime, which building this could have broken', () => {
+    /*
+      THE TRAP THIS FILE EXISTS TO PIN, re-asserted on the far side of the change that could have
+      broken it. The offset is the SUBSCRIBER's derivation from a moment the replay carries; putting
+      one on the live command would look like the feature and be a fabricated number, because nothing
+      at broadcast time knows how far in anybody is.
+    */
+    expect(remoteCode).not.toContain('startTime');
+    expect(eventsCode).not.toContain('startTime');
+    /* The room's model takes SECONDS from its caller and reads no clock of its own. */
+    const broadcastsCode = stripComments(BROADCASTS);
+    expect(broadcastsCode).toContain('youtubeStarted(url: string, startSeconds = 0) {');
+    /*
+      Scoped to the METHOD, not the file: `scheduleVideoForAll` legitimately reads the clock to size
+      its own `setTimeout` delay, and a file-wide ban would have failed on that for no reason. What
+      must not read a clock is the store of the offset — a value that depends on when you look at it
+      is not a value.
+    */
+    expect(
+      functionBody(broadcastsCode, 'youtubeStarted(url: string, startSeconds = 0) {')
+    ).not.toContain('Date.now()');
+  });
+
+  it('clears the offset with the url, in BOTH ways a frame can go', () => {
+    /*
+      A stale offset seeks the NEXT video to wherever the last one had reached — the overlay's setter
+      rebuilds the embed from url and startTime together (byte 1,503,095), so this is a real wrong
+      position rather than dead state. Both exits are asserted: `stopYTForAll` takes it off the room,
+      and the member's own `×` takes it off their screen.
+    */
+    const broadcastsCode = stripComments(BROADCASTS);
+    for (const method of ['youtubeStopped()', 'closeYoutubeFrame()']) {
+      expect(
+        functionBody(broadcastsCode, method),
+        `${method} must clear the offset with the url`
+      ).toContain('this.#youtubeStartSeconds = 0;');
+    }
+  });
+
+  it('does NOT claim the scheduled play moved to the server, because it did not', () => {
+    /*
+      `TODO.md`'s consequence 2: upstream posts `playVideoForAll` with `videoPlayTime` the moment Send
+      is pressed and its SERVER broadcasts when it fires (bytes 1,981,560 and 1,024,587). Here the
+      presenter's own `setTimeout` is still the scheduler, so closing that tab still cancels the play.
+
+      Persisting the url does not fix it, and this case is what stops "the replay is built" being
+      read as "the schedule is server-side". `videoPlayTime` is written as `null` on every play this
+      room sends, which is the reference's "Play now" value — an honest record of what we do, not a
+      column pretending to hold a schedule.
+    */
+    expect(remoteCode).toContain('recordVideoForAll(room, playable, null);');
+    expect(BUNDLE).toContain('sendServerAdminCommand("playVideoForAll",{url:e,videoPlayTime:i})');
+    /* Still the browser's timer, and the page still cancels it on unmount. */
+    expect(stripComments(BROADCASTS)).toContain('clearScheduledVideoTimer');
+    expect(pageCode).toContain('broadcasts.clearScheduledVideoTimer();');
   });
 });

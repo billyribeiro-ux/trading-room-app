@@ -4,6 +4,12 @@ import { z } from 'zod';
 import { presenterRoom } from '#lib/server/auth.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
 import { publishToRoom } from '#lib/server/room-events.js';
+import {
+  clearVideoForAll,
+  clearYoutubeForAll,
+  recordVideoForAll,
+  recordYoutubeForAll
+} from '#lib/server/room-media-state.js';
 
 /*
   "For All" — a presenter plays a video, or a YouTube video, in every browser in the room.
@@ -85,6 +91,15 @@ export const videoForAll = command(
     const room = presenterRoom();
 
     if (cmd === 'stopVideoForAll') {
+      /*
+        THE ROW FIRST, THEN THE BROADCAST, and the order is the one that fails safely.
+
+        Between the two, a member joining sees the row — so writing the row first means the worst
+        outcome of a crash in between is a member who is not shown a video the room is no longer
+        watching. The other order leaves the row saying a stopped video is playing, and every
+        arrival after it is dropped onto a dead VideoPlayer tab until somebody plays something else.
+      */
+      clearVideoForAll(room);
       publishToRoom(room, { channel: 'cmds', data: { cmd } });
       return;
     }
@@ -92,6 +107,17 @@ export const videoForAll = command(
     const playable = broadcastableUrl(url ?? '');
     if (!playable) error(400, 'That is not a playable video url.');
 
+    /*
+      `videoPlayTime: null` — this room's Play is the reference's "Play now" button, whose callback
+      is `sendServerAdminCommand("playVideoForAll", {url: e, videoPlayTime: null})` at byte
+      1,981,700. The scheduled sibling posts a timestamp instead and is a separate gap: this room's
+      scheduler is the presenter's own `setTimeout`, which `TODO.md` records and which persisting the
+      url does not by itself fix.
+
+      Recorded as null rather than omitted, because null is what the REPLAY gate reads —
+      `videoURL && !videoPlayTime` — so "playing now" has to be written, not merely implied.
+    */
+    recordVideoForAll(room, playable, null);
     publishToRoom(room, { channel: 'cmds', data: { cmd, url: playable } });
   }
 );
@@ -146,6 +172,8 @@ export const youtubeForAll = command(
     const room = presenterRoom();
 
     if (cmd === 'stopYTForAll') {
+      /* Row first, then the broadcast — same ordering argument as `videoForAll` above. */
+      clearYoutubeForAll(room);
       publishToRoom(room, { channel: 'cmds', data: { cmd } });
       return;
     }
@@ -157,6 +185,16 @@ export const youtubeForAll = command(
       The reference's order, reproduced exactly. Publishing is synchronous, so the two arrive on
       every subscriber in this order and cannot be reordered by the network.
     */
+    /*
+      The START MOMENT, written before the pair goes out, so a member arriving one second later
+      computes an offset from a time the room had already reached rather than from their own.
+
+      It is written ONCE for the stop-then-play pair rather than cleared by the stop and set by the
+      play: the stop exists to put a null between two urls in the OVERLAY (byte 2,296,932), and
+      running the server's clear in the middle would leave a member who joined in that window with
+      no video at all. The room never stopped watching anything.
+    */
+    recordYoutubeForAll(room, trimmed);
     publishToRoom(room, { channel: 'cmds', data: { cmd: 'stopYTForAll', url: trimmed } });
     publishToRoom(room, { channel: 'cmds', data: { cmd: 'playYTForAll', url: trimmed } });
   }

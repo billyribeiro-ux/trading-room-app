@@ -189,44 +189,41 @@ speculative change this file exists to prevent.
   `note-carousel.test.ts`.
 - **What it blocks:** nothing today. It decides whether the allow-lists need a second accepted form.
 
-**No persisted room video/YouTube state, so the four "For All" commands have no LATE-JOIN REPLAY.**
-The commands themselves broadcast and are received — `videoForAll` and `youtubeForAll` are remote
-commands at `apps/room/src/routes/for-all-broadcast.remote.ts:81` and `:142` (they were form actions
-in `+page.server.ts` when this row was written; the contract test records the move), pinned by
-`apps/room/src/lib/for-all-broadcast-contract.test.ts`. What is absent is the reference's server side
-of them, and it is absent because this room has nowhere to put it — `room_state`
-(`apps/room/src/lib/server/db/schema.ts:854-863`) holds `roomShortCode`, `chatMode` and `updatedAt`,
-and no other table persists playing-media state.
+**The presenter's own `setTimeout` is still the scheduler for a "play later" video.** The rest of
+this row closed on 2026-09-01: `room_state` now carries `video_url`, `video_play_time`, `yt_url` and
+`yt_start_time`, `#lib/server/room-media-state.ts` writes them on every For-All broadcast, and
+`#lib/room/media-replay.ts` replays them at connect. What that fixed, and what it did not:
 
-Three consequences, all real and none of them papered over in code:
+1. **CLOSED — a member who joins while a video is playing now sees it.** The reference replays from
+   server state on connect (`roomState.videoURL && !roomState.videoPlayTime`, bundle byte 1,967,330),
+   and so does this room. The `!videoPlayTime` term is reproduced: a play ARMED for later has a url
+   in the row and nothing on screen, so replaying it would drop an arriving member onto an empty
+   VideoPlayer tab minutes before the video exists.
+2. **STILL OPEN, and it is this row now.** Upstream posts `playVideoForAll` with `videoPlayTime` the
+   moment Send is pressed (byte 1,981,613) and its SERVER holds the pair and broadcasts when it
+   fires, which is why the dispatch forwards only `{url: i.url}` (byte 1,024,587). Here the
+   presenter's own `setTimeout` is the scheduler and posts at fire time, so **closing that tab still
+   cancels the play.** Persisting the url did not fix this and the contract says so rather than
+   letting two-of-three read as done: `does NOT claim the scheduled play moved to the server` in
+   `for-all-broadcast-contract.test.ts`. Every play this room sends records `videoPlayTime: null` —
+   the reference's own "Play now" value — which is an honest record of what we do rather than a
+   column pretending to hold a schedule.
+3. **CLOSED — a late joiner drops into the middle of a YouTube video.** `ytStartTime` is written when
+   the play goes out; `media-replay.ts` derives the elapsed seconds (`Math.round((now - startTime) /
+   1000)`, byte 1,964,799) and `YoutubePlayerOverlay` appends `start=` on the video-id form, which is
+   where and only where the reference appends it (byte 1,503,354). **Nothing invents a `startTime`
+   onto the wire**: the live command still carries `url` alone, and the contract re-asserts that on
+   the far side of this change, because building the replay is precisely what could have broken it.
 
-1. **A member who joins while a video is playing sees nothing.** The reference replays it from
-   session state on connect — `roomState.videoURL && !roomState.videoPlayTime && (hideVideoPlayer =
-   1, videoPlayerUrl = roomState.videoURL, onMainTabChange('presAreaTabs-videoplayer'))`, bundle
-   byte 1,967,430.
-2. **A scheduled play lives in the presenter's browser.** Upstream, `playVideoForAll` is posted the
-   moment Send is pressed and carries `videoPlayTime` (byte 1,981,613); the SERVER holds the pair
-   and broadcasts when it fires, which is why its dispatch forwards only `{url: i.url}` (byte
-   1,024,587). Here the presenter's own `setTimeout` is the scheduler and posts at fire time, so
-   closing that tab cancels the play. `videoPlayTime` is deliberately NOT on this room's wire — a
-   field no receiver reads is the dead scaffolding this repository forbids.
-3. **The YouTube seek offset is always 0, so no `start=` is ever appended.** The subscriber derives
-   it — `i = Math.round((Date.now() - Number(e.startTime)) / 1e3)`, byte 1,964,799 — and its ONLY
-   source is the replay, `emit('playYTForAll', {url: roomState.ytURL, startTime:
-   roomState.ytStartTime})` at byte 1,965,054. `ytStartTime` occurs exactly once in the whole
-   bundle, and that is it. A late joiner therefore starts a YouTube video from the beginning rather
-   than dropping into the middle. **Nothing invents a `startTime` onto the wire to hide this**; the
-   contract test asserts that no file puts one there.
-
-- **What is missing:** a decision, not evidence — whether this room persists playing-media state
-  (a `room_state` migration plus a replay in the page load and a server-side timer), or stays
-  process-local as the SSE hub itself already is.
-- **Where I looked:** bundle bytes 1,024,137–1,024,708 (the dispatch), 1,503,220 (the overlay),
-  1,964,799–1,967,430 (the four subscribers and both replays), 1,981,613–1,981,945 (the senders),
-  2,296,932 (the stop-then-play), 2,016,864 / 2,017,661 (the `hideVideoPlayer` gate); and
-  `apps/room/src/lib/server/db/schema.ts`, which has no column for any of it.
-- **What it blocks:** late joiners only. A member present when a presenter presses play gets the
-  video, the tab switch and the overlay today.
+- **What is missing:** a server-side timer. `scheduled_alerts` already has the shape — a claimed-at
+  column and a sweeper — so the pattern exists; what it needs is the same treatment for one video per
+  room, plus a decision about what happens to an armed play when the presenter's session ends.
+- **Where I looked:** bundle bytes 1,024,137–1,024,708 (the dispatch), 1,503,095–1,503,354 (the
+  overlay and its `start=`), 1,964,799–1,967,430 (the four subscribers and both replays),
+  1,981,560–1,981,945 (the senders); and `apps/room/src/lib/server/db/schema.ts`, which now has the
+  four columns.
+- **What it blocks:** a scheduled play surviving the presenter closing their tab. Late joiners are no
+  longer affected.
 
 ---
 
