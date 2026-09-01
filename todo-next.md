@@ -74,7 +74,7 @@ guessed.
 
 | # | surface | lines | audited against the reference? |
 |---:|---|---:|---|
-| 1 | `lib/components/ModalHost.svelte` | 6,058 | no |
+| 1 | `lib/components/ModalHost.svelte` | 6,065 | no |
 | 2 | `routes/+page.svelte` | 1,888 | no |
 | 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,541 | no |
@@ -167,7 +167,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 114 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**63 of 92 surfaces audited · 23,829 of 38,857 lines · 61.3%.**
+**63 of 92 surfaces audited · 23,829 of 38,864 lines · 61.3%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

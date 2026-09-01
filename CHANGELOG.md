@@ -33,6 +33,70 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 05:40 UTC — two modals behind a condition that is always false
+
+**Runtime impact: NONE.** Neither modal could be opened before this change or after it. What changed
+is that both are now measured decisions with a gate, instead of markup nobody had looked at.
+
+## The finding
+
+`gate/audit-surface.mjs` reported one word missing from `app-av-settings-modal` — `speakers-device`.
+Reading it found the word inside a **modal nothing can open**. `'av'` occurs exactly twice in the
+whole application: in the `ModalName` union and in the `open={name === 'av'}` that would show it.
+Nothing calls `modals.open('av')`. A hundred and thirty-nine lines of markup with six controls — a
+Speakers select with two invented device names, a Test button, two empty device selects, Change
+Devices, Save — sit behind a condition that is always false.
+
+Building the gate to prove it found a **second**: `'scheduled'`, the Manage Scheduled Alerts modal,
+whose `<tbody>` is empty and whose door was never wired either.
+
+## Both stay, and the reasons are three measurements each rather than a preference
+
+**`av`.** `#av-settings-modal` occurs twice in the 2,891,205-byte bundle and both are inside the
+component's own `styles:` array — there is no `data-bs-target` for it anywhere, so **the reference
+ships this modal unreachable too** and reproducing that is a match. The feature is built and better:
+`AvDevicePane.svelte` enumerates real devices, filters the virtual and duplicate entries upstream's
+`loadDevices()` filters, persists `audioDeviceID`/`videoDeviceID`, and is mounted at two reachable
+sites. Wiring a door here would put a second, inert device picker in front of members.
+
+**`scheduled`.** Upstream this one IS reachable — `XTe`'s "See Scheduled Alerts" carries
+`data-bs-target="#scheduledAlertsModal"` and calls `manageScheduledAlerts()`. This room's button
+carries the same const and calls `toggleManage()`, opening an INLINE table instead, and
+`ScheduledAlerts.svelte` argues why: *"both halves ask one question — what is already scheduled — so
+two components would refetch the same list and disagree about it after a removal."* The shell is the
+half that was not built.
+
+Neither was deleted, and the reason is the one that put `RecordingPreviewCard` back an hour earlier:
+both are scoped hosts in the generated stylesheet, and an absent host leaves its rules matching
+nothing. `ScheduledAlertsTable.svelte` carries both of its captured rules in its own `<style>` block,
+so the real table does not depend on the shell to be styled — measured, not assumed.
+
+## The gate
+
+`modal-reachability-contract.test.ts` asserts that the SET of doorless modals is exactly the recorded
+one. A twenty-fifth modal added without a door fails it; `'av'` gaining one fails it; a recorded
+reason outliving its subject fails it. The `av` entry's three premises are each re-read against the
+bundle and the source, so the decision cannot quietly stop being true.
+
+**Its opener matcher had to be generalised before it was right.** The first version listed `open(`,
+`openModal(` and two assignment shapes, and reported NINE live modals dead — `onopenmodal('connectivity')`
+from the sidebar, `onopenalertfilter` from the overlays. A hand-kept list of callee names is exactly
+the failure this file guards one level up, so it matches any call whose name contains `open` or
+`modal`. The callee filter is what keeps it from being a string search: `emoji-data.ts` contains
+`'user'`, `'poll'` and `'qa'` as ordinary data.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 330 files, 5,940 passed, 1 skipped; `svelte-check` 1,621
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+Four negative controls, all red on target: a new modal name with no door, a door removed from a live
+modal, a recorded reason that has outlived its subject, and the reference-premise case run alone.
+
+The docblock at the shell POINTS at the contract rather than repeating it — `ModalHost.svelte` was
+refused the twenty-two lines by `source-size-contract`, and two places recording one thing is how one
+of them goes stale.
+
 ### 2026-09-02 04:55 UTC — seven surfaces measured clean and pinned, and a template slice that read the wrong component
 
 **Runtime impact: NONE.** Contract coverage and tracker rows only.
