@@ -502,6 +502,41 @@ describe('ASR-1 — the reference stylesheet, and the two rules of it that reach
   });
 });
 
+/**
+ * Every `<Modal …>` OPENING TAG in one file, brace-aware.
+ *
+ * ## The regex this replaces was truncating its own matches, and it did it silently
+ *
+ * `/<Modal\b[^>]*>/gs` stops at the first `>` in the source — and an arrow function in any prop
+ * value contains one. `onclose={() => (giphyOpen = false)}` cut the note editor's Giphy dialog off
+ * three props early, so the counter saw its `id=` (before the arrow) and never saw its `titleId=`
+ * (after it), and filed a NAMED dialog as a self-referential one.
+ *
+ * Found on 2026-09-01 when `GIF-07` added the first `<Modal>` whose `onclose` precedes `titleId`.
+ * Every earlier call site happened to order its props the other way, which is why a counter that
+ * could not read an arrow function had been returning plausible numbers for weeks.
+ *
+ * Scanning with a brace depth is the fix rather than a longer regex: the tag ends at the first `>`
+ * that is not inside a `{…}` expression, and that is a rule about the language rather than about
+ * which characters people happen to use.
+ */
+function modalOpeningTags(source: string): string[] {
+  const tags: string[] = [];
+  for (const match of source.matchAll(/<Modal\b/g)) {
+    let depth = 0;
+    for (let index = match.index + match[0].length; index < source.length; index += 1) {
+      const character = source[index];
+      if (character === '{') depth += 1;
+      else if (character === '}') depth -= 1;
+      else if (character === '>' && depth === 0) {
+        tags.push(source.slice(match.index, index + 1));
+        break;
+      }
+    }
+  }
+  return tags;
+}
+
 describe('ASR-2 — the self-referential aria-labelledby, and the count that keeps it', () => {
   it('reads the same self-reference out of the reference component itself', () => {
     const at = BUNDLE.indexOf('["id","alert-send-report-modal","tabIndex","-1"');
@@ -529,8 +564,7 @@ describe('ASR-2 — the self-referential aria-labelledby, and the count that kee
     let named = 0;
     let selfReferential = 0;
     for (const source of sources) {
-      for (const call of source.matchAll(/<Modal\b[^>]*>/gs)) {
-        const block = call[0];
+      for (const block of modalOpeningTags(source)) {
         if (!block.includes('id=')) continue;
         total += 1;
         const id = /\bid="([^"]+)"/.exec(block)?.[1];
@@ -539,7 +573,17 @@ describe('ASR-2 — the self-referential aria-labelledby, and the count that kee
         else if (id !== undefined && id === labelled) selfReferential += 1;
       }
     }
-    expect({ total, named, selfReferential }).toEqual({ total: 22, named: 9, selfReferential: 10 });
+    /*
+      22 -> 23 on 2026-09-01, and the one that arrived is a NAMED dialog: `GIF-07` gave the note
+      editor's Giphy picker the modal chrome the capture opens it in, with `titleId` and
+      `ariaLabelledby` both `modal-basic-title` — const 82. So the ratio moved the right way, and
+      the ten self-referential ones are still ten.
+    */
+    expect({ total, named, selfReferential }).toEqual({
+      total: 23,
+      named: 10,
+      selfReferential: 10
+    });
   });
 });
 

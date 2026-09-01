@@ -14,6 +14,21 @@ established it says so.
 
 ---
 
+> ## ⛳ WHERE THIS FILE STANDS, 2026-09-01
+>
+> **Three items remain and all three are blocked on something outside this repository.** Parts 1, 2,
+> 4 and 5 are built; the "suggested order" below records each landing.
+>
+> | remaining | blocked on |
+> | --- | --- |
+> | `presAreaTabs-recordings` | an archive service. Fully SPECIFIED 2026-08-31 so building it is a transcription — the entitlement, the URL and a measured MediaMTX candidate are all recorded — but zero recordings or archive tables exist in either database |
+> | Part 3, v5 | an account the vendor has cleared for v5. Re-tested 2026-08-31: the `/v5` 404 now distinguishes nothing (every version path 404s), and the conclusion rests on its other measurement instead |
+> | the five operator reset commands | a central console AND a media plane. What is missing is REACH, not the commands |
+>
+> `TODO.md`'s header carries the same statement for the whole repository, and `todo-next.md` closed
+> at 93 of 93 room surfaces on the same day.
+
+
 # PART 1 — BOTH BUILT, 2026-08-27
 
 Both revenue leaks are closed. What follows is the record of what was built and the decisions taken,
@@ -370,7 +385,7 @@ It used to say *"Moderation (`kickUser`, `unmuteChat`, `lockSession`) and the ar
 (`archiveLogs` / `unarchiveLogs`) are the largest clusters left."* Every one of those five is built:
 `kicks.ts`, `chat-mute.ts` (whose docblock quotes the reference's own `subscribe("unmuteChat", …)`),
 and `chat-archive-port.ts`, which wires `archiveChatLog` and `unarchiveChatLogCommand`. The triage's
-own measured tally is **0 still NOT BUILT** — 14 built, 7 built under another name, 4 blocked with
+own measured tally is **0 still NOT BUILT** — 15 built, 7 built under another name, 3 blocked with
 the blocker named — and `apps/room/src/lib/missing-command-census-contract.test.ts` recomputes that
 tally on every run and fails on a disagreement **in either direction**, so the triage cannot go
 stale. This file could, and did.
@@ -379,15 +394,44 @@ stale. This file could, and did.
 those commands, so this file must POINT at it and never restate its state. Two places recording one
 thing is how one of them goes stale, and the stale one is always the summary.
 
-**Five remain, and they are blocked rather than pending.** `getMyRepeater`, `resetAudioBridge`,
-`resetAllMediaServers`, `resetMediaServer` and `resetAudioBridgeOnServer` — the SaaS operator's
-toolkit, and the owner answered the product question about them on 2026-08-15: they are not "should a
-presenter reset shared infrastructure", they are what an operator uses when a tenant has a problem.
-The triage says what is actually missing and it is not the commands: **reach**. Ours work inside one
-room; the operator need is to invoke them for a tenant's room from a central console. On top of that,
-four of the five reset a media plane this deployment does not have — the same `STREAM_SERVER_MTX`
-host that blocks `TODO.md` rows AD, X and R. Building five controls that reset servers which are not
-there is the dead scaffolding the standard forbids by name.
+**Five remain, and on 2026-09-01 they stopped being "blocked" and became NOT WORK — measured, not
+argued.** `getMyRepeater`, `resetAudioBridge`, `resetAllMediaServers`, `resetMediaServer` and
+`resetAudioBridgeOnServer`.
+
+**Four of the five methods have NO CALL SITE ANYWHERE IN THE BUNDLE.** Every occurrence of
+`resetAudioBridge`, `resetAudioBridgeOnServer`, `resetAllMediaServers`, `hardResetMediaServer`,
+`hardResetMediaServerOnServer` and `getMediaServerLost` is either the method DECLARATION — each one
+preceded by `})}`, the end of the method before it — or the command-name STRING inside its own body.
+There is no `x("click", …)`, no template reference, nothing. Swept over the whole 2,891,205-byte
+bundle:
+
+```
+resetAudioBridge             2166556 declaration   2166702 "resetAudioBridge"
+resetAudioBridgeOnServer     2166727 declaration   2166892 "resetAudioBridgeOnServer"
+resetAllMediaServers         2167330 declaration   2167673 + 2167929 (both branches)
+hardResetMediaServer         2168026 declaration   -> sends "resetMediaServer" at 2168170
+hardResetMediaServerOnServer 2168259 declaration   -> "resetMediaServer" at 2168646, 2168907
+getMediaServerLost           2167172 declaration   (never called either)
+```
+
+**So the reference renders no control that invokes them.** They are dead code upstream — methods on
+the session-control component with nothing bound to them. Under the instruction to match the dump
+exactly, building senders here would INVENT controls the reference does not have, which is the
+opposite of matching and is the dead scaffolding the standard forbids by name.
+
+That measurement replaces the two reasons this paragraph used to give, and it is worth saying why
+both were weaker. The first was **reach** — the owner answered the product question on 2026-08-15:
+these are what an operator uses when a tenant has a problem, not something a presenter should reach
+for, so the gap is a central console rather than a room control. True, and an argument about product
+shape. The second was that four of the five reset **a media plane this deployment does not have**.
+Also true, and it is the argument `TODO.md` rows X and AC were held by until both turned out to be
+category errors — so it is exactly the kind of reason that has to be re-measured rather than
+inherited. It was, and the answer this time is stronger than either: there is nothing to transcribe.
+
+The fifth, `getMyRepeater`, is not an operator control at all. It is live upstream and internal —
+the soft reset sends it after its jitter to ask which media host to come back on
+(`recording-frames.ts` carries the reading). This room has no repeater negotiation, so `restart()`
+stands in its place; that is a stated equivalence and it is at the code.
 
 ## Evidence — two of these four are NOT committed, corrected 2026-08-29
 

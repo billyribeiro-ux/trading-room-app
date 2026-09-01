@@ -157,11 +157,23 @@ export class RoomToasts {
           console.log('User blocked notifications.');
           return;
         }
+        /*
+          NO ICON when neither an explicit one nor an email hash is given, and the empty string is
+          what made that a real case rather than a defensive one.
+
+          Both original callers name a person, so a gravatar fallback is right for them — a mention
+          and a private message both have a sender whose picture the reader recognises. `stopRecMsg`
+          (2026-09-01) has no sender: it is the SERVER saying a recording stopped, and upstream's
+          `new Notification(i.data, {body: i.data})` sets no icon at all. Building
+          `avatar/?d=mm&s=50` from an empty hash would put a mystery-man silhouette on a message
+          about a recording, which is a face the reference never shows and one that would read as a
+          person having said something.
+        */
         const notificationIcon =
-          icon || `https://secure.gravatar.com/avatar/${emailHash}?d=mm&s=50`;
+          icon || (emailHash ? `https://secure.gravatar.com/avatar/${emailHash}?d=mm&s=50` : '');
         new Notification(title, {
           body: this.#decodeHtmlEntities(message),
-          icon: notificationIcon
+          ...(notificationIcon ? { icon: notificationIcon } : {})
         });
       })
       .catch((error: unknown) => {

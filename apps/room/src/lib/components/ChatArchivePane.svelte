@@ -144,13 +144,49 @@
             class="btn btn-link text-start p-0 text-reset text-decoration-none"
             onclick={() => onopen(archive)}
           >
-            <strong>{day.format(new Date(archive.olderThan))}</strong>
-            and older &middot; {archive.messageCount} message{archive.messageCount === 1 ? '' : 's'}
-            &middot; {archive.channel}
-            <small class="d-block text-muted"
-              >archived {shortWhen.format(new Date(archive.archivedAt))}</small
-            >
+            <!--
+              THREE LABELLED LINES, transcribed from the capture (`vxe`, bundle byte 2,301,700):
+
+                d(1,"div")(2,"strong",15),v(3),Xe(4,"date"),u()(),
+                d(5,"div")(6,"strong",15),v(7,"By:\xa0"),u(),d(8,"i"),v(9),u()(),
+                d(10,"div")(11,"strong",15),v(12,"Channel:\xa0"),u(),d(13,"i"),v(14),u()()()
+                …  m(3),Ze(Ct(4,3,e.updated,"mediumDate")),m(6),Ze(e.createdBy),m(5),Ze(e.channel)
+
+              — const 15 is `[1,"fw-bold"]`, and the `\xa0` is a non-breaking space so the label
+              never wraps away from its value. Until 2026-09-01 this room compressed all three onto
+              one line and dropped `By:` entirely, which is why the row could not answer the question
+              `chat_archives.archived_by_user_id` was added to answer.
+
+              `fw-bold` on a `<strong>` is redundant to a browser and is transcribed anyway: it is
+              what the capture carries, and a class removed because it "does nothing" is a class the
+              next person cannot find when a stylesheet starts keying on it.
+            -->
+            <div>
+              <strong class="fw-bold">{day.format(new Date(archive.olderThan))}</strong> and older
+            </div>
+            <div><strong class="fw-bold">By:&nbsp;</strong><i>{archive.archivedBy}</i></div>
+            <div><strong class="fw-bold">Channel:&nbsp;</strong><i>{archive.channel}</i></div>
+            <!--
+              OURS, and the fourth line rather than a fourth labelled one so the transcription above
+              stays legible as a block. The reference lists archives by a single date and gives a
+              presenter no way to tell a sweep of four messages from a sweep of four thousand before
+              restoring it; `messageCount` is that, and `archivedAt` is the second of the two dates
+              this room holds — the capture's `updated` is one date whose provenance is not in the
+              bundle, since the server that wrote it is not captured, so both are shown rather than
+              one of them guessed to be the other.
+            -->
+            <small class="d-block text-muted">
+              {archive.messageCount} message{archive.messageCount === 1 ? '' : 's'} &middot; archived
+              {shortWhen.format(new Date(archive.archivedAt))}
+            </small>
           </button>
+          <!--
+            OURS. Upstream's Unarchive is inside the log VIEWER and gated on `isPresenter`; this one
+            is on the row, so an archive can be restored without opening it first. It needs no gate
+            of its own because `listChatArchives` is `presenterRoom()` — nobody who is not a
+            presenter has a row to press it on — and `unarchiveChatLogCommand` re-checks on the
+            server either way.
+          -->
           <button
             type="button"
             class="btn btn-sm btn-outline-light"

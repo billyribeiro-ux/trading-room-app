@@ -16,7 +16,7 @@ import { RoomRoster } from './room/roster.svelte';
 
   ## Why the presenter gate is the subject rather than the layout
 
-  The component's own comment at the gate says it: *"Broadcast controls — media.recording,
+  The component's own comment at the gate says it: *"Broadcast controls — recording,
   SoundCloud, microphone, screen sharing, webcam and session control — drive what the room sends to
   everyone, so they are presenter-only. A reader keeps the Volume dropdown and Reload below, plus the
   talking and REC indicators above, which report state rather than change it."*

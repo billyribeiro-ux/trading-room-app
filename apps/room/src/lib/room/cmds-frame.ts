@@ -31,7 +31,14 @@ export interface CmdsFrame {
   recName?: string;
   /** `giveMicScreen`'s payload: `{give: boolean}`. */
   give?: boolean;
-  /** `playMP3ForAll`'s payload: `{url}`. Room-wide, so it carries no target. */
+  /**
+   * `playMP3ForAll`'s payload: `{url}`. Room-wide, so it carries no target.
+   *
+   * TWO consumers, and they share the key because the reference shares it: `setRecPreview` reads
+   * `i.url` from the same switch (byte 1,023,704) to set `sessData.recPreviewLocation`. Both are
+   * validated at their handler with `typeof`, neither is authority, and both are published by this
+   * room's own server rather than relayed from a client.
+   */
   url?: string;
   /** `focusOnScreen` — the producer id of the screen to move to. */
   screenId?: string;

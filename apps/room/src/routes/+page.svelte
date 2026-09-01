@@ -1357,6 +1357,8 @@
             onrequestreload={requestReload}
             onshowrecpreview={() => recording.showRecPreview()}
             onhiderecpreview={() => recording.hideRecPreview()}
+            onshowlocalrecpreview={() => recording.showLocalRecPreview()}
+            onhidelocalrecpreview={() => recording.hideLocalRecPreview()}
             tip={tipButtonFor(data.sessData)}
             alwaysShowRoster={data.sessData?.alwaysShowRoster === true}
             rosterCountVisible={gates.rosterCountVisible}

@@ -194,9 +194,12 @@
     ontoggletawksupport: () => void;
     ongetmypinanddoinfo: () => void;
     onrequestreload: () => void;
-    /** The recording preview lives in its own window; the page owns opening and closing it. */
+    /** `showRecPreview` / `hideRecPreview` — the capture's pair, which drive the preview CARD. */
     onshowrecpreview: () => void;
     onhiderecpreview: () => void;
+    /** OURS: the window onto this browser's own finished recording. See `RoomRecording`. */
+    onshowlocalrecpreview: () => void;
+    onhidelocalrecpreview: () => void;
 
     /** RS-09 — the tip control, already resolved. `tip-button.ts` holds the three-way gate. */
     tip: TipButton;
@@ -293,6 +296,8 @@
     onrequestreload,
     onshowrecpreview,
     onhiderecpreview,
+    onshowlocalrecpreview,
+    onhidelocalrecpreview,
     tip,
     alwaysShowRoster,
     rosterCountVisible,
@@ -529,7 +534,7 @@
       -->
       <NavbarRecIndicator {media} {recordingTooltip} />
       <!--
-        Broadcast controls - media.recording, SoundCloud, microphone, screen sharing, webcam and
+        Broadcast controls - recording, SoundCloud, microphone, screen sharing, webcam and
         session control - drive what the room sends to everyone, so they are presenter-only.
         A reader keeps the Volume dropdown and Reload below, plus the talking and REC
         indicators above, which report state rather than change it.
@@ -643,10 +648,45 @@
                 {/if}
               {/if}
               <!--
-                Outside the media.recording branch on purpose. `media.recordedUrl` is set by the
+                THE CAPTURE'S OWN PAIR, `KPe` at byte 2,475,295, with its own divider:
+
+                  O(9, roomState.isRecording && sessData.recPreviewLocation ? 9 : -1)
+                  → li > hr[115]; li[19] > O(3, globals.recPreviewOpen ? 3 : 4)
+                     3: a[163] x("click", hideRecPreview) i[164]=fas fa-times-circle " Hide Rec Preview "
+                     4: a[163] x("click", showRecPreview) i[51] =fas fa-circle        " Show Rec Preview"
+
+                Both terms of the gate matter. `roomRecording` is what the SERVER says the room is
+                doing, and `recPreviewLocation` is the frame URL it sent with `setRecPreview` — so
+                in a room whose server never sends that command these two entries do not render at
+                all, which is what the reference does in the same room. See
+                `RecordingPreviewCard.svelte`.
+              -->
+              {#if media.roomRecording && media.recPreviewLocation}
+                <li><hr class="dropdown-divider" /></li>
+                <li class="nav-item">
+                  <!-- svelte-ignore a11y_missing_attribute -->
+                  <a
+                    aria-hidden="true"
+                    onclick={media.recPreviewOpen ? onhiderecpreview : onshowrecpreview}
+                  >
+                    <i class={media.recPreviewOpen ? 'fas fa-times-circle' : 'fas fa-circle'}></i>
+                    {media.recPreviewOpen ? ' Hide Rec Preview ' : ' Show Rec Preview'}
+                  </a>
+                </li>
+              {/if}
+              <!--
+                OURS, and the two blocks cannot both be showing: the pair above needs a recording in
+                progress ON THE SERVER, this one needs a finished LOCAL one.
+
+                Outside the `media.recording` branch on purpose. `media.recordedUrl` is set by the
                 recorder's `stop` handler, which also clears `media.recording` - so while this
-                sat inside `{#if media.recording}` it appeared and vanished in the same tick and
-                could never be clicked.
+                sat INSIDE that branch it appeared and vanished in the same tick and could never be
+                clicked. (The branch is named rather than quoted: CLAUDE.md forbids template syntax
+                inside a comment, because a quoted block is prose to a human and an unclosed one to
+                any parser reading the file.)
+
+                The label reads "Local Recording" because there are now two previews in one menu and
+                the reference owns the unqualified name.
               -->
               {#if media.recordedUrl}
                 <li><hr class="dropdown-divider" /></li>
@@ -663,10 +703,10 @@
                   <!-- svelte-ignore a11y_missing_attribute -->
                   <a
                     aria-hidden="true"
-                    onclick={media.recPreviewOpen ? onhiderecpreview : onshowrecpreview}
+                    onclick={media.localPreviewOpen ? onhidelocalrecpreview : onshowlocalrecpreview}
                   >
-                    <i class={media.recPreviewOpen ? 'fas fa-times-circle' : 'fas fa-circle'}></i>
-                    {media.recPreviewOpen ? ' Hide Rec Preview ' : ' Show Rec Preview'}
+                    <i class={media.localPreviewOpen ? 'fas fa-times-circle' : 'fas fa-circle'}></i>
+                    {media.localPreviewOpen ? ' Hide Local Recording ' : ' Show Local Recording'}
                   </a>
                 </li>
               {/if}

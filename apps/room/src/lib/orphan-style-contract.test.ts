@@ -546,3 +546,78 @@ describe('app.css styles nothing that no element wears', () => {
     }
   });
 });
+
+/**
+ * The same rule for IDs, and for the `[for=…]` selectors that point at them.
+ *
+ * ## Why this was added, and what it caught on its first run
+ *
+ * Everything above sweeps CLASS selectors. On 2026-09-01 `gate/audit-surface.mjs` reported
+ * `speakers-device` absent from `app-av-settings-modal`, and the reason was that this room's markup
+ * said `id="av-speakers-device"`. Two rules in `app.css` had been written in the SAME change
+ * (`3b4f3c5`) against the captured name — `label[for='speakers-device']` at `:2117` and
+ * `#speakers-device` at `:2123` — so both matched nothing from the day they landed.
+ *
+ * That is `XCP-01` again, exactly: an `Extra` suffix on `textAreaHolder` cost the second chat column
+ * every `#textAreaHolder` rule in this file, including the `container-type` its two `@container`
+ * queries resolved against. **The gate written to catch that class of defect could not see this
+ * one, because an id is not a class.** Fifty-eight ids are styled here and this sweep found exactly
+ * one unworn; the cost of covering them was one `matchAll` and this paragraph.
+ *
+ * ## Why `[for=…]` is swept as if it were an id
+ *
+ * A `label[for='x']` rule and an `#x` rule fail identically and for the same reason, and the label
+ * half is the one nobody thinks to check — a `for` that points at no id is also a broken label, so
+ * this catches an accessibility defect and a styling defect with one assertion.
+ *
+ * ## No allow-list, deliberately
+ *
+ * The class sweep above needs one, because the reference styles four classes it never renders and
+ * that is a fact about the capture rather than about this code. No such case exists for ids: every
+ * id in `app.css` was written for markup in THIS repository, so an unworn one is always a mistake.
+ * The day a genuine exception appears, it gets an entry and a reason — not a widened matcher.
+ */
+function declaredIds(): Map<string, number[]> {
+  const found = new Map<string, number[]>();
+  postcss.parse(readFileSync(`${ROOT}app.css`, 'utf8'), { from: 'app.css' }).walkRules((rule) => {
+    for (const selector of rule.selectors) {
+      const line = rule.source?.start?.line ?? 0;
+      const add = (id: string) => found.set(id, [...(found.get(id) ?? []), line]);
+      /* `#id`, and not `#{` or a hex colour — a selector never contains one, but the guard is free. */
+      for (const match of selector.matchAll(/#([A-Za-z][\w-]*)/g)) add(match[1]);
+      for (const match of selector.matchAll(/\[for=['"]([^'"]+)['"]\]/g)) add(match[1]);
+    }
+  });
+  return found;
+}
+
+describe('app.css styles no id that no element carries', () => {
+  const ids = declaredIds();
+
+  it('read the stylesheet it says it read', () => {
+    /*
+      The vacuity guard. A regex that stops matching leaves an empty map and a green sweep, which is
+      the failure mode every measurement in this repository is required to rule out explicitly.
+    */
+    expect(ids.size).toBeGreaterThan(40);
+    expect([...ids.keys()]).toContain('speakers-device');
+  });
+
+  it('has a wearer in the markup for every one of them', () => {
+    /*
+      Matched with the same whole-token boundaries the class sweep uses, against the same
+      comment-stripped corpus — a name quoted in a transcription note is not a wearer, which is the
+      false-YES that cost this file a negative control on 2026-08-30.
+    */
+    const unworn = [...ids]
+      .filter(([id]) => !new RegExp(`(^|[^\\w-])${escapeForRegExp(id)}([^\\w-]|$)`).test(WEARERS))
+      .map(([id, lines]) => `#${id} (app.css:${lines.join(', ')})`);
+
+    expect(
+      unworn,
+      'an id styled here that nothing carries. Either the markup lost the id — check for a prefix, ' +
+        'which is how `speakers-device` and `textAreaHolder` both broke — or the rule outlived what ' +
+        'it styled and should go.'
+    ).toEqual([]);
+  });
+});

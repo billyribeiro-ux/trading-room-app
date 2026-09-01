@@ -18,7 +18,7 @@ import RoomNavbar from './components/RoomNavbar.svelte';
 
   The navbar's own comment states the rule it implements:
 
-      Broadcast controls - media.recording, SoundCloud, microphone, screen sharing, webcam and
+      Broadcast controls - recording, SoundCloud, microphone, screen sharing, webcam and
       session control - drive what the room sends to everyone, so they are presenter-only.
       A reader keeps the Volume dropdown and Reload below, plus the talking and REC indicators
       above, which report state rather than change it.

@@ -51,12 +51,42 @@
   own label. `#lib/reaction-arrivals.ts` is the consumer, and its header records why the
   notification is derived from two page loads rather than read off the frame.
 -->
+<!--
+  ── TWO INVENTED HEADERS, DELETED 2026-09-01 — the inverse of every other finding this week ──────
+
+  Both rows carried a header block this room made up:
+
+      <div id="appReactionsPopup" title="Reactions Response" class="pb-2">
+        <i class="fas fa-face-smile"></i><span class="pl-2">Reactions Response:</span>
+      </div>
+
+  and its `-Qa` twin. **`REe` and `NEe` are `d(0,"div",17)` and nothing else** — const 17 is
+  `[1,"ml-5"]`, so the reference draws these two as bare rows among the siblings at
+  `H(115,MEe,…)(116,REe,…)(117,NEe,…)(118,UEe,…)(119,HEe,…)`, with no header of any kind.
+
+  Measured against the pinned bundle rather than eyeballed. Occurrences in its 2,891,205 bytes:
+
+      appReactionsPopup       0
+      fa-face-smile           0
+      "Reactions Response:"   0          (with the colon — the header's text, not the label's)
+      appDisableVideo         1          (the NEIGHBOURING group, which really does have one)
+
+  The last line is why it looked right: this modal has twenty-odd section headers of exactly that
+  icon-then-`span.pl-2` shape, `appDisableVideo` among them and immediately adjacent, and the pattern
+  was carried across to two rows that do not have one.
+
+  **And the icon rendered as nothing.** `fa-face-smile` is Font Awesome 6; this project ships
+  `@fortawesome/fontawesome-free@5.8.1` (`apps/room/package.json:30`), where `grep -c fa-face-smile` over
+  `css/all.min.css` returns **0** and the smile is `fa-smile`. So both headers drew an empty box
+  beside a label duplicating the one on the checkbox below.
+
+  The `p-2 text-mode-box` stays and IS ours: upstream has these rows inside a box their four
+  siblings share, and four of those five live in `ModalHost.svelte` — a component cannot be a
+  sibling inside a box its parent opened. Same trade `ViewerAlertPrefsPane.svelte` records for the
+  positions row.
+-->
 {#if enableReactions}
   <div class="p-2 text-mode-box">
-    <div id="appReactionsPopup" title="Reactions Response" class="pb-2">
-      <i class="fas fa-face-smile"></i>
-      <span class="pl-2">Reactions Response:</span>
-    </div>
     <div class="ml-5">
       <input
         type="checkbox"
@@ -76,10 +106,6 @@
 {/if}
 {#if enableQaReactions}
   <div class="p-2 text-mode-box">
-    <div id="appReactionsPopupQa" title="Reactions QA Response" class="pb-2">
-      <i class="fas fa-face-smile"></i>
-      <span class="pl-2">Reactions QA Response:</span>
-    </div>
     <div class="ml-5">
       <input
         type="checkbox"

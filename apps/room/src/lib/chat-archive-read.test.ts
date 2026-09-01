@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { chatArchives, messages, users } from '#lib/server/db/schema.js';
-import { chatArchiveById } from '#lib/server/chat-archive.js';
+import { chatArchiveById, listChatArchivesFor } from '#lib/server/chat-archive.js';
 import { loadArchivedChatLog, loadChatPage } from '#lib/server/chat-log.js';
 
 /**
@@ -129,5 +129,27 @@ describe('an archive belongs to exactly one room', () => {
     const [first] = loadArchivedChatLog(ROOM, archiveId);
     expect(first.senderName).toBe('Archive Probe');
     expect(JSON.stringify(first)).not.toContain('@example.test');
+  });
+
+  it('names WHO swept it, in both reads, and never their address', () => {
+    /*
+      The capture's `By:` line (`vxe` @ bundle byte 2,301,700), against a real join rather than
+      against the source text that spells it. `archived_by_user_id` was `notNull` from the day the
+      table was added and nothing selected it until 2026-09-01, so the browser could not answer the
+      question the schema comment says the column exists for.
+
+      The address is asserted absent for the same reason it is on the sender above: the join reaches
+      a row that also holds an email, and a projection widened by one field is how one leaves.
+    */
+    const [listed] = listChatArchivesFor(ROOM);
+    expect(listed.archivedBy).toBe('Archive Probe');
+    expect(chatArchiveById(ROOM, archiveId)?.archivedBy).toBe('Archive Probe');
+    expect(JSON.stringify(listed)).not.toContain('@example.test');
+  });
+
+  it('lists this room s archives and no other room s', () => {
+    /* The join must not have turned the room predicate into a filter over the wrong table. */
+    expect(listChatArchivesFor(ROOM).map((row) => row.id)).toEqual([archiveId]);
+    expect(listChatArchivesFor(OTHER).map((row) => row.id)).toEqual([otherArchiveId]);
   });
 });

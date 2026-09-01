@@ -27,6 +27,12 @@ describe('alert and sound source contract', () => {
   });
 
   it('uses the singleton global host and SSOT warning skin', () => {
+    /*
+      Both containers are ngx-toastr's, built imperatively rather than from a template — the outer
+      one at bundle byte 878,628 (`classList.add("overlay-container")`,
+      `setAttribute("aria-live","polite")`) and the inner at 879,514 (`o.id = "toast-container"`,
+      then the position class and `"toast-container"`).
+    */
     expect(toastHost).toContain('<div class="overlay-container" aria-live="polite">');
     expect(toastHost).toContain('id="toast-container" class="toast-top-right toast-container"');
     expect(sourceCss).toContain('.toast-warning {');

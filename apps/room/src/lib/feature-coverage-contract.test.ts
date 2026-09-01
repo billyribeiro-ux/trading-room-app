@@ -173,7 +173,14 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'startWebcam',
   'stopConsumer',
   'stopOBStream',
-  'stopRecMsg',
+  /*
+    `stopRecMsg` LEFT this list on 2026-09-01, by being BUILT — `recording-frames.ts`, transcribed
+    from the subscriber at byte 2,505,283. `TODO.md` row AC had held it as blocked on the reference
+    server's wording, which is a fact about the PAYLOAD and not about the receiver.
+
+    `setRecPreview` never appeared here — it is not on the reference's `cmds` vocabulary list this
+    report reads — but it was built in the same pass and for the same reason.
+  */
   'stopRecMtx',
   'stopWebcam',
   'unarchiveLogs',

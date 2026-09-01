@@ -171,12 +171,107 @@ describe('teardown', () => {
   });
 });
 
+/**
+ * Every `new Notification(...)` the class under test constructs, with the arguments it passed.
+ *
+ * Module scope on purpose: declared inside the helper, `vite-plugin-svelte` warns
+ * *"Avoid declaring classes below the top level scope"* — a class expression rebuilt per call is a
+ * fresh constructor each time, which is exactly what a stub must not be when the test asserts
+ * identity of behaviour rather than of instances. `made` is cleared per run instead.
+ */
+const made: { title: string; options: NotificationOptions }[] = [];
+
+class FakeNotification {
+  static permission: NotificationPermission = 'granted';
+  static requestPermission = () => Promise.resolve<NotificationPermission>('granted');
+  constructor(title: string, options: NotificationOptions = {}) {
+    made.push({ title, options });
+  }
+}
+
 describe('the browser notification', () => {
   it('does nothing at all where Notification is unavailable', () => {
     // jsdom has no Notification, which is the same state a browser that refused it is in. The
     // guard is `!('Notification' in window)` and this proves it returns rather than throwing.
     const toasts = new RoomToasts();
     expect(() => toasts.notify('title', 'body', null, 'hash')).not.toThrow();
+  });
+
+  /*
+    THE ICON, WHICH NOTHING COULD SEE UNTIL 2026-09-01.
+
+    A negative control found this hole rather than a review: making `notify` build a gravatar from an
+    EMPTY hash again left every other case in this repository green, because every caller-side test
+    records what it PASSES to `notify` and none of them could see what `notify` then constructs.
+
+    jsdom has no `Notification` at all, so one is installed here — the constructor's arguments are
+    the whole subject, which is why a stub is the right instrument rather than a compromise.
+  */
+  const withNotification = async (
+    run: (toasts: RoomToasts) => void
+  ): Promise<{ title: string; options: NotificationOptions }[]> => {
+    made.length = 0;
+    const original = (globalThis as { Notification?: unknown }).Notification;
+    (globalThis as { Notification?: unknown }).Notification = FakeNotification;
+    try {
+      run(new RoomToasts());
+      /* `requestPermission()` is a promise, so the constructor runs a microtask later. */
+      await Promise.resolve();
+      await Promise.resolve();
+    } finally {
+      if (original === undefined) delete (globalThis as { Notification?: unknown }).Notification;
+      else (globalThis as { Notification?: unknown }).Notification = original;
+    }
+    return made;
+  };
+
+  it('carries NO icon for a message with no sender — upstream’s stopRecMsg sets none', () => {
+    /*
+      `new Notification(i.data, { body: i.data })`, byte 2,505,283. An empty hash would build
+      `avatar/?d=mm&s=50`, a mystery-man silhouette, and put a face on a message about a recording.
+    */
+    return withNotification((toasts) =>
+      toasts.notify('Recording Stopped.', 'Recording Stopped.', null, '')
+    ).then((made) => {
+      expect(made).toHaveLength(1);
+      expect(made[0].title).toBe('Recording Stopped.');
+      expect(made[0].options.body).toBe('Recording Stopped.');
+      expect('icon' in made[0].options, 'no icon key at all, not an empty one').toBe(false);
+    });
+  });
+
+  it('and still falls back to the sender’s gravatar when there IS one', () => {
+    /* The two original callers — a mention and a private message — both name a person. */
+    return withNotification((toasts) =>
+      toasts.notify('Message from Dana', 'hello', null, 'abc123')
+    ).then((made) => {
+      expect(made[0].options.icon).toBe('https://secure.gravatar.com/avatar/abc123?d=mm&s=50');
+    });
+  });
+
+  it('decodes the entities a chat body arrives escaped with', () => {
+    /*
+      A hole the same instrument found, and older than the icon one: `#decodeHtmlEntities` had no
+      test at all. Deleting it left every case here green.
+
+      It exists because a mention's body reaches this method already HTML-escaped — an OS
+      notification is plain text, so `&amp;` and `&#39;` would be read out literally. The decode is
+      through a detached `<textarea>`, whose contents are RCDATA: markup inside it is never parsed as
+      markup, so this cannot execute what it decodes.
+    */
+    return withNotification((toasts) =>
+      toasts.notify('Message from Dana', 'Dana&#39;s &amp; Sam&#39;s <b>plan</b>', null, 'abc123')
+    ).then((made) => {
+      expect(made[0].options.body).toBe("Dana's & Sam's <b>plan</b>");
+    });
+  });
+
+  it('and an explicit icon still wins over both', () => {
+    return withNotification((toasts) =>
+      toasts.notify('Message from Dana', 'hello', 'https://cdn.example.test/dana.png', 'abc123')
+    ).then((made) => {
+      expect(made[0].options.icon).toBe('https://cdn.example.test/dana.png');
+    });
   });
 });
 

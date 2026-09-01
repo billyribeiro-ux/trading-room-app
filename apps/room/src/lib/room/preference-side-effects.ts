@@ -12,7 +12,7 @@ import { isRoomSplitDir, type RoomSplitDir } from '#lib/room/split.svelte.js';
  * | --- | --- | --- |
  * | `chatStyle` | the room's chat rendering style is re-merged | a preferences class owning the room's rendering has stopped having a boundary |
  * | `roomSplitDir` | the split geometry is re-seeded | same, for layout |
- * | `recPreviewWindow` | an open recording preview is closed | USM-12; the window belongs to `RoomRecording` |
+ * | `recPreviewWindow` | an open recording preview is closed | USM-12; the UNGUARDED close, `RoomRecording.closeRecPreviewWindow` |
  * | `doSpeechReco` | recognition starts or stops now | USM-13; the recogniser belongs to `RoomRecording` |
  *
  * ## Why a module rather than four inline branches
@@ -27,7 +27,7 @@ import { isRoomSplitDir, type RoomSplitDir } from '#lib/room/split.svelte.js';
  *
  * ## The dependencies are passed, not imported
  *
- * All four act on objects `createRoom` owns, and two of them (`hideRecPreview`, the speech pair) are
+ * All four act on objects `createRoom` owns, and two of them (`closeRecPreviewWindow`, the speech pair) are
  * on a class **constructed after** the hook — a closure, never a read at construction. Taking them
  * as thunks makes that explicit and makes this testable without building a room.
  */
@@ -36,7 +36,7 @@ export interface PreferenceSideEffectDeps {
   mergeGlobalChatStyle: (patch: Partial<FollowChatStyle>) => void;
   /** `split.setDirection`, with the pair of size keys for the arrangement being applied. */
   setSplitDirection: (direction: RoomSplitDir) => void;
-  /** `recording.hideRecPreview` — a thunk because `recording` is constructed after this hook. */
+  /** `recording.closeRecPreviewWindow` — a thunk because `recording` is constructed after this hook. */
   hideRecordingPreview: () => void;
   /** `recording.beginSpeechRecognition` / `endSpeechRecognition`, thunks for the same reason. */
   beginSpeechRecognition: () => void;

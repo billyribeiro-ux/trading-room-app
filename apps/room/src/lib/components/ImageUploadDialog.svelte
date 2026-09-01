@@ -1,6 +1,25 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import type { Attachment } from 'svelte/attachments';
 
+  /**
+   * `imgUpload()`'s bootbox dialog — byte 1,442,225, and TWO of its options were not reproduced.
+   *
+   *     bootbox.dialog({ message: …, title: "Image Upload",
+   *                      backdrop: !0, onEscape: !0, size: "xl", buttons: { success: … } })
+   *
+   * `backdrop:!0` is the `.modal-backdrop` element bootbox emits behind the dialog; `onEscape:!0`
+   * is the keystroke that dismisses it. This repository has already ruled the first of those
+   * rendered surface twice — `ROV-04` for the image lightbox and `VID-01` for the video player,
+   * both of which emit `<div class="modal-backdrop fade show">` from the same option — and this was
+   * the one bootbox dialog in the room with neither.
+   *
+   * Found 2026-09-01. Nothing was dimmed behind it: `app.css:1556` sets `.modal { background:
+   * transparent }` and `modal-open` occurs nowhere, so the room stayed at full brightness under a
+   * dialog covering it. And Escape did nothing: the room's one global Escape ladder
+   * (`room/window-handlers.ts`) closes the popovers, the lightbox and the three `BootboxDialog`
+   * modes, and this dialog is in none of them.
+   */
   interface Props {
     onclose: () => void;
     onupload: (files: File[], message: string) => void;
@@ -37,6 +56,38 @@
   }
 
   onDestroy(releasePreviews);
+
+  /**
+   * `onEscape:!0`, and it needs the focus to work — which is `ASR-3` again, one layer down.
+   *
+   * Bootbox binds its Escape handler to the MODAL, and Bootstrap's plugin focuses the modal on
+   * show. This room ships no Bootstrap JavaScript at all (`bootstrap-dropdown-contract.test.ts`
+   * holds that premise), so a handler on this element would never have received a keystroke:
+   * `Modal.svelte` records the same finding and the same one-line fix for the other twenty-three
+   * dialogs in the room.
+   *
+   * The root carries `tabindex="-1"` already — the reference's own attribute — which is what makes
+   * it focusable without entering the tab order.
+   */
+  const takeFocus: Attachment<HTMLDivElement> = (node) => {
+    node.focus();
+  };
+
+  /**
+   * ON THE ELEMENT, NOT ON `<svelte:window>`, and `stopPropagation` is the reason.
+   *
+   * `routes/+page.svelte` binds the room's global key handler to the window, and its Escape ladder
+   * ends in `else if (dialogs.alert) dialogs.alert = null`. An upload that fails raises exactly such
+   * an alert, so a window-bound handler here would let one keystroke close two things. Stopping the
+   * event on this element keeps it off the bubble path to the window, which is the whole ladder.
+   *
+   * That also matches where the reference binds: bootbox's handler is on the modal, not the page.
+   */
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return;
+    event.stopPropagation();
+    onclose();
+  }
 </script>
 
 <div
@@ -45,6 +96,8 @@
   role="dialog"
   aria-modal="true"
   style="display: block;"
+  {@attach takeFocus}
+  onkeydown={handleKeydown}
 >
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
@@ -123,3 +176,10 @@
     </div>
   </div>
 </div>
+<!--
+  `backdrop:!0`. A sibling and not a child, exactly as `BootboxDialog.svelte` and
+  `ImageLightbox.svelte` emit it, and with no dismiss handler of its own for the reason those two
+  record: the backdrop paints BEHIND a dialog element that already covers the viewport, so a click
+  on the dimmed area never reaches it.
+-->
+<div class="modal-backdrop fade show"></div>

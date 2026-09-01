@@ -771,7 +771,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       mounting a page or a network, and one of those controls found a case of mine that passed for
       the wrong reason.
     */
-    max: 1889,
+    /*
+      1,889 -> 1,891, 2026-09-01. Two lines: `onshowlocalrecpreview` and `onhidelocalrecpreview`,
+      the renamed local-recording window handlers, beside the capture's pair which keeps the
+      unqualified name.
+    */
+    max: 1891,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   /*
@@ -861,7 +866,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Both notes point at the component rather than repeating it, which is the only reason they are
       four and six lines instead of forty.
     */
-    max: 711,
+    /*
+      711 -> 732, 2026-09-01, and every one of the twenty-one lines is a comment recording a
+      DISAGREEMENT this file is one end of.
+
+      The reference credits `ProTradingRoom.com` at four sites — this login footer, its
+      forgot/change-password arm, the room's sidebar and the closed-session page. `RoomSidebar.svelte`
+      was rebranded to `TradingRoomApp` on the recorded ground that *"every room this product serves
+      credited, and linked out to, a different company"*, and that argument applies word for word
+      here. It was not applied here, so a member reads one company on this page and a different one
+      in the room ninety seconds later.
+
+      NOT changed, deliberately: which name a product puts on its own login page is the owner's call.
+      What is added is the record at this end — the sidebar has carried its reason since the day it
+      moved, and this page carried nothing, so a reader here had no way to know the other site said
+      something else. `brand-attribution-contract.test.ts` asserts both values, so half-resolving it
+      again is a failing test rather than a thing somebody notices.
+    */
+    max: 732,
     why: 'the entry door: handoff, token strip and the login form'
   },
   {
@@ -1064,7 +1086,36 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the two subscribers at 1,117,020. There is nothing to extract — a router gaining a route is the
       router doing its job, and the alternative is a module holding one boolean assignment.
     */
-    max: 1069,
+    /*
+      1,069 -> 1,099, 2026-09-01. The `setRecPreview` receiver — byte 1,023,704, the ONLY writer of
+      `recPreviewLocation` in the whole bundle, and the command that arms `app-rec-preview`.
+
+      Four lines of handler and twenty-six of citation, and the citation is where the work is: what
+      the value arms, why `typeof` rather than a cast, why the value is safe to put in an `<img
+      src>` and nowhere else, and why upstream's `console.log` is deliberately not transcribed.
+    */
+    /*
+      1,099 -> 1,162 the same day, for the SECOND receiver a tracker had held as unbuildable.
+
+      `stopRecMsg` — byte 1,014,265, subscriber at 2,505,283 — is `TODO.md` row AC, and it was held
+      by the identical category error as row X above: the row reasoned from "our server sends no such
+      frame" to "this cannot be built". Its measurements were exact and were confirmed again by
+      reading the bundle; only the inference was wrong.
+
+      Eight lines of handler and fifty-five of citation. The citation is what stops the next reader
+      re-deriving the row's conclusion: what the reference does with the payload, why the
+      case-sensitive `indexOf("Stopped")` is kept exactly as a substring test, and why the two things
+      done differently — a toast through `RoomToasts` and a notification through its permission-aware
+      `notify` — are a match and a fix rather than an invention.
+    */
+    /*
+      1,162 -> 1,057, and the direction is the whole point. The two raises above were real work —
+      `setRecPreview`, `stopRecMsg` and `softResetDone`, three receivers and their citations — and
+      this entry's own rule is extract rather than raise, so on 2026-09-01 all three left for
+      `recording-frames.ts`. The router is now BELOW where it started the day (1,069), which is what
+      "ceilings only go down" is supposed to look like when a file grows for a good reason.
+    */
+    max: 1057,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1343,7 +1394,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       something already open does nothing at all on the next session, which is the defect being
       fixed rather than a shape to reproduce.
     */
-    max: 423,
+    /*
+      423 -> 472, 2026-09-01. `showRecPreview`/`hideRecPreview` are the CAPTURE'S now — three lines
+      each — and the local-recording window they used to be is `showLocalRecPreview` /
+      `hideLocalRecPreview` beside them, with `closeRecPreviewWindow` as the unguarded close the
+      preference-off path needs.
+
+      The growth is the separation and its argument. One method was doing two unrelated jobs: the
+      reference's menu entry, which drives a card fed by the server's `recPreviewLocation`, and this
+      room's window onto a blob its own `MediaRecorder` produced. They have different gates,
+      different flags and different lifetimes, and the entry that recorded them as one is what let
+      the card stay inert for as long as it did.
+    */
+    max: 472,
     why: 'MediaRecorder, the preview window, the room-wide broadcast, the two speech calls and auto-record'
   },
   {
@@ -1584,7 +1647,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       presenter who cleared the password got an empty panel. Found by an orphan CSS class rather than
       by reading the capture: `smallAvatarImg` is the avatar on a row of this list.
     */
-    max: 124,
+    /*
+      124 -> 125, 2026-09-01. TWO const values that were absent and had never been read, plus the
+      lines that record them.
+
+        38  [1,"row"]                          the row `mTe` wraps the notes LIST in. Ours had a
+                                               bare `.col`, which carries half a gutter of padding
+                                               that only `.row`'s negative margin cancels — so the
+                                               list sat inset while the Add Note row below it, which
+                                               DID have its row, did not.
+        96  [1,"icon","fa","fa-plus-circle"]   the Add Note icon. `icon` was dropped.
+
+      One line of markup each; the rest is the decode and the consequence of the missing row, which
+      is the part that would otherwise be rediscovered as "why is this list indented".
+    */
+    max: 125,
     why: 'the Admin Notes tab - a gate, a list, and the two actions on it'
   },
   {
@@ -1693,8 +1770,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       on. Nothing here is separable: a list pane whose rows are not clickable is the pane that was
       already here, and the log it opens is its own component.
     */
-    max: 170,
-    why: 'the chat archives browser - a date, a channel picker, two sweeps, and a row that opens its log'
+    /*
+      170 -> 206, 2026-09-01. A raise, argued, and the extraction was considered and rejected.
+
+      The capture's row (`vxe` @ bundle byte 2,301,700) is THREE labelled lines — a date, `By:` with
+      the archiver's name, and `Channel:` — and this room drew one compressed line with no `By:` at
+      all. Transcribing it costs THREE more lines of markup than the compressed row it replaces;
+      the other thirty-four of the thirty-seven are the const listing they were read from, the
+      paragraph saying which of this room's two dates stands where the reference has one, and the
+      paragraph saying why the row's Unarchive needs no `isPresenter` gate of its own. Those are
+      the comments this repository exists to keep, not padding to trim.
+
+      The separable thing here is the SWEEP FORM — the date input, the channel picker and the two
+      archive buttons — which upstream really does keep apart from the browser (`archiveOptions()` is
+      a bootbox dialog raised from the chat toolbar; `app-chat-logs-modal` is the list). Pulling it
+      out does not pay: the only parent that could hold it beside this pane is
+      `LogArchiveModals.svelte`, which is AT its own ceiling, so the four sweep props would either
+      thread through this file anyway — leaving it the same size minus the markup — or grow the
+      capped file above it. That is the exact trade the entry above records the ratchet refusing.
+    */
+    max: 206,
+    why: "the chat archives browser - a date, a channel picker, two sweeps, and the capture's three-line row"
   },
   {
     file: 'lib/components/ChatArchiveLogPane.svelte',
@@ -1713,7 +1809,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reference ships, and that the `<button>` element is the one carve-out the repository's own rule
       already names.
     */
-    max: 243,
+    /*
+      243 -> 260, 2026-09-01. The loading arm becomes the capture's own block — `Fxe`, const 6
+      `[1,"text-center","my-4"]`, const 16 `[1,"ml-2","fas","fa-spinner","fa-spin"]` and the literal
+      `" Loading..."` — which is what `gate/audit-surface.mjs` had been reporting as this surface's
+      last two gaps. It had drifted to `mt-2` and a `…` character: a THIRD spelling of an idiom
+      `ModalHost.svelte` already carries twice, verbatim, for `app-all-user-pmmodal` and the advanced
+      search.
+
+      Two lines of markup; the rest is the note. It records why `ml-2` is transcribed rather than
+      "fixed" to Bootstrap 5's `ms-2`, and the divergence that this arm is a BRANCH INSIDE the
+      viewer where upstream's is a sibling of it — so the Back button survives a slow fetch here and
+      does not there. Neither fact is inferable from the two lines above it, which is the test for
+      whether a comment earns its space.
+    */
+    max: 260,
     why: 'the archived-log viewer - a back button, a search, a download, and the reference styles that came with it'
   },
   {
@@ -2043,7 +2153,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1,184 -> 1,185, 2026-09-01. Two attributes forwarding the radio prompt's `options` and
       `message`, minus the `message=""` they replace.
     */
-    max: 1185,
+    /*
+      1,185 -> 1,199, 2026-09-01. `RecordingPreviewCard` mounted here, out of `ModalHost`, whose
+      ceiling drops by the same move.
+
+      Fourteen lines: an import, a three-prop call site, and ten of comment saying why the card is
+      not a modal and why this is the layer that can feed it — `media`, `prefs` and `isPresenter`
+      are already props here and are exactly the terms the capture's arming test reads.
+    */
+    max: 1199,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -3263,7 +3381,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       whose switches did not exist, behind the two room gates the reference gives them. If this
       climbs, the question is whether a sixth gated preference belongs here or in its own pane.
     */
-    max: 140,
+    /*
+      140 -> 241, 2026-09-01, and the raise is three gaps a background sweep found in `tke` (bundle
+      byte 2,230,654) that nothing here had ever read.
+
+        d(3,"span",16),v(4,"Users join/leave:")   the group's only visible NAME. It had none: a bare
+                                                 user icon whose sole identification was a `title`
+                                                 tooltip, which a keyboard never reaches.
+        T(7,"hr")                                the one thing dividing arrivals from departures.
+        O(5,…)/O(6,…)/O(8,…)/O(9,…)              a PER-ROW gate on each of the four, on top of the
+                                                 group gate — which is an OR, so a room that enabled
+                                                 only the beep drew all four switches, two of them
+                                                 over a popup it had turned off.
+
+      Sixty of the hundred lines are the `rows` table becoming two typed tables with a `roomKey`
+      column, at prettier's four-lines-per-object; the rest is the decode, the paragraph saying why
+      `roomKey` reads the ROOM's `beepOnUserJoin` and not the identically-named viewer preference the
+      checkbox writes, and the note recording that this pane's `p-2 text-mode-box` around the
+      positions row is OURS — upstream draws that row as the last of five siblings in a box the
+      other four of which live in `ModalHost.svelte`.
+
+      Nothing is separable. The extraction the rule asks for already happened inside the file: the
+      row markup is a snippet, rendered by both tables, so the four rows are written once.
+    */
+    max: 241,
     why: 'the alerts tab’s five gated viewer preferences — the arrival group, and the positions refresh'
   },
   {
@@ -3759,7 +3900,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       AND on unmount — strictly more than the line covered — so it was deleted rather than forwarded.
       A second teardown for state this file no longer holds is a call that can only ever be wrong.
     */
-    max: 6069,
+    /*
+      6,069 -> 6,066, 2026-09-01, and DOWN — which is the direction this file's entry has moved
+      every time. `RecordingPreviewCard` left for `RoomOverlays`: it is not a modal, and this host
+      has neither `media` nor `prefs`, so it could not have fed the card the state its gate reads.
+    */
+    max: 6066,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -4095,7 +4241,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       is the fact that retired this room's refusal to build the branch. It belongs beside
       `talkingUsers` because the whole point of the measurement is that the two are different signals.
     */
-    max: 413,
+    /*
+      413 -> 464, 2026-09-01. Two fields: `recPreviewLocation`, the server's preview frame URL
+      (`sessData`, byte 977,477), and `localPreviewOpen`, ours.
+
+      Forty of the fifty-one lines are the citation on `recPreviewLocation`, and it earns them: the
+      field reads as three separate gates in the capture — the card's arming test, the recording
+      menu's Show/Hide pair, and the 1s timer's own `src` — and the reason this room's copy stays
+      empty is the reason the card stays dark, which is a matched behaviour rather than a missing
+      one. `recPreviewOpen`'s own note is rewritten in the same pass to say which preview it means,
+      because it meant the other one until today.
+    */
+    max: 464,
     why: 'every media flag the interface renders from; STATE, never transport'
   },
   {
@@ -4396,7 +4553,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   */
   {
     file: 'lib/room/toasts.svelte.ts',
-    max: 184,
+    /*
+      184 -> 196, 2026-09-01. `notify` learned to carry NO icon.
+
+      Twelve lines, eleven of them the reason. Both original callers name a person, so a gravatar
+      fallback is right for them; `stopRecMsg` has no sender, and upstream's `new Notification(i.data,
+      {body: i.data})` sets no icon at all — building `avatar/?d=mm&s=50` from an empty hash would put
+      a mystery-man silhouette on a message about a recording.
+
+      A NEGATIVE CONTROL is what made this a real case rather than a defensive one: nothing in this
+      repository could see what `notify` constructs, because every caller-side test records only what
+      it PASSES IN. `toasts.svelte.test.ts` now installs a `Notification` stub and reads the
+      constructor's arguments, which also closed an older hole — `#decodeHtmlEntities` had no test.
+    */
+    max: 196,
     why: 'the toast queue, its timers, the duplicate guard and the browser notification'
   },
   {
@@ -4566,7 +4736,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       objects' offsets because all three default ON, and an unset preference silencing a
       notification is the polarity that would be wrong in the expensive direction.
     */
-    max: 759,
+    /*
+      759 -> 764, 2026-09-01. `recPreviewWindow`'s docblock said it was read in TWO places and it is
+      now read in THREE — the card's own arming test is the reference's read and had never existed
+      here, because the card had no behaviour to arm. The count is what makes this a preference
+      rather than a stored click, so it is stated rather than left to be recounted; the five lines
+      are the third bullet and the split of the other two.
+    */
+    max: 764,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -5297,7 +5474,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       That is what makes this a module and not a second class, and it is the thing to re-check if it
       grows: state arriving here means the seam was drawn in the wrong place.
     */
-    max: 110,
+    max: 111,
     why: "the private-chat log's two scrolls, and the two transcribed numbers they turn on"
   },
   {
@@ -5607,6 +5784,29 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'saves the close message, then closes only if the save succeeded'
   },
   {
+    file: 'lib/room/recording-frames.ts',
+    /*
+      NEW 2026-09-01, and capped at what it landed at.
+
+      The three `cmds` frames about what is being RECORDED and what happens when the media plane is
+      reset: `setRecPreview` (byte 1,023,704), `stopRecMsg` (1,014,265, subscriber 2,505,283) and
+      `softResetDone` (1,023,810, four subscribers). Twenty-five lines of receiver and the rest
+      citation, which is the ratio this repository asks for and the reason they are not in the
+      router: transcribing all three took `events.svelte.ts` from 1,069 to 1,225, and that entry's
+      rule is extract rather than raise.
+
+      The seam is `for-all-broadcasts.ts`'s and is real rather than cut to fit: these three SHARE
+      `RoomMedia`, and two of them share `RoomMediaTransport`. The rest of that chain routes
+      somewhere different per branch, which is why the chain is a chain.
+
+      If this climbs, the question is whether a FOURTH recording frame arrived — `startRec`/`stopRec`
+      are a table in `recording-commands.ts` and belong there — or whether one of these three grew a
+      collaborator, which would mean the shared-`RoomMedia` seam had stopped being the reason.
+    */
+    max: 254,
+    why: 'the recording and media-reset frames - setRecPreview, stopRecMsg, softResetDone'
+  },
+  {
     file: 'lib/room/for-all-broadcasts.ts',
     /*
       THE EIGHT "FOR ALL" RECEIVERS, extracted 2026-08-27 and capped in the same commit.
@@ -5731,7 +5931,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       server rather than relayed from a client, and a note's tab name is already drawn for anyone
       who can see the pane. The body is deliberately not sent.
     */
-    max: 77,
+    /*
+      77 -> 84, 2026-09-01. `url` grew a docblock: `setRecPreview` reads `i.url` from the same
+      switch as `playMP3ForAll`, so one key on this frame now has two consumers and the type says
+      so. No new field — inventing `recPreviewUrl` would have been a second declaration of a key the
+      reference sends once.
+    */
+    max: 84,
     why: 'the cmds frame the client reads; one half of a wire whose other half is server-only'
   },
   {
@@ -6493,7 +6699,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       than shared — four lines whose only reason to exist is that `bind:checked` over a plain
       `Record` loses every race with the DOM, and sharing it would mean a module for a closure.
     */
-    max: 100,
+    /*
+      100 -> 126, 2026-09-01, and the MARKUP SHRANK by eight lines while the file grew by
+      twenty-six. Every added line is the note explaining what left.
+
+      Both rows carried a header block this room invented — `<div id="appReactionsPopup"
+      title="Reactions Response" class="pb-2"><i class="fas fa-face-smile"></i><span class="pl-2">
+      Reactions Response:</span></div>` and its `-Qa` twin. `REe` and `NEe` are `d(0,"div",17)` and
+      nothing else. Occurrences in the pinned bundle: `appReactionsPopup` 0, `fa-face-smile` 0,
+      `"Reactions Response:"` 0 — against `appDisableVideo`, the header of the group IMMEDIATELY
+      beside these two, at 1.
+
+      That note is the whole raise, and it is worth more than the eight lines it replaced: markup
+      the reference does not have is the hardest kind of divergence to find later, because nothing
+      is missing and everything looks deliberate. Deleting it without saying what was deleted, and
+      that `fa-face-smile` is a Font Awesome 6 name in a project on 5.8.1, would leave the next
+      reader to rediscover both.
+    */
+    max: 126,
     why: 'the two reaction popups and the two room settings that decide whether they exist'
   },
   {
@@ -6589,6 +6812,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 894,
     why: 'the emoji chooser and its captured category strip'
+  },
+  {
+    file: 'lib/components/TypingIndicatorDots.svelte',
+    /*
+      `app-typing-indicator-dots` — three blinking dots, born 2026-09-01, and it is 110 lines for
+      forty of markup and CSS because the other seventy are the correction.
+
+      Both chat columns carried a paragraph saying the dots could not be reproduced, on the ground
+      that `.typing-indicator` has no rule in any stylesheet this repository holds. That is true of
+      the captured STYLESHEETS and beside the point: an Angular component's `styles:[…]` array is
+      injected at runtime out of the bundle, so it is never in one, and this component's array
+      specifies the whole appearance — 3px circles, `#9e9ea1`, resting opacity `.4`, a 1.5s blink
+      staggered a third of a cycle apart. The array is quoted here verbatim so the next reader can
+      check the transcription without re-deriving where it came from.
+
+      Two declarations carry their own paragraph and both would otherwise read as mistakes: the
+      `!important` on `display: flex`, and a `float: left` that is inert inside a flex parent in the
+      reference exactly as it is here. And the one line the capture does not have — a
+      `prefers-reduced-motion` block, the first in this application — says so where it sits.
+    */
+    max: 111,
+    why: "the capture's three blinking typing dots, its own styles array, and the reason they were not drawn until now"
   },
   {
     file: 'lib/components/ExtraChatPane.svelte',
@@ -6702,7 +6947,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       gate there. A reader adding a gate here for consistency would remove a control from every
       member.
     */
-    max: 772,
+    /*
+      772 -> 774, 2026-09-01, and the two lines are an import and a `<TypingIndicatorDots />`.
+
+      This is the raise the extraction rule ASKS for rather than one it forbids: the animated typing
+      dots became `TypingIndicatorDots.svelte`, and the cost of consuming an extracted component is
+      exactly one import plus one usage at each of its two call sites. Refusing it here would mean
+      inlining eleven lines of transcribed CSS into both chat columns instead.
+    */
+    max: 774,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -6776,7 +7029,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `…post this image:`, and this one component serves both. The default is the chat string, so the
       surface that already had this dialog is unchanged.
     */
-    max: 66,
+    /*
+      66 -> 85, 2026-09-01. ONE line of markup — `<div class="modal-backdrop fade show"></div>` —
+      and eighteen saying why it is an INTERNAL CONSISTENCY fix rather than a transcription, which
+      this repository holds to a different standard.
+
+      `sendGif` calls the SHORT form `bootbox.confirm(message, callback)`, so no `backdrop:!0`
+      appears at the call site the way it does in `imgUpload`'s options object; and the one captured
+      bootbox DOM here begins at `div.modal-content` and does not show the element either. What
+      decides it is that this room already answered the question three times — `BootboxDialog` emits
+      one and serves the SAME `bootbox.confirm`, `ImageLightbox` for `ROV-04`, `VideoPlayer` for
+      `VID-01`. Four dialogs from one library either all dim the page or none do; this was the only
+      one that did not, and the difference was nobody's decision.
+
+      A reader who finds this line with no note has to re-derive that whole argument, and the most
+      likely conclusion is that it was invented — which is the failure this file's rule exists to
+      prevent.
+    */
+    max: 85,
     why: 'the one confirmation between picking a GIF and inserting or posting it'
   },
   {
@@ -6814,12 +7084,53 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this climbs, the question is whether a THIRD chrome has appeared. There are two, and a
       variant that is not one of them is a surface the capture does not contain.
     */
-    max: 255,
+    /*
+      255 -> 316, 2026-09-01 — `GIF-07`, and the raise buys a SECOND CHROME rather than more of the
+      first.
+
+      `app-note` does not open this picker in a popover. `opengifSerachModal()` at bundle byte
+      1,482,730 is `modalService.open(this.giphySearchPopOver,{ariaLabelledBy:"modal-basic-title"})`,
+      and `L0e` draws `modal-header`, `modal-title`, `modal-body modal-lg` at `max-height: 77vh`, a
+      `modal-footer` and a `btn btn-outline-dark` reading ` Close `. There is no `giphy-search` const
+      in that component at all. This file rendered the popover shell on all four mounts, so the note
+      editor's picker was portaled to `<body>` at `inset: auto auto 0px 0px`.
+
+      The extraction the ratchet asks for is INSIDE the file and is what makes the raise small: the
+      hint, the form and the grid are two snippets, rendered by both branches, because the popover
+      splits them across its `giphy-header` and the modal does not. Splitting the two chromes into
+      two components instead would duplicate those snippets or add a third file to pass them
+      through — and the four call sites would then have to know which of two components to import,
+      which is the decision this component's `variant` prop exists to take for them.
+
+      Of the sixty-one lines, forty-three are the decode: the const table, what the two chromes
+      disagree on, and why the popover's own id and close handler are now optional props.
+    */
+    max: 316,
     why: 'the GIF search grid, its search and clear pair, and the one word that varies by surface'
   },
   {
     file: 'lib/components/ImageUploadDialog.svelte',
-    max: 126,
+    /*
+      126 -> 186, 2026-09-01. TWO bootbox options that were never reproduced, and this was the one
+      dialog of its family with neither.
+
+          bootbox.dialog({ …, title:"Image Upload", backdrop:!0, onEscape:!0, size:"xl", … })
+                                                    ^^^^^^^^^^  ^^^^^^^^^^^
+      `backdrop:!0` is the `.modal-backdrop` element, and this repository has twice already ruled
+      that option rendered surface and built the element from it — `ROV-04` for the image lightbox
+      and `VID-01` for the video player. Nothing was dimmed behind this one: `app.css:1556` sets
+      `.modal { background: transparent }` and `modal-open` occurs nowhere, so the room stayed at
+      full brightness under a dialog covering it.
+
+      `onEscape:!0` cost more than one line, and the extra is the reason it is worth the space.
+      Bootbox binds Escape to the MODAL and Bootstrap focuses the modal on show; this room ships no
+      Bootstrap JavaScript, so a handler here would never have received a keystroke — the same
+      finding `ASR-3` recorded for `Modal.svelte`, one layer down. And it is bound to the ELEMENT
+      with `stopPropagation` rather than to `<svelte:window>`, because the room's global Escape
+      ladder ends in `else if (dialogs.alert) …` and a failed upload raises exactly such an alert.
+      Both of those are paragraphs the next reader cannot re-derive from the four lines of code.
+    */
+    max: 186,
     why: 'the composer image dialog, instantiated per feature rather than shared'
   },
   {
@@ -6861,7 +7172,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       decline with its reason at the code is what stops the next reader, holding the same three
       suggestions, "fixing" it.
     */
-    max: 189,
+    /*
+      189 -> 191, 2026-09-01. Two lines: `titleTag` gains `'h4'` and a comment saying which captured
+      dialog wants each of the three levels. `app-note`'s Giphy modal opens its title with
+      `d(1,"h4",82)`, and this primitive is the only place a heading level is decided for all
+      twenty-three dialogs in the room.
+    */
+    max: 191,
     why: 'the modal shell every captured modal is rendered through'
   },
   {
@@ -7462,7 +7779,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the third seam this bar has produced, after `NavbarRecIndicator` and `NavbarSoundCloud`, and the
       third time the refusal produced the better arrangement rather than a smaller comment.
     */
-    max: 1094,
+    /*
+      1,094 -> 1,132, 2026-09-01. The recording dropdown now carries the capture's OWN preview pair
+      (`KPe`, byte 2,475,295) beside this room's local-recording one.
+
+      Forty lines: the transcribed block with its divider and its two-term gate, the decoded const
+      citation that argues every class on it, and the note on why the two blocks are two and can
+      never both be showing — the capture's needs a recording in progress on the SERVER, ours a
+      finished one in THIS BROWSER.
+
+      The last two are a self-review's: the preserved half of that note quoted a Svelte block inside
+      an HTML comment, which CLAUDE.md forbids by name — prose to a human, an unclosed block to any
+      parser reading the file. The branch is named rather than quoted now, and the reason is at it.
+    */
+    max: 1134,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {
@@ -7574,7 +7904,32 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       whether it has grown a HANDLER, which would mean the card became reachable and the whole
       argument here needs rewriting rather than extending.
     */
-    max: 61,
+    /*
+      61 -> 290, 2026-09-01, AND THIS ENTRY'S OWN PREDICTION IS WHAT CAME TRUE.
+
+      It said: *"If this file climbs, the question is whether it has grown a HANDLER, which would
+      mean the card became reachable and the whole argument here needs rewriting rather than
+      extending."* It has grown two handlers, three effects and an arming test, and the argument is
+      rewritten rather than extended — in the component, in `rec-preview-contract.test.ts`, and here.
+
+      What changed is not the card, it is the blocker. `recPreviewLocation` was recorded as a value
+      this room does not have; it is really a value the SERVER sends, by one command
+      (`setRecPreview`, byte 1,023,704) that had never been transcribed. With that command in place
+      the whole of `app-rec-preview` is transcribable, and the arming gate doing nothing in a room
+      whose server never sends it is the reference's behaviour rather than a gap in ours.
+
+      The 229 lines are 60 of markup, script and handlers, and 169 of citation: the arming test with
+      the one term this room does not implement and why, the six subscriptions and how they collapse
+      into three effects, the `untrack` that is load-bearing, and the transcribed quirk where
+      `startRec` shows the card without flipping the flag the menu reads. This is the ratio CLAUDE.md
+      asks for — *"the reason and the test that enforces it — that pair is the unit of work here"* —
+      and the prose is not trimmable to a number.
+
+      If this climbs again, the question is whether the CARD grew or the CITATIONS did. A second
+      captured component appearing in this file would be the signal to split; more `why` for the one
+      component here is what this file is.
+    */
+    max: 290,
     why: 'the recording preview card - app-rec-preview, transcribed, unreachable, and argued'
   },
   {
@@ -7903,7 +8258,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ToastHost.svelte',
-    max: 65,
+    /*
+      65 -> 86, 2026-09-01. One line of markup changed and twenty are the note.
+
+      `@flyInOut` (bundle byte 883,657) is named for a slide and defines NONE: three opacity states
+      and two `{{easeTime}}ms {{easing}}` transitions, which the defaults beside it resolve to
+      `300ms ease-in`. This room's toasts flew in from 300px to the right, which was invented and
+      was the one visible thing on this surface.
+
+      The note records that, the captured class ORDER (`${toastType} ${toastClass}` — the type
+      first), and that `cubicIn` is a stand-in for CSS `ease-in` rather than an exact match. None of
+      the three is inferable from the line above it, which is the test for whether a comment earns
+      its space.
+    */
+    max: 86,
     why: 'the toast container'
   },
   {

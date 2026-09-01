@@ -9,6 +9,20 @@ will be found later.
 end of a session. A change with no entry is a change the next person has to reverse-engineer from
 `git log`.
 
+**54 timestamps were corrected on 2026-09-01, and the rule above is why.** Every heading from
+`SHL-06` (2026-08-31 18:03) up to `two session-control refusals` was ESTIMATED rather than measured,
+each one written as "a bit after the last", and the error compounded from twelve minutes to nearly
+sixteen hours — far enough that **eleven entries claimed a day the work did not happen on**, dated
+2026-09-02 against commits made on 2026-09-01. Each heading now carries the committer timestamp of
+the commit it describes, read with `git show -s --format=%cI`; the mapping is in that commit's
+message. `changelog-ledger-contract.test.ts` refuses a heading dated after HEAD and refuses two
+headings out of order, which is the shape that would have caught this on the first estimate.
+
+The `## 2026-08-20` day heading moved in the same pass. It was added on 2026-08-20 and every entry
+since had been prepended BELOW it, so forty thousand lines of later work were filed under that day.
+It now sits above the entries that are actually from it. It is left described rather than silently
+swapped, for the reason the paragraph below is.
+
 **Branching: a feature branch and a PR per piece of work.** This paragraph used to say the opposite —
 "there isn't any, and that is deliberate… no feature branches, no PRs, confirmed by the owner
 2026-08-09" — and it was **already false on the day it was written**: `e7a0df5`, the merge of PR #1,
@@ -31,9 +45,1119 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
-## 2026-08-20
+### 2026-09-01 20:38 UTC — the fifteenth casualty of a rename, found by reading my own diff
 
-### 2026-09-02 07:05 UTC — two session-control refusals that had no reason written down
+**Runtime impact: YES, one sentence.** A member whose browser blocks the recording preview window was
+told to *"open the downloaded **media.recording** from your Downloads folder"*.
+
+## Where it came from, and why nothing caught it
+
+`mechanical-rename-contract.test.ts` was written for this: a substitution of `recording` ->
+`media.recording` applied before Phase 5 slice 20, correct for the FIELD and wrong everywhere else it
+landed. It found four user-visible casualties — two sentences, a class name and a download filename —
+and pinned each by name.
+
+Its own header explains the gap it left:
+
+> it deliberately does not try to police STRING content in general: "which sentences are
+> user-visible" is not decidable here, and a guard that guesses would either miss the next one or
+> cry wolf.
+
+The caution was right about GUESSING and it left a real defect on screen for months. Found in the
+senior-reviewer pass over this session's own diff, in a method I was already editing.
+
+Ten more sat in comments — *"every media.recording was a silent movie"*, *"a room that is still
+media.recording"*, *"Server-side media.recording needs the media.recording/transcoding workers"* —
+which are not runtime defects but are corrupted prose in a repository whose standard rests on its
+comments being readable. Fourteen repairs in nine files, each applied by name rather than by a
+blanket regex.
+
+## The rule that IS decidable, and is now a gate
+
+The header's caution was about deciding which strings a user reads. This decides nothing of the sort:
+**`media.recording` is only ever correct as a property read.** In an English sentence it is always
+the artefact, and the two are told apart mechanically — a read is preceded by a code character; the
+field NAMED in prose is written in backticks, which is the house style; anything else is the rename.
+
+Zero false positives on the corpus as it stands, which is the bar the class-attribute rule above was
+held to. Three files keep the string and are named rather than pattern-matched: this contract quotes
+the defect to describe it, and two others pin the reminder's real expression as a fixture.
+
+The corpus itself is pinned BY NAME, not by a floor. Every assertion in the block is `toEqual([])`,
+which an unread corpus satisfies while proving nothing — the trap this file's own class sweep already
+guards against with a count, and a floor of five would sit green through four files vanishing.
+
+## Verification
+
+- Four negative controls, four seen RED: the popup sentence restored, a comment restored, a component
+  comment restored, and one that shrinks the sweep's own corpus.
+- The popup sentence is also pinned by name beside the other four casualties. It is NOT asserted
+  against the capture, and that is stated at the test: this room's local-recording window has no
+  upstream counterpart, so the sentence is ours and there is no captured value to check it against.
+  What is asserted is the absence of the substitution, which is the whole of what went wrong.
+- Two more comments lost a quoted Svelte block in the same pass — CLAUDE.md forbids template syntax
+  inside a comment, and `RoomNavbar.svelte` and `recording.ts` each had one. Named branches now.
+
+---
+
+### 2026-09-01 20:14 UTC — `softResetDone` had four subscribers and this room knew about one
+
+**Runtime impact: YES.** A soft reset now clears the recording flag and the reminder banner, and cuts
+the PRESENTER's own microphone and camera — the last of which was a recorded divergence until today.
+
+## What the re-read found
+
+The receiver's entry described one subscriber. Reading every occurrence of `softResetDone` in the
+bundle found **four**, plus a fifth act in the command case itself, and this room had no test for any
+of it.
+
+| site | byte | what it does | here |
+| --- | --- | --- | --- |
+| the `cmds` case | 1,023,810 | emits, then after `3e3 * Math.random()` sends `getMyRepeater` | `restart()` after the same jitter — the one equivalence, since this room has no repeater negotiation |
+| MediaHandler | 1,115,967 | clears `isRecording`; **`isPresenter && (disableMic(), stopCam())`**; drops every webcam; `disconnectAll()` | built, all of it |
+| app-room | 2,501,883 | `isRecording = !1`, `recordingReminder = !1` | built |
+| MtxHandlerService | 1,137,494 | clears `mtxStreams`, refetches after 1s | **measured: nothing to do** |
+| app-screenshare-preview | 2,186,951 | `$("#screenshareLocalPreviewHolder").hide()` | **measured: a no-op here** |
+
+The command case also carries an upstream oddity kept as a citation rather than reproduced:
+`for (let r of this.screenSharingUsers);` — an empty loop body.
+
+## The divergence that is now built
+
+The entry read: *"NOT reproduced: upstream also cuts the PRESENTER'S own mic and camera. That is a
+presenter silencing themselves by pressing a button labelled reset the media state of the room."*
+
+The reasoning was sound and the owner's instruction to match the dump overturns a reasoned
+preference. It is also less surprising than the note assumed — `restart()` rebuilds the session, and
+a producer whose track went with it would come back muted anyway.
+
+Both calls are guarded on not-already-off, exactly as the `mutemic`/`mutecam` receivers are, and the
+guard is load-bearing rather than defensive: `toggleMicrophone` is a TOGGLE and `disableMic()` is
+not, so an unguarded call would switch an already-muted presenter's microphone ON during a reset.
+There is a test for that case.
+
+## The two subscribers with nothing to do, measured rather than assumed
+
+`MtxHandlerService` clears the stream list and refetches after one second. **This room has no
+client-side sender for `getSessionMTXMediaState`** — the list is maintained by a server-side
+reconciler (`#lib/mtx-reconcile.ts`), itself a stated divergence taken because our delivery path is
+weaker than a SocketCluster socket. Clearing without refetching is half the reference's act and the
+worse half: the room would read "No one is streaming right now..." until the next reconcile tick,
+where upstream is dark for one second. Doing nothing is closer.
+
+`app-screenshare-preview` hides `#screenshareLocalPreviewHolder`. That holder is static markup in
+`ModalHost.svelte`, and `app-screenshare-preview .webcamsHolderScreen` carries `display: none` in the
+generated sheet with no writer in this room, so `.hide()` on it is exactly a no-op.
+
+## The extraction, which the ratchet asked for and not for the first time
+
+Three transcribed receivers took `events.svelte.ts` from 1,069 lines to 1,225, and that entry's rule
+is extract rather than raise. `setRecPreview`, `stopRecMsg` and `softResetDone` are now
+`lib/room/recording-frames.ts`, following the seam `for-all-broadcasts.ts` records: a group of `cmds`
+branches lifts out cleanly when they SHARE their collaborators, and these three share `RoomMedia`.
+`SOFT_RESET_JITTER_MS` went with its only reader.
+
+**The router ends the day at 1,057 — below the 1,069 it started at.** That is what "ceilings only go
+down" is supposed to look like when a file grows for a good reason.
+
+## Verification
+
+- `events.svelte.test.ts` +5 cases for `softResetDone`, which had **none at all**: the drop-then-wait
+  ordering under fake timers, the recording flag and the reminder, the presenter's mic and camera,
+  the member who keeps theirs, and the already-muted presenter who is not toggled back on.
+- **Twelve negative controls re-run against the extracted module after the move, twelve seen RED** —
+  including one that disables the router's call entirely, which turns eight cases red and is the
+  check that the extraction is actually wired.
+- Three gate failures fixed, each a tracker the build made stale: `feature-coverage-contract`'s
+  absent-command list, `missing-command-census-contract` (BLOCKED rows 4 -> 3, with the category
+  error written into the docblock that lists them), and `reference-citation-contract`, which caught
+  **two citations of mine off by hundreds of bytes** — `KPe` at 2,474,900 is really 2,475,295, and the
+  `O(9, …)` gate is at 2,476,206 inside `YPe` at 2,475,469. Re-measured with `grep -bo`, not adjusted.
+- `docs/decoded/missing-commands-triage.md` restates its own totals (15 built, 3 blocked) and
+  `NEW-TODO.md`'s copy of that tally with it.
+- `svelte-check`: 1,630 files, 0 errors. Svelte MCP still unavailable; no `.svelte` file changed here.
+  Nothing was opened in a browser.
+
+---
+
+### 2026-09-01 19:52 UTC — `stopRecMsg`, and the sentence that was holding two rows
+
+**Runtime impact: YES.** When a room's server sends `stopRecMsg`, every browser in it now raises the
+toast the reference raises — an error one when the server's wording contains "Stopped", an info one
+otherwise — and a browser notification carrying the same text. This room's server sends no such
+frame, so nothing here changes today.
+
+## One category error, two rows
+
+`TODO.md` row AC was twice re-audited and every measurement in it is exact. Confirmed again by
+reading the bundle rather than the row: three occurrences of `stopRecMsg`, the emitter 35 bytes after
+its own `case` label at 1,014,265, the subscriber at 2,505,283 — an offset the row had itself
+corrected on 2026-08-30 after being wrong by 3,329 bytes.
+
+What the row got wrong is the inference, and it is the same one row X was held by:
+
+> a row that reasons from "our server does not send this frame" to "this cannot be built" has
+> confused a PAYLOAD with a RECEIVER.
+
+The payload really is server-generated prose this repository cannot invent, and it is still not
+invented. The receiver is transcribable regardless, and a receiver nothing triggers is exactly what
+the reference has in a room whose server is quiet.
+
+## Transcribed exactly
+
+```js
+guiEventBus.subscribe("stopRecMsg", i => {
+  -1 != i.data.indexOf("Stopped") ? this.alertsService.error(i.data) : this.alertsService.info(i.data),
+  new Notification(i.data, { body: i.data })
+})
+```
+
+The severity test is kept as it stands: case-sensitive, a substring, on a capital S. Narrowing it to
+a status code or a regular expression would be this room deciding which of the server's sentences
+count as errors.
+
+## Two things done differently, both stated at the code
+
+The toast goes through `RoomToasts`, which sets `enableHtml: false`. ngx-toastr's default is the
+same, so this is a MATCH — but one this room has to make deliberately, because `data` is text off a
+socket frame and a toast rendering it as HTML would be a stored-XSS primitive.
+
+The notification goes through `RoomToasts.notify`, which tests `'Notification' in window` and asks
+permission first. Upstream's raw `new Notification(...)` shows nothing on a browser that has never
+been asked, and throws `Illegal constructor` on several mobile browsers — inside a socket handler,
+where the throw takes the rest of the frame with it. What a permitted browser shows is identical.
+
+`data` is narrowed with `typeof` rather than asserted, for the reason `CmdsFrame` states at the top
+of its own file. Upstream calls `.indexOf` on the payload and throws when there is none.
+
+## A negative control found a hole nothing else could see
+
+`notify` learned to carry NO icon — upstream's `new Notification(i.data, {body: i.data})` sets none,
+and building `avatar/?d=mm&s=50` from an empty hash would put a mystery-man silhouette on a message
+about a recording. Making it build that gravatar again left **every** test in this repository green,
+because every caller-side test records what it PASSES to `notify` and none could see what `notify`
+then constructs.
+
+`toasts.svelte.test.ts` now installs a `Notification` stub and reads the constructor's arguments.
+That also closed an older hole in the same method: `#decodeHtmlEntities` had no test at all, and
+deleting it was green too. It is there because a mention's body arrives HTML-escaped and an OS
+notification is plain text; the decode is through a detached `<textarea>`, whose contents are RCDATA,
+so it cannot execute what it decodes.
+
+## Verification
+
+- `events.svelte.test.ts` +6 cases, driving real frames through the real dispatcher: the severity
+  switch both ways on the capital S, the `enableHtml: false` flag, the notification's arguments, and
+  three malformed payloads that must raise nothing.
+- `toasts.svelte.test.ts` +4 cases on the constructor's arguments.
+- **Twelve negative controls run, twelve seen RED**, including the four that were written only
+  because the first pass of them came back green.
+- Two docs corrected where they named these rows as blocked on a media plane:
+  `MEDIA-PLANE-MEASURED.md`'s restatement table and `OBS-XSPLIT-INGEST.md` §7, which claimed four
+  rows *"become reachable the moment MediaMTX exists, and none of them can be reached before"*. Two
+  of the four were receivers and were never blocked.
+- Two ceilings raised, each argued at its entry.
+- The Svelte MCP is unavailable in this session; no `.svelte` file changed in this entry, so
+  `svelte-autofixer` had nothing to run on. Nothing was opened in a browser.
+
+---
+
+### 2026-09-01 19:30 UTC — `app-rec-preview` was never blocked; the blocker was a command nobody had transcribed
+
+**Runtime impact: YES.** A presenter in a room whose server sends `setRecPreview` now gets the
+reference's recording preview card: it shows on `startRec`, refreshes its frame once a second,
+drags, resizes, expands and closes. In THIS room, whose server sends no such command, nothing on
+screen changes — which is the point, and is argued below.
+
+## The row this closes said "building it would ship a component that cannot run"
+
+`TODO.md` row X, on the books since the settings enumeration, and quoting the very line that
+disproves it:
+
+> The image src is `${sessData.recPreviewLocation}?${Date.now()}` polled every 1000 ms, and
+> `recPreviewLocation` is set by the SERVER on the command channel — `case "setRecPreview":
+> globals.sessData.recPreviewLocation = i.url` (bundle byte 1023704) … Building it would ship a
+> component that cannot run.
+
+Re-measured, and the premise is about the wrong thing. `recPreviewLocation` is not a value this
+repository lacks. It is a value the SERVER SENDS, by one command that had never been transcribed —
+and a command is transcribable. The row treated "our server does not send it" as "we cannot build
+it", and those are different sentences.
+
+What follows from transcribing the command: the whole component is transcribable, and the fact that
+this room's server never sends `setRecPreview` is not a gap. It makes the capture's OWN arming test
+fail — `!videoOnlyMode && isPresenter && recPreviewLocation && preferences.recPreviewWindow` — so the
+card stays dark, which is exactly what a reference room does in the same state. Matching the dump
+means transcribing the gate, not inventing a value to get past it.
+
+## What was built
+
+| piece | reference |
+| --- | --- |
+| `setRecPreview` receiver | byte 1,023,704, the only writer of `recPreviewLocation` in the bundle |
+| `RoomMedia.recPreviewLocation` | `sessData.recPreviewLocation`, declared `""` at byte 977,477 |
+| the card's arming test, six subscriptions, 1s timer, drag and both icons | `app-rec-preview`, byte 2,353,188 |
+| the recording menu's Show/Hide pair with its own divider | `KPe`, byte 2,474,900 |
+| `showRecPreview` / `hideRecPreview` | the capture's three lines each, `isRecording` refusal included |
+
+The card mounted in `ModalHost.svelte` and moved to `RoomOverlays.svelte`, which is the layer for
+things that float over the room and already holds `media`, `prefs` and `isPresenter` — the exact
+terms the gate reads. `ModalHost`'s ceiling went DOWN by the move.
+
+## Two divergences, both stated at the code
+
+**`shown` is `$state` driven by two effects, not a `$derived`,** against CLAUDE.md's usual rule, and
+the capture is what forces it: after `startRec` shows the card, `closePreview()` hides it while
+`roomState.isRecording` is still true, so any expression over the room's state puts it straight back.
+There is a test for exactly that case. `untrack` around each assignment is load-bearing for a second
+reason recorded at it.
+
+**`armed` is `$derived` where Angular reads its terms once, in `ngOnInit`.** Upstream a
+`setRecPreview` arriving one tick after construction leaves the card unwired for the whole session —
+a race, not a design. This diverges by being right and cannot reach a state the reference cannot.
+
+## And one thing kept that upstream does not have
+
+This room records locally, in the presenter's own browser, and had a window onto that recording
+wired to `showRecPreview` — the method the capture uses for its card. The two were one control
+sharing one flag. They are now two: `showLocalRecPreview` / `hideLocalRecPreview` on
+`media.localPreviewOpen`, labelled "Show Local Recording", gated on `recordedUrl`; the capture's pair
+on `media.recPreviewOpen`, gated on `roomRecording && recPreviewLocation`. They cannot both be
+showing — one needs a recording in progress on the server, the other a finished one in this browser.
+
+A third method exists and the split is the reason: `closeRecPreviewWindow()` is the preference's
+UNGUARDED close. `recPreviewWindowOnChange` (byte 2,250,601) emits straight to `closePreview()` with
+no `isRecording` test, so routing the preference through the guarded menu method would strand a card
+on screen exactly when the room's recording had already stopped.
+
+## Verification
+
+- `rec-preview-contract.test.ts` REWRITTEN: it MOUNTS the card and drives it — 26 cases covering the
+  three arming terms through both doors, all four subscriptions, the timer's start/pause/resume/stop,
+  the expand clamp, and the wire at both ends. The file it replaces asserted a conditional over source
+  text; SSR cannot see any of this, because the component is four effects and two handlers.
+- **Sixteen negative controls run, sixteen seen RED — and the first pass found a real hole.**
+  Deleting `armed` from the `recPreviewOpen` effect left all 23 cases GREEN, because every arming
+  test drove `startRec` and none drove `showRecPreview`. Three cases added; the control is red now.
+- `reference-const-coverage-contract`: `app-rec-preview` leaves the residual table by being BUILT.
+  41 components fully covered (was 40), 108 values uncovered (was 110), `stripped - raw` 21 -> 19.
+- `img-dimensions-contract`: the frame catalogued in `UNSIZEABLE`, with why `SIZED_BY_CSS` cannot
+  take it — that catalog verifies a `height` declaration and the captured rule states `max-height`.
+- `slice-anchor-contract` went red on a new inlined `indexOf` and was PAID rather than raised.
+- Nine size ceilings moved, each argued at its entry; two of them DOWN.
+- `svelte-check`: 1,629 files, 0 errors.
+- **The Svelte MCP is unavailable in this session, so `svelte-autofixer` has NOT run on
+  `RecordingPreviewCard.svelte`, `RoomNavbar.svelte`, `RoomOverlays.svelte` or `ModalHost.svelte`.**
+  Reported rather than claimed, as every commit this session has.
+- Nothing was opened in a browser. jsdom is not a renderer: the expand clamp's two thresholds are
+  driven against a stated rect because jsdom gives every element a zero one, and that is said at the
+  test.
+
+### 2026-09-01 18:49 UTC — all three trackers are down to the owner, an environment, or hardware
+
+**Runtime impact: NONE.** This entry records a position, and every claim in it was re-measured today
+rather than read off the trackers that make it.
+
+## The three trackers, together
+
+| tracker | where it stands |
+| --- | --- |
+| `todo-next.md` | **93 of 93 room surfaces**, from 2 of 42 on 2026-08-16. Closed, with four limits stated at the number |
+| `NEW-TODO.md` | **three items**, all blocked outside this repository |
+| `TODO.md` | every open row names who or what unblocks it, and none of them is a decision an audit can take |
+| the register | 70 closed, 2 open — `T5-24` and `T5-25`, both on **one sentence from the owner** |
+| the settings enumeration | last buildable row closed 2026-08-29; `enableDiscord` needs an application registration that does not exist |
+
+Re-measured today, not inherited:
+
+- **`INERT_ACTIONS` is FOUR**, each with its reason at the entry: `start-recording` and
+  `stop-recording` (no server-side recorder), `disable-private-chat` (a MATCH — the reference wires
+  nothing to it) and `get-my-token` (a security divergence: this room's session cookie is `httpOnly`,
+  so building it would hand the server the job of putting into the DOM a value an XSS currently
+  cannot read).
+- **`EXACT_ALERTS` holds no liar.** `unmute-chat`, `force-reload`, `mute-chat-24` and
+  `mute-chat-indefinitely` all left; what is left announces something that really is sent.
+- **`gate/audit-setting-coverage.mjs`**: 269 declared, 105 read here, 26 the reference reads and this
+  room does not — and every one of the 26 is a credential that must never cross, a not-a-gap, an
+  enumeration artefact or Discord.
+- **`services/**` is untouched by this session**, so its gate was correctly not run — the
+  test-what-changed table, followed rather than quoted.
+
+## What is NOT claimed
+
+That the room matches the reference everywhere. Many surfaces close on a recorded refusal or a
+measured blocker, and each says so where it stands. **Audited means the gap is known and argued, never
+that there is none** — the four limits now printed beside `todo-next.md`'s 100% say the same thing in
+the place somebody would read the number.
+
+## One question moved TO the owner's desk today
+
+Closing the surface table found it: **this product credits `ProTradingRoom.com` on its login page and
+`TradingRoomApp` in the room, ninety seconds apart.** The sidebar was rebranded on a recorded ground
+that applies word for word to the login page and was not applied there.
+`brand-attribution-contract.test.ts` pins both ends, and each failure message names what the other
+site says, so it cannot be half-resolved again. Which name goes on a login page is not an audit's
+call.
+
+## Verification
+
+Room gate exit 0 — **337 files, 6,055 passed, 1 skipped**. Controller gate exit 0 — **109 files,
+1,139 passed, 21 skipped**. `svelte-check` clean in both. No backend gate: nothing under `services/`
+changed in any of this session's fourteen commits, verified with `git diff --stat`.
+
+**The Svelte MCP has been unavailable for this entire session.** `svelte-autofixer` has not run on
+any of the components touched today — `ChatArchivePane`, `ChatArchiveLogPane`, `TypingIndicatorDots`,
+`AlertChatArea`, `ExtraChatPane`, `ModalHost`, `GiphyPicker`, `Modal`, `NoteEditor`,
+`ViewerAlertPrefsPane`, `ReactionPrefsPane`, `UserNotesPane`, `ImageUploadDialog`, `ToastHost`,
+`GifConfirmDialog` and `session/+page.svelte`. That is the one gate in `CLAUDE.md` this session could
+not run, and it is recorded here rather than left to be assumed.
+
+### 2026-09-01 18:38 UTC — the surface table closes at 93 of 93, and the number is bounded where it stands
+
+**Runtime impact: one line.** `GifConfirmDialog.svelte` gains the `.modal-backdrop` its three
+siblings emit. Everything else here is measurement.
+
+## From 2 of 42 to 93 of 93
+
+`todo-next.md` opened on 2026-08-16 at *"2 surfaces of 42, ~2.7% of lines"*. It closes today. The
+last nine rows went in one pass, and only two of them were work:
+
+| surface | verdict |
+| --- | --- |
+| `app-presentationarea` | pinned — the Recordings tab and `NTC-3`, both recorded |
+| `ModalHost.svelte` | **audited as a SET**, not a surface: twelve of its modals measure CLEAN, `app-user-info-modal`'s nine values are two recorded reasons, and five more carry their own pins |
+| `BootboxDialog`, `ImagePasteConfirm`, `GifConfirmDialog` | read against the one captured bootbox DOM this repository holds |
+| `RoomBranding` | read against `changeFavicon` and `addCustomCSS`, both imperative |
+| `RemoteAudioSinks`, `Modal`, `TabGearMenu` | covered by the `app-room` pin that names them |
+| `routes/logout`, `routes/+layout` | OURS — no reference counterpart, and the absence is the point |
+
+Five surfaces reached CLEAN in that pass and were pinned: `app-av-settings-modal` (36 consts, 3
+views), `app-play-youtube-modal` (19/3), `app-alerts-advanced-search` (50/17),
+`app-webrtc-troubleshooter` (85/43 — the largest clean surface here) and `app-alert-qa-modal` (38/15).
+
+`app-av-settings-modal` reached 0/0 **today and not before**: the audit had been reporting
+`speakers-device` against markup that said `av-speakers-device`.
+
+## The bootbox family, and the capture that is from the wrong application
+
+bootbox builds its markup in JavaScript, so none of it is in the Angular bundle —
+`bootbox-close-button`, `bootbox-accept`, `bootbox-cancel` and `bootbox-input` all return **zero**
+there. The rendered DOM exists in exactly one place, `docs/reference/evidence-dumps-full-read.md`,
+which says of itself: *"meta.json config has `OPEN_BOOTBOX: false`, so NEXT-STEP never captured a
+bootbox at all. THIS FILE IS THAT MISSING EVIDENCE."*
+
+**And it is the AngularJS ACCOUNT page on Bootstrap 3**, where the room is Angular 17 on Bootstrap 5.
+The same file makes the point about a different dependency thirty lines later — *"Do not assume one
+icon set across the two surfaces"* — and it applies here with the same force. So three captured
+values are refused and the refusal is now written down: `data-dismiss` (BS3's spelling of
+`data-bs-dismiss`), `data-bb-handler` (bootbox's own dispatch hooks, which nothing here reads), and
+`btn-default` alone — kept BESIDE `btn-secondary` rather than instead of it, so a stylesheet keyed on
+the captured name still finds it. The class names and the Cancel-then-OK order the evidence states
+explicitly are transcribed.
+
+**One gap found there.** `GifConfirmDialog` was the only bootbox dialog in the room with no
+`.modal-backdrop`, and this one is an INTERNAL CONSISTENCY fix rather than a transcription — worth
+saying, because the two are held to different standards. `sendGif` uses the short form
+`bootbox.confirm(message, callback)`, so no `backdrop:!0` appears at the call site, and the captured
+DOM begins at `div.modal-content` and does not show the element either. What decides it is that this
+room already answered the question three times: `BootboxDialog` emits one and serves the SAME
+`bootbox.confirm`, `ImageLightbox` for `ROV-04`, `VideoPlayer` for `VID-01`. Four dialogs from one
+library either all dim the page or none do.
+
+## What 100% means, bounded at the number itself
+
+The header now carries four limits, because a coverage figure nobody bounds is the next thing to go
+stale:
+
+1. **Audited is not perfect.** Many rows end in a recorded refusal or a measured blocker.
+2. **Two rows are pinned by a GLOB and are weaker for it** — and both pins say so, with the control
+   that proves it.
+3. **Four rows have no Angular selector at all** and say what they were read against instead.
+4. **`ModalHost.svelte` is a set, not a surface.**
+
+## Verification
+
+Room gate exit 0 — **337 files, 6,055 passed, 1 skipped**.
+
+**Four negative controls, three red on target and one that correctly did not fire:** the close
+button's second class removed; `btn-default` removed from the GIF dialog's Cancel; the
+`speakers-device` id renamed, which turns the `app-av-settings-modal` pin AND the `app.css` id sweep
+red from one edit. The fourth was an attempted control on that same id run against the wrong file
+list, which stayed green because the value lives in `ModalHost.svelte` and not in `AvDevicePane.svelte`
+— rerun against the right file, it fires.
+
+`reference-const-coverage-contract.test.ts`'s examined/unexamined split moved 37/73 to 43/67: six
+values crossed to EXAMINED because closing this table wrote a reason for each. None left `all` —
+only rendering does that.
+
+### 2026-09-01 18:24 UTC — `app-presentationarea` pinned, and two tool bugs where the obvious fix was wrong
+
+**Runtime impact: NONE.** No component changed. The page's second giant is measured and pinned, and
+`gate/audit-surface.mjs` stops reporting two whole classes of false gap.
+
+## 82 gaps to 5, and only one of the six corrections was about this room
+
+`app-presentationarea` — 292 consts, 125 embedded views: the screen tabs, the stream tabs, the
+notes, the files pane and the swing and day-trade alert forms.
+
+| correction | what it was |
+| --- | --- |
+| the file list, ×4 | `components/notes/**`, `components/swing-alerts/**` and `day-trade-alerts/**` are SUBDIRECTORIES, and the glob was `components/*.svelte`. Nineteen values — `notesTabs`, `swingAlert-symbol`, `AAPL`, `123.57` — reported missing against files rendering every one |
+| the tool, ×1 | `ngForm` — const 0 is `["alertForm","ngForm"]`, a local reference |
+| the tool, ×1 | a 261-character tooltip prettier splits across a `+` |
+
+Five of the six were the measurement being wrong about itself. What is left is one blocked feature
+and one recorded divergence: the **Recordings tab** (`recordings`, `recordings-tab`, `#recordings`,
+`fa-file-video` and the literal), blocked on an archive service neither database has a table for;
+`dropdownMenuNote`, which is `NTC-3` — the capture freezes the per-note gear's `id` at that literal,
+so two open notes would be two elements with one id and every menu's `aria-labelledby` would resolve
+to the first gear; and `"No room files found."`, the `#files` region's own refusal.
+
+## The local-reference fix, and why the obvious version of it was wrong
+
+`#alertForm="ngForm"` compiles to `["alertForm","ngForm"]`. The first fix widened the shape test from
+`["x",""]` to any two-string const — and **that also swallows `["value","sent"]`, `["value","queued"]`
+and `["value","failed"]`**, ordinary attribute pairs, so four real gaps quietly left
+`app-alert-send-report-modal`'s pin. A shape two different things share cannot tell them apart.
+
+Angular's own encoding does: a const index in the THIRD argument of `d(slot,"tag",N)` is the
+attribute list, and a FOURTH is the local-refs list.
+
+```js
+d(23,"div",74,3)      // consts[74] = attributes, consts[3] = local refs
+d(0,"div",52)         // attributes only
+```
+
+So the indices are read from the template and every view it reaches, and a const at one of them is
+skipped wherever it is and whatever it looks like — which is why that loop now runs after the view
+walk instead of beside the const table.
+
+**And it is restricted to `--selector` runs, which is a correctness requirement rather than caution.**
+A `--from`/`--to` run parses a SLICE, so its index 0 is the first entry in the range while the
+template's indices are the whole component's. Applying one numbering to the other skips an arbitrary
+entry, and on the first run it did: the `#files` region's pinned `pe` gap — upstream's own typo, an
+attribute literally named `pe` — disappeared because an unrelated four-argument call carried its
+range-relative index.
+
+## Adjacent string literals are joined now, the way the engine joins them
+
+```ts
+'This is the default screen users are taken to right now. If you are a presenter and talking ' +
+  'whichever screen you select will be forced on others…'
+```
+
+One string to JavaScript, two to a text search. Whitespace collapsing cannot fix it — the break is in
+SOURCE, not markup, and there is a `+` between the halves — so the 261-character tooltip was reported
+absent against `ScreenTabs.svelte:102` and `StreamTabs.svelte:120`, both of which render it. A closing
+quote, optional whitespace, `+`, optional whitespace, an opening quote of the SAME kind, all removed.
+Different quote characters are left alone: that is a concatenation of two genuinely different strings.
+
+Every search reads the folded text now, const values included — an attribute value is exactly as
+splittable as a text node.
+
+## Verification
+
+Room gate exit 0 — **336 files, 6,038 passed, 1 skipped**.
+
+**Every one of the ten pinned surfaces gives the identical answer after both tool changes**, which is
+the only evidence that a smarter reader is still reading the same thing — and the one that did not,
+`app-alert-send-report-modal`, is what caught the wrong version of the local-reference fix.
+
+**Two negative controls, each red naming the value it restores:** the literal-join reverted (the
+tooltip reappears in `app-presentationarea`'s const list) and the positional filter reverted
+(`ngForm` reappears).
+
+`todo-next.md`: 84 of 93 surfaces, 82.7%. `TabGearMenu.svelte` moved with `app-room`, whose pin holds
+its two cogs.
+
+### 2026-09-01 18:09 UTC — the toasts flew in from nowhere, and two pages of this product credit different companies
+
+**Runtime impact: yes.** Toasts fade in the way ngx-toastr fades them instead of sliding 300px from
+the right.
+
+## `@flyInOut` is named for a slide and defines none
+
+ngx-toastr's toast component, decoded at bundle byte 883,657:
+
+```js
+data: { animation: [ mJ("flyInOut", [ WF("inactive", mp({opacity:0})),
+                                      WF("active",   mp({opacity:1})),
+                                      WF("removed",  mp({opacity:0})),
+                                      X4("inactive => active", Q4("{{easeTime}}ms {{easing}}")),
+                                      X4("active => removed",  Q4("{{easeTime}}ms {{easing}}")) ])]}
+```
+
+Three opacity states and two transitions, which the default config immediately above it resolves to
+`easeTime:300`, `easing:"ease-in"`. **That is the entire animation.** This room's toasts flew in
+from `x: 300` — invented, and the one thing on this surface a viewer would notice.
+
+The captured class order came with it: `toastClasses = \`${i.toastType} ${i.config.toastClass}\``, so
+the type is first and `ngx-toastr` second. `cubicIn` stands in for CSS `ease-in` and is named as a
+stand-in rather than left to look exact — Svelte's easing set has no equivalent of
+`cubic-bezier(.42,0,1,1)`.
+
+Both containers were already right, and both are built imperatively upstream rather than from a
+template: `classList.add("overlay-container")` + `aria-live="polite"` at 878,628, and
+`o.id = "toast-container"` + the position class + `"toast-container"` at 879,514. `closeButton` and
+`progressBar` default OFF and are correctly absent — two controls that would be drawn for nobody.
+
+The assertions went into a NEW file rather than into `sound-effects-contract.test.ts`, which already
+holds two about this component: that file is evidence-bound and is dropped from any checkout without
+the captures, and an assertion nobody can run locally goes stale between CI runs.
+
+## `app-room` is pinned — 229 consts, 108 views, the largest surface in the capture
+
+Six values remain and every one is on record: the sidebar's attribution (below), `helpLink` and its
+intercom URL (`RNB-01`, a false gap — `hasSTHelpLink` is `!1` in `app-room`'s own constructor and
+never written), `cssSoundCloudIcon` (const 176 declares `id` twice and Angular keeps the second) and
+`/assets/images/playing.gif` (an asset the four-file capture cannot supply).
+
+**The pin records its own measured limitation, and that is the part worth keeping.** Its file list is
+a glob of eighty-four components, because `app-room` composes the whole page and an explicit list
+would go stale on every extraction. The audit counts a value present if it occurs in ANY listed file,
+so with eighty-four the blind spot is real: a control that changed `{shareScreenText}` in
+`RoomNavbar.svelte` to a hardcoded string — the label really would have moved on screen — **left this
+test green**, because `SHARE_SCREEN_TEXT` still sat in `navbar-labels.ts`. Two controls that DO fire
+are recorded beside it, and the per-component pins above are what catch a value moving files.
+
+## Two pages of this product credit different companies
+
+The reference carries `Powered by: ProTradingRoom.com` at four sites — the login form (byte
+1,179,402), its forgot/change-password arm (1,187,483), the room's sidebar (2,470,674) and the
+closed-session page (2,576,585).
+
+`RoomSidebar.svelte` was rebranded to `TradingRoomApp` on the recorded ground that *"every room this
+product serves credited, and linked out to, a different company."* **That argument applies word for
+word to the login page, and was not applied there** — so a member reads one company on the login page
+and a different one in the room, ninety seconds apart.
+
+**Not changed, and that is the finding rather than a deferral.** Which name a product puts on its own
+login page is the owner's call, and doing it silently on one page is how the two got out of step in
+the first place. What is added is the record at the end that had none: the sidebar has carried its
+reason since it moved, the login page carried nothing.
+`brand-attribution-contract.test.ts` asserts both values, and each failure message names what the
+OTHER site says — so half-resolving it again is a failing test rather than something somebody
+notices. **This one is on the owner's desk, not mine.**
+
+## Verification
+
+Room gate exit 0 — **336 files, 6,035 passed, 1 skipped**; `svelte-check` 1,627 files, 0 errors.
+
+**Five negative controls, four red on target and one that correctly did not fire:** the toast
+entrance restored to `fly`; the class order swapped back; the sidebar attribution reverted (the
+`app-room` const list shrinks by one); `navbar-labels.ts` dropped from `app-room`'s file list (the
+file count moves and three literals reappear). The fifth is the `{shareScreenText}` control above,
+which stayed green for a measured reason and is written into the pin rather than quietly dropped.
+
+`todo-next.md`: **83 of 93 surfaces, 82.3%** — `routes/+page.svelte`, `AlertChatArea.svelte` and
+`ToastHost.svelte` all moved, the first two because they had been read end to end as the roots of
+`app-room` and `app-chat` without the table being updated to say so.
+
+### 2026-09-01 17:49 UTC — nine gaps on four surfaces nobody had read, one of them markup this room invented
+
+**Runtime impact: yes, on all four.** An alert group gains its name, its divider and four gates it
+should always have had; two invented headers with an icon that drew nothing are gone; the user-notes
+list stops sitting inset; and the image-upload dialog dims the room behind it and closes on Escape.
+
+## Where these came from
+
+A background sweep read every reference surface `todo-next.md` still lists as unread and put each
+candidate through four refutation routes — is it rendered here under another spelling, is there a
+reason recorded anywhere, is it Angular machinery rather than surface, and do the byte offsets
+verify. **Nine survived all four; eleven did not.** Every one of the nine was re-verified here
+against the pinned bundle before anything was built.
+
+## `ViewerAlertPrefsPane.svelte` — three, and the last is the one that mattered
+
+`tke` @ 2,230,654, verbatim:
+
+```js
+d(0,"div",52)(1,"div",139),T(2,"i",140),d(3,"span",16),v(4,"Users join/leave:"),u()(),
+H(5,GEe,6,2,"div",17)(6,KEe,6,2,"div",17),T(7,"hr"),H(8,XEe,6,2,"div",17)(9,eke,6,2,"div",17),u()
+…  O(5, sessData.beepOnUserJoin ? 5 : -1)      O(6, sessData.userJoinAndLeavePopup ? 6 : -1)
+   O(8, sessData.beepOnUserJoin ? 8 : -1)      O(9, sessData.userJoinAndLeavePopup ? 9 : -1)
+```
+
+- **`d(3,"span",16),v(4,"Users join/leave:")`** — const 16 is `[1,"pl-2"]`. The group had **no
+  visible name at all**: a bare user icon whose only identification was a `title` tooltip, which a
+  pointer has to rest on and a keyboard never reaches. Twenty-odd other section headers in this modal
+  carry exactly that icon-then-`span.pl-2` pair, so this one was the outlier.
+- **`T(7,"hr")`** — the one thing dividing arrivals from departures. No const index and no `O(…)`, so
+  it renders whenever the group does, even when one of the pairs beside it does not.
+- **Four PER-ROW gates.** The group gate is an OR, so a room that enabled only the beep passed it and
+  then drew **all four switches, two of them over a popup the room had turned off**. The gate reads
+  the ROOM's `beepOnUserJoin`, never the identically-named viewer preference the checkbox writes —
+  gating a control on its own value would make an unchecked box vanish and be impossible to restore.
+
+The pane's own docblock transcribed const 139 and const 140 and jumped straight to the checkbox ids,
+so the `d(3,"span",16)` between them had never been read. Its contract asserted the ids, the checked
+states, the written preference names, the labels and both halves of the group gate — and none of
+these three.
+
+## `ReactionPrefsPane.svelte` — the INVERSE, and an icon that drew nothing
+
+Both reaction rows carried a header block **this room invented**:
+
+```html
+<div id="appReactionsPopup" title="Reactions Response" class="pb-2">
+  <i class="fas fa-face-smile"></i><span class="pl-2">Reactions Response:</span>
+</div>
+```
+
+`REe` @ 2,226,939 and `NEe` @ 2,227,411 are `d(0,"div",17)` — const 17 is `[1,"ml-5"]` — and nothing
+else. Occurrences in the 2,891,205-byte bundle: `appReactionsPopup` **0**, `fa-face-smile` **0**,
+`"Reactions Response:"` **0**; `appDisableVideo`, the header of the group immediately beside these
+two, **1**. That adjacency is why it looked right.
+
+**And the icon drew nothing.** `fa-face-smile` is a Font Awesome **6** name; this project ships
+`@fortawesome/fontawesome-free@5.8.1` (`apps/room/package.json:30`), where the smile is `fa-smile`
+and `grep -c fa-face-smile css/all.min.css` returns 0.
+
+`font-awesome-contract.test.ts` now sweeps that whole class of defect and **found four more on its
+first run** — `fa-waveform` and `fa-disk` are FA6, `fa-floppy-o` and `fa-pause-circle-o` are FA**4**.
+All four are in the bundle, and `deployed-index.html` shows the reference loading the *same*
+5.8.1, so all four are upstream's own broken icons: two are already repaired by `app.css:13`, one
+has a working sibling class, and `fa-pause-circle-o` draws nothing upstream either — the const
+immediately before it in the same table is the correct `[1,"far","fa-pause-circle"]`. Transcribed
+and pinned, in the spirit of the `btn-ligth` typo this repository keeps by name.
+
+## `UserNotesPane.svelte` — two const values, four descriptions that missed them
+
+`mTe` @ 2,065,327 opens `d(0,"div",38)(1,"div",93)`: const 38 is `[1,"row"]`, const 93 the scrolling
+`col`. This room had the bare `.col`, **and that is not cosmetic** — a Bootstrap column carries half
+a gutter of horizontal padding that only `.row`'s negative margin cancels, so the notes list sat
+inset from the panel while the Add Note row below it, which has always had its `.row`, did not.
+
+And const 96 is `[1,"icon","fa","fa-plus-circle"]`; `icon` had been dropped. Four separate places in
+this repository describe `mTe` and every one of them calls it "a `col` scrolling at max-height
+300px", so the row around it had never been read.
+
+## `ImageUploadDialog.svelte` — two bootbox options, and one of them cost three paragraphs
+
+`bootbox.dialog({ …, title:"Image Upload", backdrop:!0, onEscape:!0, size:"xl", … })` @ 1,442,225.
+
+**`backdrop:!0`** is the `.modal-backdrop` element, and this repository had already ruled that option
+rendered surface twice and built the same element from it — `ROV-04` for the lightbox and `VID-01`
+for the video player. This was the one dialog of that family with none, and `app.css:1556` sets
+`.modal { background: transparent }` with `modal-open` occurring nowhere, so the room stayed at full
+brightness under a dialog covering it.
+
+**`onEscape:!0`** did nothing here at all: the room's single global Escape ladder closes the
+popovers, the lightbox and `BootboxDialog`'s three modes, and this dialog is in none of them. Two
+things made it more than one line — it needs **focus on open**, because bootbox binds Escape to the
+modal and Bootstrap focuses the modal on show while this room ships no Bootstrap JavaScript (the
+same `ASR-3` finding `Modal.svelte` records); and it **stops the event**, because the global ladder's
+last arm is `else if (dialogs.alert) …` and a failed upload raises exactly such an alert, so a
+window-bound handler would let one keystroke close two things.
+
+## Verification
+
+Room gate exit 0 — **334 files, 6,020 passed, 1 skipped**; `svelte-check` 1,625 files, 0 errors.
+
+**Ten negative controls, every one red on the assertion it targets and every one restored:** the
+header span deleted; the `<hr>` deleted; the row gate switched from `roomKey` to `key`; the invented
+reaction header restored; a sixth undefined Font Awesome class introduced; `fa-face-smile` put back;
+`icon` dropped from the Add Note icon; the notes row unwrapped; the backdrop deleted;
+`stopPropagation` removed; and `{@attach takeFocus}` removed.
+
+Four ceilings raised and argued at their entries. **One raise landed on the wrong entry and was
+caught before the commit** — a `s.replace(…, 1)` on `max: 100,` matched the FIRST such line in an
+8,700-line file rather than the one under the entry being edited, and silently raised
+`lib/room/caption-window.ts` from 100 to 126. `git diff` on the ratchet file is what found it; that
+is why the diff is re-read before every push here.
+
+`todo-next.md`: 80 of 93 surfaces, 73.4%.
+
+### 2026-09-01 17:17 UTC — GIF-07: the note editor's GIF picker was the wrong KIND of thing, and a counter could not read an arrow function
+
+**Runtime impact: yes.** Opening GIFs from a note now raises the dialog the capture raises, in the
+middle of the screen, instead of a popover pinned to the bottom-left corner of the viewport.
+
+## The finding
+
+The bundle builds this picker four times. Three are ng-bootstrap POPOVERS. The fourth is a MODAL:
+
+```js
+opengifSerachModal(){this.modalService.open(this.giphySearchPopOver,
+  {ariaLabelledBy:"modal-basic-title"}).result.then(e=>{},e=>{})}       // byte 1,482,730
+```
+
+— const 2 is `["giphySearchPopOver",""]`, a template reference variable, so the whole picker is an
+`<ng-template>` handed to the modal service. `L0e` at byte 1,467,000 draws const 26 `modal-header`,
+const 82 `["id","modal-basic-title",1,"modal-title"]` under an `h4`, const 83
+`[1,"modal-body","modal-lg",2,"max-height","77vh","overflow-y","auto"]`, const 40 `modal-footer` and
+const 41 `btn btn-outline-dark` reading ` Close `. **There is no `giphy-search` const in `app-note`
+at all** — that class appears only in the component's own `styles:[…]`, where its three rules style
+nothing.
+
+`GiphyPicker.svelte` rendered its popover shell on all four mounts, and that shell portals itself to
+`<body>` with `inset: auto auto 0px 0px`. So the note editor's picker opened at the bottom-left of
+the viewport, detached from the editor it belongs to. **`GIF-04` corrected the three chrome CLASSES
+on this mount earlier the same day without noticing that the chrome around them was the wrong kind.**
+
+## The fix, and why it stays one component
+
+The hint, the form and the grid are two snippets now, rendered by whichever chrome the `variant`
+prop selects — the popover splits them across its `giphy-header` and the modal does not, so a single
+shared block would not have worked. Splitting into two components instead would either duplicate the
+snippets or need a third file to pass them through, and the four call sites would then have to know
+which of two components to import — which is the decision `variant` exists to take for them.
+
+`popoverId` and `onclose` become optional and are documented as POPOVER CHROME ONLY: the modal mount
+has no popover to id or to close, and requiring them would mean passing an id nothing renders.
+
+## A recorded reason that was right about a number and wrong about the element
+
+`note-editor-modal-labelling-contract.test.ts` said `modal-basic-title` could not be transcribed:
+
+> it names the Giphy modal, and `GiphyPicker` is mounted at FOUR sites, so a literal id there really
+> would appear four times in one document.
+
+The count is correct. **It is a fact about the picker, and the id belongs to the dialog around one
+of them** — the other three mounts have no `modal-header`, no `modal-title` and nothing labelled by
+that id, so it was never going to appear four times. `app-note` was the last surface holding a
+residual for it, and it is now the fortieth fully covered component in
+`reference-const-coverage-contract.test.ts` (111 residual values → 110).
+
+**Twelfth recorded reason this week to fail re-measurement.**
+
+## And the counter that had been returning plausible numbers for weeks
+
+`alert-report-modal-contract.test.ts` counts `<Modal>` call sites with `/<Modal\b[^>]*>/gs` — which
+stops at the first `>` in the source, and **an arrow function in any prop value contains one**.
+`onclose={() => (giphyOpen = false)}` cut this new dialog off three props early, so the counter saw
+its `id=` and never saw its `titleId=`, and filed a named dialog as a self-referential one.
+
+Every earlier call site happened to order its props the other way. The fix is a brace-depth scan —
+the tag ends at the first `>` not inside a `{…}` expression, which is a rule about the language
+rather than about which characters people happen to use. The re-count is 23 dialogs, 10 named, 10
+self-referential; the ten did not move, which is the evidence that nothing else had been truncated.
+
+## `app-note` is now audited end to end
+
+94 consts, 17 embedded views, **zero absent const values**. The one absent text literal is a recorded
+refusal: `"Loading images..."` is upstream's fetch-in-flight arm, and `openFileBrowser(e)` at byte
+1,477,053 sets `fileBrowserLoading = !0` and THEN POSTs `getSessionFiles`. Here `sessionImages` is a
+page-load prop, so there is no moment between opening the browser and holding the list —
+`session-image-files.ts` already carried that measurement.
+
+## Verification
+
+Room gate exit 0 — **332 files, 5,996 passed, 1 skipped**; `svelte-check` 1,624 files, 0 errors.
+
+**Two negative controls, both red naming the value they guard, both restored:** the `77vh` body
+style removed (`expected [ { value: '77vh', consts: [ 83 ] } ] to deeply equal []`) and
+`bodyClass="modal-lg"` removed. A third control — renaming `titleClass` — did NOT fire, correctly:
+`modal-title` is also rendered by `ImageUploadDialog.svelte`, which is in this surface's file list,
+so the value is present whatever this mount does. Recorded because a control that does not fire is
+only acceptable when the reason is measured.
+
+`GiphyPicker` 255 → 316, `Modal` 189 → 191, both argued at their ratchet entries. `todo-next.md`: 76
+of 93 surfaces, 72.1%. The Svelte MCP has been unavailable for this entire session, so
+`svelte-autofixer` has NOT been run on the three components touched.
+
+### 2026-09-01 16:55 UTC — the typing dots were refused on a reason that was half right, and an id prefix cost two rules
+
+**Runtime impact: yes, twice.** The three blinking dots beside "[2] alice,bob" are drawn in both chat
+columns. And the Audio/Video settings modal's speaker picker gets the two `app.css` rules written for
+it, which had matched nothing since `3b4f3c5`.
+
+## The dots: a recorded reason that had held since 2026-08-28
+
+Both chat columns and `typing-indicator-contract.test.ts` carried the same paragraph:
+
+> `app-typing-indicator-dots` is three empty spans whose entire appearance is CSS, and NEITHER it nor
+> its `.typing-indicator` class has a rule in any stylesheet this repository holds. Emitting them
+> would be markup with no consumer — the check `smallerImagePreview` failed — and inventing the
+> animation would be inventing a design.
+
+The first clause is TRUE and re-measured: grep `captured-runtime-components.css` for
+`typing-indicator` and all three hits are `.typing-indicator-container`, a different class.
+
+**The conclusion does not follow.** An Angular component's `styles:[…]` array is injected at runtime
+out of the BUNDLE, so it is never in a captured stylesheet — and this component's array is right
+beside its template, four lines from the selector the audit was reporting against:
+
+```js
+selectors:[["app-typing-indicator-dots"]],decls:4,vars:0,consts:[[1,"typing-indicator"]],
+template:function(i,o){1&i&&(d(0,"div",0),T(1,"span")(2,"span")(3,"span"),u())},
+styles:[".typing-indicator[_ngcontent-%COMP%]{display:flex!important}
+         .typing-indicator[_ngcontent-%COMP%]   span[_ngcontent-%COMP%]{height:3px;width:3px;
+           float:left;margin:0 1px;background-color:#9e9ea1;display:block;border-radius:50%;
+           opacity:.4}
+         …:nth-of-type(1){animation:1.5s …_blink infinite .3333s}
+         @keyframes _ngcontent-%COMP%_blink{50%{opacity:1}}"]
+```
+
+3px circles, `#9e9ea1`, resting opacity `.4`, a 1.5s blink staggered a third of a cycle apart.
+**Nothing had to be invented.** `TypingIndicatorDots.svelte` transcribes it into a scoped `<style>`,
+which is what `_ngcontent-%COMP%` is. One line is ours and is marked as ours: a
+`prefers-reduced-motion` block, the first in this application — the dots blink for as long as
+somebody is typing, which is the case WCAG 2.2.2 is about.
+
+**This is the eleventh recorded reason this session that did not survive re-measurement**, and the
+first that was half right — which is the harder kind, because the half that is checkable checks out.
+
+## `speakers-device`: `XCP-01` again, and the gate that could not see it
+
+`gate/audit-surface.mjs` reported `speakers-device` absent from `app-av-settings-modal`. That was
+already recorded as sitting inside a modal nobody can open — true, and it hid a second fact.
+
+The markup said `id="av-speakers-device"`. Two rules landed in `app.css` in the SAME change against
+the captured name: `label[for='speakers-device']` at `:2117` and `#speakers-device` at `:2123`. Both
+have matched nothing since the day they were written.
+
+That is `XCP-01` exactly — an `Extra` suffix on `textAreaHolder` cost the second chat column every
+`#textAreaHolder` rule in that file, including the `container-type` its two `@container` queries
+resolved against. **The gate written to catch that class of defect could not see this one, because
+an id is not a class:** `orphan-style-contract.test.ts` swept class selectors only.
+
+It now sweeps `#id` and `label[for='…']` too. **Fifty-eight ids are styled in `app.css` and exactly
+one was unworn** — this one. No allow-list, deliberately: the class sweep needs one because the
+reference styles four classes it never renders, and no such case exists for ids, every one of which
+was written for markup in this repository.
+
+The invented `name="avSpeakersDevice"` went with the prefix: const 20 is
+`["id","speakers-device",1,"form-control"]` and carries none.
+
+## Verification
+
+Room gate exit 0 — **332 files, 5,992 passed, 1 skipped**; `svelte-check` 1,624 files, 0 errors.
+
+**Three negative controls, each red on target and restored:** the dots moved after the names failed
+the ordering assertion; `opacity: 0.4` changed to `0.5` failed the transcription assertion; and
+restoring the `av-` prefix failed the new ID sweep naming `#speakers-device (app.css:2117, 2123)`.
+
+`app-typing-indicator-dots` now measures CLEAN per-surface and is pinned. The Svelte MCP has been
+unavailable for this entire session, so `svelte-autofixer` has NOT been run on the new component.
+
+### 2026-09-01 16:55 UTC — both log-archive modals measure clean, and the report modal's 46 gaps are one refusal
+
+**Runtime impact: small and real.** The archived-log viewer's loading state is the capture's own
+block rather than a third spelling of it.
+
+## `app-chat-logs-modal` and `app-alert-logs-modal`: 0/0
+
+Scoped to the five files that implement them, both now report zero absent const values and zero
+absent text literals. Two findings got them there and **the whole-app sweep reported 0/0 for both
+the entire time**, which is the argument for per-surface measurement in one line:
+
+1. `vxe`'s `By:&nbsp;<i>{createdBy}</i>` line, missing outright — the entry above.
+2. `Fxe`, the loading arm: const 6 `[1,"text-center","my-4"]` around const 16
+   `[1,"ml-2","fas","fa-spinner","fa-spin"]` and the literal `" Loading..."`. Ours had drifted to
+   `mt-2` and a `…` character — a THIRD spelling of an idiom `ModalHost.svelte` already carries
+   verbatim twice, for `app-all-user-pmmodal` and the advanced search.
+
+`By:&nbsp;`, `my-4` and `" Loading..."` all occur elsewhere in this application, so a sweep that
+searches the whole app finds every one of them.
+
+One divergence is recorded with it: this room's loading arm is a BRANCH INSIDE the viewer where
+upstream's `Fxe` is a sibling of it, so the Back button survives a slow fetch here and does not
+there.
+
+## `app-alert-send-report-modal`: 41 const values and 5 literals, and all 46 are one decision
+
+Pinned as a SET rather than a count, with each value labelled by the part of the report it belongs
+to — the spinner, the header, the flot pie, the status select, the search box, the per-recipient row.
+Half of them are generic Bootstrap classes this application uses freely elsewhere; they are absent
+HERE because the elements that would carry them are refused, and a count could not tell that apart
+from one turning up on something unrelated.
+
+The refusal itself was already measured in full at `AlertSendReportModal.svelte` and is unchanged:
+24 tables searched for `queue`, `latency`, `fail_reason`, `sent_time` and `delivery`;
+`alerts.dispatch` is five booleans naming which channels the presenter TICKED, not what happened; no
+mail transport exists in `apps/room/src/lib/server` at all; `getAlertReport` has zero occurrences
+across `apps/`. `No Reports.` is deliberately not rendered — it means "the fetch came back empty",
+and there is no fetch.
+
+**Building the queue turns this pin red**, forty-six values arriving at once, which is exactly the
+signal that the refusal expired.
+
+## Verification
+
+Room gate exit 0 — 332 files, 5,992 passed, 1 skipped. **Two negative controls, both red on target
+and restored:** the captured loading block replaced with the old `mt-2` spelling failed both log
+modals' pins; `REPORT_UNAVAILABLE` swapped for the literal `No Reports.` failed the report modal's
+literal assertion.
+
+`ChatArchiveLogPane.svelte` 243 → 260, argued at the ratchet entry. `todo-next.md`: 75 of 93
+surfaces, 67.9%.
+
+### 2026-09-01 16:16 UTC — the archive browser never said who swept the log, and the column had the answer
+
+**Runtime impact: yes.** A presenter opening Chat Logs now reads WHO archived each log, on the row,
+where the capture puts it.
+
+## The capture, read whole
+
+`vxe` at bundle byte 2,301,700 — the row inside `app-chat-logs-modal` — is three labelled lines:
+
+```js
+d(1,"div")(2,"strong",15),v(3),Xe(4,"date"),u()(),
+d(5,"div")(6,"strong",15),v(7,"By:\xa0"),u(),d(8,"i"),v(9),u()(),
+d(10,"div")(11,"strong",15),v(12,"Channel:\xa0"),u(),d(13,"i"),v(14),u()()()
+…  m(3),Ze(Ct(4,3,e.updated,"mediumDate")),m(6),Ze(e.createdBy),m(5),Ze(e.channel)
+```
+
+const 15 being `[1,"fw-bold"]`. This room drew ONE compressed line, and the middle of the three was
+missing outright: nothing rendered who had swept the log.
+
+## It was never a data gap, which is the part worth recording
+
+`chat_archives.archived_by_user_id` has been `notNull` with a foreign key to `users` since the table
+was added, and the schema comment beside it already said why — *"an administrative act on everybody's
+data, and the one question an incident asks first."* The column held the answer and **no read path
+selected it**. That is the inert-control shape pointing the other way: not a value with no consumer,
+but a consumer, present in the reference, with no value wired to it.
+
+`listChatArchivesFor` and `chatArchiveById` now `innerJoin(users, …)` — inner, because the column is
+`notNull` and `foreign_keys = ON` at `db/index.ts:12`, which is the same shape `chat-log.ts` and
+`user-notes.ts` use for their author joins — and project `users.displayName`. A display name and
+never the id: the row is read by a person, and an integer is a lookup they cannot perform.
+
+## The one thing not transcribed, and why it is not a guess
+
+The reference shows a single date, `e.updated`. Its server is not in the capture, so whether that is
+the sweep boundary or when the sweep ran cannot be read — only guessed. This room holds both and
+renders both: `olderThan` on the capture's first line, and `archivedAt` with the message count on a
+fourth line this room adds. Guessing which one `updated` meant, in order to show only one, would
+have been the invention this repository refuses.
+
+`fw-bold` on a `<strong>` is redundant to a browser and is transcribed anyway: it is what the capture
+carries, and a class removed because it "does nothing" is a class the next person cannot find when a
+stylesheet starts keying on it.
+
+## The ratchet was raised, and the extraction was considered
+
+`ChatArchivePane.svelte` 170 → 206. The separable thing is the SWEEP FORM — upstream really does keep
+it apart from the browser (`archiveOptions()` is a bootbox dialog from the chat toolbar;
+`app-chat-logs-modal` is the list). It does not pay: the only parent that could hold it beside this
+pane is `LogArchiveModals.svelte`, which is AT its own ceiling, so the four sweep props would either
+thread back through this file or grow the capped file above it. Argued at the entry.
+
+## Verification
+
+`chat-archive-row-render.test.ts` renders the pane through `svelte/server` and asserts the three
+labelled lines on the PAGE rather than in the source — a source assertion on `By:&nbsp;` passes for a
+label in a component nothing mounts, and `note-giphy-contract.test.ts` had to be rewritten onto
+rendered output earlier the same day for the mirror-image reason. `chat-archive-read.test.ts` asserts
+the join against a real database, in both reads, and that the email on the joined row does not travel.
+
+**Two negative controls, both red and both restored:** deleting the `By:` line turned two render
+assertions red; dropping `archivedBy` from the server projection turned the database assertion red
+with `expected undefined to be 'Archive Probe'`.
+
+Room: the nine tests covering these files, `svelte-check` 0 errors. **The Svelte MCP has been
+unavailable for this entire session, so `svelte-autofixer` has not been run on `ChatArchivePane.svelte`.**
+
+### 2026-09-01 16:16 UTC — 54 changelog timestamps were estimated, and eleven named a day nothing happened on
+
+**Runtime impact: NONE.** No shipped code changed. What changed is that this file's own first
+paragraph is now true, and enforced.
+
+## The finding
+
+`CHANGELOG.md` opens by saying every time is *"either a git commit timestamp or a measurement taken
+at that moment — none is estimated."* On 2026-09-01 that sentence was checked against `git log` for
+the first time, and **54 consecutive headings failed it**.
+
+Each had been written as "a bit after the last one", and the error compounded monotonically:
+
+| heading | said | the commit it describes |
+| --- | --- | --- |
+| `SHL-06`: a citation that named the wrong function | 2026-08-31 19:20 | `0046c05` 18:03 |
+| the archived chat log can be READ | 2026-09-01 03:24 | `875c2a5` 2026-08-31 22:26 |
+| the room had no error page | 2026-09-02 00:38 | `20bb78a` 2026-09-01 05:23 |
+| two session-control refusals | 2026-09-02 07:05 | `eaef902` 2026-09-01 15:21 |
+
+Twelve minutes at the bottom, fifteen hours forty-four at the top — far enough that **eleven entries
+carried 2026-09-02, a date on which no commit in this repository exists.** Every one of the 54 now
+carries the committer timestamp of the commit it describes, read with `git show -s --format=%cI`.
+
+This is not cosmetic. Reading back through an incident means correlating these headings against
+deploy logs, and a heading fifteen hours out points at the wrong deploy with total confidence.
+
+## Two entries were missing entirely
+
+`6b653b4` (the surface audit learning Angular's const encoding) and `bf1dbb4` (eight surfaces pinned,
+and app-privchat's four gaps read as one refusal) had no entry at all — against the rule two
+paragraphs above, which says one is appended for every finished piece of work. Both are written now,
+from their commits.
+
+## The `## 2026-08-20` day heading had swallowed the file
+
+It was added on 2026-08-20 and every entry since had been prepended BELOW it, so roughly forty
+thousand lines of later work were filed under that day. It now sits above the entries that are
+actually from it.
+
+## The gate
+
+`apps/controller/src/lib/changelog-ledger-contract.test.ts`, two rules:
+
+1. **No heading may be dated in the future.** The cheap one, and the one that would have caught the
+   whole block on its FIRST estimate — the wall clock said 2026-09-01 on every occasion one of the
+   eleven 2026-09-02 entries was written. It needs no entry-to-commit mapping, which is what makes it
+   enforceable: matching prose titles to commit subjects is a heuristic, and a gate built on a
+   heuristic is a gate that gets switched off the first time it is wrong.
+2. **Headings run newest-first, and the exceptions are named.** Thirty inversions survive from before
+   this rule, every one an artefact of a branch merge — two agents writing entries on two branches,
+   both prepending, the merge interleaving them. They are pinned BY TITLE, not by count, so a new
+   inversion fails naming itself and an old one can only be removed. Line numbers would have been the
+   wrong key: every entry prepended at the top moves all of them.
+
+What is deliberately NOT asserted is that every entry names a commit. Not every finished piece of
+work is one commit — the paragraph above says so — and two entries legitimately share `579edfa`. An
+assertion that correct behaviour cannot satisfy is an assertion that gets deleted.
+
+## Verification
+
+**Three negative controls, each red on the rule it targets and each restored:** a heading moved to
+2026-09-03 fails *dates no entry in the future*; a heading moved an hour later than the one above it
+fails *runs newest-first* **naming itself in the message**; a heading with its zone marker removed
+fails *states every heading in the one format the parser can read*. Controller suite green.
+
+### 2026-09-01 15:55 UTC — eight more surfaces pinned clean, and four privchat "gaps" that are one refusal
+
+**Runtime impact: NONE.** No component changed. Eight measurements that were being taken by hand are
+now assertions, and one refusal that existed only in my head is written down where it expires on its
+own.
+
+## The eight
+
+`app-chat` (93 consts, 27 embedded views), `app-extra-chat` (90/26), `app-poll-modal` (53/9),
+`app-debug-log-modal`, `app-reply-modal`, `app-kicked-page` and `app-root` all measure CLEAN scoped
+to their own files. Each is pinned with BOTH counts asserted, so a capture swap that changes the
+component's shape fails rather than silently re-measuring something else.
+
+## `app-extra-chat`'s file list is the lesson
+
+`extra-chat-surface.ts` has to be in it. Without that module the audit reports `textAreaHolder`
+missing — the id reaches the markup through `EXTRA_CHAT_COMPOSER_HOLDER_ID` rather than as a literal.
+That constant is `XCP-01`: the defect where an `Extra` suffix cost the column every `#textAreaHolder`
+rule in `app.css`, including the `container-type` its two `@container` queries resolve against. A
+false gap and a real one look identical in the output, so the file list is part of the measurement.
+
+## `app-privchat` reports four gaps and they are ONE refusal
+
+`G7` in `room/private-chat.svelte.ts`: upstream needs `getAllPCLogsLoading` because it POSTs
+`getAllPCLogs` when the panel opens. This room has no such moment — the conversation list is resolved
+in `+page.server.ts` before the page renders, and the only refresh is `invalidateAll()`, which keeps
+the previous list on screen. Both loading branches would be branches that can never render.
+
+`my-1` is the fourth and the same refusal: const 47 is used ONLY inside `sEe`, the
+*"Loading all private chats."* block. **Reading where a class is USED rather than assuming it is
+surface turned four findings into one.**
+
+The pin re-reads that premise on every run: if the conversation list ever starts being fetched on
+open, the loading states stop being unreachable and the refusal expires by itself.
+
+## Verification
+
+`pnpm run gate` exit 0 (333 files, 5,970 passed), `svelte-check` 1,622 files 0 errors. Two negative
+controls, both red on target: `XCP-01` regressing, and the privchat premise disappearing.
+`todo-next.md`: 74 of 92 surfaces, 67.7%.
+
+### 2026-09-01 15:21 UTC — two session-control refusals that had no reason written down
 
 **Runtime impact: NONE.** Neither control was built before and neither is built now. What changed is
 that both are decisions with premises a test re-reads, instead of absences nobody had looked at.
@@ -89,7 +1213,7 @@ credential list losing an entry, and `backupClusterID` becoming wired.
 
 `todo-next.md`: **73 of 92 surfaces, 26,292 of 38,904 lines (67.6%)**.
 
-### 2026-09-02 06:25 UTC — GIF-04: the Giphy picker wore the wrong chrome in the note editor
+### 2026-09-01 15:03 UTC — GIF-04: the Giphy picker wore the wrong chrome in the note editor
 
 **Runtime impact: YES, visible.** The note editor's Giphy search and clear icons were `text-white` on
 a light modal body. They are `text-dark` there now, as the capture has them, and the input loses a
@@ -158,7 +1282,7 @@ a popover mount starting to pass the modal chrome.
 `todo-next.md`: **70 of 92 surfaces, 25,938 of 38,904 lines (66.7%)**, from 51 of 89 when the session
 began.
 
-### 2026-09-02 05:40 UTC — two modals behind a condition that is always false
+### 2026-09-01 14:35 UTC — two modals behind a condition that is always false
 
 **Runtime impact: NONE.** Neither modal could be opened before this change or after it. What changed
 is that both are now measured decisions with a gate, instead of markup nobody had looked at.
@@ -222,7 +1346,57 @@ The docblock at the shell POINTS at the contract rather than repeating it — `M
 refused the twenty-two lines by `source-size-contract`, and two places recording one thing is how one
 of them goes stale.
 
-### 2026-09-02 04:55 UTC — seven surfaces measured clean and pinned, and a template slice that read the wrong component
+### 2026-09-01 14:17 UTC — the surface audit learns Angular's const encoding, and six of its own bugs
+
+**Runtime impact: NONE.** `gate/audit-surface.mjs` is a measuring instrument; nothing ships it. What
+changed is what it reports, and every one of the six fixes was found by RUNNING it rather than by
+reading it.
+
+## The one that matters most, because it is a rule this repository already wrote down
+
+The script carried the naive comment stripper — a whole-file `/* … */` regex over a `.svelte` file.
+`src/lib/source-comments.ts` exists precisely because that is wrong: `accept="image/*"` in a
+TEMPLATE opens a "comment" the regex closes at the next real one. In `CarouselDialog.svelte` those
+are **13,024 characters apart**, and the whole carousel markup between them was being deleted before
+the search ran — so the tool reported eight of that component's own on-screen strings as missing,
+`" Add slide "` and `"No images found. Upload images via Files first."` among them.
+
+A rule correct in one file and wrong in another is that module's own complaint about itself. The
+rule is now restated in the script with a pointer, because the module is TypeScript and this is a
+`.mjs` gate script that cannot import it.
+
+## Angular's const table is now READ rather than pattern-matched
+
+A const array is sectioned by bare numeric markers: attribute name/value pairs, then `1,` and class
+names, then `2,` and style pairs, then `3,` and **binding names**. Only the first three ever reach
+the page. `app-roomscroller`'s whole table is `[3,"msg","isP","logType","prevD"]` — four INPUT names
+— and the sweep was reporting two of them as values this room fails to render.
+
+Attribute NAMES are skipped for the same reason: `"type"` is vocabulary, its value is surface.
+Template reference variables are recognised by shape — `#carouselModal` compiles to
+`["carouselModal",""]`, names a node for other code to reach, and has no rendered form. Six of those
+showed up in the first sweep.
+
+## Text is compared with whitespace collapsed; const values are not
+
+Prettier wraps our markup at 100 columns and the capture has no wrapping, so `" Stop Screens "` came
+back as a gap against a control that is fully built and carries forty lines about its own icons.
+Const values are deliberately NOT normalised: a class attribute never wraps, and `"btn btn-sm"`
+against `"btn   btn-sm"` is a difference worth keeping.
+
+## `--all`, and what it is weaker at
+
+A triage mode that runs every component against the whole application: 34 of 51 reference components
+report 0/0. It says in its own output that a value found ANYWHERE counts as rendered — which is
+exactly the blind spot `PAM-11` hid in. Triage; the per-surface run is the audit.
+
+## Verification
+
+`pnpm run gate` exit 0, `svelte-check` 1,620 files 0 errors, eslint clean. Every already-pinned
+surface gives the identical answer after each of the six changes — the only evidence that a smarter
+reader is still reading the same thing.
+
+### 2026-09-01 13:58 UTC — seven surfaces measured clean and pinned, and a template slice that read the wrong component
 
 **Runtime impact: NONE.** Contract coverage and tracker rows only.
 
@@ -263,7 +1437,7 @@ un-bounded again (red, on the view counts), and the one above.
 `todo-next.md` rows 46, 55, 59, 61, 72 and 80 audited — **63 of 92 surfaces, 23,829 of 38,857 lines
 (61.3%)**, up from 51 of 89 when this session began.
 
-### 2026-09-02 04:25 UTC — a hidden card with two inert controls, and the sentence that said it wasn't there
+### 2026-09-01 13:49 UTC — a hidden card with two inert controls, and the sentence that said it wasn't there
 
 **Runtime impact: NONE.** The card was and remains invisible; what changed is that its state is now
 argued and gated instead of accidental.
@@ -325,7 +1499,7 @@ it. Comments stripped, it is red. The other three — the rule removed, a gate a
 `todo-next.md`: 57 of 92 surfaces, 23,152 of 38,857 lines (59.6%). The const sweep's examined split
 moved 32/79 → 34/77, both moves caused by audits rather than prose.
 
-### 2026-09-02 03:51 UTC — the surface audit becomes a script and a ratchet, and substring matching cost a control
+### 2026-09-01 13:23 UTC — the surface audit becomes a script and a ratchet, and substring matching cost a control
 
 **Runtime impact: NONE.** A new gate script, a new contract, and three surfaces pinned. No shipped
 code changed.
@@ -400,7 +1574,7 @@ today and reproduces each exactly.
 sweep's examined split moved 30/81 → 32/79, the first such move caused by an audit rather than by
 prose.
 
-### 2026-09-02 03:04 UTC — FilesPane read end to end, and 100 comment bodies stranded by extraction
+### 2026-09-01 12:54 UTC — FilesPane read end to end, and 100 comment bodies stranded by extraction
 
 **Runtime impact: NONE.** Comment indentation and a new gate; no shipped markup, style or behaviour
 changed. The audit itself found nothing to build, which is the result.
@@ -460,7 +1634,7 @@ clean across every `.svelte` file, which is the point: the formatter was already
 
 `todo-next.md` row 19 audited — 55 of 91 surfaces, 22,642 of 38,807 lines (58.3%).
 
-### 2026-09-02 02:19 UTC — PostAlertModal read end to end: seven classes the const sweep cannot see
+### 2026-09-01 06:20 UTC — PostAlertModal read end to end: seven classes the const sweep cannot see
 
 **Runtime impact: YES, visible.** The send-later Repeat select had no classes at all and rendered as
 the browser's default control between two Bootstrap-styled siblings. It now carries the reference's
@@ -535,7 +1709,7 @@ The ceiling on `ScheduledAlertFields.svelte` moved 182 → 218, argued at the en
 **The Svelte MCP has been disconnected for the remainder of this session, so `svelte-autofixer` did not
 run on the two edited components.** That gate was not met.
 
-### 2026-09-02 01:52 UTC — two const-sweep verdicts turned from prose into readings
+### 2026-09-01 05:58 UTC — two const-sweep verdicts turned from prose into readings
 
 **Runtime impact: NONE.** Contract tests and comments only; no shipped behaviour changed.
 
@@ -591,7 +1765,7 @@ comma, so the substitution silently matched nothing and the run reported green. 
 red. That is the second time this session a control has failed to apply and been caught only by
 checking; a control that does not apply has not been run.
 
-### 2026-09-02 01:27 UTC — the login page's other root arm, and a busy label upstream can never paint
+### 2026-09-01 05:48 UTC — the login page's other root arm, and a busy label upstream can never paint
 
 **Runtime impact: YES.** Pressing Login now replaces the page with a centred "Loading...", which is
 what a member of the original application sees. The button's " Connecting " state is gone.
@@ -668,7 +1842,7 @@ these four left by being BUILT rather than by being written about, which is a di
 not run on `SessionLoadingView.svelte` or on `session/+page.svelte`.** That gate was not met;
 `svelte-check`, the contracts and a real browser stand in its place and are not the same thing.
 
-### 2026-09-02 00:38 UTC — the room had no error page, and `app.html` was printing its own docblock on every page
+### 2026-09-01 05:23 UTC — the room had no error page, and `app.html` was printing its own docblock on every page
 
 **Runtime impact: YES, on every page of the application, and one of the two was a shipped defect
 visible to every member since 2026-08-13.**
@@ -776,7 +1950,7 @@ not run on `+error.svelte`.** That is a gate this repository requires and it was
 `svelte-check`, the contract tests and a real browser are what stand in its place, and they are not
 the same thing.
 
-### 2026-09-01 23:41 UTC — PAM-08 and PAM-09's two captured ids, and the third control that keeps its wrap
+### 2026-09-01 04:46 UTC — PAM-08 and PAM-09's two captured ids, and the third control that keeps its wrap
 
 **Runtime impact: YES, small.** Two send-later controls in the alert composer are now associated with
 their labels by `for`/`id` rather than by being wrapped in them. Same accessible name either way; the
@@ -845,7 +2019,7 @@ so `svelte-autofixer` did not run on `ScheduledAlertFields.svelte`.** That is a 
 requires and it was not met; `svelte-check` and the component's own render tests are what stand in its
 place, and they are not the same thing.
 
-### 2026-09-01 22:55 UTC — two captured modal labels, and a premise that was false about our own code
+### 2026-09-01 04:24 UTC — two captured modal labels, and a premise that was false about our own code
 
 **Runtime impact: YES, for screen-reader users** — the carousel and file-browser dialogs now take
 their accessible name from their own heading element, as the reference does.
@@ -904,7 +2078,7 @@ Room gate exit 0.
 returned), so `svelte-autofixer` did not run on the two `.svelte` files this touched. `svelte-check`
 is clean at 0/0. Saying so rather than implying the gate ran.
 
-### 2026-09-01 21:40 UTC — `ACA-06`'s save control, and the third blocker this week that named the wrong thing
+### 2026-09-01 04:12 UTC — `ACA-06`'s save control, and the third blocker this week that named the wrong thing
 
 **Runtime impact: YES** — the chat toolbar's "Save chat messages" button is built. It downloads the
 column's log as a text file, over the reference's own three ranges.
@@ -1001,7 +2175,7 @@ did not run on the four `.svelte` files this touched. `svelte-check` is clean an
 autofixer exceptions at `AGENTS.md:106` are unaffected, but that gate was not run and this says so
 rather than implying it was.
 
-### 2026-09-01 19:05 UTC — a stale triage row, and the gate that would have caught it two days ago
+### 2026-09-01 03:30 UTC — a stale triage row, and the gate that would have caught it two days ago
 
 **Runtime impact: NO** — one document corrected and one contract case added.
 
@@ -1046,7 +2220,7 @@ what explain the claim.
 
 Room gate exit 0.
 
-### 2026-09-01 18:20 UTC — a browser answered the last evidence gap, and it had been costing four declarations
+### 2026-09-01 03:23 UTC — a browser answered the last evidence gap, and it had been costing four declarations
 
 **Runtime impact: YES** — every carousel saved through the note editor was losing its black backing,
 its slide animation, its track width above nine slides, and `flex-shrink` on every unlinked slide.
@@ -1137,7 +2311,7 @@ have. That is an environment mismatch, not a repository defect, and hard-coding 
 Room gate exit 0: 319 test files / 5,782 passed / 1 skipped; `svelte-check` 0 errors, 0 warnings.
 **And this one WAS opened in a browser** — which is the entire point of the row.
 
-### 2026-09-01 16:40 UTC — the scheduled play moved to the server, and the evidence-gap row is deleted
+### 2026-09-01 03:05 UTC — the scheduled play moved to the server, and the evidence-gap row is deleted
 
 **Runtime impact: YES** — a video armed for later now fires whether or not the presenter's tab is
 still open, and a stop cancels an armed play for everyone, including presenters whose browsers are
@@ -1214,7 +2388,7 @@ armed play survives the presenter closing their tab.
 Room gate exit 0: `svelte-check` 1,602 files / 0 errors / 0 warnings. **Not opened in a browser**, and
 for this row the untested path is specific: arm a play, close the presenter's tab, and watch it fire.
 
-### 2026-09-01 15:05 UTC — the late-join replay, and two of three consequences closed
+### 2026-09-01 02:44 UTC — the late-join replay, and two of three consequences closed
 
 **Runtime impact: YES** — a member who joins a room mid-video now sees the video, and a late joiner
 drops into the middle of a YouTube video instead of starting it over.
@@ -1300,7 +2474,7 @@ Room gate exit 0: `svelte-check` 1,601 files / 0 errors / 0 warnings. **Not open
 for this row that matters: two browsers, one room, a video started in the first and the second joined
 after it, is the test nothing here has run.
 
-### 2026-09-01 13:40 UTC — `SP2-04` BUILT, `RNB-01` reclassified, and a sweep defect the new text exposed
+### 2026-09-01 02:14 UTC — `SP2-04` BUILT, `RNB-01` reclassified, and a sweep defect the new text exposed
 
 **Runtime impact: YES** — a presenter sharing a screen now sees the reference's invitation instead of
 their own capture, and the `<video>` takes no `srcObject` until they click.
@@ -1421,7 +2595,7 @@ Room gate exit 0: `svelte-check` 1,599 files / 0 errors / 0 warnings. **Not open
 and for this row that gap is worth naming: what a presenter sees when they share a screen changed, and
 nothing here has watched it change.
 
-### 2026-09-01 12:18 UTC — fourteen "gaps" that were never gaps, and the instrument now says so itself
+### 2026-09-01 01:47 UTC — fourteen "gaps" that were never gaps, and the instrument now says so itself
 
 **Runtime impact: NO** — one contract case, and three records corrected. No source file changed.
 
@@ -1481,7 +2655,7 @@ independently, which is what proves both halves carry weight.
 Room gate exit 0: `svelte-check` 1,599 files / 0 errors / 0 warnings; 316 test files / 5,679 passed /
 1 skipped. **Not opened in a browser.**
 
-### 2026-09-01 11:31 UTC — two more `data-bs-*` pairs transcribed, and the extraction the ratchet had named twice
+### 2026-09-01 01:35 UTC — two more `data-bs-*` pairs transcribed, and the extraction the ratchet had named twice
 
 **Runtime impact: NO** — three inert attributes and two component moves. No behaviour changed; the
 DOM gains `data-bs-toggle` / `data-bs-target` pairs that nothing in this application reads, because
@@ -1584,7 +2758,7 @@ Room gate exit 0: `svelte-check` 1,599 files / 0 errors / 0 warnings; 316 test f
 1 skipped. **Not opened in a browser.** rust-analyzer MCP is unavailable in this session and no `.rs`
 file was touched.
 
-### 2026-09-01 10:04 UTC — the dumps are the specification: four recorded divergences retired, and G08 built
+### 2026-09-01 00:54 UTC — the dumps are the specification: four recorded divergences retired, and G08 built
 
 **Runtime impact: YES** — the idle waveform now renders, two server commands are received, and three
 transcriptions became literal.
@@ -1662,7 +2836,7 @@ components to 36** — and `app-room` is pinned at four residuals rather than si
 Room gate exit 0: svelte-check 1,597 files / 0 errors / 0 warnings; 316 test files / 5,696 passed / 1
 skipped. **Not opened in a browser.**
 
-### 2026-09-01 09:21 UTC — three deep proxies over lists nobody mutates, and the gate that found them
+### 2026-09-01 00:21 UTC — three deep proxies over lists nobody mutates, and the gate that found them
 
 **Runtime impact: YES, and it is the good direction** — three `$state` became `$state.raw`. Same
 behaviour, fewer proxy traps on every read.
@@ -1698,7 +2872,7 @@ conversions.
 deep proxy, and the toast list made raw. Controller gate exit 0 (108 files / 1,135 passed — from 103 /
 1,099 when this run of work began), room gate exit 0 (315 files / 5,686 passed).
 
-### 2026-09-01 08:52 UTC — the room's rune gates run against the controller, and three index keys were promises with nothing behind them
+### 2026-09-01 00:12 UTC — the room's rune gates run against the controller, and three index keys were promises with nothing behind them
 
 **Runtime impact: NO** — three `{#each}` keys removed, two contracts added. No list changed order or
 identity.
@@ -1740,7 +2914,7 @@ and neither depends on the corpus.
 `VoicesSection`, and an assign-only `$effect` added to `RichTextEditor`. Controller gate exit 0: 107
 test files / 1,125 passed, up from 103 / 1,099 before this run of work.
 
-### 2026-09-01 08:15 UTC — the controller had no image-sizing gate, and the room's rule found six images it had never seen
+### 2026-09-01 00:04 UTC — the controller had no image-sizing gate, and the room's rule found six images it had never seen
 
 **Runtime impact: NO** — one contract, one devDependency. No image changed.
 
@@ -1781,7 +2955,7 @@ the parser is what catches it); the `[hidden]` rule removed, turning a never-ren
 real one; an exemption nothing wears; and, before the parser landed, the whole-file check passing on
 prose. Controller gate exit 0: 105 test files / 1,109 passed.
 
-### 2026-09-01 07:34 UTC — runes mode is now enforced by the compiler, in both apps
+### 2026-08-31 23:54 UTC — runes mode is now enforced by the compiler, in both apps
 
 **Runtime impact: NO for behaviour, YES for the build** — a compiler option, and legacy Svelte 4
 syntax is now a build error rather than a dialect the compiler quietly accepts.
@@ -1812,7 +2986,7 @@ runes mode, use `$derived` or `$effect` instead"*. Before the flag both compiled
 that ships components, `@threlte/core`, was checked first: four `.svelte` files, all four on
 `$props()`, none on `export let`.
 
-### 2026-09-01 07:33 UTC — the conformance audit named a framework major this repository does not run
+### 2026-08-31 23:54 UTC — the conformance audit named a framework major this repository does not run
 
 **Runtime impact: NO** — a version correction, a reversed decision marked, two stale claims removed
 and gated.
@@ -1855,7 +3029,7 @@ table and the citation sweep reading its own account of a bad path.
 
 Room gate exit 0 (315 files / 5,686 passed), controller gate exit 0 (104 files / 1,105 passed).
 
-### 2026-09-01 06:48 UTC — the citation sweep ran on the controller and found four wrong pointers in one pass
+### 2026-08-31 23:34 UTC — the citation sweep ran on the controller and found four wrong pointers in one pass
 
 **Runtime impact: NO** — one contract per app, four citations corrected, two given the measurement
 they were missing.
@@ -1899,7 +3073,7 @@ The room's copy was only lucky (it names a bare filename rather than a path) and
 app, and on the controller an `UNOPENABLE` entry that resolves being left in the table. Controller
 gate exit 0 (103 files / 1,102 passed), room gate exit 0 (314 files / 5,683 passed).
 
-### 2026-09-01 06:12 UTC — every file path this app cites in a comment can now be opened, and a gate keeps it that way
+### 2026-08-31 23:24 UTC — every file path this app cites in a comment can now be opened, and a gate keeps it that way
 
 **Runtime impact: NO** — one contract, one citation corrected.
 
@@ -1935,7 +3109,7 @@ not exist (reported by path AND by the file citing it), and the resolution bases
 alone (15 framework and cross-app citations correctly fail). Room gate exit 0: svelte-check 1,594
 files / 0 errors / 0 warnings; 314 test files / 5,683 passed / 1 skipped.
 
-### 2026-09-01 05:41 UTC — a docblock counted seventeen server actions in a file that exports none
+### 2026-08-31 23:16 UTC — a docblock counted seventeen server actions in a file that exports none
 
 **Runtime impact: NO** — one comment corrected, one redundant comment removed, one finished tracker
 section deleted.
@@ -1976,7 +3150,7 @@ Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test fil
 skipped. Controller's `evidence-gap-register-counts.test.ts` re-run against the edited `TODO.md`: 4
 passed.
 
-### 2026-09-01 05:06 UTC — a doc comment named the one database role the process refuses to boot with
+### 2026-08-31 23:04 UTC — a doc comment named the one database role the process refuses to boot with
 
 **Runtime impact: NO** — one Rust doc comment, one provenance pin moved, two tracker rows corrected.
 
@@ -2025,7 +3199,7 @@ repository requires for `.rs` work is not available in this session**, reported 
 around. Controller gate exit 0 (102 files / 1,099 passed), room gate exit 0 (313 files / 5,680
 passed).
 
-### 2026-09-01 04:21 UTC — every remaining residual traced, and a measurement bug found while doing it
+### 2026-08-31 22:44 UTC — every remaining residual traced, and a measurement bug found while doing it
 
 **Runtime impact: NO** — verdicts recorded at the table, and one narrowing of how the sweep reads our
 source. No shipping file changed.
@@ -2069,7 +3243,7 @@ finds it beside the values it explains.
 Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files / 5,680 passed / 1
 skipped.
 
-### 2026-09-01 03:52 UTC — two more residual blocks traced: one owner decision, one already-argued set
+### 2026-08-31 22:34 UTC — two more residual blocks traced: one owner decision, one already-argued set
 
 **Runtime impact: NO** — findings recorded at the code and in the tracker. No shipping file changed.
 
@@ -2104,7 +3278,7 @@ have taken it for unfinished work, which is exactly the mistake the previous ent
 Room gate exit 0: svelte-check 1,593 files / 0 errors / 0 warnings; 313 test files / 5,680 passed / 1
 skipped.
 
-### 2026-09-01 03:24 UTC — the archived chat log can be READ, which is the half of the archive that was never built
+### 2026-08-31 22:26 UTC — the archived chat log can be READ, which is the half of the archive that was never built
 
 **Runtime impact: YES** — a new presenter-only remote query, a new view inside the chat-logs modal,
 and a second reader over `messages`. No existing read path changed behaviour.
@@ -2198,7 +3372,7 @@ The const sweep's own table moved with it, which is what a ratchet is for: **146
 fully-covered components to 35.** Three of the drop are `app-alert-send-report-modal`'s, which shared
 `search-addon`, `Enter search term` and `btn-ligth` with the log modals.
 
-### 2026-09-01 02:38 UTC — a residual is not the same thing as work, and the sweep now measures the difference
+### 2026-08-31 21:53 UTC — a residual is not the same thing as work, and the sweep now measures the difference
 
 **Runtime impact: NO** — two cases and a corrected note on the contract added forty minutes earlier.
 
@@ -2226,7 +3400,7 @@ length of 38`.
 way and cited at the entry — the `RPT-*` refusal, enumerated as orphans in its own contract, and
 `ACA-06` in `ChatSearchBar.svelte`.
 
-### 2026-09-01 02:12 UTC — the per-surface const audit became a sweep over all 51 reference components
+### 2026-08-31 21:45 UTC — the per-surface const audit became a sweep over all 51 reference components
 
 **Runtime impact: NO** — one contract test, one tracker section. No shipping file changed.
 
@@ -2276,7 +3450,7 @@ investigated rather than repaired** — the mutation renamed `pmToolbar` to `pmT
 contains the original as a substring, so the sweep's `includes` still found it. Room gate run before
 the push.
 
-### 2026-09-01 01:35 UTC — PrivateChatPanel audited: 79 consts, and four the reference itself never reads
+### 2026-08-31 21:19 UTC — PrivateChatPanel audited: 79 consts, and four the reference itself never reads
 
 **Runtime impact: NO** — one contract. The panel was already complete; nothing running said so.
 
@@ -2310,7 +3484,7 @@ Coverage: **45 of 85 surfaces, 19,214 of 37,465 lines, 51.3%** — past half.
 
 Room gate exit 0: 309 test files / 5,626 passed / 1 skipped.
 
-### 2026-09-01 01:10 UTC — Wrong-symbol citations became a measurement instead of a discovery
+### 2026-08-31 21:11 UTC — Wrong-symbol citations became a measurement instead of a discovery
 
 **Runtime impact: NO** — one contract, three offsets made exact.
 
@@ -2361,7 +3535,7 @@ One eslint finding worth recording: the separator class held a literal non-break
 
 Room gate exit 0: 308 test files / 5,618 passed / 1 skipped.
 
-### 2026-09-01 00:40 UTC — The roster surface: complete behaviour, three citations pointing at the wrong code
+### 2026-08-31 21:00 UTC — The roster surface: complete behaviour, three citations pointing at the wrong code
 
 **Runtime impact: NO** — comments and one contract. The roster's behaviour was already right; what
 was wrong was every pointer to the evidence for it.
@@ -2405,7 +3579,7 @@ Coverage: **44 of 85 surfaces, 18,690 of 37,465 lines, 49.9%**.
 
 Room gate exit 0: 307 test files / 5,613 passed / 1 skipped.
 
-### 2026-09-01 00:10 UTC — The reply modal had all three of the Q&A modal's defects, and nothing had looked
+### 2026-08-31 20:49 UTC — The reply modal had all three of the Q&A modal's defects, and nothing had looked
 
 **Runtime impact: YES**, three ways. In the reply modal: the image button was drawn for every viewer
 including one in a room where uploads are off; it did nothing when clicked; and a pasted screenshot
@@ -2469,7 +3643,7 @@ Coverage: **43 of 85 surfaces, 17,803 of 37,449 lines, 47.5%**.
 
 Room gate exit 0: 306 test files / 5,600 passed / 1 skipped.
 
-### 2026-08-31 23:20 UTC — Thirty style-scoping ancestors, twenty of them asserted by nothing
+### 2026-08-31 20:22 UTC — Thirty style-scoping ancestors, twenty of them asserted by nothing
 
 **Runtime impact: NO** — one new contract. What it guards is a defect class that ships silently.
 
@@ -2511,7 +3685,7 @@ the element removed while its prose mentions stayed, which is the one that faile
 
 Room gate exit 0: 305 test files / 5,581 passed / 1 skipped.
 
-### 2026-08-31 23:00 UTC — PollPanel audited: a faithful transcription that nothing running could prove
+### 2026-08-31 20:13 UTC — PollPanel audited: a faithful transcription that nothing running could prove
 
 **Runtime impact: NO** — no code changed. What changed is that the surface is now checked.
 
@@ -2564,7 +3738,7 @@ what did it.
 
 Room gate exit 0: 304 test files / 5,576 passed / 1 skipped.
 
-### 2026-08-31 22:30 UTC — Two more TODO.md rows that described work already done, one for eight days
+### 2026-08-31 19:58 UTC — Two more TODO.md rows that described work already done, one for eight days
 
 **Runtime impact: NO** — comments and trackers. Both rows named a blocker, and neither blocker was
 real; the code they said was missing had shipped.
@@ -2606,7 +3780,7 @@ locating the code is a verdict about the author's memory.
 
 Room gate exit 0.
 
-### 2026-08-31 22:00 UTC — The kicked page, and TODO.md's twelve-row table is empty
+### 2026-08-31 19:51 UTC — The kicked page, and TODO.md's twelve-row table is empty
 
 **Runtime impact: YES.** A kicked member used to get a DISMISSIBLE dialog over a room whose stream
 the same frame had just closed. They read the message, pressed OK, and were left staring at a frozen
@@ -2677,7 +3851,7 @@ Ceilings: `KickedPage.svelte` declared at 107; `+page.svelte` 1798 -> 1838;
 `addressed-channel.ts` 74 -> 102 (net-zero code — one dep added, one removed);
 `create-room.svelte.ts` 1420 -> 1435.
 
-### 2026-08-31 21:15 UTC — Thirteen citations that pointed at nothing, and the two that named the wrong function
+### 2026-08-31 19:20 UTC — Thirteen citations that pointed at nothing, and the two that named the wrong function
 
 **Runtime impact: NO** — comments only. The values `screen-volume.ts` ships were correct throughout;
 only the pointers at them were not, which is the worse of the two failures. A wrong value is caught
@@ -2735,7 +3909,7 @@ server, three on an archive service, two on a server-side supply that does not e
 re-capture of `app-extra-chat`'s stylesheet, and the three bundle chunks this checkout does not hold.
 None is closable from inside this repository.
 
-### 2026-08-31 20:45 UTC — A dropped chat channel now takes the composer with it, in both columns
+### 2026-08-31 19:07 UTC — A dropped chat channel now takes the composer with it, in both columns
 
 **Runtime impact: YES.** A member whose chat channel dropped kept a live-looking composer. They
 typed into it, pressed Enter, and watched nothing happen — with only the small corner overlay `G03`
@@ -2785,7 +3959,7 @@ Svelte MCP: `svelte-autofixer` clean on the gate. rust-analyzer MCP: not used an
 Ceilings raised with the argument at each entry: `events.svelte.ts` 1017 -> 1058,
 `ExtraChatPane.svelte` 744 -> 762, `AlertChatArea.svelte` 1523 -> 1533, `+page.svelte` 1796 -> 1798.
 
-### 2026-08-31 20:10 UTC — The image that opens is the image that was clicked
+### 2026-08-31 18:54 UTC — The image that opens is the image that was clicked
 
 **Runtime impact: YES.** Clicking an inline image in a chat message did nothing at all. Clicking one
 inside an alert that also carried an attachment opened the ATTACHMENT — a different picture. Both
@@ -2847,7 +4021,7 @@ dispatcher branch it used to name no longer decides anything.
 Svelte MCP: `svelte-autofixer` clean on `MessageBody.svelte` and on the `RoomMessage` attachment
 region. rust-analyzer MCP: not used and not needed — no `.rs` file was touched.
 
-### 2026-08-31 19:40 UTC — Four BLOCKED rows closed, and three of the four blockers were not real
+### 2026-08-31 18:35 UTC — Four BLOCKED rows closed, and three of the four blockers were not real
 
 **Runtime impact: YES**, three changes a person in a room can see. The image lightbox dims the room
 behind it. The New Note cog is drawn for a member the owner granted `canEditNotes`, and is drawn for
@@ -2928,7 +4102,7 @@ Ratchet ceilings raised with the argument at each entry: `MessageBody.svelte` 17
 `ImageLightbox.svelte` 95 -> 117, `MainTabStrip.svelte` 371 -> 399, `PresentationArea.svelte`
 1105 -> 1106.
 
-### 2026-08-31 19:20 UTC — A citation that named the wrong function while quoting the right gate
+### 2026-08-31 18:03 UTC — A citation that named the wrong function while quoting the right gate
 
 **Runtime impact: NO** — one docblock corrected, one note added, three assertions.
 
@@ -2969,7 +4143,7 @@ correction that gets reverted by the next person who "remembers" the old name.
 `expected … to contain '**\`nRe\` (v4 byte 2,496,317)** places …'`. Room gate exit 0 —
 `svelte-check` 1,574 files 0 errors 0 warnings, **301 test files / 5,511 passed / 1 skipped**, build.
 
-### 2026-08-31 19:00 UTC — MTS-03's blocker was not the three things it named, and four rows turn out to share one
+### 2026-08-31 17:54 UTC — MTS-03's blocker was not the three things it named, and four rows turn out to share one
 
 **Runtime impact: NO** — one docblock, three assertions, and a row re-dispositioned. Nothing was
 built, and that is the finding.
@@ -3023,7 +4197,7 @@ The first version of the new block used `fileURLToPath(new URL(…, import.meta.
 shifting the `getRecordingsUrl` offset by one byte. Room gate exit 0 — `svelte-check` 1,574 files 0
 errors 0 warnings, **301 test files / 5,508 passed / 1 skipped**, build.
 
-### 2026-08-31 18:40 UTC — Three of the chat toolbar's four controls, and the fourth blocked on a command that does not exist
+### 2026-08-31 17:43 UTC — Three of the chat toolbar's four controls, and the fourth blocked on a command that does not exist
 
 **Runtime impact: YES.** The chat toolbar's extended section rendered a Mod Only checkbox and
 stopped. It now carries Archive Chat Messages, the Group Chat Control dropdown and — in the main
@@ -3102,7 +4276,7 @@ be worse than saying so.
 `ChatSearchBar.svelte`: no issues; two suggestions, both the standing `{' '}` decline for the
 capture's own label pads. **Not verified:** nothing was opened in a browser.
 
-### 2026-08-31 18:05 UTC — A citation that was wrong in two files, and landed 161 bytes inside the function it named
+### 2026-08-31 17:15 UTC — A citation that was wrong in two files, and landed 161 bytes inside the function it named
 
 **Runtime impact: NO** — two docblocks and one new contract test. `ACA-06`'s four controls stay
 unbuilt and the row stays open on them.
@@ -3148,7 +4322,7 @@ Chat. All four have existing machinery here (`RoomChatArchive`, `changeChatMode`
 column's built twin of the save button, `window-handlers.ts`'s `detachAlerts`), so this is a build
 rather than a discovery — and the const tables say Detach Chat belongs to the main column alone.
 
-### 2026-08-31 17:45 UTC — A pulse every member saw that belongs to one presenter, and a note that disabled the file it was written in
+### 2026-08-31 17:05 UTC — A pulse every member saw that belongs to one presenter, and a note that disabled the file it was written in
 
 **Runtime impact: YES** for `NAV-08` — the `[ REC ]` badge no longer pulses for members. `STB-04` is
 documentation and one assertion.
@@ -3213,7 +4387,7 @@ cross-reference). Room gate exit 0 — `format:check`, `lint`, `svelte-check` 1,
 **301 test files / 5,499 passed / 1 skipped**, build. **Not verified:** nothing was opened in a
 browser.
 
-### 2026-08-31 17:15 UTC — A third wrong prescription, and one line that fixes focus for all 22 dialogs
+### 2026-08-31 16:49 UTC — A third wrong prescription, and one line that fixes focus for all 22 dialogs
 
 **Runtime impact: YES.** A screenshot pasted into the second chat column uploads and posts — to
 *that* column. And every dialog in the room now takes focus when it opens.
@@ -21273,6 +22447,8 @@ has ever looked at, and it grows on its own.
 
 **Verified.** Controller **997 tests / 96 files**, room **2,562 tests / 183 files**, and the
 TODO-reading gate green after every edit.
+
+## 2026-08-20
 
 ### 2026-08-20 10:22 EDT — the caption transcript had never scrolled: an attachment's deps were one closure too deep
 

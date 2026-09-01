@@ -368,9 +368,14 @@ The presenter sends `startRecMtx { streams: mtxStreams }` / `stopRecMtx` (byte 2
 answers on the command channel with `startRec`, `stopRec`, `pauseRec`, `resumeRec`,
 `setRecPreview { url }` and `stopRecMsg { data }`.
 
-So **row X** (`setRecPreview` drives the recording-preview window), **row AC** (`stopRecMsg` raises
-the notification) and **row R's row 10** (server-side remux to MP4) all become reachable the moment
-MediaMTX exists, and none of them can be reached before. Four rows, one deployment.
+**That paragraph used to name four rows, and two of them were never blocked.** It said row X
+(`setRecPreview`) and row AC (`stopRecMsg`) _"become reachable the moment MediaMTX exists, and none of
+them can be reached before"_. Both are RECEIVERS, and a receiver is transcribable whatever any server
+sends — both were built on 2026-09-01 with no media plane involved. What genuinely waits on a
+deployment is the frame URL and the message text arriving at all, which is a different sentence.
+
+**Row R's row 10** (server-side remux to MP4) does become reachable the moment MediaMTX exists, and
+cannot be reached before.
 
 Client-side recording is NOT a divergence: `startRecFromMuser` falls back to
 `mediaService.startRecForMuser(null)` whenever `mtxStreams` is empty (byte 2524230), so the browser

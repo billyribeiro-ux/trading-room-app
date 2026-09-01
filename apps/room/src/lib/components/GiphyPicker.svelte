@@ -4,8 +4,18 @@
 
   interface Props {
     apiKey: string;
-    popoverId: string;
-    onclose: () => void;
+    /**
+     * The popover window's own id — POPOVER CHROME ONLY, and absent on the modal mount.
+     *
+     * `variant="modal"` renders no chrome at all: `app-note` opens this picker through
+     * `modalService.open(this.giphySearchPopOver, {ariaLabelledBy:"modal-basic-title"})`, so the
+     * dialog around it is the CALLER's and carries its own id and label. Requiring one here would
+     * mean `notes/NoteEditor.svelte` passing an id nothing renders, which is the with-no-consumer
+     * shape this repository refuses.
+     */
+    popoverId?: string;
+    /** The popover's own close button — POPOVER CHROME ONLY, for the reason `popoverId` gives. */
+    onclose?: () => void;
     onselect: (title: string, url: string) => void;
     /**
      * The line above the search box — `note-editor-giphy-hint-text`.
@@ -124,131 +134,182 @@
   }
 </script>
 
-<svelte:element
-  this={"ngb-popover-window"}
-  {@attach giphyPopoverPortal}
-  id={popoverId}
-  role="tooltip"
-  class="popOverDiv popover fade show bs-popover-top"
-  data-popper-placement="top"
-  style="position: absolute; inset: auto auto 0px 0px; margin: 0px;"
->
-  <div class="popover-arrow" data-popper-arrow=""></div>
-  <div class="popover-body">
-    <div class="giphy-search" style:height={panelHeight}>
-      <div class="giphy-header">
-        <div class="d-flex align-items-center justify-content-between">
-          <h4>Giphy Search</h4>
-          <button
-            type="button"
-            aria-label="Close"
-            class="btn-close btn-close-white"
-            onclick={onclose}
-          ></button>
-        </div>
-        <hr class="giphy-hr" />
-        <h6>{hint}</h6>
-        <form
-          onsubmit={(event) => {
-            event.preventDefault();
-            void search();
+<!--
+  TWO CHROMES, AND THE SECOND ONE IS NOT A POPOVER — GIF-07.
+
+  The bundle builds this picker four times. Three of them are ng-bootstrap POPOVERS; the fourth,
+  `app-note`, is a MODAL, and the difference is structural rather than cosmetic. `L0e` at bundle
+  byte 1,467,000 is opened by
+
+      opengifSerachModal(){this.modalService.open(this.giphySearchPopOver,
+        {ariaLabelledBy:"modal-basic-title"}).result.then(e=>{},e=>{})}
+
+  — const 2 is `["giphySearchPopOver",""]`, a template reference variable, so the whole picker is an
+  `<ng-template>` handed to the modal service. Its consts:
+
+      26  [1,"modal-header"]
+      82  ["id","modal-basic-title",1,"modal-title"]
+      83  [1,"modal-body","modal-lg",2,"max-height","77vh","overflow-y","auto"]
+      40  [1,"modal-footer"]
+      41  ["type","button",1,"btn","btn-outline-dark",3,"click"]        // " Close "
+
+  and **there is no `giphy-search` const in `app-note` at all** — the class appears only in that
+  component's own `styles:[…]`, where its three rules style nothing. So the modal has no dark 400px
+  panel, no `giphy-header`, and no `giphy-hr`: it is the hint, the form and the grid, sitting
+  directly in a `modal-body`.
+
+  Until 2026-09-01 this component rendered the popover shell on all four mounts, so the note
+  editor's picker was a popover portaled to `<body>` at `inset: auto auto 0px 0px` — bottom-left of
+  the viewport — while the note editor itself is a dialog. `GIF-04` had already corrected the three
+  CHROME classes on this mount without noticing that the chrome around them was the wrong one.
+
+  The two bodies are snippets rather than a duplicated block, because the popover splits them across
+  its `giphy-header` and the modal does not. Rendering them twice would be two places to fix the
+  next time the form changes.
+-->
+{#snippet searchForm()}
+  <h6>{hint}</h6>
+  <form
+    onsubmit={(event) => {
+      event.preventDefault();
+      void search();
+    }}
+  >
+    <div class="form-group">
+      <div class="input-group">
+        <input
+          type="text"
+          placeholder="Search for a GIF"
+          name="giphy"
+          aria-label="Sizing example input"
+          aria-describedby="inputGroup-sizing-sm"
+          class={inputClass}
+          bind:value={query}
+        />
+        <!--
+          ── THE INPUT-GROUP SPANS, AND WHAT THE CAPTURE ACTUALLY SAYS ────────────────────
+
+          An earlier reading of this pair took `app-note`'s modal for the whole story and
+          recorded two divergences from it: `text-white` for `text-dark`, and an `fa-2x` the
+          capture "does not have". **Decoding the other three tables by value refutes both.**
+          `text-white` and `fa-2x` are the POPOVER hosts' own captured values — app-privchat
+          73/74, app-chat 84/85 and app-extra-chat 81/82, three identical pairs — while
+          `text-dark` with a plain `fa-search`/`fa-times` belongs to the one MODAL, app-note
+          88/89/90. So this component matches its capture exactly and always did; what was
+          wrong was the note claiming it did not, which is the shape of mistake that gets
+          "corrected" back into a real defect later. The input's `border` class splits the same
+          way: on all three popover hosts, absent from `app-note`'s const 87. All four const
+          pairs are asserted against the pinned bundle in `giphy-picker-v4-contract.test.ts`.
+
+          `role="button"` and the keydown ARE ours, and that part of the note stands: the
+          capture puts a click handler on a bare `<span>`, which no keyboard can reach. Not a
+          `<button>`, because `input-group-text` is what gives these their shape inside the
+          group and a button would have to un-style itself back to it.
+        -->
+        {#if searchButton}
+          <span
+            class={spanClass}
+            role="button"
+            tabindex="0"
+            aria-label="Search Giphy"
+            onclick={() => void search()}
+            onkeydown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') void search();
+            }}
+          >
+            <i class="{iconSize} fa-search"></i>
+          </span>
+        {/if}
+        <span
+          class={spanClass}
+          role="button"
+          tabindex="0"
+          aria-label="Clear the Giphy search"
+          onclick={clearSearch}
+          onkeydown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') clearSearch();
           }}
         >
-          <div class="form-group">
-            <div class="input-group">
-              <input
-                type="text"
-                placeholder="Search for a GIF"
-                name="giphy"
-                aria-label="Sizing example input"
-                aria-describedby="inputGroup-sizing-sm"
-                class={inputClass}
-                bind:value={query}
-              />
-              <!--
-                ── THE INPUT-GROUP SPANS, AND WHAT THE CAPTURE ACTUALLY SAYS ────────────────────
-
-                An earlier reading of this pair took `app-note`'s modal for the whole story and
-                recorded two divergences from it: `text-white` for `text-dark`, and an `fa-2x` the
-                capture "does not have". **Decoding the other three tables by value refutes both.**
-                `text-white` and `fa-2x` are the POPOVER hosts' own captured values — app-privchat
-                73/74, app-chat 84/85 and app-extra-chat 81/82, three identical pairs — while
-                `text-dark` with a plain `fa-search`/`fa-times` belongs to the one MODAL, app-note
-                88/89/90. So this component matches its capture exactly and always did; what was
-                wrong was the note claiming it did not, which is the shape of mistake that gets
-                "corrected" back into a real defect later. The input's `border` class splits the same
-                way: on all three popover hosts, absent from `app-note`'s const 87. All four const
-                pairs are asserted against the pinned bundle in `giphy-picker-v4-contract.test.ts`.
-
-                `role="button"` and the keydown ARE ours, and that part of the note stands: the
-                capture puts a click handler on a bare `<span>`, which no keyboard can reach. Not a
-                `<button>`, because `input-group-text` is what gives these their shape inside the
-                group and a button would have to un-style itself back to it.
-              -->
-              {#if searchButton}
-                <span
-                  class={spanClass}
-                  role="button"
-                  tabindex="0"
-                  aria-label="Search Giphy"
-                  onclick={() => void search()}
-                  onkeydown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') void search();
-                  }}
-                >
-                  <i class="{iconSize} fa-search"></i>
-                </span>
-              {/if}
-              <span
-                class={spanClass}
-                role="button"
-                tabindex="0"
-                aria-label="Clear the Giphy search"
-                onclick={clearSearch}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') clearSearch();
-                }}
-              >
-                <i class="{iconSize} fa-times"></i>
-              </span>
-            </div>
-          </div>
-        </form>
+          <i class="{iconSize} fa-times"></i>
+        </span>
       </div>
-      <ul class="search-results">
-        <!--
-          KEYED BY `id`, DELIBERATELY, AND IT IS NOT THE REFERENCE'S KEY — GIF-06.
-
-          Angular tracks these by TITLE: `KDe = (t,n) => n.title` for `app-privchat`, `y0e` for
-          `app-note`. Titles collide constantly on Giphy — the empty string is a common one — and a
-          duplicate key in Svelte is a runtime throw that takes the picker down, where a duplicate
-          trackBy in Angular merely reuses a node. So the reference's key is not transcribed and the
-          id stands in as the least-colliding field the payload offers.
-
-          It is still EXTERNAL and still not authority: it decides which DOM node is reused, never
-          what is sent. What is sent is the URL the member double-clicked, and the server decides
-          whether that may be posted.
-        -->
-        {#each results as result (result.id)}
-          {const box = $derived(imageBox(result.images.downsized_large))}
-          <li class="gif-result">
-            <!--
-              `width`/`height` from the payload when it states usable integers, nothing at all when
-              it does not. The reference sizes this with `max-width: 100%` and no intrinsic box, so
-              the grid reflowed as each GIF decoded; the ratio lets the browser reserve the row
-              first. `max-width: 100%` still wins on the rendered width, so these change the
-              RESERVATION, not the layout.
-            -->
-            <img
-              src={result.images.downsized_large.url}
-              alt={result.title}
-              width={box?.width}
-              height={box?.height}
-              ondblclick={() => onselect(result.title, result.images.original.url)}
-            />
-          </li>
-        {/each}
-      </ul>
     </div>
-  </div>
-</svelte:element>
+  </form>
+{/snippet}
+
+{#snippet resultGrid()}
+  <ul class="search-results">
+    <!--
+      KEYED BY `id`, DELIBERATELY, AND IT IS NOT THE REFERENCE'S KEY — GIF-06.
+
+      Angular tracks these by TITLE: `KDe = (t,n) => n.title` for `app-privchat`, `y0e` for
+      `app-note`. Titles collide constantly on Giphy — the empty string is a common one — and a
+      duplicate key in Svelte is a runtime throw that takes the picker down, where a duplicate
+      trackBy in Angular merely reuses a node. So the reference's key is not transcribed and the
+      id stands in as the least-colliding field the payload offers.
+
+      It is still EXTERNAL and still not authority: it decides which DOM node is reused, never
+      what is sent. What is sent is the URL the member double-clicked, and the server decides
+      whether that may be posted.
+    -->
+    {#each results as result (result.id)}
+      {const box = $derived(imageBox(result.images.downsized_large))}
+      <li class="gif-result">
+        <!--
+          `width`/`height` from the payload when it states usable integers, nothing at all when
+          it does not. The reference sizes this with `max-width: 100%` and no intrinsic box, so
+          the grid reflowed as each GIF decoded; the ratio lets the browser reserve the row
+          first. `max-width: 100%` still wins on the rendered width, so these change the
+          RESERVATION, not the layout.
+        -->
+        <img
+          src={result.images.downsized_large.url}
+          alt={result.title}
+          width={box?.width}
+          height={box?.height}
+          ondblclick={() => onselect(result.title, result.images.original.url)}
+        />
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
+{#if variant === 'modal'}
+  <!--
+    No chrome: the dialog is the CALLER's. `notes/NoteEditor.svelte` wraps this in `Modal.svelte`
+    with `titleId="modal-basic-title"`, `bodyClass="modal-lg"` and the captured
+    `max-height: 77vh; overflow-y: auto`, which is what consts 82 and 83 say.
+  -->
+  {@render searchForm()}
+  {@render resultGrid()}
+{:else}
+  <svelte:element
+    this={"ngb-popover-window"}
+    {@attach giphyPopoverPortal}
+    id={popoverId}
+    role="tooltip"
+    class="popOverDiv popover fade show bs-popover-top"
+    data-popper-placement="top"
+    style="position: absolute; inset: auto auto 0px 0px; margin: 0px;"
+  >
+    <div class="popover-arrow" data-popper-arrow=""></div>
+    <div class="popover-body">
+      <div class="giphy-search" style:height={panelHeight}>
+        <div class="giphy-header">
+          <div class="d-flex align-items-center justify-content-between">
+            <h4>Giphy Search</h4>
+            <button
+              type="button"
+              aria-label="Close"
+              class="btn-close btn-close-white"
+              onclick={onclose}
+            ></button>
+          </div>
+          <hr class="giphy-hr" />
+          {@render searchForm()}
+        </div>
+        {@render resultGrid()}
+      </div>
+    </div>
+  </svelte:element>
+{/if}

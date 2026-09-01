@@ -426,6 +426,35 @@ export function auditSurface(options) {
   const paths = options.files.map((path) => path.trim()).filter(Boolean);
   const ours = readOurs(paths);
 
+  /*
+    ── ADJACENT STRING LITERALS ARE JOINED, BECAUSE THE FORMATTER SPLITS THEM ────────────────────
+
+    prettier breaks a long string across a `+`:
+
+    ```ts
+    'This is the default screen users are taken to right now. If you are a presenter and talking ' +
+      'whichever screen you select will be forced on others…'
+    ```
+
+    That is ONE string to JavaScript and two to a text search, so `app-presentationarea`'s const 74
+    — a 261-character tooltip — was reported absent against `ScreenTabs.svelte:102`, which renders
+    it, and `StreamTabs.svelte:120`, which renders it too. Whitespace collapsing cannot fix it: the
+    break is in SOURCE, not in markup, and there is a `+` between the halves.
+
+    Joining adjacent literals is exactly what the engine does at parse time, so this models the
+    language rather than guessing at a formatter: a closing quote, optional whitespace, `+`,
+    optional whitespace, an opening quote of the SAME kind, all of it removed. Different quote
+    characters are left alone — that is a concatenation of two genuinely different strings, and
+    folding it would invent a value neither file contains.
+
+    Every search below reads THIS and not `ours`: const values are attribute values too, and an
+    attribute value is exactly as splittable as a text node.
+  */
+  const joined = ours
+    .replace(/'\s*\+\s*'/g, '')
+    .replace(/"\s*\+\s*"/g, '')
+    .replace(/`\s*\+\s*`/g, '');
+
   let from;
   let to;
   /** Declared without an initialiser: both branches below assign it, and eslint asks for that. */
@@ -486,12 +515,12 @@ export function auditSurface(options) {
   const NOT_TOKEN = /[A-Za-z0-9_-]/;
   /** @param {string} value */
   const rendered = (value) => {
-    let at = ours.indexOf(value);
+    let at = joined.indexOf(value);
     while (at !== -1) {
-      const before = at === 0 ? '' : ours[at - 1];
-      const after = ours[at + value.length] ?? '';
+      const before = at === 0 ? '' : joined[at - 1];
+      const after = joined[at + value.length] ?? '';
       if (!NOT_TOKEN.test(before) && !NOT_TOKEN.test(after)) return true;
-      at = ours.indexOf(value, at + 1);
+      at = joined.indexOf(value, at + 1);
     }
     return false;
   };
@@ -571,23 +600,6 @@ export function auditSurface(options) {
     return out;
   };
 
-  entries.forEach((entry, index) => {
-    if (isTemplateRef(entry)) return;
-    for (const value of surfaceValuesOf(entry)) {
-      if (value.length < 2) continue;
-      if (!isSurfaceValue(value) || FRAMEWORK.has(value) || rendered(value)) continue;
-      /*
-        `?? []` and a re-set rather than a non-null assertion on the line above. The `has`/`get` pair
-        cannot miss — the `set` is one statement up — but asserting a fact the checker can see is
-        false in general is how a real miss ships as a crash, and `audit-feature-coverage.mjs` makes
-        the same choice at its own printer for the same reason.
-      */
-      const at = constGaps.get(value) ?? [];
-      if (args.selector) at.push(index);
-      constGaps.set(value, at);
-    }
-  });
-
   /*
     ── TEXT LITERALS ARE READ FROM THE VIEWS THIS COMPONENT ACTUALLY REFERENCES ──────────────────
 
@@ -666,6 +678,69 @@ export function auditSurface(options) {
   collectViews(region, 0);
 
   /*
+    ── LOCAL REFERENCE LISTS ARE FOUND BY POSITION, NOT BY SHAPE ─────────────────────────────────
+
+    `#alertForm="ngForm"` compiles to the const `["alertForm","ngForm"]`, and `app-presentationarea`
+    holds one at index 0. It is not surface — it names a node, and an `exportAs` on it names a
+    DIRECTIVE to read instead of the element — so `ngForm` was being reported as a value this room
+    fails to render, on a form this room has no Angular in.
+
+    **The obvious fix is wrong, and it was tried first.** Widening `isTemplateRef` to accept any
+    two-string const `["x","y"]` also swallows `["value","sent"]`, `["value","queued"]` and
+    `["value","failed"]` — ordinary attribute pairs — and four real gaps quietly left
+    `app-alert-send-report-modal`'s pin. A shape that two different things share cannot tell them
+    apart.
+
+    Angular's own encoding does. A const index in the THIRD argument of `d(slot,"tag",N)` is the
+    attribute list; a FOURTH argument is the local-refs list:
+
+        d(23,"div",74,3)      // consts[74] = attributes, consts[3] = local refs
+        d(0,"div",52)         // attributes only
+
+    So the indices are read from the template and from every view it reaches, and a const at one of
+    them is skipped wherever it is and whatever it looks like. That is why this loop runs here,
+    after the view walk, rather than beside the const table it reads.
+  */
+  /*
+    SELECTOR RUNS ONLY, and that restriction is a correctness requirement rather than caution.
+
+    A `--from`/`--to` run parses a SLICE of a const table, so its index 0 is the first entry in the
+    range; the indices in `d(slot,"tag",attrs,refs)` are the whole component's. Applying one
+    numbering to the other skips an arbitrary entry — and it did, on the first run: the `#files`
+    region's pinned `pe` gap (upstream's own typo, an attribute literally named `pe`) disappeared
+    because some unrelated 4-argument call in `app-presentationarea`'s template happened to carry
+    its range-relative index.
+
+    A range run therefore keeps the shape check alone, which is what it had before this existed.
+  */
+  /** @type {Set<number>} */
+  const localRefIndices = new Set();
+  if (args.selector) {
+    for (const source of [template, region, ...viewSources.values()]) {
+      for (const [, , refs] of source.matchAll(/[dT]\(\d+,"[^"]*",(\d+),(\d+)\)/g)) {
+        localRefIndices.add(Number(refs));
+      }
+    }
+  }
+
+  entries.forEach((entry, index) => {
+    if (isTemplateRef(entry) || localRefIndices.has(index)) return;
+    for (const value of surfaceValuesOf(entry)) {
+      if (value.length < 2) continue;
+      if (!isSurfaceValue(value) || FRAMEWORK.has(value) || rendered(value)) continue;
+      /*
+        `?? []` and a re-set rather than a non-null assertion on the line above. The `has`/`get` pair
+        cannot miss — the `set` is one statement up — but asserting a fact the checker can see is
+        false in general is how a real miss ships as a crash, and `audit-feature-coverage.mjs` makes
+        the same choice at its own printer for the same reason.
+      */
+      const at = constGaps.get(value) ?? [];
+      if (args.selector) at.push(index);
+      constGaps.set(value, at);
+    }
+  });
+
+  /*
     ── TEXT IS COMPARED WITH WHITESPACE COLLAPSED, AND THE REASON IS THE FORMATTER ───────────────
 
     HTML collapses runs of whitespace, so ` Stop Screens ` in the capture and
@@ -684,7 +759,7 @@ export function auditSurface(options) {
     whitespace slide there would make `"btn btn-sm"` match `"btn   btn-sm"`, which is a difference
     worth keeping.
   */
-  const flat = ours.replace(/\s+/g, ' ');
+  const flat = joined.replace(/\s+/g, ' ');
   /** @type {Set<string>} */
   const textGaps = new Set();
   const unresolved = [...viewSources].filter(([, body]) => body === '').map(([view]) => view);

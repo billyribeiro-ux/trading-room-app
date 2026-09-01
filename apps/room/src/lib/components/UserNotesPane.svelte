@@ -66,48 +66,58 @@
   -->
   <div class="text-warning py-2">{error}</div>
 {:else}
-  <div class="col" style="max-height: 300px; overflow-y: scroll;">
-    {#if loading}
-      <div class="py-2">Loading notes…</div>
-    {:else if notes.length === 0}
-      <!--
-        Ours. Upstream renders an empty `@for` and nothing else, which reads as a broken panel; a
-        presenter cannot tell "no notes yet" from "this did not load". Divergence, deliberate.
-      -->
-      <div class="py-2">No notes about this member yet.</div>
-    {/if}
-    {#each notes as note (note.id)}
-      <div class="d-flex d-flex justify-content-between d-flex align-items-stretch">
-        <span class="flex-grow-1 flex-fill">
-          <!--
-            `width`/`height` are ours and are required here: `.smallAvatarImg` caps the rendered
-            width at 20px, and an `<img>` with no intrinsic size reserves none until the bytes
-            arrive, so every note in the list shifts as the avatars load.
-          -->
-          <img
-            class="smallAvatarImg"
-            src={note.authorAvatarUrl}
-            alt={note.authorName}
-            width="20"
-            height="20"
-          />
-          [{shortWhen.format(new Date(note.createdAt))}] {note.authorName}: {note.note}
-        </span>
-        <button
-          class="btn btn-sm btn-outline-light float-right"
-          aria-label="Delete this note"
-          onclick={() => onRemove(note)}
-        >
-          <i class="fas fa-minus-circle"></i>
-        </button>
-      </div>
-    {/each}
+  <!--
+    `d(0,"div",38)(1,"div",93)` — const 38 is `[1,"row"]` and const 93 is
+    `[1,"col",2,"max-height","300px","overflow-y","scroll"]`. The ROW was absent here until
+    2026-09-01, and a bare `.col` is not a cosmetic difference: Bootstrap's column carries half a
+    gutter of horizontal padding that `.row`'s negative margin is what cancels, so the list sat
+    inset from the panel while the Add Note row below it — which HAS its `.row` — did not.
+  -->
+  <div class="row">
+    <div class="col" style="max-height: 300px; overflow-y: scroll;">
+      {#if loading}
+        <div class="py-2">Loading notes…</div>
+      {:else if notes.length === 0}
+        <!--
+          Ours. Upstream renders an empty `@for` and nothing else, which reads as a broken panel; a
+          presenter cannot tell "no notes yet" from "this did not load". Divergence, deliberate.
+        -->
+        <div class="py-2">No notes about this member yet.</div>
+      {/if}
+      {#each notes as note (note.id)}
+        <div class="d-flex d-flex justify-content-between d-flex align-items-stretch">
+          <span class="flex-grow-1 flex-fill">
+            <!--
+              `width`/`height` are ours and are required here: `.smallAvatarImg` caps the rendered
+              width at 20px, and an `<img>` with no intrinsic size reserves none until the bytes
+              arrive, so every note in the list shifts as the avatars load.
+            -->
+            <img
+              class="smallAvatarImg"
+              src={note.authorAvatarUrl}
+              alt={note.authorName}
+              width="20"
+              height="20"
+            />
+            [{shortWhen.format(new Date(note.createdAt))}] {note.authorName}: {note.note}
+          </span>
+          <button
+            class="btn btn-sm btn-outline-light float-right"
+            aria-label="Delete this note"
+            onclick={() => onRemove(note)}
+          >
+            <i class="fas fa-minus-circle"></i>
+          </button>
+        </div>
+      {/each}
+    </div>
   </div>
   <hr />
   <div class="row">
     <div class="col">
       <button class="btn btn-sm btn-outline-light float-right" onclick={onAdd}>
-        <i class="fa fa-plus-circle"></i> Add Note
+        <!-- Const 96 is `[1,"icon","fa","fa-plus-circle"]`; `icon` was dropped until 2026-09-01. -->
+        <i class="icon fa fa-plus-circle"></i> Add Note
       </button>
     </div>
   </div>

@@ -206,6 +206,12 @@ const UNSIZEABLE: Record<string, Record<string, { count: number; why: string }>>
       why: "the carousel slide's own preview, an image a presenter just uploaded or pasted by URL. The reference bounds it at `max-height: 140px; max-width: 100%` with `object-fit: contain` (byte 1,488,253) and gives it no box on purpose — the point of that state is to show the WHOLE image, and a fixed width or height would letterbox or crop the very thing the presenter is checking. It sits inside an already-open modal, so nothing below it can be pushed."
     }
   },
+  'lib/components/RecordingPreviewCard.svelte': {
+    '{tick ? previewSrc : undefined}': {
+      count: 1,
+      why: "the server's recording preview frame, refreshed once a second. `app-rec-preview .recPreviewScreen` bounds it at `width: 100%; max-height: calc(100% - 42px)` with `object-fit: contain`, inside a `.recsHolderScreen` that is a FIXED 350x260 box (700x520 expanded) — so the height axis is bounded by a percentage of an ancestor whose height is a literal, and nothing on the page can move whatever the frame turns out to be. It cannot take the `SIZED_BY_CSS` route because that catalog verifies a `height` declaration and the captured rule states `max-height`; stating a `height` here would letterbox the frame, which is the one thing this card exists to show honestly."
+    }
+  },
   'lib/components/GifConfirmDialog.svelte': {
     '{url}': { count: 1, why: 'the chosen Giphy image, confirmed at `width: 100%` before sending.' }
   },

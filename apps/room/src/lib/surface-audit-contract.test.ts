@@ -1,3 +1,4 @@
+import { globSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { auditSurface } from '../../gate/audit-surface.mjs';
 
@@ -253,6 +254,82 @@ const CLEAN: readonly {
     files: ['src/lib/components/ModalHost.svelte', 'src/lib/components/ScreenPane.svelte']
   },
   {
+    selector: 'app-chat',
+    consts: 93,
+    views: 27,
+    files: [
+      'src/lib/components/AlertChatArea.svelte',
+      'src/lib/components/ChatSearchBar.svelte',
+      'src/lib/components/ChatTabStrip.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/GiphyPicker.svelte',
+      'src/lib/components/MessageMenu.svelte',
+      'src/lib/chat-mode.ts'
+    ]
+  },
+  {
+    /*
+      The extra column, and its file list carries a lesson: `extra-chat-surface.ts` has to be in it.
+      Without that module the audit reports `textAreaHolder` missing, because the id reaches the
+      markup through `EXTRA_CHAT_COMPOSER_HOLDER_ID` rather than as a literal — which is `XCP-01`, the
+      defect where an `Extra` suffix cost this column every `#textAreaHolder` rule in `app.css`.
+    */
+    selector: 'app-extra-chat',
+    consts: 90,
+    views: 26,
+    files: [
+      'src/lib/components/ExtraChatPane.svelte',
+      'src/lib/extra-chat-surface.ts',
+      'src/lib/components/ChatSearchBar.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/GiphyPicker.svelte',
+      'src/lib/components/ChatTabStrip.svelte'
+    ]
+  },
+  {
+    selector: 'app-poll-modal',
+    consts: 53,
+    views: 9,
+    files: [
+      'src/lib/components/PollPanel.svelte',
+      'src/lib/components/PollSavedList.svelte',
+      'src/lib/room/polls.svelte.ts'
+    ]
+  },
+  {
+    selector: 'app-debug-log-modal',
+    consts: 11,
+    views: 0,
+    files: ['src/lib/components/ModalHost.svelte', 'src/lib/components/Modal.svelte']
+  },
+  {
+    selector: 'app-reply-modal',
+    consts: 23,
+    views: 2,
+    files: [
+      'src/lib/components/ReplyModal.svelte',
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/GiphyPicker.svelte'
+    ]
+  },
+  {
+    selector: 'app-kicked-page',
+    consts: 3,
+    views: 0,
+    files: ['src/lib/components/KickedPage.svelte']
+  },
+  {
+    selector: 'app-root',
+    consts: 4,
+    views: 6,
+    files: [
+      'src/routes/+page.svelte',
+      'src/lib/components/KickedPage.svelte',
+      'src/lib/components/RoomShell.svelte'
+    ]
+  },
+  {
     /* Two consts and no embedded views — a thin container, and the numbers say so. */
     selector: 'app-positions-container',
     consts: 2,
@@ -269,10 +346,79 @@ const CLEAN: readonly {
     consts: 1,
     views: 0,
     files: ['src/lib/components/WebcamStrip.svelte', 'src/lib/components/PresentationArea.svelte']
+  },
+  /*
+    ── FIVE MORE, 2026-09-01, and they are what finished `ModalHost.svelte` ──────────────────────
+
+    That file is the union of two dozen reference modals, so it could not be audited as one surface
+    and was the last row in `todo-next.md` still reading `no`. These five are the ones it implements
+    that had never been measured against their own selectors.
+
+    `app-av-settings-modal` reached 0/0 the same day and not before: the audit had reported
+    `speakers-device` against markup that said `av-speakers-device`, an ours-prefix that cost the
+    select both of the `app.css` rules written for it.
+  */
+  {
+    selector: 'app-av-settings-modal',
+    consts: 36,
+    views: 3,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/AvDevicePane.svelte'
+    ]
+  },
+  {
+    selector: 'app-play-youtube-modal',
+    consts: 19,
+    views: 3,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/YoutubePlayerOverlay.svelte'
+    ]
+  },
+  {
+    selector: 'app-alerts-advanced-search',
+    consts: 50,
+    views: 17,
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/AlertChatArea.svelte'
+    ]
+  },
+  {
+    /*
+      Eighty-five consts and FORTY-THREE views, the largest clean surface here — and it needs
+      `connectivity-status-rows.ts` in the list, because `UDP Enabled`, `TCP Enabled` and the three
+      status glyphs reach the markup through a table rather than as literals.
+    */
+    selector: 'app-webrtc-troubleshooter',
+    consts: 85,
+    views: 43,
+    files: [
+      'src/lib/components/ConnectivityModal.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/connectivity-status-rows.ts',
+      'src/lib/components/MobileRestorePane.svelte'
+    ]
+  },
+  {
+    selector: 'app-alert-qa-modal',
+    consts: 38,
+    views: 15,
+    files: [
+      'src/lib/components/AlertQaModal.svelte',
+      'src/lib/components/AlertQaComposer.svelte',
+      'src/lib/components/AlertQaAlertCard.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/CompactMessageRow.svelte'
+    ]
   }
 ];
 
-describe('seven surfaces measured clean — audited 2026-09-01', () => {
+describe('the surfaces measured clean — audited 2026-09-01', () => {
   it.each(CLEAN)('$selector renders every const value and text literal', (surface) => {
     const report = auditSurface({ selector: surface.selector, files: [...surface.files] });
     expect(report.region.consts, `${surface.selector}'s const table must still parse`).toBe(
@@ -284,6 +430,67 @@ describe('seven surfaces measured clean — audited 2026-09-01', () => {
     expect(report.views.unresolved).toEqual([]);
     expect(report.constGaps.map((gap) => gap.value)).toEqual([]);
     expect(report.textGaps).toEqual([]);
+  });
+});
+
+describe('app-privchat — audited 2026-09-01, and its four gaps are ONE refusal', () => {
+  /*
+    Four values, one reason, and the reason is `G7` in `room/private-chat.svelte.ts`.
+
+    ```js
+    O(1, e.getAllPCLogsLoading ? 1 : 2)   // " Loading private chats. Please wait... " / " No active chat "
+    O(3, e.getAllPCLogsLoading ? 3 : -1)  // the tab column's own "Loading all private chats." block
+    ```
+
+    Upstream needs that flag because it POSTs `getAllPCLogs` when the panel opens. **This room has no
+    such moment**: the conversation list is resolved in `+page.server.ts` before the page renders, and
+    the only refresh is `invalidateAll()`, which keeps the previous list on screen while it runs.
+    There is no instant at which the strip exists and its contents are unknown, so both branches
+    would be branches that can never render.
+
+    `my-1` is the fourth, and it is the same refusal: const 47 is used ONLY inside `sEe`, the
+    "Loading all private chats." block. Reading where a class is USED rather than assuming it is
+    surface is what turned four findings into one.
+  */
+  const report = auditSurface({
+    selector: 'app-privchat',
+    files: [
+      'src/lib/components/PrivateChatPanel.svelte',
+      'src/lib/components/PrivateChatComposer.svelte',
+      'src/lib/room/private-chat.svelte.ts',
+      'src/lib/components/GiphyPicker.svelte',
+      'src/lib/components/RoomOverlays.svelte',
+      'src/lib/components/RoomMessage.svelte',
+      'src/lib/components/ModalHost.svelte'
+    ]
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(79);
+    expect(report.views.resolved).toBe(19);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('has exactly the one loading block left, and nothing else', () => {
+    expect(report.constGaps.map((gap) => gap.value)).toEqual(['my-1']);
+    expect(report.textGaps).toEqual([
+      'Loading all private chats.',
+      'Please wait...',
+      ' Loading private chats. Please wait... '
+    ]);
+  });
+
+  it("and the refusal's premise is still what it says it is", () => {
+    /*
+      Read rather than trusted: if the conversation list ever starts being fetched on OPEN, the
+      loading states stop being unreachable and this refusal expires. The premise is that the list
+      arrives with the page.
+    */
+    const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
+    expect(server).toContain('loadConversations(');
+    const panel = readFileSync(new URL('./room/private-chat.svelte.ts', import.meta.url), 'utf8');
+    expect(panel).toContain('getAllPCLogsLoading');
+    expect(panel).toContain('branches that can never render');
   });
 });
 
@@ -367,5 +574,482 @@ describe('the #files region of app-presentationarea — audited 2026-09-01', () 
 
   it('and the one absent literal is the never-fetched message', () => {
     expect(report.textGaps).toContain('No room files found.');
+  });
+});
+
+/*
+  The two LOG ARCHIVE modals are the same surface twice — upstream's two components differ only in
+  the word "chat" or "alerts" and the `type` on the wire, and `LogArchiveModals.svelte` says so at
+  length. They are pinned as two entries anyway, against two byte ranges, because the day the alerts
+  half stops being a placeholder is the day one of these two has to move without the other.
+*/
+const LOG_ARCHIVE_FILES = [
+  'src/lib/components/LogArchiveModals.svelte',
+  'src/lib/components/ChatArchivePane.svelte',
+  'src/lib/components/ChatArchiveLogPane.svelte',
+  /* The shared modal chrome: `modal-dialog`, `modal-header`, `btn-close`, the Close label. */
+  'src/lib/components/Modal.svelte',
+  /* Upstream's `app-st-message` inside the log; this room's compact row stands in for it. */
+  'src/lib/components/CompactMessageRow.svelte'
+];
+
+describe('app-chat-logs-modal — audited 2026-09-01', () => {
+  const report = auditSurface({ selector: 'app-chat-logs-modal', files: LOG_ARCHIVE_FILES });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(38);
+    expect(report.views.resolved).toBe(11);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('renders every const value and every text literal the reference does', () => {
+    /*
+      CLEAN as of 2026-09-01, and it took two findings to get here — both invisible to the whole-app
+      sweep, which is the argument for this file existing at all:
+
+      `vxe`, the archive ROW, is three labelled lines and the middle one is
+      `<strong class="fw-bold">By:&nbsp;</strong><i>{{createdBy}}</i>`. This room drew one compressed
+      line with no `By:` at all, while `chat_archives.archived_by_user_id` had held the answer since
+      the table was added. `chat-archive-row-render.test.ts` now asserts it on the rendered page.
+
+      `Fxe`, the loading arm, is `[1,"text-center","my-4"]` around
+      `[1,"ml-2","fas","fa-spinner","fa-spin"]` and the literal `" Loading..."`. Ours had drifted to
+      `mt-2` and a `…` character — a third spelling of an idiom `ModalHost.svelte` already carries
+      verbatim twice.
+
+      Both were reported 0/0 by the WHOLE-APP sweep, because `By:&nbsp;`, `my-4` and `" Loading..."`
+      all occur elsewhere in this application while being absent from this surface.
+    */
+    expect(report.constGaps).toEqual([]);
+    expect(report.textGaps).toEqual([]);
+  });
+});
+
+describe('app-alert-logs-modal — audited 2026-09-01', () => {
+  const report = auditSurface({ selector: 'app-alert-logs-modal', files: LOG_ARCHIVE_FILES });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(38);
+    expect(report.views.resolved).toBe(11);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('renders every const value and every text literal the reference does', () => {
+    /*
+      The alerts half of the modal is a PLACEHOLDER — `LogArchiveModals.svelte` records that its
+      sweep is gated on `deleteAlertPW`, one of the seven credential-shaped settings that never reach
+      this room — and it still measures clean, because the two components share every const and
+      almost every literal. The two that differ are the empty-state and the row's third line:
+      upstream's alerts row is `Pxe`, two labelled lines (a date and `By:`) where the chat row's
+      `vxe` has three, since an alert has no channel.
+
+      That is the honest reading of this green: what is pinned is the CHROME, and the chrome is one
+      surface drawn twice. It is not a claim that the alerts sweep is built.
+    */
+    expect(report.constGaps).toEqual([]);
+    expect(report.textGaps).toEqual([]);
+  });
+});
+
+describe('app-alert-send-report-modal — audited 2026-09-01', () => {
+  /*
+    ONE REFUSAL, FORTY-SIX GAPS. Every value below belongs to the report body, the search bar, the
+    status select, the flot pie or the per-recipient row — and all five rest on the same thing:
+    a list of DELIVERY RECORDS for one alert, which this application has nowhere.
+
+    `AlertSendReportModal.svelte` carries the measurement in full: 24 tables searched for `queue`,
+    `latency`, `fail_reason`, `sent_time` and `delivery`; `alerts.dispatch` is five booleans naming
+    which channels the presenter TICKED, not what happened; no mail transport exists in
+    `apps/room/src/lib/server` at all; and `getAlertReport` has zero occurrences across `apps/`.
+
+    So this is not a backlog. It is one decision, and the list is here so that BUILDING the queue
+    turns this test red — forty-six values arriving at once is exactly the signal that the refusal
+    expired.
+  */
+  const report = auditSurface({
+    selector: 'app-alert-send-report-modal',
+    files: ['src/lib/components/AlertSendReportModal.svelte', 'src/lib/components/Modal.svelte']
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(39);
+    expect(report.views.resolved).toBe(11);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('is missing exactly the report, and nothing outside it', () => {
+    /*
+      Asserted as a SET rather than a length. Half of these are generic Bootstrap classes —
+      `input-group`, `form-select`, `fw-bold`, `bg-dark` — that this application uses freely
+      elsewhere; they are absent HERE because the elements that would carry them are refused, and a
+      count could not tell that apart from one of them turning up on something unrelated.
+    */
+    expect(report.constGaps.map((gap) => gap.value)).toEqual([
+      /* the spinner, RPT-02's fake-loading defect */
+      'my-4',
+      'ml-2',
+      'fas',
+      'fa-spinner',
+      'fa-spin',
+      /* the report container and its header */
+      'w-100',
+      'report-header-container',
+      'text-white',
+      'my-1',
+      'report-header',
+      /* `$.plot("#pie-container", …)` — jQuery flot, which this room does not load */
+      'pie-container',
+      /* the status select: All / sent / queued / failed */
+      'input-group',
+      'search-select-addon',
+      'input-group-text',
+      'Search select',
+      'form-select',
+      'sent',
+      'queued',
+      'failed',
+      /* the search box and its two addons, including upstream's `btn-ligth` typo */
+      'search-term',
+      'search-addon',
+      'Enter search term',
+      'form-control',
+      'clear-search-addon',
+      'btn-ligth',
+      'fa-search',
+      'report-body',
+      'fa-times',
+      /* the per-recipient row: name, address, sent time, latency, failure reason */
+      'list-group',
+      'list-group-item',
+      'list-group-item-action',
+      'border-0',
+      'bg-dark',
+      'fw-bold',
+      'sent-time',
+      'failed-reason',
+      'm-1',
+      'fa-clock',
+      'ms-1',
+      'fa-exclamation-circle',
+      'me-1'
+    ]);
+  });
+
+  it('and the five literals are the four filter labels and the empty-queue answer', () => {
+    /*
+      `No Reports.` is deliberately NOT rendered. It means "the fetch came back empty", and there is
+      no fetch — a presenter reading it under a title carrying a real AlertID would conclude their
+      alert reached nobody. `REPORT_UNAVAILABLE` says what is actually true instead, and is marked
+      as ours at the code.
+    */
+    expect(report.textGaps).toEqual([' Loading...', 'All', 'Queued', 'Failed', 'No Reports.']);
+  });
+});
+
+describe('app-typing-indicator-dots — audited 2026-09-01', () => {
+  /*
+    The smallest reference component there is: one const, no embedded views, four instructions.
+    It is pinned anyway, and the reason is what it took to get here rather than what it costs to
+    keep — the surface reported one gap for four days behind a recorded reason that was half right,
+    and the half that was wrong ("inventing the animation would be inventing a design") is the kind
+    that only ever gets caught by re-reading the bundle.
+
+    `typing-indicator-contract.test.ts` holds the values; this holds the fact that there are no
+    others.
+  */
+  const report = auditSurface({
+    selector: 'app-typing-indicator-dots',
+    files: ['src/lib/components/TypingIndicatorDots.svelte']
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(1);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('renders every const value and every text literal the reference does', () => {
+    expect(report.constGaps).toEqual([]);
+    expect(report.textGaps).toEqual([]);
+  });
+});
+
+describe('app-note — audited 2026-09-01', () => {
+  /*
+    The note editor and everything it opens: the Giphy dialog, the carousel builder, the file
+    browser, the version history. 94 consts and 17 embedded views, the third-largest surface pinned
+    here.
+
+    `GIF-07` closed the last const gap. `modal-basic-title`, `modal-lg` and `77vh` all belong to the
+    ng-bootstrap MODAL `opengifSerachModal()` opens the picker inside — and this room had been
+    rendering `GiphyPicker`'s POPOVER shell on that mount, portaled to `<body>` at
+    `inset: auto auto 0px 0px`. The dialog is `Modal.svelte` now, with the captured id, `h4` title,
+    `modal-lg` body and `max-height: 77vh`.
+  */
+  const report = auditSurface({
+    selector: 'app-note',
+    files: [
+      'src/lib/components/notes/NoteEditor.svelte',
+      'src/lib/components/notes/NoteTabContent.svelte',
+      'src/lib/components/notes/NotesPane.svelte',
+      'src/lib/components/notes/CarouselDialog.svelte',
+      'src/lib/components/notes/note-image.ts',
+      'src/lib/components/notes/carousel.ts',
+      'src/lib/components/notes/note-tab-chrome.ts',
+      'src/lib/components/GiphyPicker.svelte',
+      'src/lib/components/ImageUploadDialog.svelte',
+      'src/lib/components/Modal.svelte'
+    ]
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(94);
+    expect(report.views.resolved).toBe(17);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('renders every const value the reference does', () => {
+    expect(report.constGaps).toEqual([]);
+  });
+
+  it('and the one absent literal is a state that cannot arise here', () => {
+    /*
+      `A0e` — `"Loading images..."`, the file browser's fetch-in-flight arm. Upstream's
+      `openFileBrowser(e)` at byte 1,477,053 sets `fileBrowserLoading = !0`, opens the dialog, THEN
+      POSTs `getSessionFiles`. Here `sessionImages` is a page-load prop derived once in
+      `PresentationArea.svelte` from `data.files`, and every upload path calls `invalidateAll()` —
+      so there is no moment between opening the browser and holding the list.
+
+      `session-image-files.ts` carries the measurement and says exactly this: *"a branch that can
+      never render is a branch that can never be checked."*
+    */
+    expect(report.textGaps).toEqual(['Loading images...']);
+  });
+});
+
+describe('app-room — audited 2026-09-01, the whole page', () => {
+  /*
+    THE LARGEST SURFACE IN THE CAPTURE: 229 consts and 108 embedded views, the room's own root
+    template. `--all` had reported four gaps at whole-app scope for weeks; scoped to the files that
+    implement it, it reports SIX, and the two the whole-app sweep could not see are the interesting
+    ones — `https://protradingroom.com` and `" ProTradingRoom.com "` occur elsewhere in this
+    application (the login page still renders them), so a search over everything counts them present
+    while they are absent from THIS surface by decision.
+
+    ## The file list is a GLOB, and that is deliberate here and nowhere else
+
+    Every other pin in this file names its files, because a surface is implemented by a handful of
+    components and naming them is what makes a missing one visible. `app-room` is the page: it
+    composes the navbar, the sidebar, the presentation area, the tab strips, every modal and every
+    overlay. An explicit list would be eighty entries that go stale the day a component is
+    extracted — and extraction is a thing this repository does constantly, under the size ratchet.
+
+    So the glob is the list, and the COUNT is asserted beside it: a component added or removed moves
+    the number and this test says so, which is the property the explicit lists are for.
+
+    ## ⚠️ THIS PIN IS WEAKER THAN THE OTHERS, and the measurement that shows it
+
+    The audit counts a value as rendered if it occurs in ANY listed file, and this list is
+    eighty-four of them. A control run on 2026-09-01 changed `{shareScreenText}` in
+    `RoomNavbar.svelte` to a hardcoded `"Share Screens"` — the label really would have moved on
+    screen — and **this test stayed green**, because `SHARE_SCREEN_TEXT = 'Share Screen '` still sat
+    in `navbar-labels.ts`, which is in the list.
+
+    That is the same blind spot `--all` has, narrowed rather than closed: it now spans one page's
+    components instead of the whole application. What this pin therefore asserts is that
+    `app-room`'s 229 consts and 108 views are all accounted for SOMEWHERE on the page, and that the
+    six exceptions are the six named below. The per-component pins above are what catch a value
+    moving to the wrong file, and they are why those keep their explicit lists.
+
+    Two controls that DO fire, and both were run: the sidebar's attribution rebranded back (the
+    const list shrinks by one), and `navbar-labels.ts` dropped from the list (the file count moves
+    and three text literals reappear).
+  */
+  const files = [
+    ...globSync('src/lib/components/*.svelte').filter((path) => !path.includes('Probe')),
+    'src/routes/+page.svelte',
+    /* The two modules that hold label literals the markup only ever renders through a prop. */
+    'src/lib/navbar-labels.ts',
+    'src/lib/screen-share-menu.ts',
+    'src/lib/room-message-chrome.ts'
+  ].sort();
+
+  const report = auditSurface({ selector: 'app-room', files });
+
+  it('reads the component and the files it says it reads', () => {
+    expect(report.region.consts).toBe(229);
+    expect(report.views.resolved).toBe(108);
+    expect(report.views.unresolved).toEqual([]);
+    expect(files.length, 'a component was added or removed from lib/components').toBe(84);
+  });
+
+  it('has five const values left, and every one is on record', () => {
+    /*
+      - `https://protradingroom.com` — the sidebar's attribution, rebranded to
+        `https://www.tradingroom.app` on a reason recorded at that markup. The LOGIN page still
+        renders the captured one, and `brand-attribution-contract.test.ts` pins both ends of that
+        disagreement so it cannot be half-resolved again.
+      - `https://intercom.help/simpler-trading/en/` and `helpLink` — `RNB-01`, a FALSE gap:
+        `hasSTHelpLink` is `!1` in `app-room`'s own constructor and never written, so upstream's
+        room does not render this link either.
+      - `cssSoundCloudIcon` — const 176 declares `id` twice and Angular keeps the second, so both
+        DOMs carry `id="soundcloudDropdown"`.
+      - `/assets/images/playing.gif` — the one genuine blocker, and an ASSET rather than a decision:
+        the capture is four files and none of them is an image.
+
+      `reference-const-coverage-contract.test.ts` holds the measurement behind each of the last
+      four, including the searches that establish `hasSTHelpLink` is never assigned.
+    */
+    expect(report.constGaps.map((gap) => gap.value).sort()).toEqual([
+      '/assets/images/playing.gif',
+      'cssSoundCloudIcon',
+      'helpLink',
+      'https://intercom.help/simpler-trading/en/',
+      'https://protradingroom.com'
+    ]);
+  });
+
+  it('and one text literal, which is the other half of the rebrand', () => {
+    expect(report.textGaps).toEqual([' ProTradingRoom.com ']);
+  });
+});
+
+describe('app-presentationarea — audited 2026-09-01, the page s other giant', () => {
+  /*
+    292 consts and 125 embedded views — the main tab area: the screen tabs, the stream tabs, the
+    notes, the files pane, and the swing and day-trade alert forms. Second only to `app-room`, and
+    like it a GLOB, for the same reason and with the same measured weakness recorded there.
+
+    Getting from 82 gaps to 5 was four separate corrections to the FILE LIST and two to the tool,
+    and the split is worth recording because only one of the six was a fact about this room:
+
+      * `src/lib/components/notes/**` and `src/lib/components/swing-alerts/**` and
+        `day-trade-alerts/**` are SUBDIRECTORIES, and the first list globbed `components/*.svelte`.
+        Nineteen values — `notesTabs`, `swingAlert-symbol`, `AAPL`, `123.57` — were reported missing
+        against files that render every one of them.
+      * `ngForm` is `app-presentationarea`'s const 0, `["alertForm","ngForm"]`, a local reference
+        with an `exportAs`. The tool now finds reference lists by POSITION (the fourth argument of
+        `d(slot,"tag",attrs,refs)`) rather than by shape — the shape fix was tried first and
+        swallowed `["value","sent"]` along with it.
+      * The 261-character default-screen tooltip is rendered twice, at `ScreenTabs.svelte:102` and
+        `StreamTabs.svelte:120`, and prettier splits it across a `+`. The tool now folds adjacent
+        string literals the way the engine does.
+
+    Four of the six were the measurement being wrong about itself, which is the ordinary case.
+  */
+  const files = [
+    ...globSync('src/lib/components/**/*.svelte').filter((path) => !path.includes('Probe')),
+    'src/routes/+page.svelte',
+    'src/lib/navbar-labels.ts',
+    'src/lib/screen-share-menu.ts',
+    'src/lib/file-sort.ts',
+    'src/lib/files-gates.ts',
+    'src/lib/components/notes/note-tab-chrome.ts'
+  ].sort();
+
+  const report = auditSurface({ selector: 'app-presentationarea', files });
+
+  it('reads the component and the files it says it reads', () => {
+    expect(report.region.consts).toBe(292);
+    expect(report.views.resolved).toBe(125);
+    expect(report.views.unresolved).toEqual([]);
+    expect(files.length, 'a component was added or removed under lib/components').toBe(94);
+  });
+
+  it('is missing the RECORDINGS tab and one recorded divergence, and nothing else', () => {
+    /*
+      `recordings`, `recordings-tab`, `#recordings`, `fa-file-video` and the literal `"Recordings"`
+      are one blocked feature: a recordings archive, which needs a service neither database has a
+      table for. `TODO.md` carries it as blocked on an archive service, not as a decision.
+
+      `dropdownMenuNote` is `NTC-3`, argued at `notes/NoteTabContent.svelte`: the capture freezes the
+      per-note gear's `id` at that literal, so two open notes would be two elements with one id and
+      every menu's `aria-labelledby` would resolve to the first gear. Reproducing it would reproduce
+      a defect, so the id is per-note here.
+    */
+    expect(report.constGaps.map((gap) => gap.value)).toEqual([
+      'recordings',
+      'recordings-tab',
+      '#recordings',
+      'fa-file-video',
+      'dropdownMenuNote'
+    ]);
+  });
+
+  it('and two literals: the same tab, and the never-fetched files message', () => {
+    /*
+      `"No room files found."` is the `#files` region's own recorded refusal —
+      `O(84, sessionFiles ? -1 : 84)` and `O(85, sessionFiles && length > 0 ? 85 : -1)` are NOT
+      complements, because an empty array is truthy, so it is the never-fetched state and our loader
+      ends in `.all()`.
+    */
+    expect(report.textGaps).toEqual(['Recordings', 'No room files found.']);
+  });
+});
+
+describe('app-user-info-modal — audited 2026-09-01, and its nine gaps are TWO recorded reasons', () => {
+  /*
+    131 consts and 35 embedded views — the member card, its four tabs, the avatar menu, the admin
+    notes and the follow-chat style pane.
+
+    Nine values remain and they are two groups, both already argued elsewhere in this repository
+    before this pin existed. That is the ordinary outcome for a surface that has been worked on for
+    weeks, and it is why the pin asserts the SET rather than a count: a tenth arriving is a new
+    thing, and the nine cannot quietly become a different nine.
+  */
+  const report = auditSurface({
+    selector: 'app-user-info-modal',
+    files: [
+      'src/lib/components/ModalHost.svelte',
+      'src/lib/components/Modal.svelte',
+      'src/lib/components/UserNotesPane.svelte',
+      'src/lib/components/FollowChatStylePane.svelte',
+      /*
+        Needed, and its absence is instructive: without it the audit reports SEVEN more —
+        `edit-user-avatar-options`, `remove-profile-picture-btn`, `fa-cog`, the Gravatar URL and the
+        three avatar-menu literals — against a component that renders every one of them.
+      */
+      'src/lib/components/AvatarOptionsMenu.svelte'
+    ]
+  });
+
+  it('reads the component it says it reads', () => {
+    expect(report.region.consts).toBe(131);
+    expect(report.views.resolved).toBe(35);
+    expect(report.views.unresolved).toEqual([]);
+  });
+
+  it('is missing four `#`-prefixed tab targets and five Angular value attributes, and nothing else', () => {
+    /*
+      THE FOUR `#nav-*` are the false-gap family `reference-const-coverage-contract.test.ts`
+      measures: the room emits the exact string, composed at runtime from a bare id in an `{#each}`,
+      and a substring sweep over source cannot see a string the source never contains. That file's
+      `every #-prefixed residual with a composing site is emitted at runtime` proves it per value
+      rather than asserting it.
+
+      THE FIVE `followChatStyle.*` are `value="followChatStyle.color"` and its siblings — static
+      attributes beside an `[(ngModel)]` that overwrites them, which is upstream's own mistake, and
+      the same one again on the four `chatStyle.*` at byte 2,261,183.
+
+      **Transcribing them was attempted on 2026-09-01 and Svelte refuses it:**
+      `Attributes need to be unique` (svelte.dev/e/attribute_duplicate). `value` and `bind:value`
+      are one attribute to the compiler, so the pair Angular accepts is UNWRITABLE here — not
+      undesirable, unwritable. `FollowChatStylePane.svelte` records the error that establishes it,
+      so nobody re-attempts it from the const table alone.
+    */
+    expect(report.constGaps.map((gap) => gap.value)).toEqual([
+      '#nav-info',
+      '#nav-system',
+      '#nav-options',
+      '#nav-notes',
+      'followChatStyle.color',
+      'followChatStyle.usernameColor',
+      'followChatStyle.bgColor',
+      'followChatStyle.tickerColor',
+      'followChatStyle.fontSize'
+    ]);
+  });
+
+  it('and renders every text literal, avatar menu included', () => {
+    expect(report.textGaps).toEqual([]);
   });
 });
