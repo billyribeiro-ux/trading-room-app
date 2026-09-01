@@ -33,6 +33,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 07:05 UTC — two session-control refusals that had no reason written down
+
+**Runtime impact: NONE.** Neither control was built before and neither is built now. What changed is
+that both are decisions with premises a test re-reads, instead of absences nobody had looked at.
+
+## The finding
+
+`gate/audit-surface.mjs` measured `app-session-control-modal` against the eight files that implement
+it — 135 consts, 32 embedded views — and reported five absent text literals. Three were already
+argued (the WHIP pair at `ModalHost.svelte`, the Player Link readout in
+`stream-player-blocked-contract.test.ts`). **Two had no reason recorded anywhere**, and an unrecorded
+absence is the state this repository treats as worse than a gap: it reads as something nobody has
+looked at, and the next reader either rebuilds it or leaves it another month.
+
+**Swap Primary and Backup Media Servers** (`lDe`, byte 2,140,840) has two independent blockers, and
+either alone is enough. Its GATE is `O(36, sessData.backupClusterID ? 36 : -1)` — a second MediaMTX
+cluster, and `backupClusterID` is `wired: false`, so the gate is false for every room this repository
+can produce. Its ACTION, `switchToBackup()` at byte 2,173,860, opens a prompt and compares what is
+typed against `sessData.deleteAlertPW` **in the browser** — which would require shipping one of the
+seven controller-only credentials to every presenter's page.
+
+**Admin Dashboard Login** (`cDe`, byte 2,141,013) is the sharper one, because the problem is the gate
+itself: `O(69, isPresenter && sessData.modAdminLoginList ? 69 : -1)`. `modAdminLoginList` is one of
+the seven credentials that never cross to the room. Rendering the button when the list is non-empty
+would leak, one bit at a time, whether a room HAS an admin access list — precisely the oracle the
+guard exists to close. And what it opens is a CONTROLLER surface:
+`POST ${apiROOT}/sessions/v2/loginToAdminFromRoom`, then `window.open` on the URL it answers with.
+
+## Why a test rather than a comment
+
+A comment saying "we did not build these" cannot fail. What CAN change is the premise: a gate that is
+a credential today could be re-modelled, and a cluster that does not exist could be provisioned. So
+the gates are read from the pinned bundle, the two `wired: false` entries from the controller's
+settings schema, and the seven credential names from `room-credential-prompt.ts`, on every run.
+
+## Two negative controls were wrong before they were right
+
+Renaming `modAdminLoginList` to `modAdminLoginListX` left the run GREEN, because `toContain` is
+satisfied by a longer name that contains the old one — **the ninth substring failure this repository
+has recorded**, after `js` inside `json`, `pmToolbar` inside `pmToolbarZZ`, and `form-select` inside
+`form-select-sm` earlier the same day. The assertion is whole-word now and the control is red.
+
+The other control added the credential name in an HTML COMMENT and passed — correctly: the source is
+read through `codeOf`, so a mention in prose is not the room holding the value. Re-run as real markup
+it is red.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 332 files, 5,959 passed, 1 skipped; `svelte-check` 1,622
+files, 0 errors, 0 warnings.
+
+Three negative controls, all red on target once corrected: the room holding a credential, the
+credential list losing an entry, and `backupClusterID` becoming wired.
+
+`todo-next.md`: **73 of 92 surfaces, 26,292 of 38,904 lines (67.6%)**.
+
 ### 2026-09-02 06:25 UTC — GIF-04: the Giphy picker wore the wrong chrome in the note editor
 
 **Runtime impact: YES, visible.** The note editor's Giphy search and clear icons were `text-white` on
