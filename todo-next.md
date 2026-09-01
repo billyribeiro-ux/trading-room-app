@@ -76,9 +76,9 @@ guessed.
 |---:|---|---:|---|
 | 1 | `lib/components/ModalHost.svelte` | 6,065 | no |
 | 2 | `routes/+page.svelte` | 1,888 | no |
-| 3 | `lib/components/notes/NoteEditor.svelte` | 1,622 | no |
+| 3 | `lib/components/notes/NoteEditor.svelte` | 1,623 | no |
 | 4 | `lib/components/AlertChatArea.svelte` | 1,541 | no |
-| 5 | `lib/components/RoomMessage.svelte` | 1,254 | no |
+| 5 | `lib/components/RoomMessage.svelte` | 1,254 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-st-message` (74 consts, 53 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. The largest clean surface in that contract. |
 | 6 | `lib/components/RoomNavbar.svelte` | 1,093 | §NAV — 11 rows against `U4e` read whole: 4 built, 1 fixed, 3 measured refusals, 1 deliberate divergence, 2 blocked. `docs/decoded/room-surface-audit-2026-08-30.md`. |
 | 7 | `lib/components/PresentationArea.svelte` | 1,108 | §MTS — feeds `canEditNotes` to the tab strip (`MTS-02`). |
 | 8 | `lib/components/RoomOverlays.svelte` | 1,184 | `## RoomOverlays.svelte` in the v4 register — 7 gaps, read 2026-08-31. |
@@ -100,7 +100,7 @@ guessed.
 | 24 | `lib/components/AlertQaModal.svelte` | 407 | §19.4, §19.3 — 10 items, 6 defects, 1 false comment, against the reference's 159-line `<app-alert-qa-modal>`. Plus §QAM, 13 rows from a whole re-read on 2026-08-31: 4 built, 2 fixed, 1 already built, 1 measured refusal, 4 blocked. |
 | 25 | `lib/components/MainTabStrip.svelte` | 398 | `## MainTabStrip.svelte` in the v4 register — 7 gaps, read 2026-08-31 against `app-presentationarea` — selector block at byte 1,994,350, consts |
 | 26 | `lib/components/day-trade-alerts/DayTradeAlertForm.svelte` | 360 | `room-surface-audit-2026-08-30.md` §DayTradeAlertForm — 5 rows (`DTF-01` … `DTF-05`) against `Ewe`, bundle byte 1,940,236, read end to end 2026-08-31 with all fourteen sub-templates and the component's consts table walked BY VALUE. 1 BUILT, 1 FIXED, 1 ALREADY BUILT, 2 MEASURED REFUSAL; gated by `trade-alert-form-contract.test.ts`. |
-| 27 | `lib/components/ScreenTabs.svelte` | 341 | no |
+| 27 | `lib/components/ScreenTabs.svelte` | 341 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-screenshare-view` (20 consts, 7 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. |
 | 28 | `lib/components/AvDevicePane.svelte` | 338 | `## AvDevicePane.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle: `loadDevices` at bytes 2,162,037–2,165,010, |
 | 29 | `lib/components/swing-alerts/SwingAlertForm.svelte` | 330 | `room-surface-audit-2026-08-30.md` §SwingAlertForm — 5 rows (`SWF-01` … `SWF-05`) against `hwe`, bundle byte 1,933,979, read the same way and on the same date. The two forms are now asserted IDENTICAL once the day-trade half is renamed, so neither can drift alone. |
 | 30 | `lib/components/ScheduledAlerts.svelte` | 263 | `## ScheduledAlerts.svelte` in the v4 register — Read end to end on 2026-08-31 against the v4 bundle; `XTe`'s "See Scheduled Alerts" control transcribed 2026-09-01, and the three send-later fields moved out to `ScheduledAlertFields.svelte` (row 89) when that took the file past its ceiling. |
@@ -111,7 +111,7 @@ guessed.
 | 35 | `lib/components/SpeechRecoOverlay.svelte` | 246 | `## SpeechRecoOverlay.svelte` in the v4 register — Five rows. |
 | 36 | `lib/components/ScreenZoomControls.svelte` | 236 | `## ScreenZoomControls.svelte` in the v4 register — Four rows, appended 2026-08-31. |
 | 37 | `lib/components/ScreenVolumeControl.svelte` | 227 | `## ScreenVolumeControl.svelte` in the v4 register — Four rows, appended 2026-08-31. |
-| 38 | `lib/components/GiphyPicker.svelte` | 215 | `## GiphyPicker.svelte` in the v4 register — Six rows, from decoding all four Giphy templates in the bundle rather than the one the file's own |
+| 38 | `lib/components/GiphyPicker.svelte` | 254 | `## GiphyPicker.svelte` in the v4 register — Six rows, from decoding all four Giphy templates in the bundle rather than the one the file's own GIF-04 added 2026-09-01: the fourth mount is `app-note`'s MODAL and its three chrome values are the other column — `form-control` without `border`, `input-group-text text-dark`, plain `fa-search`/`fa-times`. This component hardcoded the popover column, so the note editor's Giphy icons were `text-white` on a light body. One `variant` prop, because upstream has two chromes rather than three independent choices. |
 | 39 | `lib/components/ScreenShareMenu.svelte` | 203 | `## ScreenShareMenu.svelte` in the v4 register — 4 rows (SSM-01…04) read end to end 2026-08-31. The whole dropdown had no focusable element; SSM-04 corrected all four byte offsets in its own entry table, each of which landed INSIDE the function it named. |
 | 40 | `lib/components/NavbarSoundCloud.svelte` | 200 | §NAV — born 2026-08-31 out of `RoomNavbar`, carrying `NAV-02` and the presenter dropdown it belongs beside. |
 | 41 | `lib/components/RichTextEditor.svelte` | 190 | `## components/RichTextEditor.svelte` in the v4 register — 6 rows (RTE-01…06) against `app-rich-text-editor`, read end to end 2026-08-31. |
@@ -138,25 +138,25 @@ guessed.
 | 92 | `lib/components/RecordingPreviewCard.svelte` | 60 | `rec-preview-contract.test.ts` — `app-rec-preview` (byte 2,353,175) transcribed whole, extracted from `ModalHost.svelte` 2026-09-01. UNREACHABLE by design: `.recsHolderScreen` is `display: none`, the reference's own rule, with no writer in this room, because this room's preview is a separate WINDOW (`room/recording.ts`). It stays because `captured-css-ancestor-contract` goes red without it — an absent scoped host leaves its generated rules matching nothing. The contract asserts the CONDITIONAL, not the absence: the two icons may stay handler-less only while the card cannot be reached. |
 | 56 | `lib/components/ChatSearchBar.svelte` | 450 | `surface-audit-contract.test.ts`, `chat-search-contract.test.ts`, `chat-mode-contract.test.ts` — READ END TO END 2026-09-01 against `app-chat`'s `chatToolbar` region (bytes 1,449,150–1,451,150; the extra column's copy at 2,395,378 is byte-identical, which is why this room has ONE component and the size contract refused the second transcription). **CLEAN — zero absent const values, zero absent text literals**, across 27 resolved views. Pinned as a ratchet, so a regression is a failing test rather than a thing somebody has to notice. |
 | 57 | `lib/components/ViewerAlertPrefsPane.svelte` | 139 | no |
-| 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | no |
+| 58 | `lib/components/AvatarOptionsMenu.svelte` | 133 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-room-roster` (24 consts, 11 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. Audited with the roster. |
 | 59 | `lib/components/MobileRestorePane.svelte` | 130 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-mobile-app-info-modal` (15 consts, 1 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. |
 | 60 | `lib/components/ImageUploadDialog.svelte` | 125 | no |
 | 61 | `lib/components/WebcamStrip.svelte` | 124 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-webcam-holder` (1 consts, 0 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. ONE const — the weakest evidence in that contract, and it is recorded as such there. |
 | 62 | `lib/components/UserNotesPane.svelte` | 114 | no |
 | 63 | `lib/components/RestreamPane.svelte` | 105 | no |
-| 64 | `lib/components/ChatTabStrip.svelte` | 104 | no |
+| 64 | `lib/components/ChatTabStrip.svelte` | 104 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-alerts` (54 consts, 13 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. Audited with the alerts column; the tab strip's consts are in that table. |
 | 65 | `lib/components/CloseSessionPane.svelte` | 104 | no |
 | 66 | `lib/components/ReactionPrefsPane.svelte` | 99 | no |
 | 67 | `lib/components/ImageLightbox.svelte` | 116 | §ROV — `ROV-04`, the backdrop this dialog opened without. |
 | 68 | `lib/components/NavbarRecIndicator.svelte` | 108 | §NAV — born 2026-08-31 out of `RoomNavbar`; the three REC badges, and where `breathing-rec` is not. |
 | 69 | `lib/components/RoomBranding.svelte` | 91 | no |
-| 70 | `lib/components/CompactMessageRow.svelte` | 77 | no |
+| 70 | `lib/components/CompactMessageRow.svelte` | 77 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-st-compactmessage` (77 consts, 51 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. |
 | 71 | `lib/components/ImagePasteConfirm.svelte` | 76 | no |
 | 72 | `lib/components/PositionsContainer.svelte` | 74 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-positions-container` (2 consts, 0 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet, with the const and view counts asserted alongside so a parse that goes quiet fails rather than reporting green. Thin: two consts and no embedded views, and the pinned counts say so rather than implying more. |
-| 73 | `lib/components/ModeratorMessage.svelte` | 73 | no |
+| 73 | `lib/components/ModeratorMessage.svelte` | 73 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-st-message` (74 consts, 53 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. Audited with row 5 — one reference component, several files here. |
 | 74 | `lib/components/GifConfirmDialog.svelte` | 64 | no |
 | 75 | `lib/components/ToastHost.svelte` | 64 | no |
-| 76 | `lib/components/YoutubePlayerOverlay.svelte` | 88 | no |
+| 76 | `lib/components/YoutubePlayerOverlay.svelte` | 88 | `surface-audit-contract.test.ts` — READ END TO END 2026-09-01 by `gate/audit-surface.mjs` against `app-ytplayer` (5 consts, 1 embedded views): **CLEAN — zero absent const values, zero absent text literals.** Pinned as a ratchet with both counts asserted. Five consts — thin, and the pinned count says so. |
 | 77 | `lib/components/PollSavedList.svelte` | 59 | no |
 | 78 | `lib/components/NavbarTipButton.svelte` | 58 | §NAV — born 2026-08-31 out of `RoomNavbar`; RS-09 s navbar copy and its `noopener` refusal. |
 | 79 | `lib/components/RemoteAudioSinks.svelte` | 50 | no |
@@ -167,7 +167,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 114 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**63 of 92 surfaces audited · 23,829 of 38,864 lines · 61.3%.**
+**70 of 92 surfaces audited · 25,938 of 38,904 lines · 66.7%.**
 
 > **A second, differently-shaped pass exists:** `docs/decoded/room-surface-audit-2026-08-30.md` reads
 > **18 surfaces** against the pinned v4 bundle and records **223 verified gaps** plus 965 reference

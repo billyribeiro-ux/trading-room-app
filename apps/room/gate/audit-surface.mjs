@@ -274,11 +274,24 @@ function splitTable(table) {
  * @returns {string}
  */
 function readOurs(paths) {
-  return paths
-    .map((path) => [path, readFileSync(join(ROOM, path), 'utf8')])
-    .map(([path, source]) => codeOf(String(path), String(source)))
-    .map(decodeEntities)
-    .join('\n');
+  return (
+    paths
+      .map((path) => [path, readFileSync(join(ROOM, path), 'utf8')])
+      .map(([path, source]) => codeOf(String(path), String(source)))
+      .map(decodeEntities)
+      /*
+      OUR side is JS-unescaped too, and the reference's is already. `MessageMenu.svelte` writes the
+      kebab glyph as `const KEBAB_TEXT = '\\u2807 '` — the escape, which is exactly how the bundle
+      writes it — and decoding only one side left the two unequal, so a fully-transcribed control came
+      back as a missing literal in both message components.
+
+      The direction is safe: decoding can only make a match MORE likely, so the error it risks is a
+      false negative (a real gap counted present) rather than a false alarm, and it takes a literal
+      backslash-u in source to cause one.
+    */
+      .map(unescapeJs)
+      .join('\n')
+  );
 }
 
 /**

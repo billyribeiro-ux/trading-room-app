@@ -6797,7 +6797,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `text-dark`, and `fa-2x`), which matches its own sibling rather than the reference because this
       picker is a dark popover where the reference's is a light modal.
     */
-    max: 216,
+    /*
+      216 -> 255 on 2026-09-01, for `GIF-04`, and the raise is the DECODE plus one prop.
+
+      GIF-03 concluded *"this component matches its capture exactly and always did"*. That is true of
+      the three POPOVER mounts and false of the fourth: `NoteEditor.svelte` mounts it inside
+      `app-note`'s MODAL, whose three chrome values are the other column — `form-control` without
+      `border` (const 87), `input-group-text text-dark` (88), plain `fa-search`/`fa-times` (89, 90).
+      Hardcoding the popover column put `text-white` icons on a light modal body.
+
+      One `variant` prop rather than three booleans, because upstream has two CHROMES and not three
+      independent choices — three booleans would let a caller build a combination the capture has
+      never had. The table in that prop's docblock is the decode, and three `$derived` lines are the
+      code.
+
+      If this climbs, the question is whether a THIRD chrome has appeared. There are two, and a
+      variant that is not one of them is a surface the capture does not contain.
+    */
+    max: 255,
     why: 'the GIF search grid, its search and clear pair, and the one word that varies by surface'
   },
   {

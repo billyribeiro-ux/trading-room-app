@@ -1279,6 +1279,7 @@
           it selects one to confirm and send. See the prop's own note.
         -->
         <GiphyPicker
+          variant="modal"
           hint="*Double click an image to insert it"
           apiKey={giphyApiKey}
           popoverId={`${componentId}-note-giphy`}

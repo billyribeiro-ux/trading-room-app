@@ -33,6 +33,75 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-02 06:25 UTC — GIF-04: the Giphy picker wore the wrong chrome in the note editor
+
+**Runtime impact: YES, visible.** The note editor's Giphy search and clear icons were `text-white` on
+a light modal body. They are `text-dark` there now, as the capture has them, and the input loses a
+`border` the modal does not carry.
+
+## The finding
+
+`gate/audit-surface.mjs`, scoped to `app-note` and the nine files that implement it, reported
+`text-dark` absent. Decoding the four Giphy templates by value shows why:
+
+| | popover ×3 | note modal |
+| --- | --- | --- |
+| input | `form-control border` | `form-control` |
+| icon span | `input-group-text text-white` | `input-group-text text-dark` |
+| icons | `fa fa-2x fa-times` | `fa fa-search`, `fa fa-times` |
+
+They vary together because the GROUNDS differ: a popover paints its own dark panel, the modal body
+does not. One shared `GiphyPicker` serves all four mounts and hardcoded the popover column.
+
+**`GIF-03` had already read three of the four tables and concluded *"this component matches its
+capture exactly and always did"*.** That is true of the three popovers and false of the fourth, and
+the fourth is the one where it shows. A whole-application search finds `text-dark` somewhere and
+stops; only scoping the search to one surface's own files can see it — which is the measurement this
+session built the tool for.
+
+## The fix, and why it is one prop
+
+`variant: 'popover' | 'modal'`, defaulting to the majority, driving all three values through
+`$derived`. Not three booleans: upstream has two CHROMES, and three independent flags would let a
+caller build a combination the capture has never had. It is the third time this component has needed
+exactly this shape — `hint` and `panelHeight` are the other two — and each says so at its own prop.
+
+`{@const}` was the first attempt and Svelte refused it: it is allowed only as the immediate child of
+a block or component, and these sit inside a plain `<div>`. `$derived` in the script is both the legal
+and the better place — it is where a reader looks for "what does this prop change".
+
+## Two contracts had to change with it, and one was asserting the wrong thing
+
+`note-giphy-contract.test.ts` read the SOURCE for `<i class="fa fa-2x fa-search">` and for two spans
+spelled `text-white`. Both literals are gone. Its subject was never the spelling — it is that the
+PAIR exists, because the search half once shipped missing and the clear half sat beside an icon
+suggesting the opposite. It is asserted on rendered output in BOTH chromes now, which is also the
+stronger form: a source assertion passes on a ternary regardless of which arm it takes.
+
+## Also this run
+
+`app-st-message` (74 consts, 53 views) and `app-st-compactmessage` (77/51) — the two largest message
+surfaces — measured **CLEAN**, along with `app-screenshare-view`, `app-alerts`, `app-roomscroller`,
+`app-room-roster`, `app-ytplayer` and `app-screenshare-preview`. All eight pinned.
+
+They were not clean until one more decoder went in: the kebab glyph is `'\u2807 '` in
+`MessageMenu.svelte` and `"\u2807 "` in the bundle — the same escape on both sides, and only the
+reference's was being decoded. Unescaping ours too can only make a match more likely, so the risk it
+adds is a false negative rather than a false alarm, and it takes a literal backslash-u in source to
+cause one.
+
+## Verification
+
+`pnpm run gate` in `apps/room`: **exit 0** — 331 files, 5,943 passed, 1 skipped; `svelte-check` 1,621
+files, 0 errors, 0 warnings. **Playwright, full suite, real Chromium: 15 passed.**
+
+**Four negative controls, all red on target**: the modal mount losing its variant (the shipped
+defect), the two chromes collapsed back into one, only the span switching while the icons do not, and
+a popover mount starting to pass the modal chrome.
+
+`todo-next.md`: **70 of 92 surfaces, 25,938 of 38,904 lines (66.7%)**, from 51 of 89 when the session
+began.
+
 ### 2026-09-02 05:40 UTC — two modals behind a condition that is always false
 
 **Runtime impact: NONE.** Neither modal could be opened before this change or after it. What changed
