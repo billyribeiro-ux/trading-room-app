@@ -72,7 +72,15 @@
   let body: HTMLElement | null = null;
   let showHtml = $state(false);
   let renderedContent = $derived(initialContent || EMPTY_DOCUMENT);
-  let active = $state<Record<string, boolean>>({});
+  /*
+    `$state.raw`, because this record is only ever REPLACED — `active = next` in `syncActive`, and
+    nowhere is a key assigned in place. The docs put the trade in one sentence: raw state *"avoids the
+    cost of making them reactive"* for values *"you weren't planning to mutate anyway"*.
+
+    It is read once per toolbar button on every render, so the proxy was paying a `get` trap for each
+    of them to make a write that never happens observable.
+  */
+  let active = $state.raw<Record<string, boolean>>({});
 
   /** counters, recomputed from the rendered text rather than the markup */
   const plain = $derived(value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' '));

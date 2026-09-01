@@ -33,6 +33,42 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ## 2026-08-20
 
+### 2026-09-01 09:21 UTC — three deep proxies over lists nobody mutates, and the gate that found them
+
+**Runtime impact: YES, and it is the good direction** — three `$state` became `$state.raw`. Same
+behaviour, fewer proxy traps on every read.
+
+The last of the room's rune gates run against the controller. `state-raw-contract.test.ts` found
+**three** fields holding an object or array that is only ever REPLACED, where the deep proxy was pure
+overhead. Verified by reading every write before converting any of them:
+
+- **`monthly`** (`rooms/[id]/[[tab]]`) — a logins-per-month series built in one
+  `Object.entries(...).map(...)` and cleared with `[]`. Iterated in the template and indexed for an
+  export filename, so the proxy wrapped every row object to charge a trap for each read of a list
+  nobody edits. The clearest win of the three.
+- **`selected`** (same page) — `[]`, `[...selectableIds]`, `[...selected, id]`, `found.map(...)`.
+  Nothing pushes or splices; it is read by `.includes` per row.
+- **`active`** (`RichTextEditor`) — `active = next` in `syncActive` and nowhere else. Read once per
+  toolbar button on every render.
+
+The docs put the trade in one sentence: raw state *"avoids the cost of making them reactive"* for
+values *"you weren't planning to mutate anyway"*, and it *"can only be reassigned"* — which is exactly
+what all three do.
+
+**The counter-example is in the same app and is now asserted.** `toast.svelte.ts` is deliberately NOT
+raw, and its own comment says why: entries are pushed and spliced, so the deep proxy is what makes
+those mutations observable. A sweep that only ever said "make it raw" would be wrong there, so the
+negative is pinned: **a pushed-and-spliced list must stay a proxy**. Making it raw turns the suite
+red, which is the control that proves the rule has two sides.
+
+The corpus numbers are the controller's own rather than the room's: four object-or-array `$state`
+fields tracked, three raw and one deliberately not, against the room's `> 5` floor and its eight named
+conversions.
+
+**Verification.** Two negative controls, each seen RED and restored: `monthly` downgraded back to a
+deep proxy, and the toast list made raw. Controller gate exit 0 (108 files / 1,135 passed — from 103 /
+1,099 when this run of work began), room gate exit 0 (315 files / 5,686 passed).
+
 ### 2026-09-01 08:52 UTC — the room's rune gates run against the controller, and three index keys were promises with nothing behind them
 
 **Runtime impact: NO** — three `{#each}` keys removed, two contracts added. No list changed order or
