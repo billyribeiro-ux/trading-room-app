@@ -45,6 +45,74 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 04:59 UTC — font preloading matches on source names, from one place instead of two
+
+## The September 2026 Svelte blog item, applied: `filename` on the `preload` filter's font branch
+
+SvelteKit 3.0.0-next.24 added a `filename` to the `font` member of the `preload` filter's input —
+the source file's pathname relative to the project root, "so that a filter can match on it instead
+of the hashed path" (installed declaration, `@sveltejs/kit/types/index.d.ts:1334-1349`). The
+PUBLISHED `kit/hooks` doc still shows the pre-next.24 signature with no union, so the installed
+types are the authority here and `font-preload-contract.test.ts` reads them at their bytes rather
+than transcribing them.
+
+## Applying it found a duplicate
+
+`hooks.server.ts` accepted `type === 'font' && path.endsWith('.woff2')`. `+layout.svelte`
+SEPARATELY hand-wrote three `<link rel="preload" as="font">` tags, `?url`-importing the faces so the
+hashed name stayed in sync. SvelteKit emits the identical tag — `rel`, `as`, `type`, `crossorigin`
+all the same — for every font the filter accepts, so **each face carried two preload links on every
+page**, and the two lists had already drifted: three in the layout against the filter's four,
+because the note editor's `summernote` face is in the root layout's CSS graph too.
+
+The filter is the half that stays. It is fed by the build's own font list, so a face entering or
+leaving the CSS graph is a fact it already knows and the layout would have had to be told. Two
+places recording one decision is how one of them goes stale, and this pair had already proved it.
+
+## And the filter became an allow-list
+
+Four source names, not an extension test. An extension test is an open rule: any woff2 a future
+stylesheet drags into the root layout gets preloaded on every page of the room with nobody having
+decided, and preload is a claim on the critical path. Deny-by-default, per `CLAUDE.md`. Naming
+sources is only possible because of `filename` — `path` is the hashed output
+(`fa-solid-900.OMe8Chpq.woff2`), different on every build.
+
+Staleness fails loud rather than silent: a name that no longer resolves stops preloading a face and
+nothing renders differently, so the contract resolves all four against the disk.
+
+## What was measured, against a real build
+
+| claim | evidence |
+| --- | --- |
+| the `?url` imports were not what put the faces in the graph | node 0's font list is **byte-identical** before and after — 12 fonts, same sources. `filter_fonts` walks the stylesheet map, not the imports |
+| no change to what is preloaded | the allow-list accepts exactly the four woff2 the extension test accepted |
+| the rejected siblings are worth rejecting | 8 files, **573,164 bytes**, statted from `.svelte-kit/output/client/_app/immutable/assets` |
+| the layout emits no preload markup now | the two `rel="preload"` strings left in the built `_layout.svelte.js` are inside the new docblock |
+
+The comment this replaces said "6 extra requests / ~540 KB" — right when written, and short by two
+once `summernote` brought a woff and a ttf of its own. The number is asserted now, not recited.
+
+## Two things fell out
+
+`font-awesome-contract.test.ts` carried a `FONT_FILES` exclusion for `fa-solid-900` and its siblings,
+there because the layout imported those woff2 FILENAMES and a filename is not a class. With the
+imports gone the exclusion had no subject, and an exclusion nothing reaches is a hole that only
+widens — deleted. And `routes/+layout.svelte`'s size ceiling went **down**, 28 to 27.
+
+## The honest consequence
+
+From the official `kit/hooks` doc: *"in dev mode `preload` is not called, since it depends on
+analysis that happens at build time."* So `pnpm dev` now emits no font preload at all. Correct
+trade — dev serves the woff2 unhashed off local disk, and a first-paint reflow there is not a
+shipped defect.
+
+**Verification.** Four negative controls seen RED: a name not on disk, the extension test restored,
+a face dropped from the list, and a preload tag put back in the layout. `svelte-check` 0/0.
+`pnpm run gate` exit 0 in `apps/room`. Nothing was opened in a browser; the rendered-output claims
+above are read from the built server bundle and the emitted asset directory.
+
+---
+
 ### 2026-09-02 04:35 UTC — a checkbox nobody had noticed is inert, and one row that needs a sentence from the owner
 
 ## PAM-17 — the refusal holds, and it was hiding an inert control

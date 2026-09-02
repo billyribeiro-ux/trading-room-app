@@ -1,27 +1,26 @@
 <script lang="ts">
   import '../app.css';
-  // The three Font Awesome faces keep the upstream `font-display: auto` (a re-declaration as
-  // `optional` was tried and reverted: `optional` lets the browser skip a face on any load it
-  // judges slow, which renders every icon from the fallback for that whole page view). Instead
-  // the woff2 files are preloaded so they are in the cache before first paint - measured on the
-  // prod build: fonts finish at ~26ms and FontFaceSet fires loadingdone at ~72ms, ahead of first
-  // contentful paint at ~84ms, so the glyphs are correct in the very first frame. Importing with
-  // `?url` keeps the hashed build filename in sync with the `url()` references in the CSS
-  // instead of hard-coding a path that would rot.
-  import brandsFont from '@fortawesome/fontawesome-free/webfonts/fa-brands-400.woff2?url';
-  import regularFont from '@fortawesome/fontawesome-free/webfonts/fa-regular-400.woff2?url';
-  import solidFont from '@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2?url';
   import type { LayoutProps } from './$types';
 
+  /**
+   * NO `<svelte:head>` FONT PRELOADS HERE, AND THEIR ABSENCE IS THE DELIVERABLE.
+   *
+   * This file used to hand-write three `<link rel="preload" as="font">` tags for the Font Awesome
+   * faces, `?url`-imported so the hashed build name stayed in sync. `hooks.server.ts` passes
+   * `preload` to `resolve`, and SvelteKit emits the identical tag — `rel="preload"`, `as="font"`,
+   * `type="font/woff2"`, `crossorigin` — for every font that filter accepts. So each face was
+   * preloaded TWICE per page, and the two lists had already drifted: three faces here against the
+   * filter's four (the note editor's `summernote` face is in this layout's CSS graph too).
+   *
+   * The filter is the half that stays because it is the one that cannot go stale — it is fed by
+   * the build's own font list, so a face entering or leaving the CSS graph is a fact it already
+   * knows and this file would have had to be told. `font-preload-contract.test.ts` holds the pair.
+   *
+   * One honest consequence, from the official `kit/hooks` doc: *"in dev mode `preload` is not
+   * called, since it depends on analysis that happens at build time."* `pnpm dev` therefore emits
+   * no font preload. Correct trade — dev serves the woff2 unhashed off local disk.
+   */
   let { children }: LayoutProps = $props();
-
-  const iconFonts = [solidFont, regularFont, brandsFont];
 </script>
-
-<svelte:head>
-  {#each iconFonts as href (href)}
-    <link rel="preload" {href} as="font" type="font/woff2" crossorigin="anonymous" />
-  {/each}
-</svelte:head>
 
 {@render children()}
