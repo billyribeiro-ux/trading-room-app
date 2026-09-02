@@ -45,6 +45,52 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 04:28 UTC — a menu click that jumps the room to the top, and a vendor chain that is dead in both codebases
+
+## STB-06 — both halves, and the second looks like a regression
+
+Const 57 at bundle byte 1,998,356 is `["href","#",1,"dropdown-item"]`, and template `ASe` at
+1,925,678 hangs the handler on the `<li>` with the anchor carrying none. Two things follow and this
+room had neither:
+
+- `href="#"` — ours interpolated the stream id, a different rendered attribute.
+- **no `preventDefault()`** — so upstream a menu click follows the anchor: the room scrolls to the
+  top and a history entry is pushed.
+
+The note that stood at `runItem` said of the second: *"That half is a defect and is not reproduced."*
+It is a defect, and that is not one of the four things that excuse a divergence. Both halves are
+reproduced, and **clicking a stream menu item now jumps the room to the top** — written at the code
+because it looks like a regression and is a match.
+
+`runItem` no longer takes the event at all, which is the strongest form of "nothing prevents this",
+and the contract pins the href and the absence together because either alone is wrong. Svelte's
+`a11y_invalid_attribute` warning on a bare `#` is suppressed the way `NoteTabContent.svelte` already
+suppresses it.
+
+The handler stays on the `<a>` rather than moving to the `<li>`: `.dropdown-item` is a block filling
+its item, so the same element receives the event by bubbling either way and an anchor is what a
+keyboard reaches. Internal structure — unlike `SSM-2`, where the reference's own split would put a
+handler on a node this room marks `aria-hidden`.
+
+## SV-SP-13 — measured, and NOT transcribed
+
+`onDoubleClicked` at byte 1,491,771 tries four spellings on each side:
+`exitFullscreen`/`mozCancelFullScreen`/`webkitExitFullscreen`/`msExitFullscreen`, and their request
+twins.
+
+It is a runtime FEATURE DETECTION whose first branch is the standard one, so in every browser this
+application supports the other three are unreachable — upstream as well as here. Identical
+observable behaviour, and internal structure. The alternative is six `document as unknown as …`
+casts (no prefixed name is in TypeScript's DOM library) guarding branches nothing can reach.
+
+**A divergence in this room's favour is stated rather than claimed as a match:** upstream's
+`try { … } catch { return }` cannot catch the promise `requestFullscreen()` returns, so a refusal —
+no user gesture, a sandboxed frame — is an unhandled rejection there and a named warning here.
+
+**Runtime impact.** A stream menu click scrolls the room to the top, as the reference's does.
+
+**Verified:** room gate exit 0 at `14c8bc0` — 341 files, 6,197 passed, 1 skipped. Negative control seen red: restoring `preventDefault()`.
+
 ### 2026-09-02 04:13 UTC — a notification that repeats once per question you have asked, and an exception that expired as designed
 
 ## OVL-07 — and the amplification is severe, so it is stated first

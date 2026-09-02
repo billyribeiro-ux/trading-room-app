@@ -167,6 +167,11 @@ const AT_BYTE: ReadonlyArray<readonly [number, string]> = [
   */
   [1_500_486, '[1,"zoom-controls-container-detached",3,"ngClass"]'],
   [1_500_537, '["appDoubleClick","",1,"position-relative"'],
+  /* SV-SP-13 — the four-spelling fullscreen chain, whose first branch is the only reachable one. */
+  [
+    1_491_771,
+    'onDoubleClicked(){try{let e=null;e=document.querySelector(`#video-screen-container-'
+  ],
   [1_494_556, 'this.showControls=!1,this.localpreview=!1'],
   /* SP2-02 — the clip, and the rule that lifts it in the popout. */
   [1_500_330, 'consts:[[1,"h-inherit"]'],

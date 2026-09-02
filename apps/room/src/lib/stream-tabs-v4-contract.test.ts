@@ -315,14 +315,28 @@ describe('STB-01 — the tab-select listener sits where const 31 puts it', () =>
     expect(tabs).not.toContain('stopPropagation');
   });
 
-  it('still prevents the `href="#"` navigation, which IS a defect upstream', () => {
+  it('STB-06 — follows the `href="#"` navigation now, jump and all', () => {
     /*
-      Const 57 is `href="#"` and the reference hangs no handler on the anchor, so a menu click
-      upstream scrolls the room to the top. Half of that behaviour is reproduced (the bubbling)
-      and half is not (the jump) — recorded as a deliberate divergence rather than an omission.
+      Const 57 at byte 1,998,356 is `["href","#",1,"dropdown-item"]` and the reference hangs no
+      handler on the anchor, so a menu click upstream follows it: the room scrolls to the top and a
+      history entry is pushed.
+
+      This assertion was the inverse until 2026-09-02 — *"half of that behaviour is reproduced (the
+      bubbling) and half is not (the jump) — recorded as a deliberate divergence"*. It is a defect,
+      and "it would reproduce an upstream defect" is not one of the four things that excuse a
+      divergence, so both halves are reproduced now.
+
+      BOTH parts are pinned, because they are separable and either alone is wrong: the anchor must
+      carry the capture's bare `#` rather than an interpolated id, and nothing may prevent its
+      default. `runItem` no longer takes the event at all, which is the strongest form of the second.
     */
-    expect(tabs).toContain('event.preventDefault();');
     expect(CONSTS[57]).toContain('#');
+    expect(tabs, 'the interpolated href came back').not.toContain('href="#{stream._id}"');
+    expect(tabs, 'the menu anchors lost the capture’s bare href').toContain('href="#"');
+    expect(tabs, 'STB-06: the navigation is being prevented again').not.toContain(
+      'event.preventDefault();'
+    );
+    expect(tabs).toContain('function runItem(streamId: string');
   });
 });
 

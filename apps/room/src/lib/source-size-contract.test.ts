@@ -8287,7 +8287,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       nothing is invented), and SV-SP-01 (the watermark is `H(10,…,"span",9)`, opened inside the
       video container, a different node this move does not touch).
     */
-    max: 790,
+    /*
+      790 -> 809, 2026-09-02. SV-SP-13 — the vendor fullscreen chain, measured and NOT transcribed,
+      recorded at the function it is about.
+
+      `onDoubleClicked` at byte 1,491,771 tries four spellings on each side —
+      `exitFullscreen`/`mozCancelFullScreen`/`webkitExitFullscreen`/`msExitFullscreen` and their
+      request twins. It is a runtime FEATURE DETECTION whose first branch is the standard one, so in
+      every browser this application supports the other three are unreachable, upstream as well as
+      here: identical observable behaviour, and internal structure. The alternative is six
+      `document as unknown as …` casts (no prefixed name is in TypeScript's DOM library) guarding
+      branches nothing can reach.
+
+      The nineteen lines also state a divergence in this room's FAVOUR rather than claiming a match:
+      upstream's `try { … } catch { return }` cannot catch the promise `requestFullscreen()` returns,
+      so a refusal is an unhandled rejection there and a named warning here.
+    */
+    max: 809,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
@@ -8661,7 +8677,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/StreamTabs.svelte',
-    max: 306,
+    /*
+      306 -> 320, 2026-09-02. STB-06 — BOTH halves of const 57 reproduced, and the second is a defect.
+
+      `["href","#",1,"dropdown-item"]` at byte 1,998,356, with the handler on the `<li>` and the
+      anchor carrying none. This room interpolated the stream id into the href AND prevented the
+      default, so neither half matched.
+
+      The note that stood here said of the jump: *"That half is a defect and is not reproduced."* It
+      is, and reproducing an upstream defect is matching. **A stream menu click now scrolls the room
+      to the top and pushes a history entry**, which looks like a regression and is not — hence the
+      length.
+
+      `runItem` no longer takes the event at all, which is the strongest form of "nothing prevents
+      this", and `stream-tabs-v4-contract.test.ts` pins the href and the absence together because
+      either alone is wrong.
+    */
+    max: 320,
     why: 'the stream tab strip, including two fields upstream never writes'
   },
   {

@@ -343,6 +343,25 @@
    * The container is fullscreened rather than the `<video>` because that is what the capture does -
    * and it is the better choice anyway, since anything else drawn over the screen goes fullscreen
    * with it instead of being clipped away.
+   *
+   * ## SV-SP-13 — the VENDOR chain is not transcribed, measured 2026-09-02
+   *
+   * The capture's full expression, re-read at byte 1,491,771, tries four spellings on each side:
+   * `exitFullscreen` / `mozCancelFullScreen` / `webkitExitFullscreen` / `msExitFullscreen`, and
+   * `requestFullscreen` / `mozRequestFullScreen` / `webkitRequestFullscreen` / `msRequestFullscreen`.
+   *
+   * It is a RUNTIME FEATURE DETECTION whose first branch is the standard one, so in every browser
+   * this application supports the other three are unreachable — upstream as well as here. That makes
+   * the observable behaviour identical and the difference internal structure, which is the one thing
+   * that is not a divergence to close. The alternative is six `document as unknown as …` casts (none
+   * of the prefixed names is in TypeScript's DOM library) guarding branches nothing can reach, which
+   * is the dead scaffolding this repository refuses by name.
+   *
+   * **The error handling differs too, and in this room's favour, which is worth stating rather than
+   * claiming as a match.** Upstream wraps the whole thing in `try { … } catch { return }`. That
+   * catches a synchronous throw and CANNOT catch the promise `requestFullscreen()` returns — a
+   * refusal (no user gesture, a sandboxed frame) is an unhandled rejection there. The `.catch()`
+   * below handles it and says which screen failed. Invisible to a viewer either way.
    */
   function toggleFullscreen(node: HTMLElement) {
     if (document.fullscreenElement) {
