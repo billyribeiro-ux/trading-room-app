@@ -236,6 +236,30 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
 */
 const ANSWERED_BY_DERIVATION: readonly string[] = ['playChatMessageSoundFor'];
 
+/**
+ * `PAM-02` — the one row the re-triage confirmed that this session did NOT act on, and why.
+ *
+ * The reference gates its "Send Text" alert control on `sessData.twillioApiSID` being set. The
+ * proposal is the pattern this repository already has: derive a one-bit boolean on the CONTROLLER —
+ * `hasTextAlerts: Boolean(settings.twillioApiSID)` — and send only that, so the credential stays
+ * behind and the QUESTION travels. `playChatMessageSoundFor` → `chatSoundForEmailHashes` is exactly
+ * that shape and is the single entry in `ANSWERED_BY_DERIVATION` above.
+ *
+ * **It is not built, and the reason is not that the pattern is wrong.** `twillioApiSID` is one of
+ * the seven in `CREDENTIALS_THE_REFERENCE_LEAKS` below, whose comment says they *"must NEVER leave
+ * this list by being wired"* — and a derived boolean is not wiring the setting, which is precisely
+ * the distinction an owner should draw rather than an agent. The bit it would disclose to the room
+ * is "text alerts are configured", which is what the reference's own UI already shows by drawing the
+ * control; it says nothing about the credential's value.
+ *
+ * Recorded here, next to the list it turns on, so the decision is one sentence rather than a
+ * re-derivation: **if the owner says a derived boolean over a credential is permitted, this is
+ * `hasTextAlerts` on the controller, `hasTxt` on `room/gates.ts`, and the control's gate in
+ * `PostAlertModal.svelte`.** Until then the seven stay untouched, which is the same standing that
+ * refused `T5-24` four times.
+ */
+const CREDENTIAL_DERIVATION_AWAITING_THE_OWNER = 'PAM-02 — hasTextAlerts from twillioApiSID';
+
 /*
   The seven that must NEVER leave this list by being wired.
 
@@ -455,5 +479,13 @@ describe('room settings the reference reads and this room does not', () => {
     for (const derived of ANSWERED_BY_DERIVATION) {
       expect(REFERENCE_READS_AND_WE_DO_NOT).toContain(derived);
     }
+    /*
+      And the one derivation this session did NOT make is named against the credential it would be
+      derived from, so the pending decision cannot be lost. Asserted rather than left in prose
+      because a note nothing reads is a note that goes stale — the day `twillioApiSID` leaves the
+      credential list, this line has to be revisited with it.
+    */
+    expect(CREDENTIAL_DERIVATION_AWAITING_THE_OWNER).toContain('twillioApiSID');
+    expect(CREDENTIALS_THE_REFERENCE_LEAKS).toContain('twillioApiSID');
   });
 });

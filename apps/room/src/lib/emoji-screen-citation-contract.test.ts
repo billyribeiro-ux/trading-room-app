@@ -160,6 +160,18 @@ const AT_BYTE: ReadonlyArray<readonly [number, string]> = [
     `.webcamScreen { pointer-events: none }` means the click never fires.
   */
   [1_501_400, '(9,"video",8),x("click",function(){return o.showControls=!o.showControls})'],
+  /*
+    SP2-07 / SZC-03 — the two consts that prove the DETACHED cluster is a sibling of the double-click
+    box rather than a child of it. Const 4 is the cluster, const 5 is the box; the create block at
+    1,501,256 (pinned above) closes slot 5 before it opens node 6.
+  */
+  [1_500_486, '[1,"zoom-controls-container-detached",3,"ngClass"]'],
+  [1_500_537, '["appDoubleClick","",1,"position-relative"'],
+  /* SV-SP-13 — the four-spelling fullscreen chain, whose first branch is the only reachable one. */
+  [
+    1_491_771,
+    'onDoubleClicked(){try{let e=null;e=document.querySelector(`#video-screen-container-'
+  ],
   [1_494_556, 'this.showControls=!1,this.localpreview=!1'],
   /* SP2-02 — the clip, and the rule that lifts it in the popout. */
   [1_500_330, 'consts:[[1,"h-inherit"]'],

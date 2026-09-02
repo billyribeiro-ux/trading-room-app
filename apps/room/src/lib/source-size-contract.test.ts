@@ -2181,7 +2181,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       not a modal and why this is the layer that can feed it — `media`, `prefs` and `isPresenter`
       are already props here and are exactly the terms the capture's arming test reads.
     */
-    max: 1199,
+    /*
+      1,199 -> 1,241, 2026-09-02. OVL-07 — the Q&A notice REPEATS upstream and delivered once here.
+
+      Read at bytes 1,408,880-1,410,100: the body runs inside `for (let _ of o.qa)` for every entry
+      whose `uid` is the viewer's, and then AGAIN, outside that loop, under
+      `globals.user.isPresenter`. This room resolved the audience once — "have I asked on this
+      alert, or am I a presenter" — and delivered one notice.
+
+      **Thirty-five of the forty-two lines are the amplification, written out because it is severe.**
+      A viewer with N of their own entries on an alert gets N notices and N sounds for one new
+      question; a PRESENTER with N gets N + 1. A presenter who has answered five times on a busy
+      alert hears six dings for the sixth reply.
+
+      That is the reference's behaviour and reproducing it is matching. The note is that long so the
+      owner reads a sentence rather than discovering it from a room, and so that anybody who later
+      wants one notice per event knows they are choosing to diverge rather than fixing something this
+      room introduced. `overlay-delivery-contract.test.ts` asserts both arms separately, because
+      collapsing them reads like a tidy-up.
+    */
+    max: 1241,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -2285,7 +2304,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The other eight are the note on `onaction`'s type, which is the shared `MessageActionEvent`
       now rather than the fourth local restatement of two of its members.
     */
-    max: 196,
+    /*
+      196 -> 214, 2026-09-02. MSB-06 — `rel="noreferrer"` DELETED from the chat link, and eighteen
+      lines saying where the protection went, because a security attribute removed with no note over
+      it is the one a reviewer stops on.
+
+      The reference's pipe at bundle byte 1,326,550 is
+      `'<a href="'+e+'" target="_blank" class="linkColor" onclick="event.stopPropagation()">'` —
+      no `rel`, and that is a CHOICE: `"rel",` occurs 8 times in the bundle, seven of them
+      `"rel","noopener noreferrer"`. Upstream puts it where it wants it and not here.
+
+      The attribute was doing real work — a chat link opens a third-party site a member chose — so
+      it MOVED rather than went: `hooks.server.ts` sets `Referrer-Policy: same-origin` on every
+      response, which covers this link, every other link in the room and every subresource, and
+      leaves the markup matching the capture character for character. Strictly better than either
+      half alone, which is why this is a header and not a decision to keep the attribute.
+    */
+    max: 214,
     why: 'one parsed message body - six segment kinds, and the gif reveal that belongs to them'
   },
   {
@@ -2823,7 +2858,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       value goes straight out uncompared, and why an unreachable controller means "prompt" rather
       than "confirm". None of that is guessable from the code.
     */
-    max: 525,
+    /*
+      525 -> 538, 2026-09-02. NP-04 — the read-only note body gets the `<app-note>` host the
+      reference gives it, and the thirteen lines are the evidence that settles the structure.
+
+      The update block writing `id="summernoteEdit-<id>"` and the `styles:[…]` array at byte
+      1,487,671 belong to the SAME component, so the element that takes that id is INSIDE `app-note`
+      and is the `.note-view` its two rules size. This pane rendered a bare `<div>`, so the
+      read-only note had neither the host nor either rule and did not fill its pane.
+
+      The two RULES are in `app.css`, not here, and the note says why: `notes-style-contract.test.ts`
+      forbids this file a `<style>` block outright, because a component-scoped Notes override fought
+      the captured stylesheet once already. That test now pins the host and the rules TOGETHER — the
+      host without them does nothing and the rules without it match nothing.
+    */
+    max: 538,
     why: 'the note tab strip and the three confirmations; everything else passes through'
   },
   {
@@ -4903,7 +4952,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       of the expression and unreachable through the type — `RoomFileRow` declares four fields as
       `string`. The visible effect was the wait, not the result, and the note now says so.
     */
-    max: 424,
+    /*
+      424 -> 442, 2026-09-02, and NO code changed: eighteen lines are `FP-06`'s disposition, at the
+      setter it declines to change.
+
+      `console.log("tab", e), this.selectedFileTab = e` at byte 1,960,015. The log is not
+      transcribed as code: it changes the developer console rather than the product, which is
+      internal structure — and this repository already has a consistent practice for upstream's
+      logging, visible in three other files, of transcribing `console.log` calls INTO THE CITATION
+      as evidence rather than executing them. Running one here breaks that pattern for one setter,
+      and would print on every Files-tab click in a product where the console is where a real error
+      has to be visible.
+
+      Worth the lines because without them the next comparison finds a log upstream and none here
+      and adds it — and the comma operator (the reference logs BEFORE assigning) is the detail that
+      would then be got wrong.
+    */
+    max: 442,
     why: 'the file drive; the first slice to collapse a prop list at TWO call sites rather than one'
   },
   {
@@ -5322,7 +5387,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       loop would be two places to get the progress dialog, the `Upload Failed...` wording and the
       join-with-spaces wrong.
     */
-    max: 851,
+    /*
+      851 -> 874, 2026-09-02, and no code changed: PAM-17's disposition, plus a DEFECT found while
+      writing it that neither the audit nor the re-triage names.
+
+      The refusal holds and is re-measured rather than inherited: `dontPush` would instruct a
+      downstream that does not exist — nothing in `services/api` reads a dispatch flag and no Twilio,
+      Resend, SendGrid, APNs or Firebase client is in it, asserted in
+      `alert-report-modal-contract.test.ts` — and `scheduled-alerts.remote.ts` refuses six of the
+      reference's twelve payload fields on the same ground.
+
+      **What that argument never covered is the CHECKBOX.** `PostAlertModal.svelte` renders one, the
+      value is threaded through `submission.dontPush` into `#persistAlert`, and it dies there. A
+      presenter ticks "don't push" and the room records nothing and says nothing. No disposition list
+      names it: `INERT_ACTIONS` covers the user-action dispatcher, not a modal's own checkboxes.
+
+      The note ends with two coherent endings and takes neither, because both are the owner's — stop
+      rendering a control the capture has, or store an intention nothing performs. The sentence it
+      replaced, *"has no consumer in this room yet"*, is what let the checkbox hide behind the field.
+    */
+    max: 874,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {
@@ -8203,7 +8287,42 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Two offsets in the note were corrected before it shipped —
       `emoji-screen-citation-contract.test.ts` re-reads every byte a file cites and rejected both.
     */
-    max: 757,
+    /*
+      757 -> 790, 2026-09-02. SP2-07 / SZC-03 — the detached zoom cluster moves OUT of the
+      double-click box, where the capture has it.
+
+      Create block at byte 1,501,256: slot 5 is const 4, `zoom-controls-container-detached`, and it
+      CLOSES before `d(6,"div",5)` opens the `appDoubleClick` box. Sibling, and first. Ours nested
+      it inside.
+
+      Thirty-three lines, and they buy a DELETION elsewhere: six `ondblclick={swallowDoubleClick}`
+      bindings and their function existed only to stop a double-click on a zoom button reaching that
+      box and maximising the screen. Upstream needs none. A workaround removed by matching rather
+      than argued away.
+
+      Most of the note is the two things the row was refused on, both measured rather than reasoned:
+      the containing block (`app-screenshare-view`'s const 0 is `[1,"h-inherit"]` and `.detach-screen`
+      has no position rule, so upstream has no positioned ancestor inside the component either —
+      nothing is invented), and SV-SP-01 (the watermark is `H(10,…,"span",9)`, opened inside the
+      video container, a different node this move does not touch).
+    */
+    /*
+      790 -> 809, 2026-09-02. SV-SP-13 — the vendor fullscreen chain, measured and NOT transcribed,
+      recorded at the function it is about.
+
+      `onDoubleClicked` at byte 1,491,771 tries four spellings on each side —
+      `exitFullscreen`/`mozCancelFullScreen`/`webkitExitFullscreen`/`msExitFullscreen` and their
+      request twins. It is a runtime FEATURE DETECTION whose first branch is the standard one, so in
+      every browser this application supports the other three are unreachable, upstream as well as
+      here: identical observable behaviour, and internal structure. The alternative is six
+      `document as unknown as …` casts (no prefixed name is in TypeScript's DOM library) guarding
+      branches nothing can reach.
+
+      The nineteen lines also state a divergence in this room's FAVOUR rather than claiming a match:
+      upstream's `try { … } catch { return }` cannot catch the promise `requestFullscreen()` returns,
+      so a refusal is an unhandled rejection there and a named warning here.
+    */
+    max: 809,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
@@ -8545,7 +8664,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ScreenZoomControls.svelte',
-    max: 237,
+    /*
+      237 -> 222, 2026-09-02, and it goes DOWN — which is what this ratchet is for.
+      `swallowDoubleClick` and its six bindings are gone, and removing one attribute from each button
+      let prettier collapse six multi-line elements back onto single lines, so the file lost twenty
+      more than the note added.
+
+      The guard's own docblock already carried the finding — *"UPSTREAM IT IS NOT NESTED … so the
+      reference needs no guard"* — and `ScreenPane.svelte` now un-nests the cluster, so there is no
+      box to stop the event reaching.
+
+      The note is longer than the code it replaced because matching GIVES SOMETHING UP, and that has
+      to be recorded: the nesting kept these controls usable while the video was fullscreen, and
+      upstream's are not, because `onDoubleClicked` fullscreens the node the cluster now sits
+      outside.
+    */
+    max: 222,
     why: 'the zoom and pan controls over a shared screen'
   },
   {
@@ -8562,7 +8696,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/StreamTabs.svelte',
-    max: 306,
+    /*
+      306 -> 320, 2026-09-02. STB-06 — BOTH halves of const 57 reproduced, and the second is a defect.
+
+      `["href","#",1,"dropdown-item"]` at byte 1,998,356, with the handler on the `<li>` and the
+      anchor carrying none. This room interpolated the stream id into the href AND prevented the
+      default, so neither half matched.
+
+      The note that stood here said of the jump: *"That half is a defect and is not reproduced."* It
+      is, and reproducing an upstream defect is matching. **A stream menu click now scrolls the room
+      to the top and pushes a history entry**, which looks like a regression and is not — hence the
+      length.
+
+      `runItem` no longer takes the event at all, which is the strongest form of "nothing prevents
+      this", and `stream-tabs-v4-contract.test.ts` pins the href and the absence together because
+      either alone is wrong.
+    */
+    max: 320,
     why: 'the stream tab strip, including two fields upstream never writes'
   },
   {
@@ -8638,7 +8788,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the attribute is written as the spread this repository already uses for its captured
       `ngbtooltip` pairs.
     */
-    max: 732,
+    /*
+      732 -> 759, 2026-09-02. STV-02 — the SECOND reload, one line of code and twenty-six of reason.
+
+      `…setPreference("bufferSizeLevel",e), this.hls && this.loadStream())` at byte 1,908,711. The
+      tail was refused because this room's `$effect` on `bufferSizeLevel` already reloads. It does —
+      and so does upstream's `preferenceChanged` subscription, which `setPreference` on the line
+      before fires. **The reference reloads TWICE per click** and this room reloaded once.
+
+      The lines are the cost, stated rather than hidden: a reload re-fetches the HLS manifest and
+      rebuilds the buffer, so matching doubles a network-heavy operation. A later reader looking at
+      two reloads and finding no reason would be right to delete one, which is exactly what happened
+      the first time.
+
+      The guard is `hls` and not `videoPlayer`, which is the reference's own and is STV-03's whole
+      subject: on the native-HLS path `hls` is null and neither reload runs.
+    */
+    max: 759,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {

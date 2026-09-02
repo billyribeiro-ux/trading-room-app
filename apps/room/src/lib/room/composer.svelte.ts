@@ -754,9 +754,32 @@ export class RoomComposer {
     nonTradeAlert: boolean,
     dontPush: boolean
   ) {
-    // `dontPush` is NOT sent: the action received it and never read it, and `post-alert.remote.ts`
-    // refuses it rather than accept a field nothing consumes. The parameter stays; the caller
-    // computes it, and the push suppression it names has no consumer in this room yet.
+    /*
+      `dontPush` is NOT sent, and `post-alert.remote.ts` refuses it rather than accept a field
+      nothing consumes. That policy is right and is re-measured rather than inherited — see below —
+      but the sentence that used to end this note, *"has no consumer in this room yet"*, was hiding
+      something.
+
+      ## PAM-17 — the refusal holds, and it leaves an INERT CONTROL upstream of itself
+
+      Re-measured 2026-09-02. The field would instruct a downstream that does not exist: nothing in
+      `services/api` reads a dispatch flag, and no Twilio, Resend, SendGrid, APNs or Firebase client
+      is in it — asserted in `alert-report-modal-contract.test.ts`, which sweeps every `.rs` under
+      `services/api/src` for both. `scheduled-alerts.remote.ts` refuses six of the reference's twelve
+      payload fields on exactly this ground. Accepting `dontPush` would be accepting a field that
+      records an intention nothing can act on, which is what `RPT-01` refuses for the report modal.
+
+      **What that argument does not cover is the CHECKBOX.** `PostAlertModal.svelte` renders one
+      (`name="dontPush"`), the value is threaded through `submission.dontPush` into this function,
+      and it dies here. So a presenter ticks "don't push" and the room records nothing, tells them
+      nothing and does nothing — an inert control, and one no disposition list names:
+      `INERT_ACTIONS` covers the user-action dispatcher, not a modal's own checkboxes.
+
+      Two coherent endings and BOTH are the owner's, which is why this is written rather than
+      resolved: stop rendering the checkbox — a divergence from a control the capture has — or carry
+      the flag into `alerts.dispatch`, whose column already has `{sms,email,twitter,push,cross_post}`
+      and no actor, and accept that the room then stores an intention nothing performs.
+    */
     void dontPush;
     try {
       await this.#commands.postAlert({ kind, body, targetUrl, nonTradeAlert });

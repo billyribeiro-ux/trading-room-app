@@ -452,11 +452,38 @@
     if (videoPlayer) videoPlayer.muted = isMuted;
   }
 
-  /** `setBufferSize()`, lines 278-285 — refuses out-of-range and no-op changes before persisting. */
+  /**
+   * `setBufferSize()` — refuses out-of-range and no-op changes before persisting.
+   *
+   * Read whole at bundle byte 1,908,711:
+   *
+   * ```js
+   * …bufferSizeLevel() !== e && (this.appService.globals.preferences.bufferSizeLevel = e,
+   *   this.appService.setPreference("bufferSizeLevel", e), this.hls && this.loadStream())
+   * ```
+   *
+   * ## STV-02 — the SECOND reload, and it really is a second one
+   *
+   * The tail `this.hls && this.loadStream()` was not reproduced, on the ground that this room's
+   * `$effect` keyed on `bufferSizeLevel` already reloads. It does — and so does upstream's
+   * `preferenceChanged` subscription at byte 1,902,159, which `setPreference` on the line before
+   * fires. So **the reference reloads TWICE per click**: once through the subscription and once
+   * directly, and this room reloaded once.
+   *
+   * Transcribed 2026-09-02 with the cost stated rather than hidden: a reload re-fetches the HLS
+   * manifest and rebuilds the buffer, so matching doubles a network-heavy operation on this control.
+   * It is a control a presenter touches rarely, and "it would reproduce an upstream defect" is not
+   * one of the four things that excuse a divergence — but a later reader looking at two reloads and
+   * seeing no reason would be right to delete one, so the reason is here.
+   *
+   * The guard is `hls`, not `videoPlayer`: it is the reference's own, and `STV-03` above records why
+   * that distinction is load-bearing — on the native-HLS path `hls` is null and neither reload runs.
+   */
   function setBufferSize(level: number) {
     if (level < 1 || level > 3) return;
     if ((bufferSizeLevel || 3) === level) return;
     onBufferSizeChange?.(level);
+    if (hls) void loadStream();
   }
 </script>
 

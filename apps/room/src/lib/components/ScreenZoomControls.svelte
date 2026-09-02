@@ -130,16 +130,27 @@
     fullscreen = false
   }: Props = $props();
 
-  /**
-   * `ondblclick` is stopped on every button because in OUR detached arrangement the cluster sits
-   * inside `.video-screen-container`, whose double-click maximises the screen - so a quick
-   * double-tap on the magnifier would go fullscreen too. UPSTREAM IT IS NOT NESTED: `Y0e` is node 5
-   * of that component's root template and the `appDoubleClick` box (const 5) is node 6, a SIBLING,
-   * so the reference needs no guard. Ours nests it to fullscreen with the picture (SV-SP-01).
-   */
-  function swallowDoubleClick(event: MouseEvent) {
-    event.stopPropagation();
-  }
+  /*
+    ── `swallowDoubleClick` IS GONE, 2026-09-02, AND SO IS THE ARRANGEMENT THAT NEEDED IT — SZC-03 ──
+
+    It stopped `ondblclick` on all six buttons, because in OUR detached arrangement the cluster sat
+    inside `.video-screen-container`, whose double-click maximises the screen — so a double-tap on
+    the magnifier went fullscreen too.
+
+    This docblock already carried the answer: *"UPSTREAM IT IS NOT NESTED: `Y0e` is node 5 of that
+    component's root template and the `appDoubleClick` box (const 5) is node 6, a SIBLING, so the
+    reference needs no guard."* Every word measured and still true — re-read at byte 1,501,256.
+    `ScreenPane.svelte` lifts the cluster out to where the capture puts it, so there is no box to
+    stop the event reaching and six handlers with nothing to do.
+
+    **The reason the nesting was chosen is worth recording, because matching gives it up.** It read
+    *"Ours nests it to fullscreen with the picture (SV-SP-01)"* — the controls stayed usable while
+    the video was fullscreen. Upstream's do not: `onDoubleClicked` fullscreens
+    `#video-screen-container-${id}`, and the cluster is outside that node there, so it disappears
+    for as long as the picture is maximised. That is now true here too. It is a real capability
+    given up to match, and SV-SP-01 — the watermark — is untouched, because it is a different node
+    (`H(10,Q0e,…,"span",9)`, opened inside the video container).
+  */
 </script>
 
 {#snippet darkButtons()}
@@ -149,47 +160,22 @@
     title={showZoomCtrl ? 'Hide zoom controls' : 'Zoom'}
     aria-pressed={showZoomCtrl}
     onclick={ontoggle}
-    ondblclick={swallowDoubleClick}
   >
     <i class="icon fas fa-search"></i>
   </button>
-  <button
-    type="button"
-    class="btn btn-sm btn-dark"
-    title="Screenshot"
-    onclick={oncapture}
-    ondblclick={swallowDoubleClick}
-  >
+  <button type="button" class="btn btn-sm btn-dark" title="Screenshot" onclick={oncapture}>
     <i class="icon fas fa-camera"></i>
   </button>
 {/snippet}
 
 {#snippet zoomTrio()}
-  <button
-    type="button"
-    class="btn btn-sm btn-warning"
-    title="Zoom in"
-    onclick={onzoomin}
-    ondblclick={swallowDoubleClick}
-  >
+  <button type="button" class="btn btn-sm btn-warning" title="Zoom in" onclick={onzoomin}>
     <i class="icon fas fa-search-plus"></i>
   </button>
-  <button
-    type="button"
-    class="btn btn-sm btn-warning"
-    title="Zoom out"
-    onclick={onzoomout}
-    ondblclick={swallowDoubleClick}
-  >
+  <button type="button" class="btn btn-sm btn-warning" title="Zoom out" onclick={onzoomout}>
     <i class="icon fas fa-search-minus"></i>
   </button>
-  <button
-    type="button"
-    class="btn btn-sm btn-warning"
-    title="Reset view"
-    onclick={onreset}
-    ondblclick={swallowDoubleClick}
-  >
+  <button type="button" class="btn btn-sm btn-warning" title="Reset view" onclick={onreset}>
     <i class="icon fas fa-redo"></i>
   </button>
 {/snippet}
@@ -222,7 +208,6 @@
     title={fullscreen ? 'Exit full screen' : 'Full screen'}
     aria-pressed={fullscreen}
     onclick={() => onfullscreen?.()}
-    ondblclick={swallowDoubleClick}
   >
     <i class="icon fas {fullscreen ? 'fa-compress-arrows-alt' : 'fa-expand'}"></i>
   </button>

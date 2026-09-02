@@ -34,7 +34,10 @@ import type { RoomNote } from './types.js';
  *
  * ## THREE LABELS ARE DELIBERATELY NOT PADDED, and this file is where that is recorded
  *
- * ` Upload `, ` Browse ` and ` Change image ` in `CarouselDialog.svelte` still lose their spaces.
+ * ` Upload `, ` Browse ` and ` Change image ` in `CarouselDialog.svelte` lost their spaces until
+ * 2026-09-02. The paragraph below is what the exception looked like while it stood, and it is kept
+ * because it named its own expiry condition and then met it — which is what a recorded exception is
+ * supposed to do.
  * The reason is not a measurement — the capture pads all three, at bytes 1,462,300 (`E0e`) and
  * 1,463,604 (`k0e`) — it is that three existing assertions pin their exact current spelling, in two
  * contract test files the change that wrote this one was not permitted to edit:
@@ -175,14 +178,28 @@ describe('CD-07 — the carousel modal and its browser', () => {
     expect(DIALOG.match(/\{' Cancel '\}/g)).toHaveLength(2);
   });
 
-  it('still drops three, and they are the three two other test files pin', () => {
+  it('and the last three too, since 2026-09-02 — the exception expired as written', () => {
     /*
-      NOT a tolerance. Each of these fails the moment somebody makes the one-line edit named in this
-      file's header, which is the point: the exception is recorded where it can expire.
+      This block asserted the OPPOSITE until 2026-09-02: that ` Upload `, ` Browse ` and
+      ` Change image ` still lost their trailing space. It was written as an assertion rather than a
+      comment precisely so it would fail when somebody made the edit, and it did.
+
+      The exception was never a measurement — the capture pads all three, `v(9," Upload ")` and
+      `v(12," Browse ")` at byte 1,462,593 and `v(4," Change image ")` at 1,463,600, re-read today.
+      It was scope: three assertions in two other contract files pinned the unpadded spelling, and
+      the change that recorded this one was not permitted to edit them. They are edited now.
+
+      Worth keeping the history here rather than deleting the block: a recorded exception that says
+      exactly how it expires, and then expires that way, is the shape this repository wants for the
+      ones that are still open.
     */
-    expect(DIALOG).toContain('><i class="fas fa-upload"></i> Upload</label');
-    expect(DIALOG).toContain('><i class="fas fa-folder-open"></i> Browse</button');
-    expect(DIALOG).toContain('><i class="fas fa-times"></i> Change image</button');
+    expect(DIALOG).toContain("Upload{' '}</label");
+    expect(DIALOG).toContain("Browse{' '}</button");
+    expect(DIALOG).toContain("Change image{' '}</button");
+    /* And the unpadded forms are gone rather than merely joined by padded ones. */
+    expect(DIALOG).not.toContain('Upload</label');
+    expect(DIALOG).not.toContain('Browse</button');
+    expect(DIALOG).not.toContain('Change image</button');
   });
 });
 

@@ -45,6 +45,380 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 04:35 UTC — a checkbox nobody had noticed is inert, and one row that needs a sentence from the owner
+
+## PAM-17 — the refusal holds, and it was hiding an inert control
+
+`dontPush` is computed from a checkbox, threaded through `submission.dontPush` into `#persistAlert`,
+and `void`ed there. The recorded reason: `post-alert.remote.ts` refuses the field rather than accept
+one nothing consumes.
+
+**That policy is right and it re-measures.** Nothing in `services/api` reads a dispatch flag, and no
+Twilio, Resend, SendGrid, APNs or Firebase client is in it — the sweep added for RPT-01 asserts both.
+`scheduled-alerts.remote.ts` refuses six of the reference's twelve payload fields on exactly this
+ground.
+
+**What it never covered is the CHECKBOX.** `PostAlertModal.svelte` renders one, and a presenter who
+ticks it gets nothing recorded, nothing sent and nothing said. That is an inert control, and no
+disposition list names it: `INERT_ACTIONS` covers the user-action dispatcher, not a modal's own
+checkboxes. **Neither the audit nor the re-triage found this** — it fell out of writing down why the
+field is refused, which is the argument for writing these down.
+
+Two coherent endings and both are the owner's, so the note takes neither: stop rendering a control
+the capture has, or carry the flag into `alerts.dispatch` — whose column already has
+`{sms,email,twitter,push,cross_post}` and no actor — and accept that the room then stores an
+intention nothing performs. The sentence that used to end this note, *"has no consumer in this room
+yet"*, is what let the checkbox hide behind the field.
+
+## PAM-02 — blocked on one sentence, and the sentence is written out
+
+The reference gates its "Send Text" control on `sessData.twillioApiSID`. The proposal is this
+repository's own pattern: derive `hasTextAlerts: Boolean(settings.twillioApiSID)` on the CONTROLLER
+and send only that bit — the credential stays behind, the question travels, exactly as
+`playChatMessageSoundFor` → `chatSoundForEmailHashes` does.
+
+**Not built, and not because the pattern is wrong.** `twillioApiSID` is one of the seven in
+`CREDENTIALS_THE_REFERENCE_LEAKS`, whose comment says they *"must NEVER leave this list by being
+wired"*. A derived boolean is not wiring the setting — and that distinction is precisely the one an
+owner draws rather than an agent, on the same standing that refused `T5-24` four times.
+
+The bit it would disclose is "text alerts are configured", which the reference's own UI already shows
+by drawing the control; it says nothing about the credential's value. Recorded in
+`setting-coverage-contract.test.ts` beside the list it turns on, and **asserted** rather than left in
+prose, so the pending decision cannot go stale: if the owner permits it, the work is `hasTextAlerts`
+on the controller, `hasTxt` on `room/gates.ts`, and the control's gate in `PostAlertModal.svelte`.
+
+**Runtime impact.** None. Both rows are records.
+
+**Verified:** room gate exit 0 at `91f87e1` — 341 files, 6,199 passed, 1 skipped.
+
+### 2026-09-02 04:28 UTC — a menu click that jumps the room to the top, and a vendor chain that is dead in both codebases
+
+## STB-06 — both halves, and the second looks like a regression
+
+Const 57 at bundle byte 1,998,356 is `["href","#",1,"dropdown-item"]`, and template `ASe` at
+1,925,678 hangs the handler on the `<li>` with the anchor carrying none. Two things follow and this
+room had neither:
+
+- `href="#"` — ours interpolated the stream id, a different rendered attribute.
+- **no `preventDefault()`** — so upstream a menu click follows the anchor: the room scrolls to the
+  top and a history entry is pushed.
+
+The note that stood at `runItem` said of the second: *"That half is a defect and is not reproduced."*
+It is a defect, and that is not one of the four things that excuse a divergence. Both halves are
+reproduced, and **clicking a stream menu item now jumps the room to the top** — written at the code
+because it looks like a regression and is a match.
+
+`runItem` no longer takes the event at all, which is the strongest form of "nothing prevents this",
+and the contract pins the href and the absence together because either alone is wrong. Svelte's
+`a11y_invalid_attribute` warning on a bare `#` is suppressed the way `NoteTabContent.svelte` already
+suppresses it.
+
+The handler stays on the `<a>` rather than moving to the `<li>`: `.dropdown-item` is a block filling
+its item, so the same element receives the event by bubbling either way and an anchor is what a
+keyboard reaches. Internal structure — unlike `SSM-2`, where the reference's own split would put a
+handler on a node this room marks `aria-hidden`.
+
+## SV-SP-13 — measured, and NOT transcribed
+
+`onDoubleClicked` at byte 1,491,771 tries four spellings on each side:
+`exitFullscreen`/`mozCancelFullScreen`/`webkitExitFullscreen`/`msExitFullscreen`, and their request
+twins.
+
+It is a runtime FEATURE DETECTION whose first branch is the standard one, so in every browser this
+application supports the other three are unreachable — upstream as well as here. Identical
+observable behaviour, and internal structure. The alternative is six `document as unknown as …`
+casts (no prefixed name is in TypeScript's DOM library) guarding branches nothing can reach.
+
+**A divergence in this room's favour is stated rather than claimed as a match:** upstream's
+`try { … } catch { return }` cannot catch the promise `requestFullscreen()` returns, so a refusal —
+no user gesture, a sandboxed frame — is an unhandled rejection there and a named warning here.
+
+**Runtime impact.** A stream menu click scrolls the room to the top, as the reference's does.
+
+**Verified:** room gate exit 0 at `14c8bc0` — 341 files, 6,197 passed, 1 skipped. Negative control seen red: restoring `preventDefault()`.
+
+### 2026-09-02 04:13 UTC — a notification that repeats once per question you have asked, and an exception that expired as designed
+
+## OVL-07 — and the amplification is severe, so it is stated first
+
+Read whole at bundle bytes 1,408,880-1,410,100:
+
+```js
+const f = s.isA ? "answer" : "question";
+for (let _ of o.qa)
+  _.uid === globals.user.userXrefID && ( …sound…, !l && alertPopup && info(…), … );
+globals.user.isPresenter && ( …the SAME body again, outside the loop… );
+```
+
+The notice is delivered **once per entry of the alert's Q&A that the viewer owns**, and then once
+more if the viewer is a presenter. This room resolved the audience once — *"have I asked on this
+alert, or am I a presenter"* — and delivered one notice.
+
+The two agree for a member with one question and diverge sharply otherwise: **a viewer with N of
+their own entries gets N notices and N sounds for one new question, and a PRESENTER with N gets
+N + 1.** A presenter who has answered five times on a busy alert hears six dings for the sixth reply.
+
+That is upstream's behaviour and reproducing it is matching; "it would reproduce an upstream defect"
+is not one of the four things that excuse a divergence. **It is written out at length at the code and
+here so the owner reads a sentence rather than discovering it from a room** — and so that anybody who
+later wants one notice per event knows they are choosing to diverge, not fixing something this room
+introduced.
+
+The two arms stay separate rather than collapsing to a count, because the capture's guards differ:
+the loop's is `uid === me`, the second arm's is `isPresenter`, and a presenter who has asked nothing
+still gets exactly one. `overlay-delivery-contract.test.ts` asserts both, because collapsing them
+reads like a tidy-up.
+
+## CD-07 — a recorded exception that named its own expiry, and met it
+
+` Upload `, ` Browse ` and ` Change image ` in `CarouselDialog.svelte` lost their trailing space.
+The capture pads all three — `v(9," Upload ")` and `v(12," Browse ")` at byte 1,462,593,
+`v(4," Change image ")` at 1,463,600 — and **the exception was never a measurement**: three
+assertions in two other contract files pinned the unpadded spelling, and the change that recorded it
+was not permitted to edit them.
+
+`note-padded-labels-contract.test.ts` had written that exception as an ASSERTION rather than a
+comment, *"so the exception is recorded where it can expire"*. Six edits later it expired exactly as
+written, and the block is kept — inverted — because a recorded exception that says how it ends and
+then ends that way is the shape this repository wants for the ones still open.
+
+**Runtime impact.** A Q&A notice now repeats as the reference's does. Three carousel labels carry the
+capture's trailing space.
+
+**Verified:** room gate exit 0 at `355958b` — 341 files, 6,196 passed, 1 skipped. Two negative controls seen red: collapsing the two delivery
+arms back into one audience test, and dropping one of the three pads.
+
+### 2026-09-02 04:03 UTC — a workaround deleted by matching, and a capability given up to do it
+
+SP2-07 and SZC-03 are the same finding from two directions, and one change closes both.
+
+## The structure
+
+Create block at bundle byte 1,501,256:
+
+```js
+d(0,"div",0), H(1,z0e,…)(2,G0e,…)(3,W0e,…)(4,q0e,…)(5,Y0e,6,4,"div",4),   ← const 4, the cluster
+d(6,"div",5)                                                              ← const 5, appDoubleClick
+  (7,"pan-zoom",6)(8,"div",7)(9,"video",8), x("click",…), u(),
+  H(10,Q0e,2,1,"span",9), u()()()()
+```
+
+Slot 5 is `[1,"zoom-controls-container-detached",3,"ngClass"]` and it CLOSES before `d(6,…)` opens
+`["appDoubleClick","",1,"position-relative",…]`. **Sibling, and first.** This room nested it inside.
+
+## It deletes a workaround rather than adding one
+
+Six `ondblclick={swallowDoubleClick}` bindings in `ScreenZoomControls.svelte` existed only to stop a
+double-click on a zoom button reaching that box and maximising the screen. Upstream needs none. All
+six and the function are gone — and **the component's own docblock had already written the finding
+down**: *"UPSTREAM IT IS NOT NESTED: `Y0e` is node 5 … and the `appDoubleClick` box (const 5) is node
+6, a SIBLING, so the reference needs no guard."* Measured again and still true.
+
+`ScreenZoomControls`'s ceiling goes **DOWN, 237 → 222**: removing one attribute from each button let
+prettier collapse six multi-line elements, so the file lost twenty more lines than the note added.
+
+## Both refusals measured rather than reasoned
+
+The row was refused on two grounds and neither survives:
+
+- *"Moving it out means inventing the ancestor its `position: absolute` resolves against."*
+  `app-screenshare-view`'s const 0 is `[1,"h-inherit"]` — no `position` — and the popout wrapper's
+  only two rules are `.detach-screen .webcamScreen{…}` and `.detach-screen .overflow-hidden{…}`. So
+  upstream has NO positioned ancestor inside the component either; `right: 5px; top: 5px` resolves
+  against the popout window. Nothing is invented.
+- *"It would undo SV-SP-01."* The watermark is `H(10,Q0e,…,"span",9)`, opened after the `<video>`
+  closes and inside the video container — a different node this move does not touch.
+
+## What matching gives up, stated rather than discovered
+
+The nesting was chosen so the controls **fullscreen with the picture**. Upstream's do not:
+`onDoubleClicked` fullscreens `#video-screen-container-${id}`, and the cluster sits outside that
+node there, so it disappears while the picture is maximised. That is now true here. A real
+capability given up to match, and the note says so at the code.
+
+**Runtime impact.** In a popped-out screen, the zoom cluster positions against the window rather than
+the video box, and disappears while the picture is fullscreen — as the reference's does. A
+double-click on a zoom button no longer needs swallowing, because it no longer reaches anything.
+
+**Verified:** room gate exit 0 at `d6a6f1b` — 341 files, 6,194 passed, 1 skipped. Two negative controls seen red: re-nesting the cluster, and
+restoring one of the six guards.
+
+### 2026-09-02 03:46 UTC — the read-only note had no host element, and a rule of this repository's told me where its CSS goes
+
+## NP-04
+
+`app-note`'s own `styles:[…]` array at bundle byte 1,487,671:
+
+```
+[_nghost-%COMP%]{display:block;height:100%}   .note-view[_ngcontent-%COMP%]{height:100%}
+```
+
+The update block that writes `id="summernoteEdit-<id>"` and the innerHTML belongs to the **same
+component** as that array, which settles the structure the row left open: the read-only note body is
+INSIDE `app-note` and is the `.note-view` those two rules size.
+
+`NotesPane.svelte` rendered it as a bare `<div>`. So the editing branch had a host (`NoteEditor`
+renders one) and the read-only branch had none, and neither captured rule reached it — the note did
+not fill its pane.
+
+## Where the CSS goes, which I got wrong first
+
+The obvious place is a `<style>` block on `NotesPane.svelte`, and `notes-style-contract.test.ts`
+refuses that file one outright: *"forbids the local 2px tab collapse and component-scoped Notes
+layout overrides"*. Component-scoped Notes layout fought the captured stylesheet once already, and
+the captured sheet plus the `app-presentationarea` bridge are the layout authority for this surface.
+
+Not `captured-runtime-components.css` either: it is GENERATED from `css/complete-app-styles.css`,
+refuses hand edits in its own header, and does not contain these rules — they are in the JS bundle's
+style array. The same distinction ASR-1 turns on.
+
+So they are in `app.css`, scoped under `app-presentationarea` beside the other Notes bridge rules,
+and that test now **pins the host and the rules together** — the host without them does nothing, and
+the rules without it match nothing.
+
+## G7 re-tested and held
+
+`getAllPCLogsLoading`'s two loading branches are not modelled here, and the recorded reason survives:
+upstream POSTs `getAllPCLogs` when the panel opens, while this room resolves the conversation list in
+`+page.server.ts` before the page renders, and `invalidateAll()` keeps the previous list on screen
+while it runs. **There is no instant at which the strip exists and its contents are unknown**, so
+both branches would be branches that can never render. The note already says what would make it real
+— fetching on open — so the next author finds two empty states waiting rather than the capture.
+
+**Runtime impact.** A read-only note fills its pane, as the reference's does.
+
+**Verified:** room gate exit 0 at `a6b042d` — 341 files, 6,189 passed, 1 skipped. Negative control seen red: replacing the host element with
+a `<span>`.
+
+### 2026-09-02 03:37 UTC — a reload the reference does twice, and a log that is not product output
+
+## STV-02 — it really is a second reload
+
+`…setPreference("bufferSizeLevel", e), this.hls && this.loadStream())` at bundle byte 1,908,711. The
+tail was refused because this room's `$effect` keyed on `bufferSizeLevel` already reloads.
+
+It does — and so does upstream's `preferenceChanged` subscription at 1,902,159, which `setPreference`
+on the line before fires. **So the reference reloads TWICE per click** and this room reloaded once.
+Transcribed, with the cost written at the code rather than hidden: a reload re-fetches the HLS
+manifest and rebuilds the buffer, so matching doubles a network-heavy operation on this control. A
+later reader finding two reloads and no reason would be right to delete one, which is what happened
+the first time.
+
+Guarded on `hls`, not `videoPlayer` — the reference's own guard, and STV-03's whole subject: on the
+native-HLS path `hls` is null and neither reload runs. Its own negative control is separate from the
+row's, because dropping the guard is the plausible wrong fix.
+
+## FP-06 — a `console.log` is not the product
+
+`console.log("tab", e), this.selectedFileTab = e` at byte 1,960,015. NOT transcribed as code, and
+the reason is not taste:
+
+- It changes the developer console, not anything a member or presenter sees. That is internal
+  structure rather than reference-facing output.
+- **This repository already has a consistent practice for upstream's logging**, in
+  `room/recording-frames.ts`, `room/message-delete.ts` and `room/caption-staleness.ts`: the
+  reference's `console.log` calls are transcribed INTO THE CITATION, as evidence of what the
+  reference does, rather than executed. Running one here breaks that pattern for a single setter.
+- All three Files-tab call sites funnel through this setter, so it would print on every tab click,
+  in a product where the console is where a real error has to be visible.
+
+Recorded at the setter with the detail a future build would get wrong — the reference logs BEFORE
+assigning, via the comma operator.
+
+**Runtime impact.** Changing the stream's buffer size now reloads twice, as the reference does.
+Nothing else moves.
+
+**Verified:** room gate exit 0 at `8e7fd35` — 341 files, 6,188 passed, 1 skipped. Two negative controls seen red: dropping the direct reload,
+and dropping its `hls` guard.
+
+### 2026-09-02 03:30 UTC — `trackBy`, and the one row where Svelte's own documentation settles it
+
+DTP-04 and SWP-04 asked both alert panes to change `{#each visibleAlerts as row (row.id)}` to
+`(row)`, because the reference passes `Li(t,n){return n}` as `ɵɵrepeaterCreate`'s seventh argument
+(bytes 1,944,820 and 1,938,465) — Angular's identity `trackBy` — and a Svelte object key is its
+exact analogue. **The analogue is exact.** Measured and NOT changed, for two reasons that stand
+independently.
+
+**A key is not rendered output.** `trackBy` and a Svelte key are both reconciliation hints: they
+decide whether a DOM node is moved or re-created, and the resulting markup is identical either way.
+That is internal structure.
+
+**Svelte's documentation names this exact trade and recommends against it.** Read from the MCP
+rather than from memory, per this repository's own rule, `svelte/each` says verbatim: *"The key can
+be any object, but **strings and numbers are recommended since they allow identity to persist when
+the objects themselves change**."*
+
+The objects here change. `visibleAlerts` is `limitDayTradeLogs(searchDayTradeLogs(alerts, search),
+limit)` — `filter` and `slice`, which return new ARRAYS holding the SAME element references, so
+within one page's lifetime the two keys agree exactly. They part across a REFETCH, where the load
+produces new objects for the same alerts: `row.id` moves the existing rows and `row` destroys and
+re-creates every one of them, losing focus, selection and scroll position inside each row, on every
+new alert.
+
+`CLAUDE.md` makes official Svelte guidance the floor, so a change the framework's own documentation
+recommends against needs more than an analogue, and "the reference's reconciliation hint is spelled
+differently" is not more.
+
+Recorded in `each-key-contract.test.ts` rather than at either pane — one answer for both, and a copy
+in each is how the two would drift. The measurement it rests on is asserted too: if those helpers
+copied their rows the argument would be a different one, so `slice`/`filter` and the absence of a
+spread are pinned.
+
+**Runtime impact.** None. No code changed.
+
+**Verified:** room gate exit 0 at `5cbd8c8` — 341 files, 6,186 passed, 1 skipped. Negative control seen red: keying one pane by the object
+fails the new assertion.
+
+### 2026-09-02 03:24 UTC — a security attribute deleted to match the capture, and moved rather than dropped
+
+MSB-06. The reference's chat-link pipe, read whole at bundle byte 1,326,550:
+
+```js
+'<a href="' + e + '" target="_blank" class="linkColor" onclick="event.stopPropagation()">'
+```
+
+No `rel` — and that is a CHOICE upstream rather than an oversight, which is what makes it worth
+matching. `"rel",` occurs 8 times in the bundle: seven `"rel","noopener noreferrer"` (the avatar
+menu's outbound links among them) and one `"rel","required"`. Upstream puts `rel` on the links it
+wants it on, and not on this one. `rel="noreferrer"` here was ours.
+
+**It was doing real work, so it moved rather than went.** A chat link opens a third-party site a
+member chose, and this application set no referrer policy anywhere — so deleting the attribute alone
+would have started sending the room URL as a `Referer` to whatever domain a member pastes.
+`hooks.server.ts` now sets `Referrer-Policy: same-origin` on every response, which covers this link,
+every other link in the room and every subresource. The `<a>` matches the capture character for
+character AND no room URL crosses to a pasted domain, which is strictly better than either half.
+
+`same-origin` rather than the browser's `strict-origin-when-cross-origin` default: that default
+still sends the ORIGIN cross-origin, and nothing outside this room needs to know it exists.
+
+## Three of my own mistakes, and how each was caught
+
+**A sweep in the wrong spelling.** The first draft of this note said *"`rel=` occurs nowhere in the
+2,891,205-byte bundle"*. That was a grep for the HTML form against a file storing attributes
+comma-separated — the same class of error this pass has now paid for three times. Corrected in
+place, and it makes the finding STRONGER: upstream uses `rel` seven times and omits it here.
+
+**An assertion in a file that cannot run.** The guard went into `message-links-contract.test.ts`,
+the natural home — and one of the 42 files `gate/evidence-bound-tests.mjs` excludes when the capture
+roots are absent. The negative control produced *no output at all* rather than a failure, which is
+how it was found. Both assertions now live in `shell-body-rte-reference-contract.test.ts`, which
+runs, and the excluded file carries a note saying where they went and why.
+
+**A slice that matched its own prose.** The `not.toContain('rel=')` assertion read the raw component,
+and the note explaining the deletion quotes `rel="noreferrer"` to explain it. Comment-stripped now.
+That is the ninth instance of this in the repository and the second in this pass.
+
+**Both halves are pinned in one describe block, deliberately.** Deleting the attribute WITHOUT the
+header is the change that leaks, and a test asserting only the markup would pass on exactly that.
+
+**Runtime impact.** Chat links render the capture's attribute set. No referrer leaves this origin,
+for any request.
+
+**Verified:** room gate exit 0 at `03cdc9d` — 341 files, 6,182 passed, 1 skipped. Both negative controls seen red: restoring the attribute,
+and removing the header.
+
 ### 2026-09-02 03:13 UTC — two rows measured and NOT built, with the cost of matching written down
 
 Not every row the re-triage confirms is work, and these two are the honest cases. Both are recorded

@@ -232,6 +232,49 @@ describe('OVL-04 — a mention rings, and the popup preference does not silence 
   });
 });
 
+describe('OVL-07 — the Q&A notice REPEATS, once per entry the viewer owns', () => {
+  /*
+    Read whole at bundle bytes 1,408,880-1,410,100:
+
+      const f = s.isA ? "answer" : "question";
+      for (let _ of o.qa)
+        _.uid === globals.user.userXrefID && ( …sound…, !l && alertPopup && info(…), … );
+      globals.user.isPresenter && ( …the SAME body again, outside the loop… );
+
+    This room resolved the audience ONCE — "have I asked on this alert, or am I a presenter" — and
+    delivered one notice. The two agree for a member with one question and diverge sharply otherwise:
+    a viewer with N of their own entries gets N notices, and a PRESENTER with N gets N + 1.
+
+    That amplification is upstream's and reproducing it is matching. It is asserted here rather than
+    left to the comment because the obvious "tidy-up" is to collapse the two arms into one delivery,
+    which reads like a bug fix and is a divergence.
+  */
+  it('delivers once per entry the viewer owns, in a loop over the alert’s questions', () => {
+    const at = overlays.indexOf('function deliverQaNotice(');
+    expect(at, 'deliverQaNotice is gone').toBeGreaterThan(-1);
+    const end = overlays.indexOf('\n  }', at);
+    expect(end, 'deliverQaNotice is unterminated').toBeGreaterThan(at);
+    const body = overlays.slice(at, end);
+    expect(body).toContain('for (const other of data.alertQuestions)');
+    expect(body).toContain('other.senderId === data.user.id) deliverOnce();');
+  });
+
+  it('and AGAIN for a presenter, outside that loop, which is the N + 1', () => {
+    const at = overlays.indexOf('function deliverQaNotice(');
+    const end = overlays.indexOf('\n  }', at);
+    const body = overlays.slice(at, end);
+    expect(body).toContain('if (isPresenter) deliverOnce();');
+    /*
+      The two guards must stay SEPARATE. The single-delivery form this replaced tested them together
+      — `if (!isPresenter && !askedOnThisAlert) return;` — and collapsing back to that is the change
+      this assertion exists to catch.
+    */
+    expect(body, 'the two arms were collapsed back into one audience test').not.toContain(
+      '!isPresenter && !askedOnThisAlert'
+    );
+  });
+});
+
 describe('OVL-05 — the lightbox describes the image the way the capture does', () => {
   /*
     ## THIS ROW WAS BUILT FROM THE WRONG UPSTREAM FUNCTION, and reversed on 2026-09-02

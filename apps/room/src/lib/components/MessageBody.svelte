@@ -168,10 +168,28 @@
       style={alertLabelBadgeStyle(segment.label)}>{segment.label.name}</span
     >{:else if segment.kind === 'stock'}<span class="stockColor" style={stockStyle}
       >{segment.text}</span
-    >{:else if segment.kind === 'link' && segment.url}<a
+    >{:else if segment.kind === 'link' && segment.url}<!--
+      MSB-06 — `rel` is GONE, 2026-09-02, and the protection moved rather than being dropped.
+
+      The reference's link, read whole at bundle byte 1,326,550:
+
+        '<a href="' + e + '" target="_blank" class="linkColor" onclick="event.stopPropagation()">'
+
+      No `rel`, and deliberately: `"rel",` occurs 8 times in the bundle — seven
+      `"rel","noopener noreferrer"` and one `"rel","required"` — so the reference puts it on the
+      links it wants it on and not on this one. `rel="noreferrer"` here was ours, so the rendered
+      attribute set differed from the capture's.
+
+      It was doing real work — a chat link opens a third-party site a member chose — so it is not
+      simply deleted: `hooks.server.ts` sets `Referrer-Policy: same-origin` on every response, which
+      covers this link, every other link in the room and every subresource, and leaves the markup
+      matching the capture character for character. The reasoning is at that header.
+
+      `target="_blank"` needs no `noopener` companion: browsers have implied it for `_blank` since
+      2021, and the reference relies on the same behaviour.
+    --><a
       href={segment.url}
       target="_blank"
-      rel="noreferrer"
       class="linkColor"
       onclick={(event) => event.stopPropagation()}>{segment.text}</a
     >{:else if segment.kind === 'image' && segment.url}{#if isMutedGif(segment.url)}<!-- svelte-ignore a11y_no_static_element_interactions --><!-- svelte-ignore a11y_click_events_have_key_events -->

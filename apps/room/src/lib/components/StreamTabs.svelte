@@ -130,11 +130,28 @@
     openMenuId = openMenuId === streamId ? null : streamId;
   }
 
-  function runItem(event: MouseEvent, streamId: string, action?: (id: string) => void) {
-    // Const 57 is `href="#"` and the reference hangs no handler on the anchor, so upstream a menu
-    // click DOES scroll the room to the top. That half is a defect and is not reproduced; the
-    // bubbling half is - the click reaches the `li` and selects the tab, exactly as upstream.
-    event.preventDefault();
+  /**
+   * `STB-06` — both halves are reproduced as of 2026-09-02, and the second one is a defect.
+   *
+   * Const 57 at byte 1,998,356 is `["href","#",1,"dropdown-item"]` and the template `ASe` at
+   * 1,925,678 hangs the handler on the `<li>` (const 56, `[3,"click"]`) with the anchor carrying
+   * none. Two things followed and this room had neither:
+   *
+   *   `href="#"`             — ours interpolated the stream id, a different rendered attribute.
+   *   no `preventDefault()`  — so upstream a menu click follows the anchor: the room scrolls to the
+   *                            top AND a history entry is pushed.
+   *
+   * The note that stood here said of the second: *"That half is a defect and is not reproduced."*
+   * It is a defect, and "it would reproduce an upstream defect" is not one of the four things that
+   * excuse a divergence. **Clicking a stream menu item now jumps the room to the top**, as the
+   * reference does. Written down because it looks like a regression and is a match.
+   *
+   * The handler stays on the `<a>` rather than moving to the `<li>`: `.dropdown-item` is a block
+   * filling its item, so the same element receives the event by bubbling either way, and an anchor
+   * is what a keyboard reaches. That is internal structure — unlike `SSM-2`, where the reference's
+   * own split puts a handler on a node this room marks `aria-hidden`.
+   */
+  function runItem(streamId: string, action?: (id: string) => void) {
     openMenuId = null;
     action?.(streamId);
   }
@@ -251,21 +268,19 @@
         >
           {#if isPresenter}
             <li>
+              <!-- svelte-ignore a11y_invalid_attribute -->
               <a
-                href="#{stream._id}"
+                href="#"
                 class="dropdown-item"
-                onclick={(event) => runItem(event, stream._id, onbringeveryone)}
+                onclick={() => runItem(stream._id, onbringeveryone)}
               >
                 <i class="fas fa-eye"></i> Bring everyone here
               </a>
             </li>
           {/if}
           <li>
-            <a
-              href="#{stream._id}"
-              class="dropdown-item"
-              onclick={(event) => runItem(event, stream._id, ontogglelock)}
-            >
+            <!-- svelte-ignore a11y_invalid_attribute -->
+            <a href="#" class="dropdown-item" onclick={() => runItem(stream._id, ontogglelock)}>
               {#if stream._id === lockedScreenId}
                 <span title="Unlock this screen?">
                   <i aria-hidden="true" class="fas fa-unlock"></i> Unlock Screen

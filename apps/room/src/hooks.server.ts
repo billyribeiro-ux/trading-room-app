@@ -98,8 +98,44 @@ export const handle: Handle = async ({ event, resolve }) => {
   // Chrome uses exactly one (woff2), but `type === 'font'` matches every emitted font asset, so
   // the unfiltered form made the Link header preload woff AND ttf too - measured as 6 extra
   // requests / ~540 KB of never-used bytes on every cold load.
-  return resolve(event, {
+  const response = await resolve(event, {
     preload: ({ type, path }) =>
       type === 'js' || type === 'css' || (type === 'font' && path.endsWith('.woff2'))
   });
+
+  /*
+    `Referrer-Policy: same-origin` — and it is here because of a MATCH, not despite one.
+
+    `MSB-06`. The reference's chat link is read whole at bundle byte 1,326,550:
+
+      '<a href="' + e + '" target="_blank" class="linkColor" onclick="event.stopPropagation()">'
+
+    No `rel` — and that is a CHOICE upstream rather than an oversight, which is what makes it worth
+    matching. `"rel",` occurs 8 times in the bundle: seven `"rel","noopener noreferrer"` (the avatar
+    menu's outbound links among them, `AvatarOptionsMenu.svelte` consts 19 and 21) and one
+    `"rel","required"`. So the reference puts `rel` on the links it wants it on, and this one is not
+    one of them. This room's `MessageBody` carried `rel="noreferrer"`, which is ours.
+
+    (My first draft of this note said `rel=` occurs nowhere in the bundle. That was a sweep for the
+    HTML spelling against a file that stores attributes comma-separated — the same class of error
+    this pass has now paid for three times, and it is corrected here rather than quietly fixed.)
+
+    Deleting the attribute alone would have leaked: every chat link opens a third-party site chosen
+    by a member, and with no policy anywhere the browser sends a Referer. So the protection moves to
+    the layer the reference-facing markup does not express. The `<a>` now matches the capture
+    character for character AND no room URL crosses to a pasted domain — which is strictly better
+    than either half, and is the reason this is a header rather than a decision to keep the
+    attribute.
+
+    `same-origin` rather than the browser's `strict-origin-when-cross-origin` default: that default
+    still sends the ORIGIN cross-origin, and nothing outside this room needs to know it exists.
+    Same-origin requests keep the full referrer, which is what the SSE reconnects and the remote
+    functions see.
+
+    Set on every response rather than on the document, because a policy that only covers the HTML
+    leaves every subresource on the default — and `<meta name="referrer">` cannot reach a fetch that
+    starts before the parser reaches it.
+  */
+  response.headers.set('Referrer-Policy', 'same-origin');
+  return response;
 };
