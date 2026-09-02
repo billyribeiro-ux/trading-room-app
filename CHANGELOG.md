@@ -45,6 +45,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 02:41 UTC — the compact member reaction pill, and three assertions that hard-coded an empty parameter list
+
+RMSG-06. Four templates repeat the reaction loop; three wrap the pill in
+`O(1, e.value.clickedBy.length > 0 ? 1 : -1)` and one does not:
+
+```js
+Oge  1,333,312   card admin       gated
+u1e  1,341,960   card member      gated
+V1e  1,371,615   compact admin    gated
+m_e  1,379,950   compact MEMBER   d(0,"span")(1,"span",51), x("click",…), v(2)   ← no gate
+```
+
+`addRemoveReaction` empties `clickedBy` rather than deleting the key, so once a reaction's last
+holder removes it, upstream draws `😀 0` — on a compact member row and on no other row in the
+product. This room gated all four, on the recorded ground that reproducing it *"would ship a pill
+claiming a reaction nobody has made"*.
+
+That is an argument about whether the reference's behaviour is good, which is not one of the four
+things that excuse a divergence. Reproduced.
+
+**The strip stays ONE snippet and takes the gate as a parameter**, which is what its existing
+assertion had always been protecting — two strips is how the compact one drifted the first time. The
+term passed is `reverseMessage`, which already chooses between the two compact containers `$1e`
+(admin, holding the gated `V1e`) and `__e` (member, holding `m_e`), so one question keeps one answer.
+
+## Three assertions broke, and all three for the same reason
+
+`card-class-lists-contract`, `compact-message-contract` and `message-renderer-differences-contract`
+each matched `reactionStrip()` with the empty parameter list written into the pattern. None of them
+cares about the arguments — one counts definitions, one checks a host draws the strip at all, one
+counts call sites — and all three would have failed on any future parameter.
+
+The irony is on the record: `card-class-lists-contract`'s own comment two lines above says a test
+that pins a NUMBER *"fails the next time a container is added for a measured reason, and the repair
+is to bump the number, which teaches nobody anything"*. It then hard-coded the parameter list. All
+three now match with the list left open, and the one test that does care about the arguments asserts
+them by name.
+
+**Runtime impact.** A reaction whose last holder removes it stays on screen as `👍 0` on a compact
+member row, and on no other row — which is what the reference does.
+
+**Verified:** room gate exit 0 at `b986dbb` — 341 files, 6,170 passed, 1 skipped. Both negative controls seen red: gating all four fails the
+compact-member case, and ungating all four fails the other three.
+
 ### 2026-09-02 02:19 UTC — a whole capture file nobody had read, in the directory everything else is read from
 
 ROV-03 recorded the chat-image viewer as BLOCKED, and its measurement was exact: `openImageModal`

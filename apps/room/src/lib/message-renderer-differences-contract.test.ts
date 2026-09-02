@@ -6,7 +6,7 @@ import RoomMessage from './components/RoomMessage.svelte';
 import {
   alertQaCountText,
   CARD_USERNAME_TEXT_PRIMARY_REFUSED,
-  COMPACT_MEMBER_REACTION_GATE_DIVERGENCE,
+  COMPACT_MEMBER_REACTION_GATE_BUILT,
   DATE_SEPARATOR_TAKES_BODY_STYLE,
   TRIAL_BADGE_TEXT,
   usernameRowStyle
@@ -229,14 +229,14 @@ describe('RMSG-05 — the date separator anchor takes the body style, in both re
   });
 });
 
-describe('RMSG-06 — the compact MEMBER repeater has no clickedBy gate upstream; ours gates all four', () => {
+describe('RMSG-06 — three of the four repeaters gate the pill, and ours now match all four', () => {
   it('finds the gate on exactly three of the four repeaters in the pinned bundle', () => {
     const bundle = readFileSync(BUNDLE, 'utf8');
     const gates = bundle.match(/O\(1,e\.value\.clickedBy\.length>0\?1:-1\)/g) ?? [];
     expect(gates).toHaveLength(3);
     /* And the fourth — `m_e`, which opens the pill directly with no `H(1, …)` in front of it. */
     expect(bundle).toContain('function m_e(t,n){if(1&t){const e=Y();d(0,"span")(1,"span",51)');
-    expect(COMPACT_MEMBER_REACTION_GATE_DIVERGENCE).toContain('1,379,950');
+    expect(COMPACT_MEMBER_REACTION_GATE_BUILT).toContain('1,379,950');
   });
 
   const REACTED = {
@@ -251,23 +251,43 @@ describe('RMSG-06 — the compact MEMBER repeater has no clickedBy gate upstream
     for (const isAdmin of [true, false]) {
       const layout = `${displayMode === 'r' ? 'card' : 'compact'} ${isAdmin ? 'admin' : 'member'}`;
 
-      it(`draws a held reaction and hides an emptied one — ${layout}`, () => {
+      /*
+        ONE OF FOUR DIFFERS, which is why all four are drawn rather than the interesting one.
+
+        `m_e` (1,379,950) is the compact MEMBER repeater and it renders the pill unconditionally, so
+        an emptied reaction draws there as `👍 0` and nowhere else. Reproduced 2026-09-02: the
+        assertion below flips on exactly that host, and a test that only looked at it could not say
+        the other three still agree.
+      */
+      const emptiedShows = displayMode === 'c' && !isAdmin;
+
+      it(`draws a held reaction, and an emptied one only where upstream does — ${layout}`, () => {
         const html = draw({ ...REACTIONS_ON, displayMode }, { ...REACTED, isAdmin });
         expect(html).toContain('🎉');
-        /*
-          The one that matters: upstream's compact MEMBER row renders this as `👍 0`. All four
-          layouts are asserted because the finding is that one of four differs — a test that only
-          looked at the compact member row could not say the other three agree.
-        */
-        expect(html).not.toContain('👍');
+        if (emptiedShows) expect(html, 'the compact member host must draw `👍 0`').toContain('👍');
+        else expect(html, 'only the compact MEMBER host draws an emptied pill').not.toContain('👍');
       });
     }
   }
 
   it('renders ONE reaction strip implementation, with three call sites', () => {
-    expect(MESSAGE.match(/\{#snippet reactionStrip\(\)\}/g) ?? []).toHaveLength(1);
-    expect(MESSAGE.match(/\{@render reactionStrip\(\)\}/g) ?? []).toHaveLength(3);
+    /*
+      Still one snippet, and the gate is a PARAMETER rather than a second copy — which is the shape
+      this assertion has always been protecting. Two strips is how the compact one drifted before.
+    */
+    expect(MESSAGE.match(/\{#snippet reactionStrip\(gated: boolean\)\}/g) ?? []).toHaveLength(1);
+    expect(MESSAGE.match(/\{@render reactionStrip\([^)]*\)\}/g) ?? []).toHaveLength(3);
     /* And the compact copy that used to live inline is gone: `chat-reaction-added` appears once. */
     expect(MESSAGE.match(/chat-reaction-added/g) ?? []).toHaveLength(1);
+  });
+
+  it('passes the gate from the term that also picks the container', () => {
+    /*
+      `reverseMessage` chooses between `$1e` (compact admin, const 26) and `__e` (compact member,
+      const 65), and those two hold `V1e` and `m_e` — the gated repeater and the ungated one. Using
+      any other discriminator here would be a second rule for the same question.
+    */
+    expect(MESSAGE).toContain('{@render reactionStrip(reverseMessage)}');
+    expect(MESSAGE.match(/\{@render reactionStrip\(true\)\}/g) ?? []).toHaveLength(2);
   });
 });

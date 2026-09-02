@@ -493,15 +493,26 @@
   differ from each other in nothing but a class. Four containers, one list; the compact branch kept
   its own copy until RMSG-06, and the gate it differed by was already implied by its container's.
 -->
-{#snippet reactionStrip()}
+{#snippet reactionStrip(gated: boolean)}
               <!--
-                RMSG-06 — three of the four repeaters gate the pill on `clickedBy.length > 0`; the
-                compact MEMBER one (`m_e`, 1,379,950) does not, so upstream draws `emoji 0` there
-                once a reaction empties. Ours gates all four, and this is now the only strip:
-                `COMPACT_MEMBER_REACTION_GATE_DIVERGENCE`.
+                RMSG-06 — three of the four repeaters gate the pill on `clickedBy.length > 0` and one
+                does not, and as of 2026-09-02 this reproduces both.
+
+                  Oge  1,333,312   card admin       O(1, e.value.clickedBy.length > 0 ? 1 : -1)
+                  u1e  1,341,960   card member      the same
+                  V1e  1,371,615   compact admin    the same
+                  m_e  1,379,950   compact MEMBER   d(0,"span")(1,"span",51), x("click",…), v(2)
+
+                `m_e` renders the pill unconditionally, and `addRemoveReaction` empties `clickedBy`
+                rather than deleting the key — so once a reaction's last holder removes it, upstream
+                draws `😀 0` on a compact member row and on no other row in the product.
+
+                It was refused as a defect. It is one, and it is the reference's: the parameter is
+                `false` from the single compact call site when that row is a MEMBER's, and `true`
+                everywhere else, so exactly one of four hosts differs, as upstream.
               -->
               {#each reactions as [reactionKey, reaction] (reactionKey)}
-                {#if reaction.clickedBy.length > 0}
+                {#if !gated || reaction.clickedBy.length > 0}
                   <!-- svelte-ignore a11y_click_events_have_key_events -->
                   <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <span
@@ -914,7 +925,13 @@
                 `react:`) and already gates this container, so the inner test can never be false
                 where it is evaluated.
               -->
-              {@render reactionStrip()}
+              <!--
+                RMSG-06's discriminator. `reverseMessage` is what chooses between the two compact
+                containers here — `$1e` (admin, const 26, byte 1,371,909) and `__e` (member, const
+                65, 1,380,430) — and those two containers hold `V1e` and `m_e`, the gated repeater
+                and the ungated one. So the same term that picks the container picks the gate.
+              -->
+              {@render reactionStrip(reverseMessage)}
             </div>
           {/if}
         </div>
@@ -1225,10 +1242,10 @@
                   ]}
                   style={bodyStyle}
                 >
-                  {@render reactionStrip()}
+                  {@render reactionStrip(true)}
                 </span>
               {:else}
-                <div style={bodyStyle}>{@render reactionStrip()}</div>
+                <div style={bodyStyle}>{@render reactionStrip(true)}</div>
               {/if}
             {/if}
           </div>

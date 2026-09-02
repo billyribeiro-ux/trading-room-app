@@ -151,12 +151,21 @@ export const CARD_USERNAME_TEXT_PRIMARY_REFUSED =
  * deleting the key, so a reaction whose last holder removes it draws upstream as `😀 0` — on a
  * compact member row and on no other row in the product.
  *
- * That is a DEFECT of the kind RM-19 records for `copyMessage`'s write-back: reproducing it would
- * ship a pill claiming a reaction nobody has made, on one layout of four. The gate is applied to
- * all four here, which is what three of them already say.
+ * It was refused as a DEFECT — "reproducing it would ship a pill claiming a reaction nobody has
+ * made, on one layout of four" — and the gate was applied to all four here. **Reproduced as of
+ * 2026-09-02**, because that sentence is an argument about whether the reference's behaviour is
+ * good, which is not one of the four things that excuse a divergence; a pill the reference draws is
+ * reference-facing output.
+ *
+ * `RoomMessage.svelte`'s `reactionStrip` takes the gate as a parameter. It is `false` from the one
+ * compact call site when that row is a member's and `true` everywhere else, so exactly one host of
+ * four differs — and the term that selects it is `reverseMessage`, the same one that already chooses
+ * between the two compact containers `$1e` (admin, holding `V1e`) and `__e` (member, holding `m_e`).
  */
-export const COMPACT_MEMBER_REACTION_GATE_DIVERGENCE =
-  'm_e at byte 1,379,950 renders the pill with no clickedBy gate; the other three templates gate it.';
+export const COMPACT_MEMBER_REACTION_GATE_BUILT =
+  'm_e at byte 1,379,950 renders the pill with no clickedBy gate; the other three templates gate ' +
+  'it. Both are reproduced since 2026-09-02 — the strip takes the gate as a parameter, false only ' +
+  'for the compact MEMBER host.';
 
 /**
  * `RMSG-05` — the date separator's `<a>` takes `styleF`, and it does in BOTH components.

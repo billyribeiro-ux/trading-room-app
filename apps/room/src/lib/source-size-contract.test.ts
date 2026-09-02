@@ -7821,7 +7821,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       out when `MessageActionEvent` gained a fourth member and this file could not describe it. The
       prop and `runAction` both take the shared union now.
     */
-    max: 1255,
+    /*
+      1,255 -> 1,272, 2026-09-02. RMSG-06 — the compact MEMBER reaction repeater has no
+      `clickedBy` gate upstream, and this room gated all four hosts.
+
+      `m_e` at byte 1,379,950 opens the pill directly where `Oge`, `u1e` and `V1e` each wrap it in
+      `O(1, e.value.clickedBy.length > 0 ? 1 : -1)`. `addRemoveReaction` empties `clickedBy` rather
+      than deleting the key, so a reaction whose last holder removes it draws upstream as `😀 0` —
+      on a compact member row and on no other row in the product.
+
+      It was refused as a defect, and it is one. That is an argument about whether the reference's
+      behaviour is good, which is not one of the four escapes; the pill is rendered output.
+
+      The strip stays ONE snippet and takes the gate as a PARAMETER, which is what its existing
+      assertion has always been protecting — two strips is how the compact one drifted before. The
+      term passed is `reverseMessage`, the same one that already chooses between the two compact
+      containers `$1e` (admin, holding the gated `V1e`) and `__e` (member, holding `m_e`), so one
+      question keeps one answer.
+    */
+    max: 1272,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {
@@ -8740,7 +8758,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/message-renderer-differences.ts',
-    max: 183,
+    /*
+      183 -> 192, 2026-09-02. `COMPACT_MEMBER_REACTION_GATE_DIVERGENCE` became
+      `…_BUILT` and grew nine lines: why the refusal did not survive, and where the gate now comes
+      from. The constant is kept rather than deleted for the reason it was exported — the contract
+      test reads it, so the history cannot be lost by deleting a comment.
+    */
+    max: 192,
     why: 'RMSG-01..06: where app-st-message and app-st-compactmessage disagree, with the consumers beside the measurements'
   }
 ];
