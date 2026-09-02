@@ -45,6 +45,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 03:46 UTC — the read-only note had no host element, and a rule of this repository's told me where its CSS goes
+
+## NP-04
+
+`app-note`'s own `styles:[…]` array at bundle byte 1,487,671:
+
+```
+[_nghost-%COMP%]{display:block;height:100%}   .note-view[_ngcontent-%COMP%]{height:100%}
+```
+
+The update block that writes `id="summernoteEdit-<id>"` and the innerHTML belongs to the **same
+component** as that array, which settles the structure the row left open: the read-only note body is
+INSIDE `app-note` and is the `.note-view` those two rules size.
+
+`NotesPane.svelte` rendered it as a bare `<div>`. So the editing branch had a host (`NoteEditor`
+renders one) and the read-only branch had none, and neither captured rule reached it — the note did
+not fill its pane.
+
+## Where the CSS goes, which I got wrong first
+
+The obvious place is a `<style>` block on `NotesPane.svelte`, and `notes-style-contract.test.ts`
+refuses that file one outright: *"forbids the local 2px tab collapse and component-scoped Notes
+layout overrides"*. Component-scoped Notes layout fought the captured stylesheet once already, and
+the captured sheet plus the `app-presentationarea` bridge are the layout authority for this surface.
+
+Not `captured-runtime-components.css` either: it is GENERATED from `css/complete-app-styles.css`,
+refuses hand edits in its own header, and does not contain these rules — they are in the JS bundle's
+style array. The same distinction ASR-1 turns on.
+
+So they are in `app.css`, scoped under `app-presentationarea` beside the other Notes bridge rules,
+and that test now **pins the host and the rules together** — the host without them does nothing, and
+the rules without it match nothing.
+
+## G7 re-tested and held
+
+`getAllPCLogsLoading`'s two loading branches are not modelled here, and the recorded reason survives:
+upstream POSTs `getAllPCLogs` when the panel opens, while this room resolves the conversation list in
+`+page.server.ts` before the page renders, and `invalidateAll()` keeps the previous list on screen
+while it runs. **There is no instant at which the strip exists and its contents are unknown**, so
+both branches would be branches that can never render. The note already says what would make it real
+— fetching on open — so the next author finds two empty states waiting rather than the capture.
+
+**Runtime impact.** A read-only note fills its pane, as the reference's does.
+
+**Verified:** room gate exit 0 at `a6b042d` — 341 files, 6,189 passed, 1 skipped. Negative control seen red: replacing the host element with
+a `<span>`.
+
 ### 2026-09-02 03:37 UTC — a reload the reference does twice, and a log that is not product output
 
 ## STV-02 — it really is a second reload

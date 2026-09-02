@@ -59,4 +59,25 @@ describe('Notes captured stylesheet authority', () => {
     expect(notesPane).not.toContain('<style>');
     expect(notesPane).not.toContain('class="notes-pane"');
   });
+
+  it('NP-04 — the read-only note has `app-note` around it and the two rules that size it', () => {
+    /*
+      `app-note`'s own `styles:[…]` at bundle byte 1,487,671:
+
+        [_nghost-%COMP%]{display:block;height:100%}
+        .note-view[_ngcontent-%COMP%]{height:100%}
+
+      The update block that writes `id="summernoteEdit-<id>"` and the innerHTML belongs to that same
+      component, which is what settles the structure: the read-only body is INSIDE `app-note` and is
+      the `.note-view` those rules size. This pane rendered a bare `<div>`.
+
+      **The rules are in `app.css`, not in the component**, and that is this file's own rule three
+      assertions up — a component-scoped Notes override fought the captured stylesheet once already.
+      Asserted here so the pair cannot drift apart: the host element without the rules is an element
+      that does nothing, and the rules without the host are two selectors matching nothing.
+    */
+    expect(notesPane, 'the read-only note lost its host element').toContain('<app-note>');
+    expect(localCss).toContain('app-presentationarea app-note:not(:root)');
+    expect(localCss).toContain('app-presentationarea app-note:not(:root) .note-view:not(:root)');
+  });
 });

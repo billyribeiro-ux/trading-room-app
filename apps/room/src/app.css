@@ -799,6 +799,38 @@ app-presentationarea #notesTabsContent:not(:root) {
 }
 
 /*
+ * NP-04 — `app-note`'s OWN two rules, from its `styles:[…]` array at bundle byte 1,487,671:
+ *
+ *   [_nghost-%COMP%]{display:block;height:100%}
+ *   .note-view[_ngcontent-%COMP%]{height:100%}
+ *
+ * `_nghost` is the component's host element, which is `app-note`. The read-only note body is the
+ * `.note-view` those rules size, and until 2026-09-02 `NotesPane.svelte` rendered it as a bare
+ * `<div>` with no host at all, so it had neither rule and did not fill its pane.
+ *
+ * ## Why HERE and not in the component or the generated sheet
+ *
+ * Not in `NotesPane.svelte`: `notes-style-contract.test.ts` forbids that file a `<style>` block
+ * outright, because component-scoped Notes layout overrides fought the captured stylesheet once
+ * already — the captured sheet and this bridge are the layout authority for the Notes surface.
+ *
+ * Not in `captured-runtime-components.css`: that file is GENERATED from
+ * `css/complete-app-styles.css` and refuses hand edits in its own header, and these two rules are
+ * not in that capture — they are in the JS bundle's style array. The same distinction ASR-1 turns on.
+ *
+ * Scoped under `app-presentationarea` like every rule above it, so it reaches the notes surface and
+ * nothing else — `NoteEditor.svelte` carries its own scoped host rule for the EDITING branch.
+ */
+app-presentationarea app-note:not(:root) {
+  display: block;
+  height: 100%;
+}
+
+app-presentationarea app-note:not(:root) .note-view:not(:root) {
+  height: 100%;
+}
+
+/*
   Stacking correction: contain the shared screen's `z-index: 1999`.
 
   `.video-screen-container` carries `position: relative; z-index: 1999` verbatim from the captured

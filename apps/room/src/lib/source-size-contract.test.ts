@@ -2839,7 +2839,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       value goes straight out uncompared, and why an unreachable controller means "prompt" rather
       than "confirm". None of that is guessable from the code.
     */
-    max: 525,
+    /*
+      525 -> 538, 2026-09-02. NP-04 — the read-only note body gets the `<app-note>` host the
+      reference gives it, and the thirteen lines are the evidence that settles the structure.
+
+      The update block writing `id="summernoteEdit-<id>"` and the `styles:[…]` array at byte
+      1,487,671 belong to the SAME component, so the element that takes that id is INSIDE `app-note`
+      and is the `.note-view` its two rules size. This pane rendered a bare `<div>`, so the
+      read-only note had neither the host nor either rule and did not fill its pane.
+
+      The two RULES are in `app.css`, not here, and the note says why: `notes-style-contract.test.ts`
+      forbids this file a `<style>` block outright, because a component-scoped Notes override fought
+      the captured stylesheet once already. That test now pins the host and the rules TOGETHER — the
+      host without them does nothing and the rules without it match nothing.
+    */
+    max: 538,
     why: 'the note tab strip and the three confirmations; everything else passes through'
   },
   {

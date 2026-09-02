@@ -455,11 +455,27 @@
             />
           {/key}
         {:else}
-          <div
-            class="note-view"
-            id={`summernoteEdit-${note.id}`}
-            {@attach safeNoteHtml(note.contentHtml ?? '')}
-          ></div>
+          <!--
+            NP-04 — the read-only body gets the host element the reference gives it.
+
+            The update block and the `styles:[…]` array at bundle byte 1,487,671 belong to the SAME
+            component, which settles the structure the row left open:
+
+              …ei("id","summernoteEdit-",o.tab._id,""), z("innerHTML", …)
+              styles:["[_nghost-%COMP%]{display:block;height:100%}.note-view[_ngcontent-%COMP%]{height:100%}…"]
+
+            So the element that takes `id="summernoteEdit-<id>"` and the innerHTML lives INSIDE
+            `app-note` and is the `.note-view` those two rules size. The editing branch above already
+            renders one (`NoteEditor.svelte`); this branch rendered a bare `<div>`, so the read-only
+            note had neither the host nor either rule and did not fill its pane.
+          -->
+          <app-note>
+            <div
+              class="note-view"
+              id={`summernoteEdit-${note.id}`}
+              {@attach safeNoteHtml(note.contentHtml ?? '')}
+            ></div>
+          </app-note>
         {/if}
       </div>
 
