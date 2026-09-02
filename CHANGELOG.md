@@ -45,6 +45,66 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 06:03 UTC — the audit's `DELIBERATE DIVERGENCE` category was defined by a reason the owner ruled out
+
+## The systemic finding, larger than any row it contains
+
+Line 205 of `docs/decoded/room-surface-audit-2026-08-30.md`'s legend defines the disposition as
+*"matching the reference here would reproduce a defect"*. That is the exact sentence the owner's
+standing instruction excludes: **match the dump files exactly end to end**, and reproducing an
+upstream defect **is** matching.
+
+So this is not one questionable row. **Sixteen rows** rest on that sentence, and every one of them
+reads as settled while resting on a reason that no longer carries. The legend row is marked
+`RE-DEFINED` rather than quietly reworded — a silent redefinition is precisely what would leave
+them looking settled.
+
+## What replaced it
+
+The four escapes that do excuse not matching, written into the document under the legend:
+
+| # | escape | what it takes to claim it |
+| --- | --- | --- |
+| 1 | SECURITY | matching would reintroduce something `CLAUDE.md` forbids BY NAME |
+| 2 | EVIDENCE ABSENT | the value is in no capture we hold, **and the search is shown** |
+| 3 | LANGUAGE IMPOSSIBLE | proved with the actual compiler error |
+| 4 | NOT A DIVERGENCE | internal structure rather than reference-facing OUTPUT, or unreachable upstream |
+
+And the three arguments that read like escapes and are not, each already found wrong here:
+*"it reproduces an upstream defect"*; *"our server does not send that frame"* (a RECEIVER is
+transcribable whatever any server sends — wrong three times); *"it is blocked on a host we do not
+have"* (check whether the CLIENT half is separable).
+
+A **fourth outcome** is named beside them, because two rows have now landed on it: where matching
+collides with a rule `CLAUDE.md` states by name — a class with no CSS, a control whose only effect
+is changing its own label — it is neither an escape nor an agent's call. It goes to the owner. **A
+conflict between two owner rules is the one thing an agent must not settle silently in either
+direction.**
+
+Rows re-read against the table carry a `RE-READ 2026-09-02` line naming their escape; rows without
+one are marked **provisional** in as many words, so the document now says which of its own verdicts
+have been re-measured and which have not.
+
+## The first re-reading: AVD-04 holds, but not on the reason it gave
+
+It cited the retired sentence. The argument that actually carries was already one paragraph further
+down: **this pane deliberately enumerates LATE**, before permission, so `s.label` is empty for every
+device — while upstream enumerates after permission, where a blank row is a rare edge. Copying the
+expression would render a dropdown blank in the COMMON case, which is a *different rendered result*
+than the reference produces. That is escape 4 on its own terms: the divergence is in the surrounding
+timing, and using the label the reference itself computes and then discards is what keeps the OUTPUT
+matched.
+
+## One mechanical note worth keeping
+
+The new section heading is `####`, not `###`. `room-surface-audit-counts.test.ts` attributes every
+`### ` line to a row and demands each carry a disposition, so a section heading at that level is a
+row no count can see — it went red on exactly that first.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
 ### 2026-09-02 05:53 UTC — USM-18's refusal rested on a premise the bundle contradicts
 
 ## What the row said, and what is actually there

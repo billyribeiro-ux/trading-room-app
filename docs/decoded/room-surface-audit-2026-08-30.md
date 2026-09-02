@@ -202,12 +202,47 @@ exactly like a row nobody has opened yet:
 | `FIXED` | a defect of OURS removed, rather than a reference behaviour added |
 | `ALREADY BUILT` | present under a name the audit's reader did not search for |
 | `MEASURED REFUSAL` | read, measured, deliberately not built — with the measurement at the code |
-| `DELIBERATE DIVERGENCE` | matching the reference here would reproduce a defect |
+| `DELIBERATE DIVERGENCE` | **RE-DEFINED 2026-09-02 — see below.** Originally: *matching the reference here would reproduce a defect* |
 | `OWNER DECISION` | not ours to decide; what the owner has to answer is named |
 | `BLOCKED` | cannot be finished from this checkout; what would unblock it is named |
 
 The disposition is the first line under the row's heading, in bold. A row with no disposition line
 carries its `**severity** · category · reference byte` line there instead, and is open.
+
+#### `DELIBERATE DIVERGENCE` was defined by a reason the owner has since ruled out
+
+**Recorded 2026-09-02.** The definition in the table above — *"matching the reference here would
+reproduce a defect"* — is no longer sufficient on its own, and the row it appears on has been marked
+rather than quietly reworded, because sixteen rows in this document rest on that sentence and a
+silent redefinition would leave every one of them looking settled.
+
+The owner's standing instruction is **match the dump files exactly, end to end**, and it names the
+only four things that excuse not matching. Reproducing an upstream defect is not among them:
+reproducing an upstream defect **is** matching.
+
+| # | escape | what it takes to claim it |
+| --- | --- | --- |
+| 1 | **SECURITY** | matching would reintroduce something `CLAUDE.md` forbids BY NAME — client-asserted authority, one of the seven credentials crossing, a stored-XSS primitive, an httpOnly cookie read into the DOM |
+| 2 | **EVIDENCE ABSENT** | the value is in no capture this repository holds, **and the search is shown** |
+| 3 | **LANGUAGE IMPOSSIBLE** | proved with the actual compiler error |
+| 4 | **NOT A DIVERGENCE** | the marker is about internal structure rather than reference-facing OUTPUT, or the reference code is unreachable upstream (proved by the absence of a call site across the whole bundle) |
+
+Three arguments that read like escapes and are not, each of which has been found wrong here before:
+
+* *"It would reproduce an upstream defect."* That is the definition being retired.
+* *"Our server does not send that frame."* A RECEIVER is transcribable whatever any server sends —
+  found wrong three times in this repository.
+* *"It is blocked on a host we do not have."* Check whether the CLIENT half is separable first.
+
+**What this means for the sixteen rows.** Each needs re-reading against the four, and the outcome is
+one of three: it holds under a valid escape and the row says WHICH; it does not, and the row is work;
+or matching collides with a rule `CLAUDE.md` states by name — a class with no CSS, a control whose
+only effect is changing its own label — in which case it is neither an escape nor an agent's call,
+and the row is named for the owner the way `USM-18` now is. A conflict between two owner rules is
+the one thing an agent must not settle silently in either direction.
+
+Rows re-read so far carry a `RE-READ 2026-09-02` line naming their escape. Rows without one have not
+been re-read against this table yet, and their disposition should be treated as **provisional**.
 
 Also recorded per surface: how many reference behaviours were confirmed **present** here. A list of
 only gaps reads as though nothing works, and 965 behaviours were confirmed built.
@@ -10158,8 +10193,18 @@ DOMException` (which is an assertion about a value nothing checked; the module r
 
 ### AVD-04 — The dropdown shows a BLANK row for an unlabelled device upstream; the reference builds the label it needs and then throws it away
 
-**DELIBERATE DIVERGENCE 2026-08-31 — matching the reference here would reproduce a defect, and the
-measurement is recorded at `labelFor` in `#lib/device-enumeration.ts`.**
+**DELIBERATE DIVERGENCE 2026-08-31, and the measurement is recorded at `labelFor` in
+`#lib/device-enumeration.ts`.**
+
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the original wording did not earn it.** It
+said *"matching the reference here would reproduce a defect"*, which is the retired reason. The row
+holds anyway, on the sentence it already contains one paragraph down: **this pane deliberately
+enumerates LATE.** Upstream enumerates after permission has been granted, so `s.label` is populated
+and the blank row is a rare edge; here the pane opens before permission, so `s.label` is empty for
+every device and copying the expression would render a dropdown that is blank in the COMMON case.
+Matching the expression would therefore produce a DIFFERENT rendered result than the reference
+produces, which is escape 4 on its own terms — the divergence is in the surrounding timing, and
+using the label the reference itself computed is what keeps the OUTPUT matched.
 
 The reference computes the label, byte 2,162,800:
 
