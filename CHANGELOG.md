@@ -45,6 +45,59 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 21:17 UTC — the room was opened in a browser, and the CSS changes were verified there
+
+**Runtime impact: NO.** One new end-to-end case and one config docblock. What changed is what this
+file is allowed to claim: every verification note today said *"nothing was opened in a browser"*, and
+that was an inherited belief rather than a measurement.
+
+## The e2e suite runs in this container, and did not because of one symlink
+
+`pnpm run test:e2e` failed on every spec with
+
+> `browserType.launch: Executable doesn't exist at
+> /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell`
+
+Not a harness problem and not an application problem: **Playwright 1.62.1 asks for Chromium build
+1234 and the image ships 1194**, with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, so nothing fetches the
+missing one. One symlink from the expected path to the installed `headless_shell` and the suite runs
+green. **15 passed** on the first real run — the room shell, the login handoff, a refused handoff,
+the dropdowns, the private-chat scroll rules, the room-config seam and the note-carousel CSSOM.
+
+The fix belongs in the environment and not in `playwright.config.ts` — pinning an `executablePath`
+there would make CI launch a binary the runner does not have — so it is written into that file's
+docblock as the recipe. It is recorded because the failure names a PATH and not a CAUSE, and reads
+exactly like *"the browser cannot run here"*, which is how a session decides browser verification is
+unavailable and writes it off for the rest of the day. That is the third blocker today that was an
+inference wearing a measurement's clothes.
+
+## And it verified the two stylesheet changes, which nothing else could
+
+A 16th case, in `room-renders.spec.ts`, reads the browser's own CSSOM:
+
+* **XCP-09** — the generated `captured-extra-chat.css` is asserted as TEXT by
+  `extra-chat-styles-contract.test.ts`, and text is exactly what a stylesheet is not. The selectors
+  it ships are the kind a parser drops SILENTLY —
+  `app-extra-chat .roomLog:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *)`, a `:not()`
+  containing a compound `:is()` with a descendant combinator, legal in Selectors 4 and in nothing
+  before it. A browser that refused it would discard the whole rule with no error, the second chat
+  column would render unstyled exactly as before the generator existed, and every assertion about
+  that file would stay green because they are all about its bytes. **Measured: 20+ rules addressing
+  `app-extra-chat` are live in the CSSOM**, `.roomLog` among them with `overflow-y: scroll`, plus
+  `.txt-area`, `.chatTabs` and `.counterBadge`. `cssText` is the browser's re-serialisation of a rule
+  it ACCEPTED; a rejected rule is not in that list at all.
+* **USM-18** — `chat-uploaded-img-sm` resolves to no rule in any stylesheet the page holds, which is
+  what the capture does and what must stay true. The way this breaks is somebody adding the rule to
+  `app.css` to "finish" the feature, and that is now caught in the only place it can be seen.
+
+Two negative controls seen red: the extra-chat import removed from `app.css` (the rule count
+collapses), and a `.chat-uploaded-img-sm` rule added to it (the absence assertion fires by name).
+Full suite re-run after restoring: **16 passed**.
+
+`pnpm run gate` exit 0.
+
+---
+
 ### 2026-09-02 20:56 UTC — the last two blocked rows re-measured; both hold, both were imprecise
 
 **Runtime impact: NO.** Documentation and one contract docblock. The two rows this closes out are
