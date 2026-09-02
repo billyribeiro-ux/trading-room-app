@@ -5387,7 +5387,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       loop would be two places to get the progress dialog, the `Upload Failed...` wording and the
       join-with-spaces wrong.
     */
-    max: 851,
+    /*
+      851 -> 874, 2026-09-02, and no code changed: PAM-17's disposition, plus a DEFECT found while
+      writing it that neither the audit nor the re-triage names.
+
+      The refusal holds and is re-measured rather than inherited: `dontPush` would instruct a
+      downstream that does not exist — nothing in `services/api` reads a dispatch flag and no Twilio,
+      Resend, SendGrid, APNs or Firebase client is in it, asserted in
+      `alert-report-modal-contract.test.ts` — and `scheduled-alerts.remote.ts` refuses six of the
+      reference's twelve payload fields on the same ground.
+
+      **What that argument never covered is the CHECKBOX.** `PostAlertModal.svelte` renders one, the
+      value is threaded through `submission.dontPush` into `#persistAlert`, and it dies there. A
+      presenter ticks "don't push" and the room records nothing and says nothing. No disposition list
+      names it: `INERT_ACTIONS` covers the user-action dispatcher, not a modal's own checkboxes.
+
+      The note ends with two coherent endings and takes neither, because both are the owner's — stop
+      rendering a control the capture has, or store an intention nothing performs. The sentence it
+      replaced, *"has no consumer in this room yet"*, is what let the checkbox hide behind the field.
+    */
+    max: 874,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
   },
   {

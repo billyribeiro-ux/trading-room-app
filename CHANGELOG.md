@@ -45,6 +45,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 04:35 UTC — a checkbox nobody had noticed is inert, and one row that needs a sentence from the owner
+
+## PAM-17 — the refusal holds, and it was hiding an inert control
+
+`dontPush` is computed from a checkbox, threaded through `submission.dontPush` into `#persistAlert`,
+and `void`ed there. The recorded reason: `post-alert.remote.ts` refuses the field rather than accept
+one nothing consumes.
+
+**That policy is right and it re-measures.** Nothing in `services/api` reads a dispatch flag, and no
+Twilio, Resend, SendGrid, APNs or Firebase client is in it — the sweep added for RPT-01 asserts both.
+`scheduled-alerts.remote.ts` refuses six of the reference's twelve payload fields on exactly this
+ground.
+
+**What it never covered is the CHECKBOX.** `PostAlertModal.svelte` renders one, and a presenter who
+ticks it gets nothing recorded, nothing sent and nothing said. That is an inert control, and no
+disposition list names it: `INERT_ACTIONS` covers the user-action dispatcher, not a modal's own
+checkboxes. **Neither the audit nor the re-triage found this** — it fell out of writing down why the
+field is refused, which is the argument for writing these down.
+
+Two coherent endings and both are the owner's, so the note takes neither: stop rendering a control
+the capture has, or carry the flag into `alerts.dispatch` — whose column already has
+`{sms,email,twitter,push,cross_post}` and no actor — and accept that the room then stores an
+intention nothing performs. The sentence that used to end this note, *"has no consumer in this room
+yet"*, is what let the checkbox hide behind the field.
+
+## PAM-02 — blocked on one sentence, and the sentence is written out
+
+The reference gates its "Send Text" control on `sessData.twillioApiSID`. The proposal is this
+repository's own pattern: derive `hasTextAlerts: Boolean(settings.twillioApiSID)` on the CONTROLLER
+and send only that bit — the credential stays behind, the question travels, exactly as
+`playChatMessageSoundFor` → `chatSoundForEmailHashes` does.
+
+**Not built, and not because the pattern is wrong.** `twillioApiSID` is one of the seven in
+`CREDENTIALS_THE_REFERENCE_LEAKS`, whose comment says they *"must NEVER leave this list by being
+wired"*. A derived boolean is not wiring the setting — and that distinction is precisely the one an
+owner draws rather than an agent, on the same standing that refused `T5-24` four times.
+
+The bit it would disclose is "text alerts are configured", which the reference's own UI already shows
+by drawing the control; it says nothing about the credential's value. Recorded in
+`setting-coverage-contract.test.ts` beside the list it turns on, and **asserted** rather than left in
+prose, so the pending decision cannot go stale: if the owner permits it, the work is `hasTextAlerts`
+on the controller, `hasTxt` on `room/gates.ts`, and the control's gate in `PostAlertModal.svelte`.
+
+**Runtime impact.** None. Both rows are records.
+
+**Verified:** room gate exit 0 at `91f87e1` — 341 files, 6,199 passed, 1 skipped.
+
 ### 2026-09-02 04:28 UTC — a menu click that jumps the room to the top, and a vendor chain that is dead in both codebases
 
 ## STB-06 — both halves, and the second looks like a regression
