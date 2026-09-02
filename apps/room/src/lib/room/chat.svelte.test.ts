@@ -3,7 +3,7 @@ import { flushSync } from 'svelte';
 import { describe, expect, it } from 'vitest';
 
 import { EXTRA_COMPOSER, RoomChat } from './chat.svelte';
-import { unreadFor } from './chat-tab-unread';
+import { unreadFor, withoutChannel } from './chat-tab-unread';
 
 /*
   The seventh room state class. The reactivity block at the bottom is the only gate that can see the
@@ -330,6 +330,49 @@ describe('the unread counters', () => {
     expect(unreadFor(chat.unread, 'off-topic').messages).toBe(2);
     expect(unreadFor(chat.unread, 'vip').messages).toBe(1);
   });
+
+  it.each(['constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty'])(
+    'returns the SAME map when clearing a channel named %s that was never counted',
+    (channel) => {
+      /*
+        The other half of the prototype-chain fix, and the reason it needs its own assertion: this
+        one is about IDENTITY, not values. `withoutChannel` used to ask `channel in counts`, and `in`
+        walks the prototype chain — so opening a channel named `toString` took the copy branch,
+        allocated an object identical to the one it replaced, and reassigned a `$state.raw` field.
+        Every tab in the strip re-rendered to remove a key that was never there.
+
+        `toBe`, not `toEqual`: the values were always right, which is exactly why nothing caught it.
+      */
+      const counts = { main: { messages: 2, mentions: 0 } };
+      expect(withoutChannel(counts, channel)).toBe(counts);
+    }
+  );
+
+  it.each(['constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty'])(
+    'answers zero for a channel named %s, which is a legal channel name',
+    (channel) => {
+      /*
+        THE PROTOTYPE CHAIN, and these are not hypothetical names. Channel names are the room
+        owner's, out of `chatTabsWithBadges`, and `parseChatTabsWithBadges` refuses only a
+        built-in collision, a duplicate, a bad `badges` value, an over-long name and control
+        characters. Every name here passes all five.
+
+        `unreadFor` used to be `counts[channel] ?? NOTHING_UNREAD`, so each of these returned a
+        FUNCTION (or `Object.prototype`), which is not nullish, so the fallback never fired and the
+        caller read `.messages` off it as `undefined` — the literal text `undefined` in the badge
+        that `unreadFor`'s own docblock exists to prevent.
+
+        Executed on the real column rather than on a hand-built map, so the fix has to hold through
+        `RoomChat` and `$state.raw` and not merely in the pure function.
+      */
+      const chat = room();
+      expect(unreadFor(chat.unread, channel)).toEqual({ messages: 0, mentions: 0 });
+
+      /* And the counts still WORK for such a channel, which is the other half. */
+      chat.chatArrived(channel, arrival);
+      expect(unreadFor(chat.extraUnread, channel).messages).toBe(1);
+    }
+  );
 
   it('counts a mention only when the viewer is a presenter', () => {
     const member = room();

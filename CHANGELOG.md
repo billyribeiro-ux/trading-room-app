@@ -45,6 +45,108 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 19:40 UTC — six carried findings closed, and a twelfth unenforced verifier
+
+**Runtime impact: YES for two of them** — the typing indicator stops sending a frame per keystroke,
+and the unread badge stops reading the prototype chain. The rest are a deleted script, a deleted
+export, four corrected documented totals and two corrected comments.
+
+Each was re-measured before being touched. Two of the carried claims turned out to be wrong about
+the reference and are recorded as refuted rather than fixed.
+
+## The typing indicator sent one POST per keystroke
+
+`TypingSignal.stop()` cleared its timer under a guard and then sent UNCONDITIONALLY, while its own
+doc comment said *"Idempotent."*
+
+The reference makes a whitespace-only box a STOP — `onKey`, byte **1,440,194**:
+`0 === $("#textAreaTxt").val().trim().length ? refreshTypingStatus(!0) : updateLastTypedTime()`. So
+the carried claim that our `.trim()` was a divergence is REFUTED: upstream trims too, and this file
+had never quoted the caller that proves it. What follows from it is the defect: every keystroke into
+a box holding only spaces took the stop path, and `refreshTypingStatus(!0)` re-sends. Upstream those
+redundant frames ride an open websocket; here each is an HTTP round trip through a remote function.
+The class exists to make a burst cost two frames, and a control character defeated it.
+
+`stop()` now returns early when there is no burst to stop. **A deliberate divergence in frame count
+and not in output**: `notyping` is idempotent at the receiver, so no member can observe the
+difference. Argued at the code and at the ceiling entry.
+
+## The unread badge read the prototype chain
+
+`unreadFor` was `counts[channel] ?? NOTHING_UNREAD`. A channel named `constructor`, `toString` or
+`valueOf` returns a function and `__proto__` returns `Object.prototype` — none nullish, so the
+fallback never fired and the caller read `.messages` off a function as `undefined`, putting the
+literal text into the badge that function's own docblock exists to prevent. `withoutChannel` asked
+`channel in counts`, which walks the chain too, so opening such a channel allocated a copy identical
+to the original and reassigned a `$state.raw` field, re-rendering every tab to remove a key that was
+never there.
+
+**Not hypothetical names.** Channel names are the room owner's, and `parseChatTabsWithBadges` refuses
+only a built-in collision, a duplicate, a bad `badges` value, an over-long name and control
+characters. `constructor` passes all five.
+
+## A twelfth verifier enforced by nobody
+
+`verify-documented-test-counts.mjs` is the LAST step of the controller's `test`, and nothing invokes
+`test` — CI runs `test:gates && test:unit`, and the local `gate` ran the same two. So the four
+documented totals in `ENGINEERING-SSOT.md`, `PRODUCTION-CUTOVER-PLAN.md` and
+`SVELTE-CONFORMANCE-AUDIT.md` had drifted to **1077 tests against a suite of 1176, and 104 files
+against 116**, with nothing anywhere going red.
+
+This is the same shape as the eleven verifiers found unenforced on 2026-08-29, one round later, and
+it could not be fixed the same way: `test:gates` is asserted to be a literal PREFIX of `test`, and
+this step is at the end. So it gets its own script — `test:counts:report`, which reads the report
+`test:unit` has just written rather than running Vitest a second time — added to CI **and** to the
+gate, which `package-scripts-contract.test.ts` requires to be equal step for step.
+
+## A stale fork of the supply-chain evidence builder
+
+`apps/controller/scripts/build-api-release-evidence.sh`, 989 lines against the live script's 1,028,
+referenced by no workflow, no verifier and no package script. What made it a hazard rather than
+clutter is what a stale fork of THAT script contains: **its own pinned tool versions** — Syft 1.44.0
+against 1.51.1, Grype 0.112.0 against 0.118.0, and an older `rust:` builder digest. Running the copy
+sitting beside the other controller scripts would have produced release evidence from a scanner
+generations behind the policy it is measured against, and every check downstream would have passed.
+
+Deleted, and `verify-api-release-artifact.mjs --verify-contract` now asserts there is exactly ONE
+tracked copy at the pinned path. `git ls-files` rather than a directory walk, with status 1 (no
+match) branched apart from status ≥2 (git failed) — the distinction `naming-boundary.test.ts` learned
+the expensive way.
+
+## Three corrections and a deletion
+
+* **`gates.ts`** carried the only second-hand fact in the file: the `vo` mapping quoted from
+  `HANDOFF.md` because "the query-parameter block belongs to the app service" rather than to the 51
+  decoded components. True, and unnecessary — the pinned bundle ships here. The parser is quoted now
+  from byte **2,599,050**, with all four query parameters assigned out of one block. A caveat traded
+  for a citation.
+* **`arrivals.ts`** said the `alertQuestions` read was unbounded and "returns every question the room
+  has ever had". `loadQuestionsForAlerts` filters `inArray(alertQuestions.alertId, …)` against the
+  loaded alert page plus the captured fixtures. The conclusion did not move — scoped to fifty alerts
+  is not bounded by a row count, because one alert can carry an unbounded thread — but the next piece
+  of work changed address, from "bound the server read" to "bound the questions per alert".
+* **`gates.ts`'s "eighteen predicates"** was checked too and is CORRECT: eighteen getters. Refuted,
+  not fixed.
+* **`HERO_HEADLINE`** was exported and read by nothing — not the hero, not a `<title>`, not a meta
+  description, not a test. Deleted, with the reason a joined form should be derived at its consumer.
+
+## Verified
+
+Nine negative controls seen red, each with its anchor asserted present first: `stop()` restored to
+its unconditional form; `.trim()` removed; the announce guard removed; `unreadFor` restored to the
+`??` read; `withoutChannel` restored to `in`; the gate losing the counts step while CI keeps it; CI
+losing it while the gate keeps it; a documented total drifted by one; and a second build script
+re-added, which fails with the exact message naming both paths.
+
+Five new executed cases in `typing-indicator-contract.test.ts` count FRAMES rather than reading
+source, with the remote mocked — the defect was invisible to every source-text assertion in that
+file, to `svelte-check` and to the type system. Ten new cases in `chat.svelte.test.ts` cover the five
+prototype names on the real column, values and identity separately.
+
+`pnpm run gate` exit 0 in both apps. Nothing was opened in a browser.
+
+---
+
 ### 2026-09-02 19:12 UTC — XCP-09 closed: the second chat column has its stylesheet
 
 **Runtime impact: YES.** The extra chat column renders with its own component styles for the first

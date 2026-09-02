@@ -1,5 +1,22 @@
 import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { TypingSignal } from './room/typing-signal.js';
+
+/*
+  The wire, mocked, so the LAST describe in this file can count frames instead of reading source.
+
+  `vi.hoisted` because `vi.mock` is lifted above the imports and the factory would otherwise close
+  over a binding that does not exist yet. The array is the assertion subject: one entry per frame
+  `TypingSignal` actually sent, in order, `true` for `typing` and `false` for `notyping`.
+*/
+const wire = vi.hoisted(() => ({ sent: /** @type {boolean[]} */ [] as boolean[] }));
+
+vi.mock('../routes/typing.remote', () => ({
+  setTyping: async ({ typing }: { chatChannel: string; typing: boolean }) => {
+    wire.sent.push(typing);
+  }
+}));
 
 import {
   TYPING_DELAY_MS,
@@ -167,6 +184,94 @@ describe('the send is debounced into TWO frames', () => {
   */
   it('does not surface a failure to the member', () => {
     expect(signal).toContain('} catch {');
+  });
+});
+
+describe('the frame count, EXECUTED rather than read as text', () => {
+  /*
+    Everything above this line asserts the SOURCE of `TypingSignal`, which is what caught the wires
+    and is exactly what cannot catch a count. The defect this block exists for was invisible to all
+    of it, to `svelte-check` and to the type system: `stop()` cleared its timer under a guard and
+    then sent UNCONDITIONALLY, while its own doc comment said "Idempotent."
+
+    Byte 1,440,194 makes a whitespace-only box a STOP — `0 === val().trim().length ?
+    refreshTypingStatus(!0) : updateLastTypedTime()` — so every keystroke into a box holding only
+    spaces took that path. Upstream those redundant frames ride a websocket that is already open;
+    here every frame is an HTTP round trip through a remote function, so it was one POST per
+    keystroke for as long as somebody leaned on the space bar. This class exists to make a burst cost
+    two frames.
+
+    The remote is mocked rather than the class rewritten around an injected sender: the WIRE is what
+    is being counted, and an injection point would be a seam invented for the test that the shipped
+    code would then have to carry forever.
+  */
+  beforeEach(() => {
+    wire.sent.length = 0;
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A signal with `RoomChat`'s `amITyping` semantics, which is the only state it does not own. */
+  const make = () => {
+    let announced = false;
+    return new TypingSignal({
+      channel: () => 'main',
+      announce: () => {
+        if (announced) return false;
+        announced = true;
+        return true;
+      },
+      clear: () => {
+        announced = false;
+      },
+      delayMs: 5_000
+    });
+  };
+
+  it('costs TWO frames for a burst, however many keys it holds', async () => {
+    const signalUnderTest = make();
+    for (const value of ['h', 'he', 'hel', 'hell', 'hello']) signalUnderTest.typed(value);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(wire.sent).toEqual([true]);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(wire.sent).toEqual([true, false]);
+  });
+
+  it('sends ONE notyping for a box held full of spaces, not one per keystroke', async () => {
+    /*
+      THE REGRESSION TEST. One real key, then five whitespace keystrokes: one `typing` and exactly
+      one `notyping`. Before the guard this was six frames, and it grew with the member's patience.
+    */
+    const signalUnderTest = make();
+    signalUnderTest.typed('a');
+    for (const value of [' ', '  ', '   ', '    ', '     ']) signalUnderTest.typed(value);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(wire.sent).toEqual([true, false]);
+  });
+
+  it('sends nothing at all when a member blurs a composer they never typed in', async () => {
+    const signalUnderTest = make();
+    signalUnderTest.stop();
+    signalUnderTest.stop();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(wire.sent).toEqual([]);
+  });
+
+  it('announces again after a burst has ended, so the debounce is not a one-shot', async () => {
+    /*
+      The other side of the guard: making `stop()` idempotent must not make it terminal. A member who
+      pauses for six seconds and types again is a second burst and costs two more frames.
+    */
+    const signalUnderTest = make();
+    signalUnderTest.typed('a');
+    await vi.advanceTimersByTimeAsync(5_000);
+    signalUnderTest.typed('b');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(wire.sent).toEqual([true, false, true, false]);
   });
 });
 

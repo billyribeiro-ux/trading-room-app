@@ -47,9 +47,26 @@ const NOTHING_UNREAD: ChatTabUnread = { messages: 0, mentions: 0 };
  * reads `unreadMsgs[e.name]` straight out of a bare object and relies on `undefined` being falsy in
  * both the gate and the interpolation — which works in a template that renders `undefined` as the
  * empty string, and would put the literal text `undefined` in a Svelte badge.
+ *
+ * ## `Object.hasOwn`, and it is a correctness fix rather than a style preference
+ *
+ * This was `counts[channel] ?? NOTHING_UNREAD`, and that reads the PROTOTYPE CHAIN. A channel named
+ * `constructor` returns a function; `toString` and `valueOf` return functions; `__proto__` returns
+ * `Object.prototype`. None of them is nullish, so the `??` never fires and the caller gets an object
+ * that is not a `ChatTabUnread` — `.messages` is `undefined`, and the badge this feeds renders the
+ * literal text this docblock's own paragraph above exists to prevent.
+ *
+ * NOT A HYPOTHETICAL NAME. Channel names are the room owner's, from `chatTabsWithBadges`, and
+ * `parseChatTabsWithBadges` refuses exactly three things: a collision with a built-in, a duplicate,
+ * and a bad `badges` value — plus `MAX_CHAT_TAB_NAME` and control characters. `constructor` is a
+ * legal channel name in every one of those checks, and the failure it produces is silent.
+ *
+ * The map is a plain object rather than a `Map` because it is `$state.raw` and is replaced whole,
+ * which is argued at {@link withArrival}; `Object.hasOwn` is what makes that shape safe rather than
+ * merely cheap.
  */
 export function unreadFor(counts: ChatTabUnreadCounts, channel: string): ChatTabUnread {
-  return counts[channel] ?? NOTHING_UNREAD;
+  return Object.hasOwn(counts, channel) ? counts[channel] : NOTHING_UNREAD;
 }
 
 /**
@@ -81,9 +98,14 @@ export function withArrival(
  * the end of `switchChatChannel`. DELETES the key rather than writing two zeroes: `unreadFor`
  * already answers absent as zero, so a zero row would be a second spelling of the same fact and one
  * more entry to carry for the life of the page.
+ *
+ * `Object.hasOwn` rather than `in`, for the reason {@link unreadFor} gives at length and for one
+ * more that belongs here: `in` walks the prototype chain too, so switching to a channel named
+ * `toString` took the copy branch, allocated a new object identical to the old one, and reassigned a
+ * `$state.raw` field — re-rendering every tab in the strip to remove a key that was never there.
  */
 export function withoutChannel(counts: ChatTabUnreadCounts, channel: string): ChatTabUnreadCounts {
-  if (!(channel in counts)) return counts;
+  if (!Object.hasOwn(counts, channel)) return counts;
   const { [channel]: _cleared, ...remaining } = counts;
   return remaining;
 }

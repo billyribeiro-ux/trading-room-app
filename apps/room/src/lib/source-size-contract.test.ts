@@ -4302,7 +4302,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/room/arrivals.ts',
-    max: 155,
+    /*
+      RAISED 155 -> 164 on 2026-09-02, and the added lines are a correction rather than new material.
+
+      The docblock said the `alertQuestions` read in `+page.server.ts` was a `.select(...).all()`
+      with no `.limit()` that "returns every question the room has ever had". It is not:
+      `loadQuestionsForAlerts` filters `inArray(alertQuestions.alertId, …)` against the loaded alert
+      page plus the captured fixtures, so it is scoped to about fifty alerts.
+
+      The CONCLUSION did not move, and saying why is what costs the lines: scoped to fifty alerts is
+      not bounded by a row count, because one busy alert can carry an unbounded thread. So the honest
+      order changed from "bound the server read" to "bound the questions per alert", which is a
+      different piece of work at a different address. A corrected premise that leaves the answer
+      standing is exactly the case where deleting the old sentence would lose the reasoning.
+    */
+    max: 164,
     why: 'which rows in a wholesale-replaced list are new; a plain .ts on purpose'
   },
   {
@@ -4390,7 +4404,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       keeping the writers pure is what makes that field's `$state.raw` correct: every path returns a
       NEW object, which is much easier to see in eighty lines than inside a class of four hundred.
     */
-    max: 90,
+    /*
+      RAISED 90 -> 112 on 2026-09-02, for two `Object.hasOwn` calls and the twenty lines that say why
+      they are a correctness fix rather than a style preference.
+
+      `unreadFor` was `counts[channel] ?? NOTHING_UNREAD`, which reads the PROTOTYPE CHAIN. A channel
+      named `constructor`, `toString` or `valueOf` returns a function and `__proto__` returns
+      `Object.prototype` — none of them nullish, so the fallback never fired and the caller read
+      `.messages` off a function as `undefined`, putting the literal text into the badge that
+      function's own docblock exists to prevent. `withoutChannel` asked `channel in counts`, and `in`
+      walks the chain too, so opening such a channel allocated a copy identical to the original and
+      reassigned a `$state.raw` field, re-rendering every tab to remove a key that was never there.
+
+      NOT HYPOTHETICAL NAMES, which is the half that justifies the length: channel names are the room
+      owner's, and `parseChatTabsWithBadges` refuses only a built-in collision, a duplicate, a bad
+      `badges` value, an over-long name and control characters. `constructor` passes all five. The
+      comment has to say that, because the fix looks like defensive programming until you know the
+      input is attacker-adjacent configuration.
+    */
+    max: 112,
     why: 'the per-channel unread arithmetic; a plain .ts because the state lives on RoomChat'
   },
   {
@@ -6896,7 +6928,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       separate props, which is how the navbar ended up with two of the three settings and not the
       flag. One accessor answers the whole feature now.
     */
-    max: 420,
+    /*
+      RAISED 420 -> 436 on 2026-09-02, and every line of it is evidence that replaced a caveat.
+
+      `viewerOnlyMode` carried the only second-hand fact in this file: a note saying the `vo` mapping
+      came from `HANDOFF.md` quoting the bundle at ~2595500, and that it could not be checked here
+      because `docs/source/components/**` decodes the 51 COMPONENTS while the query-parameter block
+      belongs to the app service. Both halves were true and neither mattered — the pinned bundle
+      ships in this repository. The parser is quoted now, from byte 2,599,050, with all four of this
+      app's query parameters assigned out of the one block, which is why `r`, `vo`, `co` and
+      `dscreen` are read the same way here.
+
+      A caveat traded for a citation is the trade this file's ceiling exists to allow.
+    */
+    max: 436,
     why: 'the eighteen view gates; getters not derived fields, so a thunk assigned in the constructor is read at call time'
   },
   {
@@ -6915,7 +6960,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `lib/server/`. That is a real gap in the ratchet — the same one components had until this
       morning — and it is named rather than quietly worked around.
     */
-    max: 100,
+    /*
+      RAISED 100 -> 139 on 2026-09-02, and the code is FIVE lines: `stop()` now returns early when
+      there is no burst to stop.
+
+      The other thirty-four are the transcription that was missing and the divergence that needed it.
+      This file quoted `refreshTypingStatus` and `updateLastTypedTime` and never quoted the caller
+      that chooses between them — `onKey`, byte 1,440,194 — which is where the `.trim()` comes from
+      and therefore the whole reason a whitespace-only box is a STOP. Without that quotation the
+      early return reads like a room-invented optimisation instead of the thing that keeps a
+      transcription affordable.
+
+      And it IS a divergence, argued rather than slipped in: with `force = true` the reference
+      re-sends `notyping` on every keystroke for as long as the box stays whitespace, and again on
+      every blur. Upstream those frames ride an open websocket; here each one is an HTTP round trip
+      through a remote function, so reproducing them meant one POST per keystroke and defeated the
+      two-frames-per-burst property this class exists for. No member can observe the difference —
+      `notyping` is idempotent at the receiver — so the divergence is in frame count, which is
+      internal, and not in output.
+
+      The method's own doc comment claimed "Idempotent." while it cleared the timer under a guard and
+      then sent unconditionally. That sentence is the reason a paragraph rather than a line: a comment
+      that states an invariant the next line breaks is the failure mode this whole file is a defence
+      against.
+    */
+    max: 139,
     why: 'the send half of the typing indicator - a debounce that produces two frames per burst'
   },
   {

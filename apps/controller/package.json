@@ -18,6 +18,7 @@
     "format:check": "prettier --check .",
     "test": "pnpm run schema:verify && pnpm run backend:migrations:verify && pnpm run backend:release:verify && pnpm run evidence:verify && pnpm run privacy:verify && pnpm run breakpoints:verify && pnpm run manage:styles && pnpm run account:contract && pnpm run home:contract && pnpm run fonts:verify && pnpm run room-login:contract && pnpm run runtime:http && pnpm run test:unit && node scripts/verify-documented-test-counts.mjs --report .vitest-report.json",
     "test:counts": "node scripts/verify-documented-test-counts.mjs",
+    "test:counts:report": "node scripts/verify-documented-test-counts.mjs --report .vitest-report.json",
     "test:gates": "pnpm run schema:verify && pnpm run backend:migrations:verify && pnpm run backend:release:verify && pnpm run evidence:verify && pnpm run privacy:verify && pnpm run breakpoints:verify && pnpm run manage:styles && pnpm run account:contract && pnpm run home:contract && pnpm run fonts:verify && pnpm run room-login:contract",
     "test:unit": "vitest run --coverage --reporter=default --reporter=json --outputFile=.vitest-report.json",
     "test:e2e": "playwright test",
@@ -49,7 +50,7 @@
     "manage:styles": "node scripts/verify-manage-styles.mjs",
     "api-post-routes:extract": "node scripts/extract-api-post-routes.mjs",
     "emoji:extract": "node scripts/extract-emoji-picker.mjs",
-    "gate": "pnpm run format:check && pnpm run lint && pnpm run check && pnpm run test:gates && pnpm run test:unit && pnpm run build"
+    "gate": "pnpm run format:check && pnpm run lint && pnpm run check && pnpm run test:gates && pnpm run test:unit && pnpm run test:counts:report && pnpm run build"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.8.1",

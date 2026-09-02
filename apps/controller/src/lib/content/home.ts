@@ -16,9 +16,17 @@ export const BRAND = 'tradingroom.app';
 
 export const HERO_EYEBROW = 'Live trading-room infrastructure';
 
-export const HERO_HEADLINE_LINES = ['The trading floor,', 're-engineered.'] as const;
+/*
+  TWO LINES, and the break is the design rather than a wrap: `HeroCinematic.svelte` renders
+  `[0]` and `[1]` as separate elements so each can carry its own reveal.
 
-export const HERO_HEADLINE = HERO_HEADLINE_LINES.join(' ');
+  `HERO_HEADLINE`, the joined single string, used to sit here and was read by NOTHING — not the
+  hero, not a `<title>`, not a meta description, not a test. It was removed on 2026-09-02 under
+  this repository's rule that nothing exists without a consumer. If a joined form is ever needed
+  (a document title, an og:title), derive it AT the consumer: a second exported spelling of the
+  same words is a second thing to keep in step with the first.
+*/
+export const HERO_HEADLINE_LINES = ['The trading floor,', 're-engineered.'] as const;
 
 export const HERO_SUB =
   'tradingroom.app puts your entire desk — HD screen-share, voice, chat, and trade alerts — on one ' +

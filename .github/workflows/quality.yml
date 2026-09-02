@@ -208,10 +208,19 @@ jobs:
         # `package-scripts-contract.test.ts` asserts so the two cannot drift apart. Everything is
         # local — each was run individually in a container with no PostgreSQL and no preview, and all
         # eleven passed — so nothing here can go red because something else is down.
+        #
+        # `test:counts:report` JOINED ON 2026-09-02, and it is the twelfth verifier found enforced by
+        # nobody — the same defect as the eleven above, one round later. It is the LAST step of
+        # `test`, so it can never be part of `test:gates`, which the contract asserts is a literal
+        # PREFIX. Four documented totals in `ENGINEERING-SSOT.md`, `PRODUCTION-CUTOVER-PLAN.md` and
+        # `SVELTE-CONFORMANCE-AUDIT.md` had drifted to 1077 tests against a suite of 1176 and 104
+        # files against 116, and nothing anywhere went red. It reads the report `test:unit` has just
+        # written rather than running Vitest a second time, so it costs nothing and must follow it.
         run: |
           if [ "${{ matrix.app }}" = "controller" ]; then
             pnpm run test:gates
             pnpm run test:unit
+            pnpm run test:counts:report
           else
             pnpm run test
           fi

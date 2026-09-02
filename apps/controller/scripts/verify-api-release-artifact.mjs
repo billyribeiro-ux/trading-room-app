@@ -8,6 +8,7 @@
  * expiring exceptions rather than a scanner-wide ignore flag.
  */
 
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -558,6 +559,47 @@ function runSelfTest() {
   expect(severityMerged.blocked.length === 1, 'duplicate sources must retain the highest reported severity');
 }
 
+/**
+ * Exactly ONE `build-api-release-evidence.sh` in the tree, at the path this file pins.
+ *
+ * A SECOND COPY EXISTED until 2026-09-02, at `apps/controller/scripts/`, 989 lines against the live
+ * script's 1,028, referenced by nothing — not the workflow, not this verifier, not a package script.
+ * What made it a hazard rather than clutter is what a stale fork of THIS script contains: its own
+ * pinned tool versions. It carried Syft 1.44.0 against 1.51.1, Grype 0.112.0 against 0.118.0, and an
+ * older `rust:` builder digest. Somebody running the copy that is right beside the other controller
+ * scripts would have produced supply-chain evidence from a scanner generations behind the one the
+ * policy was written against, and every check downstream would have passed.
+ *
+ * `git ls-files` rather than a directory walk: the question is what is TRACKED, a build output or a
+ * developer's scratch copy is not the hazard, and the answer does not depend on what is on disk.
+ * Status is branched explicitly — 1 means "no match" and is itself a failure here, anything above
+ * that is git failing to run, which must not be read as an empty result. That distinction is the one
+ * `naming-boundary.test.ts` learned the expensive way.
+ */
+function assertOneBuildScript() {
+  const found = spawnSync('git', ['ls-files', '*build-api-release-evidence.sh'], {
+    cwd: REPOSITORY_ROOT,
+    encoding: 'utf8'
+  });
+  if (found.error) fail(`could not run git ls-files: ${found.error.message}`);
+  if (found.status !== 0 && found.status !== 1) {
+    fail(`git ls-files failed with status ${found.status}: ${found.stderr?.trim() ?? '(no stderr)'}`);
+  }
+
+  const paths = (found.stdout ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .sort();
+  const expected = 'scripts/build-api-release-evidence.sh';
+  if (paths.length !== 1 || paths[0] !== expected) {
+    fail(
+      `expected exactly one tracked build script at ${expected}; found ${paths.length ? paths.join(', ') : '(none)'}. ` +
+        'A second copy carries its own tool pins and would build release evidence with a different scanner.'
+    );
+  }
+}
+
 async function verifyContract() {
   const [policyFile, workflow, dockerfile, buildScript, evidenceDoc, syftConfig, grypeConfig] = await Promise.all([
     readJson(POLICY_PATH, 'release policy'),
@@ -569,6 +611,7 @@ async function verifyContract() {
     readFile(GRYPE_CONFIG_PATH, 'utf8')
   ]);
   validatePolicy(policyFile.value);
+  assertOneBuildScript();
   if (syftConfig !== '{}\n') fail('Syft release config must remain an explicit empty YAML document');
   if (grypeConfig !== 'ignore: []\nmatch-upstream-kernel-headers: true\n') {
     fail('Grype release config must disable user ignores and include upstream kernel-header matches');

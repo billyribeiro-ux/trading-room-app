@@ -140,12 +140,28 @@ export class RoomGates {
    * block. `?vo=2` additionally sets `viewerOnlyModeLimited` upstream; nothing in this room reads
    * that yet, so it is deliberately not modelled here rather than added as state with no consumer.
    *
-   * PROVENANCE, stated because it is the one fact in this change that was not re-read this session:
-   * the `vo` -> `viewerOnlyMode` mapping comes from `HANDOFF.md`, which quotes it from the minified
-   * bundle at ~2595500. It is NOT in `docs/source/components/**` — that tree decodes the 51
-   * COMPONENTS, and the query-parameter block belongs to the app service. What IS re-read and cited
-   * is every consumer: `app-presentationarea.compiled.js:92`, `app-room.compiled.js:76,856`, and
-   * the two `ngClass` helpers `jCe`/`VCe` in `app-presentationarea.render-helpers.js:9-10`.
+   * PROVENANCE — RE-READ AND CLOSED 2026-09-02, and it had been the one fact in this gate carried
+   * second-hand. It used to say the `vo` mapping came from `HANDOFF.md` quoting the bundle at
+   * ~2595500, and that it was not in `docs/source/components/**` because that tree decodes the 51
+   * COMPONENTS while the query-parameter block belongs to the app service. Both halves were true and
+   * neither was necessary: the pinned bundle ships in this repository.
+   *
+   * The parser, byte 2,599,050 onward — every one of this app's four query parameters assigned out
+   * of one block, which is why they are read the same way here:
+   *
+   * ```js
+   * const h = s.get("dscreen"), f = s.get("r"), _ = s.get("vo"), F = s.get("co");
+   * …
+   * f && "1" === f && (globals.videoOnlyMode = !0),
+   * _ && "1" === _ && (globals.viewerOnlyMode = !0),
+   * _ && "2" === _ && (globals.viewerOnlyMode = !0, globals.viewerOnlyModeLimited = !0),
+   * F && "1" === F && (globals.chatOnlyMode = !0)
+   * ```
+   *
+   * So `?vo=1` and `?vo=2` both raise this flag and `2` additionally raises `viewerOnlyModeLimited`,
+   * exactly as the paragraph above says — measured now rather than quoted. The consumers stay cited
+   * as they were: `app-presentationarea.compiled.js:92`, `app-room.compiled.js:76,856`, and the two
+   * `ngClass` helpers `jCe`/`VCe` in `app-presentationarea.render-helpers.js:9-10`.
    */
   get viewerOnlyMode() {
     return page.url.searchParams.get('vo') === '1' || page.url.searchParams.get('vo') === '2';
