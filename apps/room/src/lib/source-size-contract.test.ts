@@ -4627,8 +4627,35 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       recorded in a contract and this one was not, which is how a deliberate divergence reads as an
       oversight to the next comparison against the bundle.
     */
-    max: 142,
-    why: 'the freshness poll and the tab-visibility rules, executable at last'
+    /*
+      142 -> 157, 2026-09-02, and this raise is the FIRST one on this file that buys behaviour
+      rather than prose. A raise is a conversation, so here it is.
+
+      **Half of what the 2026-08-30 raise recorded is now CODE.** The 10 000 ms arming delay is
+      matched: `VISIBILITY_ARMING_MS`, an `armedAt` stamp, and one gate at the top of
+      `visibilityChanged`. The reason it was refused — that our poll is idempotent so nothing needs
+      protecting, and that arming immediately means an early tab-away is actually noticed — was true
+      and was not one of the four things that excuse not matching. Being better than the reference
+      is still a divergence.
+
+      **The other half stays, and its reason changed.** `unloadRoster()` is not reproduced because
+      matching the CODE would produce a DIFFERENT rendered result — the roster arrives with the page
+      load here, so unloading it would flash an empty sidebar on every return to the tab, which the
+      reference does not do. That is an escape on its own terms rather than an argument from taste.
+
+      **Why not an extraction.** A ten-second window and a one-line gate belong beside the handler
+      they govern; a module holding one constant and one comparison would be the ceremony this
+      repository refuses, and the reader who wants to know why the room ignores an early tab-away
+      would then have two files to find. What DID move out is the long form of the argument: it
+      lives in `visibility-change-contract.test.ts`, where it is asserted, and this file carries the
+      short form. That is the same split `ModalHost.svelte` took for USM-18 on the same day.
+
+      The fifteen lines are: the constant and its docblock (10), the `armedAt` field and its note
+      (2), the gate and its note (2), and the net of rewriting the handler's G16 section from two
+      refusals to one match and one escape (1).
+    */
+    max: 157,
+    why: "the freshness poll, the tab-visibility rules, and G16's arming window"
   },
   {
     file: 'lib/room/roster.svelte.ts',

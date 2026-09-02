@@ -45,6 +45,240 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 12:49 UTC — the re-reading is complete: all twenty-nine rows, and four now need the owner
+
+Every `DELIBERATE DIVERGENCE` row in `room-surface-audit-2026-08-30.md` has been read against the
+four escapes. The category was **defined** by *"matching would reproduce a defect"*, which the owner
+ruled out, so none could be left standing on the reason it carried.
+
+## Where they landed
+
+| outcome | rows |
+| --- | --- |
+| **MATCHED — stale** (12) | NTC-3, OVL-07, STB-06, MSM-03, MSB-06's `rel` half, PAM-14, SZC-03, SP2-07, RMSG-06, FP-09, PCC-07, SV-SP-09 — the divergence no longer existed and nothing had updated the row |
+| **MATCHED — this pass** (1) | G16's 10 000 ms arming delay |
+| **HELD, escape named** (12) | MSM-02 + NTC-3's second half (4 — the const is the creation-time value, Bootstrap rewrites it); AVD-04 (4 — late enumeration); MSB-06's `Sw.sanitize` (4 — text position); SP2-06 (2 — `<pan-zoom>`'s templates are in no capture); DTP-04 / SWP-04 (4, plus the official `svelte/each` guidance); poll-09 (4, and stronger than the row claimed); EMOJI2-07 (4 — idempotent); RM-19 (4 — our five-second poll); SRCH-05 (2 — the bundle shows only the request); G16's roster unload (4); dta-05 (**1** — the 2026-08-07 escalation's exact shape) |
+| **BLOCKED** (4) | NAV-10, RNB-04, RNB-05, SCH-07 |
+| **OWNER** (4) | MTS-06, SSM-2, STV-02, PAM-13 |
+
+## The three recording rows share one root
+
+NAV-10, RNB-04 and RNB-05 are consequences of **one blocker** — the MediaMTX host — rather than
+choices about a menu. The reference selects its whole recording menu with
+`O(6, useMTX || recBotMethod ? 6 : 7)`, so server-side recording is the premise for all of it.
+Matching them in isolation gives a room that still records in the browser and cannot reach what it
+recorded — a third behaviour, in neither application.
+
+**RNB-04's receiver half is separable work and is named as such**, because *"our server does not send
+that frame"* is not an escape: `setRecPreview` (byte 1,023,752) and the gate at 2,476,206 are
+transcribable today and would be inert rather than wrong.
+
+## The four owner rows are one question asked four ways
+
+What happens when *"match the dump files exactly"* collides with a rule `CLAUDE.md` states **by
+name** — which is the argument for putting it once rather than four times.
+
+- **MTS-06** — transcribing hardcoded `aria-selected` removes the attribute's whole function for its
+  whole audience. Governs **FP-04, PAM-15 and PAM-12** too: four components, so a convention in the
+  reference rather than a slip in one.
+- **SSM-2** — the same collision in degree: the only handler lands on an `aria-hidden` node, so the
+  control does not exist *at all* for assistive technology.
+- **STV-02** — escape 4 does **not** apply, on the row's own measurement: *"the viewer sees two
+  stalls"*. Matching deliberately doubles media-plane teardowns — 2N with N streams live, because
+  `preferenceChanged` is on the shared bus — against *"maximized for the highest performance ALWAYS"*.
+- **PAM-13** — no escape; work, pending one answer. `fc` was traced to all three sites and is a
+  **tri-state**: `undefined` at 2,122,856, non-empty at 2,123,302, and **empty at 2,128,421 — the
+  modal's own reset**. So the misfire is the state the modal is left in after *every* reset, not a
+  rare edge. What decides whether it is safe to build is what this room's uploader does with zero
+  files; an empty alert is a row in a fintech room a presenter did not mean to post.
+
+## SCH-07 — the one row I judge to be work and did not build
+
+The reason is **tooling, not judgement**. `CLAUDE.md` makes the Svelte MCP mandatory on every task
+touching a `.svelte` file, and it is not connected in this session; splitting a pane into a new
+dialog is exactly the class of change that rule exists for. The full transcription is specified in
+the row — modal ids, classes, title and dismiss button, from consts already quoted — so it is one
+sitting's work with the tooling present.
+
+Its first argument was **circular in the same way `SZC-03`'s was**: *"a pane embedded in
+`PostAlertModal`'s body cannot carry a second modal's dialog, because there is no second modal"* — the
+absence of the second modal IS the divergence. Its second argument is a real question about which
+Bootstrap generation styles a scoped table, and that decides **how** the chrome is transcribed, not
+whether the dialog exists. Worth noting: `ScheduledAlerts.svelte:218` already renders const 74's
+`data-bs-target="#scheduledAlertsModal"`, aimed at a dialog this room does not have.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
+### 2026-09-02 12:36 UTC — five more rows re-read: two were stale, three had reasons that did not survive
+
+Twenty-four of the twenty-nine `DELIBERATE DIVERGENCE` rows are re-read. Every one of the five below
+had a reason that was **true** and was **not one of the four escapes** — and in three cases a better
+reason was sitting underneath it.
+
+## Stale — already matched, nothing had updated the row
+
+- **RMSG-06.** All four reaction repeaters now differ exactly as the reference's four do.
+  `RoomMessage.svelte:496` is `{#snippet reactionStrip(gated: boolean)}` with
+  `{#if !gated || clickedBy.length > 0}`; the card sites pass `true` and the compact site passes
+  `reverseMessage`, so the compact ADMIN row is gated like `V1e` and the compact MEMBER row is not,
+  like `m_e`. **One parameter reproduces the asymmetry instead of flattening it.** The old reason —
+  that matching *"would ship a pill claiming a reaction nobody has made"* — was the retired argument:
+  the pill IS what the reference draws on that one layout.
+- **FP-09.** The trim is gone. The refusal was a taste argument (*"ours is the one whose result a
+  person can predict"*) and its premise was too narrow: **a trailing space is not only typed by
+  accident.** With the trim in place ` png` matched nothing, while the reference matches every row
+  containing `png` — different LISTS, not different answers to an empty query. A second divergence in
+  the same expression went with it: the reference short-circuits an empty term where this ran the
+  whole `Object.values` walk with `''`, which cost the wait rather than the result.
+
+## Reasons replaced, same outcome
+
+**RM-19 — escape 4, and the measurement is decisive.** `copyMessage` writes the stripped text onto
+the message and makes no server call, so upstream the message **stays** stripped: that application is
+push-driven and nothing routinely rebuilds the list. **This room re-reads itself every five seconds** —
+`refresh.svelte.ts` runs `invalidate('room:data')` on a 5000 ms interval, and the load returns bodies
+from the database. So transcribing the line would not reproduce upstream's result; it would produce a
+**flicker** — formatting vanishing for up to five seconds and returning on its own — a third
+behaviour present in neither application. There is no vehicle for the write either: `patchEvidence`
+is scoped to `evidenceKey`, which marks captured fixture rows only.
+
+**SRCH-05 — escape 2, and the row was defending the wrong half.** It argued that a silent cap is the
+worse failure, which is a judgement about which behaviour is better. The escape is one level up, at
+the **cap**: `alert-log.ts:73-84` already records that the reference asks its own server and **the
+bundle shows only the request**, so whatever bound that server applies is uncaptured. There is no
+number to match. Given that a bound must be chosen, `CLAUDE.md` names the alternative — *"an
+unbounded SELECT that grows with usage"* — so the cap stays at 500. The notice is then **not a
+divergence but the disclosure of one**; removing it while keeping the cap would match neither
+application.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
+### 2026-09-02 12:29 UTC — G16's arming delay is matched: the room now ignores its first ten seconds
+
+Nineteen of the twenty-nine `DELIBERATE DIVERGENCE` rows are re-read. This one carries real code.
+
+## G16 is compound, and its own verifier said so
+
+*"Only ONE of its two limbs survives; it must be split before it is acted on"* — 2026-08-30. Split
+now, and they went opposite ways.
+
+**MATCHED — the 10 000 ms arming delay.** `appVisibilityChange` puts the whole `addEventListener`
+inside `setTimeout(…, 1e4)` at byte 2,511,416, so for ten seconds after the room loads there is **no
+listener at all**: a flip in that window is not observed, not queued, and not replayed on arrival.
+
+The reason recorded against it was that the delay protects a socket handshake still in flight, that
+our five-second poll is idempotent so nothing needs protecting, and that arming immediately *"means
+a member who tabs away during the first ten seconds is actually noticed"*. Every clause is true and
+none is one of the four escapes. **Being better than the reference is still a divergence.**
+
+Implemented as a **clock, not a timer** — `VISIBILITY_ARMING_MS`, an `armedAt` stamp taken at
+construction, one gate at the top of `visibilityChanged`. No handle to leak, nothing to `unref` on
+the server where this factory is also constructed during SSR, identical behaviour. The
+`<svelte:document>` binding stays declarative: a late `addEventListener` would put back the
+hand-managed listener this file's own contract asserts is gone, to buy nothing.
+
+**Two things in that reference body are deliberately NOT reproduced, and neither is a divergence.**
+`clearInterval(this.visibilityChangeTimer)` on the show branch clears a `setTimeout` handle with the
+wrong clearer, on a timeout that has already fired. And the disarm branch hands `removeEventListener`
+a **fresh arrow function**, which matches no registered listener. Reproducing a call that does
+nothing is reproducing nothing.
+
+**HELD — `unloadRoster()` on hide, escape 4**, and its reason is now stated properly: matching the
+CODE would produce a DIFFERENT rendered result. Upstream the roster is a separate fetch, absent while
+hidden and invisibly reloaded on return; here it arrives with the page load, so unloading would empty
+the sidebar and repaint it on **every** return to the tab. Asserted as an absence *with* the reason,
+so "completing G16" cannot mean adding it back silently.
+
+## Three more re-read, all escape 4
+
+- **DTP-04 / SWP-04** — a track function is reconciliation, not output: the rendered markup is
+  byte-identical either way, and neither pane animates its rows. The official `svelte/each` doc
+  settles it: *"strings and numbers are recommended since they allow identity to persist when the
+  objects themselves change"* — exactly what the months `<select>`'s refetch does to them.
+- **poll-09** — and the evidence is **stronger than the row claimed**. All 18 `savedPolls`
+  occurrences in the bundle were read at their offsets: one READ, one `deleteKey`, thirteen an
+  in-memory field of the same name, three an HTML id. **There is no `localstorage.set("savedPolls", …)`
+  anywhere**, so upstream `loadStoredPolls()` always returns `[]` and the only path that runs is the
+  `else` — which reads the SERVER's copy, which is what this room does. The branch is dead at both
+  ends.
+- **PCC-07** — stale, MATCHED. `PrivateChatComposer` binds `onkeyup`, the only event const 55 binds.
+  The old refusal was right about the mechanism and wrong about the consequence: `preventDefault` on
+  a keyup does run after the newline is inserted, but nothing is lost — `chat-composer-enter.ts` took
+  a binding-mode parameter and the three-way branch survives on either event. Matching **fixed a real
+  defect**: Shift+Enter was swallowing a line break the reference keeps.
+
+## The ceiling, argued rather than raised quietly
+
+`refresh.svelte.ts` went **142 → 157**, argued at the entry as the ratchet requires — the first raise
+on this file that buys *behaviour* rather than prose. Half of what the 2026-08-30 raise recorded is
+now code. The long form of the argument moved to `visibility-change-contract.test.ts` where it is
+asserted; the module carries the short form. Same split `ModalHost.svelte` took for USM-18.
+
+**Verification.** Three negative controls seen RED: the gate removed, the window shortened to five
+seconds, and an `unloadRoster` call added. `pnpm run gate` exit 0 in `apps/room`.
+
+**Tooling, stated rather than implied:** the Svelte MCP is not connected in this session, so steps 1
+and 3 of the mandatory workflow could not be run for `refresh.svelte.ts`. The `svelte/each` and
+`svelte/best-practices` passages quoted are from documentation already read and quoted in these
+files. `svelte-check` is 0 errors / 0 warnings and the gate is green, but the autofixer pass was not
+performed.
+
+---
+
+### 2026-09-02 12:14 UTC — six more audit rows re-read; five were stale, one refusal overturned by measurement
+
+Fourteen of the twenty-nine `DELIBERATE DIVERGENCE` rows are now re-read against the four escapes.
+
+## Five more stale — matched during this session, with nothing updating the row
+
+| row | what is actually true |
+| --- | --- |
+| **MSB-06** (`rel` half) | `rel="noreferrer"` is gone from `MessageBody.svelte`; the only occurrence left in the file is the argument in a comment. The concern behind the old refusal — a `window.opener` handle back into a logged-in room — is answered by `Referrer-Policy: same-origin` in `hooks.server.ts`, which covers this link, every other link and every subresource, and needs no attribute the reference does not have. And `rel` is a **choice** upstream: `"rel",` occurs **8 times** in the bundle, seven `noopener noreferrer` and one `required`. |
+| **PAM-14** | All six invented `id`/`name` pairs are gone, asserted on the RENDERED markup of all three tabs. The row's own argument is why the deletion is narrow: it said the ids are what make `<label for>` work, and for these six that was false — no label pointed at any of them and nothing read one. The three CHECKBOX ids a real label does point at were **kept**. *"Delete the ids"* would have been the wrong lesson. |
+| **SZC-03** | `swallowDoubleClick` and all six `ondblclick` bindings are gone, and the component's ceiling went **down** (237 → 222). Its premise was removed rather than argued with: the old note said the nesting was ours and on purpose, so the guard was *"the price of a placement this repository chose"* — circular, because the guard existed because of the nesting, and the nesting was the divergence. |
+| **SP2-07** | See below — the one worth reading. |
+| *(and NTC-3, OVL-07, STB-06, MSM-03 in the 06:11 entry)* | |
+
+## SP2-07 — a refusal overturned by a measurement, not an argument
+
+It refused on the ground that moving the detached cluster out means *"inventing the ancestor"* its
+`position: absolute` resolves against. That was a gap in the reading, not in the evidence, and two
+lookups closed it:
+
+- `app-screenshare-view`'s const 0 is `[1,"h-inherit"]` — **no `position`**;
+- the popout wrapper's only two rules are `.detach-screen .webcamScreen{max-height:100vh!important}`
+  and `.detach-screen .overflow-hidden{overflow:initial!important}` — neither positions anything.
+
+So **upstream has no positioned ancestor inside the component either**, and `right: 5px; top: 5px`
+resolves against the popout window at both ends. Nothing was invented. The cluster is now a sibling
+immediately before `#video-screen-container-{id}`, which is the create block's own order — slot 5
+closes before `d(6,…)` opens on the `appDoubleClick` box.
+
+Its last worry — that the cluster now sits outside the element `toggleFullscreen` fullscreens, so
+the popout's magnifier would vanish when maximised — is answered by the same fact that made the move
+correct: **it is outside that element upstream too.**
+
+## Two that HOLD, each on an escape the row already contained
+
+- **MSB-06's `Sw.sanitize` — escape 4.** Upstream the return value is a STRING that becomes markup,
+  so the sanitiser is what stops a crafted URL closing the anchor. Here the link is a Svelte element
+  and the url goes into a TEXT position, where the compiler escapes it: no markup boundary for a
+  payload to cross, and the same rendered output either way.
+- **SP2-06's watermark — escape 2**, and this row had already shown the search before the rule
+  asking for it was written. Its own *"what the bundle proves and what it does not, kept apart"*
+  paragraph **is** the escape: that the watermark sits inside the transform is **inferred**, and
+  `<pan-zoom>` is third-party with its templates in no capture we hold. The anti-leak function
+  decides which reading to build on rather than excusing the divergence — if the bundle *did* prove
+  it pans, the row would be escape 1 and still not built.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
 ### 2026-09-02 06:21 UTC — one Svelte, one SvelteKit, and a gate that keeps it that way
 
 ## Measured first, against npm rather than recalled

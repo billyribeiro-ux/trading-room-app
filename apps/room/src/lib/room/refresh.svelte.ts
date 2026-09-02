@@ -32,6 +32,19 @@
 /** `globals.appHasFocus`'s poll interval. Five seconds, as the room has always used. */
 const REFRESH_MS = 5000;
 
+/**
+ * `G16` — the reference does not observe visibility for the first ten seconds, and now nor does
+ * this room. `},1e4)` closes the `setTimeout` that adds its listener, at bundle byte 2,511,416.
+ *
+ * A clock rather than a timer: no handle to leak, nothing to `unref` on the server where this
+ * factory is also constructed during SSR, and identical behaviour — upstream's listener is absent,
+ * so a flip inside the window is not observed, not queued and not replayed. The `<svelte:document>`
+ * binding stays declarative; a late `addEventListener` would put back the hand-managed listener
+ * `visibility-change-contract.test.ts` asserts is gone. That file carries the full argument, the two
+ * upstream no-ops not reproduced, and why the roster half went the other way.
+ */
+const VISIBILITY_ARMING_MS = 10_000;
+
 export interface RoomRefreshDeps {
   /** `invalidate('room:data')` — the narrow re-read the poll performs. */
   refresh: () => Promise<unknown>;
@@ -45,6 +58,8 @@ export function createRoomRefresh(deps: RoomRefreshDeps) {
   let missedChatWhileHidden = false;
   /* Plain `let`: nothing renders from a timer handle. */
   let timer: ReturnType<typeof globalThis.setInterval> | undefined;
+  /* When this room armed. Read once per flip; nothing renders from it. */
+  const armedAt = Date.now();
 
   /**
    * A poll that loses the network must not become an unhandled rejection.
@@ -97,21 +112,18 @@ export function createRoomRefresh(deps: RoomRefreshDeps) {
      * ```
      * (bundle byte 2,511,416.)
      *
-     * **The 10 000 ms arming delay.** Upstream does not listen for a whole ten seconds after the
-     * room loads. That delay exists to protect a socket handshake still in flight from a visibility
-     * flip during load; this room's equivalent is `invalidateAll()` and a five-second poll, neither
-     * of which a mid-load flip can corrupt — the poll is idempotent and the load is a fetch. Arming
-     * immediately means a member who tabs away during the first ten seconds is actually noticed.
+     * ## THE TWO WENT OPPOSITE WAYS ON 2026-09-02
      *
-     * **`unloadRoster()` on hide and `showSidebar && loadRoster()` on show.** The roster is a
-     * separate fetch upstream, so dropping it while hidden saves a subscription. Here it arrives
-     * with the page load and is refreshed by the same `invalidateAll()` this method already calls;
-     * unloading it would mean an empty sidebar for one frame on every return to the tab, in
-     * exchange for nothing.
+     * **The 10 000 ms arming delay — MATCHED**, see {@link VISIBILITY_ARMING_MS}. The reason
+     * recorded here until then was that our poll is idempotent so nothing needs protecting, and
+     * that arming immediately means an early tab-away is actually noticed. Both true; neither is an
+     * escape. **Being better than the reference is still a divergence.**
      *
-     * Recorded here because the sibling refusal — the 500 ms `alwaysShowRoster` timer — is recorded
-     * in `always-show-roster-contract.test.ts` and this one was not, which is how a deliberate
-     * divergence reads as an oversight to the next comparison.
+     * **`unloadRoster()` on hide, `showSidebar && loadRoster()` on show — NOT matched**, because
+     * matching the CODE would produce a DIFFERENT rendered result. Upstream the roster is a
+     * separate fetch, absent while hidden and invisibly reloaded on return; here it arrives with
+     * the page load, so unloading it would empty the sidebar and repaint it on every return — a
+     * flash the reference does not have.
      *
      * THE CATCH-UP AND THE POLL'S OWN IMMEDIATE REFRESH ARE THE SAME REQUEST, so only one goes out.
      * `missedChatWhileHidden` is set while hidden; when it is set this is a catch-up and
@@ -120,6 +132,9 @@ export function createRoomRefresh(deps: RoomRefreshDeps) {
      * would double every return to the tab.
      */
     visibilityChanged(hidden: boolean): void {
+      /* Upstream's listener does not exist yet, so a flip in here is not observed at all. */
+      if (Date.now() - armedAt < VISIBILITY_ARMING_MS) return;
+
       if (hidden) {
         appHasFocus = false;
         this.stop();

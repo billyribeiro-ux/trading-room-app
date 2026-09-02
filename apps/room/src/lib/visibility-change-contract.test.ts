@@ -1,7 +1,28 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
+import { codeOf } from '#lib/source-comments.js';
+
 import { createRoomRefresh } from './room/refresh.svelte';
+
+/**
+ * A room whose ten-second arming window has already passed.
+ *
+ * `G16` — the reference adds its `visibilitychange` listener inside a `setTimeout(…, 1e4)`, so a
+ * flip in the first ten seconds is not observed at all. `refresh.svelte.ts` reproduces that with a
+ * clock comparison, which means every case below that exercises a flip has to move the clock first
+ * or it is asserting the arming window rather than the behaviour it names.
+ *
+ * Fake timers rather than a real wait, and `Date` is in Vitest's default `toFake` set, so
+ * `advanceTimersByTime` moves the same clock the module reads. The window is asserted in its own
+ * case below; here it is only got out of the way.
+ */
+const armedRoom = (deps: Parameters<typeof createRoomRefresh>[0]) => {
+  vi.useFakeTimers();
+  const refresh = createRoomRefresh(deps);
+  vi.advanceTimersByTime(10_000);
+  return refresh;
+};
 
 /*
   `visibilityChangeEnabled` — pause chat work while the tab is hidden, catch up when it returns.
@@ -147,7 +168,7 @@ describe('and catches up when the tab comes back', () => {
       `appHasFocus = false;` and `appHasFocus = true;` appeared in the page — which is satisfied by
       those characters existing in either order, in either branch, or in dead code.
     */
-    const refresh = createRoomRefresh({ refresh: async () => {}, refreshAll: async () => {} });
+    const refresh = armedRoom({ refresh: async () => {}, refreshAll: async () => {} });
     expect(refresh.appHasFocus, 'a room starts focused').toBe(true);
     refresh.visibilityChanged(true);
     expect(refresh.appHasFocus).toBe(false);
@@ -245,7 +266,7 @@ describe('and catches up when the tab comes back', () => {
       by one inside an `if` that never runs. Now both counters are real.
     */
     const calls = { narrow: 0, wide: 0 };
-    const refresh = createRoomRefresh({
+    const refresh = armedRoom({
       refresh: async () => void (calls.narrow += 1),
       refreshAll: async () => void (calls.wide += 1)
     });
@@ -279,5 +300,110 @@ describe('the roster half is deliberately absent', () => {
     */
     expect(pageCode).not.toContain('unloadRoster');
     expect(pageCode).not.toContain('loadRoster(');
+  });
+});
+
+describe('G16 — the first ten seconds are not observed, exactly as upstream', () => {
+  /*
+    `appVisibilityChange(e)` at bundle byte 2,511,416, read whole:
+
+    ```js
+    e ? this.visibilityChangeTimer = setTimeout(() => {
+          document.addEventListener("visibilitychange", () => {
+            document.hidden ? (globals.appHasFocus = !1, unloadRoster())
+                            : (globals.appHasFocus = !0, …, showSidebar && loadRoster(), …)
+          })
+        }, 1e4)
+      : document.removeEventListener("visibilitychange", () => { … })
+    ```
+
+    The LISTENER is inside the `setTimeout`, so for ten seconds after the room loads there is no
+    listener at all: a flip in that window is not observed, not queued, and not replayed on arrival.
+
+    ## Why this was refused until 2026-09-02, and why the refusal did not survive
+
+    The recorded reason was that the delay protects a socket handshake still in flight, that this
+    room's poll is idempotent so nothing needs protecting, and that arming immediately *"means a
+    member who tabs away during the first ten seconds is actually noticed"*. Every clause is true.
+    None of them is one of the four things that excuse not matching — **being better than the
+    reference is still a divergence**, and this document's `DELIBERATE DIVERGENCE` category was
+    defined by exactly that kind of argument until it was retired.
+
+    ## Two things in that body are NOT reproduced, and neither is a divergence
+
+    `clearInterval(this.visibilityChangeTimer)` on the show branch clears a `setTimeout` handle with
+    the wrong clearer, on a timeout that has already fired — a no-op whichever way it is read. And
+    the disarm branch passes `removeEventListener` a FRESH arrow function, which matches no
+    registered listener, so it removes nothing. Reproducing a call that does nothing is reproducing
+    nothing; both are recorded here so the next reader does not file them as gaps.
+  */
+
+  it('ignores a flip inside the window, and observes one after it', () => {
+    vi.useFakeTimers();
+    const calls = { narrow: 0, wide: 0 };
+    const refresh = createRoomRefresh({
+      refresh: async () => void (calls.narrow += 1),
+      refreshAll: async () => void (calls.wide += 1)
+    });
+
+    /*
+      Inside the window nothing happens AT ALL — this is the assertion that distinguishes matching
+      the reference from deferring the work. `appHasFocus` does not move, the poll is not stopped,
+      and returning costs no refetch, because as far as the room is concerned the tab never left.
+    */
+    vi.advanceTimersByTime(9_999);
+    refresh.visibilityChanged(true);
+    expect(refresh.appHasFocus, 'a hide inside the arming window is not observed').toBe(true);
+    refresh.visibilityChanged(false);
+    expect(calls, 'and returning from one costs no refetch').toEqual({ narrow: 0, wide: 0 });
+
+    /* One millisecond later the listener exists upstream, and the handler acts here. */
+    vi.advanceTimersByTime(1);
+    refresh.visibilityChanged(true);
+    expect(refresh.appHasFocus, 'a hide after the window IS observed').toBe(false);
+    refresh.visibilityChanged(false);
+    expect(calls, 'and the return catches up').toEqual({ narrow: 1, wide: 0 });
+
+    refresh.stop();
+    vi.useRealTimers();
+  });
+
+  it('states the window as the reference does, and reads it from the module', () => {
+    /*
+      The number is read out of the source rather than restated, so the two cannot drift. A test
+      that hard-codes 10_000 beside a module that says 5_000 passes while the behaviour is wrong.
+    */
+    const source = readFileSync('src/lib/room/refresh.svelte.ts', 'utf8');
+    expect(source).toContain('const VISIBILITY_ARMING_MS = 10_000;');
+    expect(source, 'the gate must read the constant, not a literal').toContain(
+      'Date.now() - armedAt < VISIBILITY_ARMING_MS'
+    );
+  });
+
+  it('does NOT unload the roster, and that one is a real divergence with a real reason', () => {
+    /*
+      The second half of `G16`, kept apart from the first because they went opposite ways.
+
+      Upstream the hide branch calls `unloadRoster()` and the show branch `showSidebar &&
+      loadRoster()`. There the roster is a SEPARATE fetch, so it is simply absent while hidden and
+      its reload is invisible. Here it arrives with the page load, so unloading it would empty the
+      sidebar and repaint it on every return to the tab — a flash the reference does not have.
+
+      Matching the CODE would therefore produce a DIFFERENT rendered result, which is the escape.
+      Asserted as an absence so the day somebody "completes" G16 by adding the unload, this says why
+      it was left out.
+    */
+    const path = 'src/lib/room/refresh.svelte.ts';
+    const source = readFileSync(path, 'utf8');
+    /*
+      `codeOf`, and its first draft here did not use it and went red on its own subject: the
+      paragraph explaining why `unloadRoster` is absent contains the word `unloadRoster`. That is
+      the ninth recorded instance of a slice of raw source matching the very comment explaining the
+      change, and the reason this repository has the helper at all.
+    */
+    expect(codeOf(path, source)).not.toContain('unloadRoster');
+    expect(source, 'the reason has to survive with the absence').toContain(
+      'DIFFERENT rendered result'
+    );
   });
 });

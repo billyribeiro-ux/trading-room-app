@@ -818,7 +818,17 @@ const c=s?`gifExtra_${o}`:`gif_${o}`
 
 ### RM-19 — copyMessage mutates msg.txt upstream before writing to the clipboard
 
-**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 11:20 UTC, not reproduced.** `this.msg.txt = sf(this.msg.txt).result` writes the stripped text back onto the MESSAGE, so copying silently rewrites the one on screen: formatting, links and ticker colouring vanish from the log for everyone looking at that browser, and nothing puts them back. The clipboard content is identical either way. Ours strips into a DETACHED element and leaves the message alone. Recorded rather than silently improved — this is a place where matching the reference would mean reproducing a defect, and the next person comparing the two should find the reason rather than assume the line was missed.
+**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 11:20 UTC, not reproduced.** `this.msg.txt = sf(this.msg.txt).result` writes the stripped text back onto the MESSAGE, so copying silently rewrites the one on screen: formatting, links and ticker colouring vanish from the log for everyone looking at that browser, and nothing puts them back. The clipboard content is identical either way. Ours strips into a DETACHED element and leaves the message alone.
+
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the reason it gave was the retired one.** *"Matching would mean reproducing a defect"* is no longer sufficient; reproducing an upstream defect is matching. What carries instead is a measurement about the two data flows, and it is decisive:
+
+**Upstream's mutation persists; ours could not.** `copyMessage` writes the stripped text onto the message object and makes no server call, so upstream the stripped message stays stripped until something rebuilds the list — and nothing routinely does, because that application is push-driven. **This room re-reads itself every five seconds.** `refresh.svelte.ts` runs `invalidate('room:data')` on a `REFRESH_MS = 5000` interval while the tab is visible; the load returns message bodies from the database, so a local write to `item.body` is replaced on the next tick.
+
+So transcribing the line would not reproduce upstream's rendered result. It would produce a **flicker** — formatting, links and ticker colouring vanishing for up to five seconds and then returning on their own — which is a third behaviour, present in neither application. The divergence is in the surrounding refresh policy, and leaving the message alone is what keeps the rendered output matched.
+
+Worth adding what the mechanics would cost, because it strengthens the reading rather than excusing it: there is no vehicle for the write either. `patchEvidence` is scoped to `evidenceKey`, which marks CAPTURED FIXTURE rows only (`hidden_room_items.evidence_key`), and live rows have none — so matching would need a new client-side body overlay whose only purpose is to be overwritten five seconds later.
+
+The clipboard content is identical either way; `sf(…).result` is the same plain text the detached element produces.
 
 **low** · `divergence` · reference byte **1,355,969**
 
@@ -992,9 +1002,17 @@ function _ge(t,n){if(1&t&&(d(0,"div",3)(1,"a",6),v(2),Xe(3,"date"),u()()),2&t){c
 
 ### RMSG-06 — The compact MEMBER reaction repeater has no `clickedBy` gate; the other three have it, and matching would draw a pill claiming a reaction nobody made
 
-**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 22:40 UTC, not reproduced.** Four templates repeat the reaction loop. `Oge` (card admin, 1,333,312), `u1e` (card member, 1,341,960) and `V1e` (compact admin, 1,371,615) each wrap the pill in `O(1, e.value.clickedBy.length > 0 ? 1 : -1)`. `m_e` (compact member, 1,379,950) opens `d(0,"span")(1,"span",51)` and renders it unconditionally.
+**BUILT 2026-09-02 — MATCHED, asymmetry and all. Recorded as `DELIBERATE DIVERGENCE 2026-08-30 22:40 UTC` until then.** Four templates repeat the reaction loop. `Oge` (card admin, 1,333,312), `u1e` (card member, 1,341,960) and `V1e` (compact admin, 1,371,615) each wrap the pill in `O(1, e.value.clickedBy.length > 0 ? 1 : -1)`. `m_e` (compact member, 1,379,950) opens `d(0,"span")(1,"span",51)` and renders it unconditionally.
 
-`addRemoveReaction` empties `clickedBy` rather than deleting the key, so a reaction whose last holder removes it draws upstream as `🎉 0` — on a compact member row and on no other row in the product. That is a defect of the kind RM-19 records for `copyMessage`'s write-back: reproducing it would ship a pill claiming a reaction nobody has made, on one layout of four. The gate is applied to all four here, which is what three of them already say, and the contract renders all four layouts so that "one of four differs" is a statement about four rather than about one.
+`addRemoveReaction` empties `clickedBy` rather than deleting the key, so a reaction whose last holder removes it draws upstream as `🎉 0` — on a compact member row and on no other row in the product.
+
+**RE-READ 2026-09-02 — MATCHED, all four repeaters now differ exactly as the reference's four do.** The reason recorded on 2026-08-30 was that reproducing it *"would ship a pill claiming a reaction nobody has made"*, which is the retired argument: the pill IS what the reference draws, on that one layout, and none of the four escapes covers it.
+
+`RoomMessage.svelte:496` is `{#snippet reactionStrip(gated: boolean)}` with `{#if !gated || reaction.clickedBy.length > 0}`. The card sites call `reactionStrip(true)` — `Oge` and `u1e`, both gated — and the compact site calls `reactionStrip(reverseMessage)`, so the compact ADMIN row is gated like `V1e` and the compact MEMBER row is not, like `m_e`. One parameter reproduces the reference's own asymmetry instead of flattening it.
+
+**The parameter is a BOOLEAN and not a count, deliberately.** An earlier draft of the surrounding assertions pinned `reactionStrip()` with an empty parameter list in three places, and this file's own comment two lines above warned against pinning a NUMBER for the same reason — an assertion that hard-codes the shape of a call goes stale the first time the call gains an argument, which is what happened.
+
+The row's second half stands unchanged: unifying the strip is what surfaced the difference, because the compact branch's own second gate on the log type is IMPLIED by its container's, upstream as well as here.
 
 **Found by unifying the strip, which is the second half of this row.** The compact branch held a SECOND copy of the pill list, differing from `reactionStrip` by an inner gate on the log type — `g_e`'s own `O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)` at 1,380,270. That gate is IMPLIED by the container's, upstream as well as here: `__e` renders under `O(36, (enableReactions && "chat" === logType || enableQAReactions && "alerts" === logType && isQAMsg) && checkMsgReactions(msg) ? 36 : -1)` (`b_e`, 1,380,680), every disjunct of which entails a disjunct of the inner one, and `menuAllows.reaction` is that same expression here. So the copy could go, and going is what surfaced that its `{#each}` and the card's gated differently.
 
@@ -2063,7 +2081,13 @@ this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this.simUs
 
 ### G16 — `visibilitychange` is armed immediately, not after the reference's 10 000 ms delay, and it does not unload/reload the roster
 
-**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 12:55 UTC, which is what the row asked for.** The row's own closing observation is the point: the SIBLING refusal (the 500 ms `alwaysShowRoster` timer) is recorded in `always-show-roster-contract.test.ts` and this one was not, which is how a deliberate divergence reads as an oversight to the next comparison. Both halves are now in `refresh.svelte.ts`. The 10 000 ms delay protects a socket handshake still in flight; this room's equivalent is `invalidateAll()` and an idempotent five-second poll, neither of which a mid-load visibility flip can corrupt — and arming immediately means a member who tabs away in the first ten seconds is actually noticed. `unloadRoster()` saves a subscription upstream because the roster is a separate fetch; here it arrives with the page load, so unloading it would buy an empty sidebar for one frame on every return to the tab.
+**HALF BUILT 2026-09-02 — the arming delay is MATCHED; the roster unload holds under escape 4. Recorded as `DELIBERATE DIVERGENCE 2026-08-30 12:55 UTC` until then, and the row's verifier had already said the claim is COMPOUND and must be split before it is acted on — which is what happened.**
+
+**The 10 000 ms arming delay — MATCHED.** The refusal was that the delay *"protects a socket handshake still in flight"*, that this room's five-second poll is idempotent so nothing needs protecting, and that arming immediately *"means a member who tabs away in the first ten seconds is actually noticed"*. Every clause is true and none is an escape: **being better than the reference is still a divergence.** `refresh.svelte.ts` now gates `visibilityChanged` on `Date.now() - armedAt < VISIBILITY_ARMING_MS`, so a flip inside the window is not observed, not queued and not replayed — which is what upstream's absent listener does. A clock rather than a timer because there is no handle to leak and nothing to `unref` on the server, where this factory is also constructed during SSR; and the `<svelte:document>` binding stays declarative, because a late `addEventListener` would put back the hand-managed listener this file's own contract asserts is gone.
+
+**Two things in that body are deliberately NOT reproduced, and neither is a divergence.** `clearInterval(this.visibilityChangeTimer)` on the show branch clears a `setTimeout` handle with the wrong clearer, on a timeout that has already fired — a no-op read either way. And the disarm branch hands `removeEventListener` a FRESH arrow function, which matches no registered listener and removes nothing. Reproducing a call that does nothing is reproducing nothing.
+
+**`unloadRoster()` / `showSidebar && loadRoster()` — escape 4, NOT A DIVERGENCE, because matching the CODE would produce a DIFFERENT rendered result.** Upstream the roster is a separate fetch: it is simply absent while hidden and its reload on return is invisible. Here it arrives with the page load, so unloading it would empty the sidebar and repaint it on **every** return to the tab — a flash the reference does not have. The divergence is in the surrounding data flow, and not unloading is what keeps the output matched. Asserted as an absence, with the reason, so that "completing G16" cannot mean adding it back silently.
 
 **low** · `divergence` · reference byte **2,511,416**
 
@@ -2618,7 +2642,23 @@ onImagePaste(e){const i=this,o=(e.clipboardData||e.originalEvent.clipboardData).
 
 ### PAM-13 — img tab with no URL: the reference dispatches an upload whenever the module-level fc array EXISTS (even when empty); ours requires at least one file
 
-**DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC.** `return fc ? void this.doImagurFileListUpload(e) : void 0` tests whether a module-level array EXISTS, not whether it holds anything — so an empty file list dispatches an upload of nothing, which either no-ops in the uploader or posts an alert with no image and no URL. Reproducing that means reproducing a bug whose only outcomes are a wasted request or an empty alert. Ours requires at least one file, which is the same behaviour for every case a presenter can actually reach and differs only where the reference misfires.
+**OWNER DECISION — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC`. No escape applies, so it is work; what it needs first is one answer, and it is named below.**
+
+`return fc ? void this.doImagurFileListUpload(e) : void 0` tests whether a module-level array EXISTS, not whether it holds anything. The 2026-08-30 reading called that a bug that *"differs only where the reference misfires"* — the retired argument, and it also understated how reachable the misfire is. `fc` was traced to all three of its sites and it is a **tri-state**:
+
+| site | byte | what it does |
+| --- | --- | --- |
+| `var fc;` | 2,122,856 | declared **undefined** — falsy, so before the first ever file pick the branch is `void 0` and nothing happens |
+| `…, fc = []; for (…) fc.push(i)` | 2,123,302 | the drop/select handler — a **non-empty** array |
+| `…, fc = []` | 2,128,421 | the modal's own reset, beside `di('#fileListAlert').empty()` and `this.alertTxt = ''` — an **empty** array, which is TRUTHY |
+
+So the misfire is not a rare edge: `[]` is **the state the modal is left in after every reset**, and the reachable sequence is post an alert, reopen, choose the img tab, leave the URL empty, press Post. Upstream then dispatches an upload of nothing.
+
+**Ours is a two-state guard** — `post-alert-behavior.ts:149`, `draft.fileCount > 0 ? upload : { status: 'noop' }` — so there is no `undefined` to distinguish "never touched" from "reset". Transcribing the reference needs that third state back: a latch set on the first pick and on every reset, with the guard reading the latch rather than the count.
+
+**The one question that decides whether this is safe to build, and it is not an agent's to answer:** what this room's uploader does when handed zero files. Upstream's own outcome is *"a wasted request or an empty alert"*, and an empty alert is a row in a multi-tenant fintech room that a presenter did not mean to post. If the answer is that it no-ops, this is a small faithful transcription and should be built. If it posts, matching means shipping a control that emits junk on a sequence a presenter reaches by ordinary use, and that is the owner's call rather than a transcription.
+
+Named here rather than built, and named rather than left as a divergence, because the difference between those two is exactly what this pass exists to stop being blurred.
 
 **low** · `divergence` · reference byte **2,128,708**
 
@@ -2632,7 +2672,11 @@ if("img"===this.selectedTab){if(this.imageAlertTxt&&(e.txt=this.imageAlertTxt+"\
 
 ### PAM-14 — Element ids and name attributes added on the six text inputs/textareas that the reference leaves unnamed
 
-**DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC, and the reference is not consistent about this either.** The ids and `name` attributes are OURS and they are what make `<label for>` and `aria-labelledby` work: a text input with no accessible name is unreachable by a screen reader, and this repository adds them for the same reason it gives the captured trade span a `role` and a keydown. **The reference names some of its own** — const 62 is `["type","datetime-local","id","alert-send-later-time","name","alert-send-later-time",…]`, so the send-later input carries both — which makes this a difference in consistency rather than in kind. Nothing about them is visible to a member, and none is read by any selector in the captured stylesheets.
+**BUILT — MATCHED; re-labelled 2026-09-02 from `DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC`.** All six invented `id`/`name` pairs are gone from `PostAlertModal.svelte`, and `post-alert-render.test.ts` asserts their absence on the RENDERED markup of all three tabs, so a re-introduction through any route fails there rather than in review.
+
+**The row's own argument is why the deletion is narrow rather than total, and that distinction is the deliverable.** It said the attributes are what make `<label for>` work, and for these six that was not true: consts 14, 20, 22, 25 and 58 carry no `id` and no `name`, no `<label for>` in this room pointed at any of the six, and nothing in the repository read one — so they gave no control an accessible name it did not already have from the `aria-label` the const does carry. The three CHECKBOX ids that a real `<label for>` does point at were kept, and are asserted present in the same file. "Delete the ids" would have been the wrong lesson.
+
+The row's second observation stands and is worth keeping: **the reference names some of its own** — const 62 is `["type","datetime-local","id","alert-send-later-time","name","alert-send-later-time",…]` — so upstream is inconsistent about this, and matching means following it control by control rather than applying a rule.
 
 **low** · `divergence` · reference byte **2,131,663**
 
@@ -2980,10 +3024,29 @@ openAlertSendReport(e){e?this.appService.guiEventBus.emit("doAlertSendReportModa
 `truncated` occurs **exactly once** in the whole bundle, at 1,643,312, inside hls.js ("last AAC PES
 packet truncated…"). The reference's success handler reads only `i.alerts`. This is ours.
 
-Kept because a silent cap is the worse failure: 500 results with no note reads as "that is all there
-is". `alert-report-modal-contract.test.ts` now asserts the full-file count AND the rendered notice, so
-the divergence cannot be tidied away for symmetry with the reference — which is the only way a
-deliberate divergence is actually lost.
+**RE-READ 2026-09-02 — escape 2, EVIDENCE ABSENT, and the row was defending the wrong half.**
+
+It argued that *"a silent cap is the worse failure"*, which is a judgement about which behaviour is
+better and therefore not an escape. The escape is one level up, at the CAP rather than at the notice,
+and `alert-log.ts:73-84` already states it: **the reference asks its own server
+(`getAlertsAdvancedSearch`) and the bundle shows only the REQUEST**, so whatever bound that server
+applies is in no capture this repository holds. There is no number to match. `ALERT_SEARCH_LIMIT` is
+declared as a choice rather than presented as transcribed, which is the discipline this row should
+have cited.
+
+Given that a bound must be chosen, `CLAUDE.md` decides which way the ambiguity resolves and it names
+the alternative by name: *"an unbounded SELECT that grows with usage"* is the shape it forbids, and
+the modal renders every hit in one list with no paging of its own. So the cap stays at 500 — ten
+times the fifty a page load carries, and still a list a browser can draw.
+
+**The notice is then not a divergence at all; it is the disclosure of one.** The reference has no cap
+to announce, so it announces none. Ours has one, and `500 results with no note` would read as *"that
+is all there is"* — a silent wrong answer. Removing the notice while keeping the cap would match
+neither application.
+
+`alert-report-modal-contract.test.ts` asserts the full-file count AND the rendered notice, so this
+cannot be tidied away for symmetry with the reference — which is the only way a deliberate divergence
+is actually lost.
 
 **The first version of that assertion was too weak and its negative control caught it**, which is
 worth recording here because it is the same lesson the register's preface teaches: it checked for the
@@ -3395,15 +3458,33 @@ this.appService.globals.currScreenID=this.selectedScreenShareTab
 
 ### SV-SP-09 — No presenter self-preview deferral: our own screen always renders full video instead of the 'click here for larger preview' line
 
-**DELIBERATE DIVERGENCE, recorded 2026-08-30.** The reference does not decode a presenter's own
+**BUILT — MATCHED by value; re-labelled 2026-09-02 from `DELIBERATE DIVERGENCE, recorded 2026-08-30`.** The reference does not decode a presenter's own
 screen until they click *"(You are sharing your screen as X click here for larger preview)"*; this
 room renders it from the LOCAL capture, so it is already on screen and there is nothing to defer.
 
-**The two are not the same trade.** Upstream defers because its own screen would otherwise be a
-second WebRTC consumer of a producer it is already producing — a real cost. Ours is a direct
-`srcObject` from the capture that already exists for the encoder: no consumer, no negotiation, and no
-extra decode beyond compositing a stream the browser is holding regardless. Reproducing the deferral
-would mean hiding a picture that costs nothing to show, and adding a click to get it back.
+**RE-READ 2026-09-02 — THIS ROW IS STALE. The deferral is BUILT, and matched by value.** The
+paragraph below argued that reproducing it *"would mean hiding a picture that costs nothing to
+show"* — a cost argument, not one of the four escapes, and it did not survive. What is in the
+repository now:
+
+| upstream | here |
+| --- | --- |
+| `this.localpreview = !1` @ 1,494,582 | `ScreenPane.svelte:153/178` — the prop, defaulting `false` |
+| `O(3, isScreenSharing && localSharingStreams[muser._id] && !localpreview ? 3 : -1)` @ 1,501,676 | `ScreenPaneStatus.svelte:121` — `{#if offerLargePreview}` |
+| `W0e`'s `" (You are sharing your screen as ", screenName, " click here for larger preview) "` @ 1,492,944 | `:124`, character for character, both trailing spaces |
+| const 11's `2,"color","#ffcc00"` @ 1,500,900 | inline `style="color: #ffcc00;"`, transcribed rather than moved to a class |
+| `H0e`'s `isPresentingThisScreen && !localpreview` on the `<video>` @ 1,502,095 | `ScreenPane.svelte:212` — `stream !== null && (!ownScreen \|\| localPreview)` |
+| `largePreview()` sets it true and attaches @ 1,499,849 | `onlargepreview`, with `:405` `ownScreen && !localPreview ? null : stream` |
+
+The sibling ORDER is matched too — `H(1,z0e,…)(2,G0e,…)(3,W0e,…)(4,q0e,…)` at 1,501,269 puts the
+invitation between `Video Disabled` and `Connecting To Screen of`, and `screen-pane-contract.test.ts`
+asserts that position, the gate and all five readings of `localpreview`.
+
+**One divergence remains inside it and it is escape 4.** Upstream hangs the click on the `<p>`, which
+is not focusable, not keyboard operable and announced as a paragraph. Here a real `<button>` sits
+INSIDE the captured `<p>`, which keeps the element, its class, its inline colour, its text and its
+position — the rendered paragraph is the reference's — and adds a focusable node within it. The
+scoped rule strips the button chrome so nothing about the rendering changes.
 
 `SV-SP-03` depends on this being stated: `ownScreen` short-circuits the connecting spinner precisely
 because our own screens are connected the moment they exist.
@@ -4447,6 +4528,29 @@ application never wrote one.
 Building it would mean reading a key nothing has ever written, and the `deleteSavedPoll` shape
 differs besides: by row id here, by array index plus a full JSON resend there.
 
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the evidence is stronger than the row
+claimed: the branch is dead UPSTREAM TOO.**
+
+The 2026-08-31 argument was that *this* application never wrote the key. True, and not the strongest
+thing available. All **18** occurrences of `savedPolls` in the 2,891,205-byte bundle were read at
+their offsets, and not one of them is a write:
+
+| what | where |
+| --- | --- |
+| the READ | `JSON.parse(localstorage.get("savedPolls",[]))` @ 2,111,077 |
+| the DELETE | `localstorage.deleteKey("savedPolls")` @ 2,111,334 |
+| an in-memory field named `this.savedPolls` — a different thing | 2,103,639 · 2,105,481 · 2,105,554 · 2,105,720 · 2,111,281 · 2,111,491 · 2,111,519 · 2,111,562 · 2,111,680 · 2,111,720 · 2,111,830 · 2,112,253 · 2,112,276 |
+| an HTML `id` / `aria-controls` / `data-bs-target` on the tab | 2,113,254 · 2,113,298 · 2,114,480 |
+
+**There is no `localstorage.set("savedPolls", …)` anywhere in the bundle.** So in the shipped
+reference `loadStoredPolls()` always returns `[]`, `e.length` is always 0, and the only path that
+ever runs is the `else` — which reads `sessData.savedSessionPolls`, the SERVER's copy. That is
+precisely what this room does.
+
+So the migration is not a behaviour this room lacks; it is a branch the reference cannot reach
+either, and the absence of a writer across the whole bundle is the proof escape 4 asks for.
+Transcribing it would add a read of a key nobody writes, at either end.
+
 **low** · `missing-behaviour` · reference byte **2,111,310**
 
 ```
@@ -4609,15 +4713,31 @@ onFileTabChange(e){console.log("tab",e),this.selectedFileTab=e}
 
 ### FP-09 — Search term is trimmed here and is not trimmed in the reference's filter pipe
 
-**DELIBERATE DIVERGENCE, recorded 2026-08-30.** The reference's `filter` pipe lower-cases the term
+**BUILT 2026-09-02 — MATCHED, plus a second divergence in the same expression. Recorded as `DELIBERATE DIVERGENCE 2026-08-30` until then.** The reference's `filter` pipe lower-cases the term
 and does not trim it (read verbatim at byte 1,914,488), so typing a single space filters the list to
 rows whose text happens to contain a space — most of them, and unpredictably. Ours trims, so a
 whitespace-only query is an empty query and the list is unchanged.
 
-Both are answers to a query nobody means to type. Ours is the one whose result a person can predict,
-and reproducing the other would mean writing a filter that treats the space bar as a search term. The
-divergence is one character of code and this paragraph is the whole of it; nothing else in the pipe
-differs — any string-valued own property, case-insensitive substring, empty term returns the list.
+**RE-READ 2026-09-02 — MATCHED, and the trim is gone. The refusal was a taste argument dressed as a reason.**
+
+It said both are answers to a query nobody means to type and that *"ours is the one whose result a
+person can predict"* — true, and not one of the four escapes. What made it worth acting on rather
+than merely conceding is that the premise was too narrow: **a trailing space is not only typed by
+accident.** With the trim in place, ` png` matched nothing, and this pipe is how the Files pane is
+searched at all. The reference has no trim, so it matches every row containing `png`. Those are
+different LISTS, not different answers to an empty query.
+
+`files.svelte.ts:299` is now `const query = this.#fileSearch.toLowerCase();` with no trim, which is
+the pipe read whole at byte 1,914,488.
+
+**A second divergence was found in the same expression and fixed with it.** The reference
+short-circuits an empty term — `transform(e, i) { return e ? i ? (…) : e : [] }` returns the array
+UNCHANGED — where this ran the whole `Object.values` walk with `''`. Stated precisely, because the
+dramatic reading is wrong: `''.includes('')` is true and `RoomFileRow` types four fields as
+`string`, so no row the type can express was actually dropped. **The visible effect was the wait,
+not the result** — an allocation and an `Object.values` walk per row, on the render that happens
+most, to arrive at the list it started with. That is the shape question `CLAUDE.md` asks of every
+read path, and the answer scales with the room's file count.
 
 **low** · `divergence` · reference byte **1,914,488**
 
@@ -4847,6 +4967,9 @@ size:"large",buttons:{download:{label:'<i class="fa fa-download"></i> Download I
 ### dta-05 — Linked-room log override (`linkedRoom${e}AlertsOther`) is deliberately not carried
 
 **DELIBERATE DIVERGENCE — verified by reading 2026-08-30 17:19 UTC; the row is its own disposition and the code already carries the reason.** `linkedRoom${e}AlertsOther` lets a room fetch ANOTHER room's alert log, with the room named by the BROWSER: `sendServerCommand(\`get${e}AlertsLog\`, { sessionID: s || globals.sessionID, days: i })`. Both endpoints here take the room from the session row instead and say so in place (`api/day-trade-alerts/+server.ts:20-31`, `api/swing-alerts/+server.ts:21-25`), the setting is excluded from the room config at `room-config-client.ts:452` and `:480`, and `trade-alerts.svelte.ts` sends no session parameter at all.
+
+**RE-READ 2026-09-02 — escape 1, SECURITY, and it is the cleanest instance of that escape in this
+document: the next sentence names the prohibition rather than describing it.**
 
 **This is the 2026-08-07 privilege escalation's exact shape** — an authority decision asserted by the client — so carrying it would mean reintroducing the thing `CLAUDE.md` names as never to be reintroduced. The honest cost is stated rather than hidden: a room configured upstream to mirror another room's alert log shows its own here. Building it correctly would mean the mirror being resolved on the CONTROLLER from the room's own settings and never named on the wire, which is a real feature and not this row.
 
@@ -6641,7 +6764,7 @@ x("keyup",…)("paste",function(o){return D(e),E(g(2).onImagePaste(o))})("focus"
 
 ### PCC-07 — The capture binds `keyup`; every composer in this room binds `keydown`
 
-**DELIBERATE DIVERGENCE 2026-08-31 02:15 UTC.** Const 55's binding section is `3,"keyup","paste","focus"` and it is not transcribed, for a reason this repository has already written down twice: `CarouselDialog.svelte:586-587` records `onkeydown` "rather than `onkeyup` so the Enter that confirms cannot also submit", and `AlertChatArea.svelte:985` binds `onkeydown` to a handler decoded from a `keyup` composer. Recorded here so the third reader does not file it as a gap.
+**BUILT 2026-09-02 — MATCHED. Recorded as `DELIBERATE DIVERGENCE 2026-08-31 02:15 UTC` until then.** Const 55's binding section is `3,"keyup","paste","focus"` and it is not transcribed, for a reason this repository has already written down twice: `CarouselDialog.svelte:586-587` records `onkeydown` "rather than `onkeyup` so the Enter that confirms cannot also submit", and `AlertChatArea.svelte:985` binds `onkeydown` to a handler decoded from a `keyup` composer. Recorded here so the third reader does not file it as a gap.
 
 **low** · `divergence` · reference byte **2,214,572** (const 55, decoded by value)
 
@@ -6649,7 +6772,15 @@ x("keyup",…)("paste",function(o){return D(e),E(g(2).onImagePaste(o))})("focus"
 3,"keyup","paste","focus"
 ```
 
-**Ours:** `onkeydown`. The measurement that settles it: `preventDefault()` on `keyup` runs after the browser has already inserted the newline, so PCC-01's swallow arm — the reference's own `i.val(i.val())` — could not swallow anything on the event the reference binds. Matching the event would reproduce a defect and lose the branch, which is the definition this document gives the disposition.
+**RE-READ 2026-09-02 — MATCHED, and the refusal's own measurement turned out to be the way IN rather than the reason against.** `PrivateChatComposer.svelte:215` binds `onkeyup`, which is the only event const 55 binds.
+
+The 2026-08-31 reasoning was right about the mechanism and wrong about what followed from it. `preventDefault()` on a `keyup` does run after the browser has inserted the newline — so the conclusion drawn was that matching the event *"would reproduce a defect and lose the branch"*. It loses nothing. What was missing was an input: `chat-composer-enter.ts` now takes a `ComposerEnterBinding` of `'keydown-and-keyup' | 'keyup-only'`, and both `composerEnterAction` and `composerEnterPrevents` read it, so the three-way branch survives on either event with the arms that can no longer fire on a keyup answered honestly rather than pretended.
+
+**What matching actually fixed, which is the point:** Shift+Enter in the private composer was swallowing a line break the reference KEEPS. Ours killed it on the way down; upstream binds `keyup`, where the newline is already in the field. The other two arms are unchanged in effect — plain Enter's newline is `.trim()`ed away by the send at byte 2,208,062, and Alt+Enter's explicit `+ "\n"` lands on top of the browser's, which is upstream's own double and is now reproduced.
+
+**And the row's premise was wrong twice over.** *"Every composer in this room binds `keydown`"* — only TWO of the six bind `keydown.enter` at all, and they are the two the reference also binds `keydown` on. The two cited precedents (`CarouselDialog.svelte`, `AlertChatArea.svelte`) are those two; neither governs this composer.
+
+*The 2026-08-31 state, for the record:* `onkeydown`, refused on the reasoning above.
 
 *This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
 
@@ -6947,12 +7078,21 @@ cluster is **node 5** and the `appDoubleClick` box (const 5,
 **node 6**. They are SIBLINGS under const 0, so upstream no double-click on the cluster can reach a
 fullscreen handler and the reference carries no guard.
 
-**Ours is nested, and on purpose.** `ScreenPane.svelte:565-578` puts the cluster inside
-`#video-screen-container-…`, which is what makes it fullscreen with the picture — the same nesting
-`SV-SP-01` relies on for the user-ID watermark, which is clipped away if it sits outside. So the
-guard is the price of a placement this repository chose, not a transcription of anything, and
-un-nesting it to match the reference would undo a row already built. Recorded at the code rather
-than removed, because a guard whose stated reason is false is a guard the next reader deletes.
+**RE-READ 2026-09-02 — MATCHED, and the row's premise was removed rather than argued with.** The
+2026-08-31 note said the nesting was ours and on purpose, so the guard was *"the price of a placement
+this repository chose"*. That reasoning was circular: the guard existed because of the nesting, and
+the nesting was the divergence.
+
+`SP2-07` un-nested it. `ScreenPane.svelte:546-563` now renders the `{#if detached}` cluster as a
+SIBLING immediately before `#video-screen-container-{id}`, which is the reference's own node 5 /
+node 6 arrangement. With the cluster outside the `appDoubleClick` box, no double-click on it can
+reach a fullscreen handler — exactly as upstream — so the guard has nothing left to guard.
+`swallowDoubleClick` and all six `ondblclick` bindings are deleted; the only occurrence of the word
+left in the component is this argument in a comment, and the component's size ceiling went DOWN
+(237 → 222) rather than up, which is the measurement that the code shrank rather than moved.
+
+`SV-SP-01`'s watermark is untouched and was the row's other worry: it is opened AFTER the `<video>`
+container closes, so it is a child of a different node and the move does not reach it.
 
 This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
@@ -7643,12 +7783,43 @@ This row was ADDED after this document was committed.
 
 ### NAV-10 — `Download Recording` has no counterpart anywhere in the reference
 
-**DELIBERATE DIVERGENCE 2026-08-31.** The string `Download Recording` occurs **zero times in
+**BLOCKED — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`; a consequence of the MediaMTX blocker, not a choice about this menu.** The string `Download Recording` occurs **zero times in
 2,891,205 bytes**; so does `recordedUrl`. The reference's recording menu is `YPe` (byte 2,475,469) on
 the MediaMTX/rec-bot path and `e4e` (byte 2,477,105) otherwise, and neither renders a download: the
 recording is made server-side and `recPreviewLocation` is where it goes. This room records in the
 browser with a `MediaRecorder`, so it HAS a blob to hand back, and the item exists because of that —
 it is a capability of this architecture rather than a transcription.
+
+**RE-READ 2026-09-02 — this is not a divergence to argue, it is a CONSEQUENCE of a blocked row, and
+the three recording rows share one root.**
+
+The reference selects its whole recording menu with
+`O(6, e.mediaService.useMTX || e.mediaService.mediaSoupService.recBotMethod ? 6 : 7)` — Start, Stop,
+Pause, Resume, Rec Preview and the absence of a download all belong to an **MTX or record-bot path**,
+where the recording is made server-side and reachable at a URL the server owns. This room records in
+the BROWSER with a `MediaRecorder`, because `TODO.md`'s `X` / `AC` / `R row 10` are blocked on a
+**MediaMTX host at `STREAM_SERVER_MTX`** (8889 WHIP/WHEP, 1935 RTMP, TLS) that this deployment does
+not have.
+
+So the menu differences are downstream of that one blocker, and matching them in isolation does not
+produce the reference's behaviour — it produces a THIRD one, present in neither application: a room
+that still records in the browser and has no way to reach what it recorded. The right disposition is
+therefore the blocker's, with what unblocks it named, rather than a per-item argument about taste.
+
+**What is separable, and is NOT excused by the blocker:** the RECEIVER half. *"Our server does not
+send that frame"* is not one of the four escapes — a receiver is transcribable whatever any server
+sends, and this repository has been wrong about that three times. `setRecPreview` (byte 1,023,752,
+`this.globals.sessData.recPreviewLocation = i.url`) and the gate at 2,476,206,
+`isRecording && sessData.recPreviewLocation`, are both transcribable today and would be inert rather
+than wrong: with no producer, `recPreviewLocation` stays unset and the item never draws — which is
+exactly what the reference does when its own server sends nothing. **That half is real work and is
+named here as such**, kept out of this pass only because it lands in the same commit as the host it
+is pointless without, and because doing it alone would mean deciding whether this room's own
+post-stop preview is removed with it — a capability question for the owner, not a transcription.
+
+**Unblocked by:** the MediaMTX host. At that point the recording is server-side, the download item
+has nothing local to hand back and goes, and the preview gate has a producer — all three rows close
+together and none of them needs an argument.
 
 Recorded rather than removed, and recorded rather than left to look like a match. The control next to
 it is a real gap in the other direction and is named here so the next reader does not have to
@@ -8683,18 +8854,37 @@ onclick=showChatGif('${c}')>gif muted, click to show</div>
 
 ### MSB-06 — `rel="noreferrer"` is ours, and `Sw.sanitize` is deliberately not reproduced
 
-**DELIBERATE DIVERGENCE — recorded 2026-08-31, not matched.**
+**BUILT 2026-09-02 — the `rel` half MATCHED and replaced by a header; the `Sw.sanitize` half holds under escape 4. Recorded as `DELIBERATE DIVERGENCE 2026-08-31` until then.**
 This row was ADDED after this document was committed, by the seventh batch.
 The reference's anchor is `'<a href="'+e+'" target="_blank" class="linkColor"
 onclick="event.stopPropagation()">'+Sw.sanitize(e)+"</a>"` — no `rel`, and the SANITISED url as the
 link TEXT beside the RAW one in `href`. Ours carries `rel="noreferrer"` and puts `segment.text` in
 the text position.
 
-Both differences are the same decision. `target="_blank"` with no `rel` hands the opened page a
-`window.opener` handle back into a room a member is logged into; reproducing that would reproduce a
-defect, which is what this disposition is for. And `Sw.sanitize` exists upstream because the string
-becomes markup — here it becomes a text node, so sanitising it would only mangle a URL a member can
-read, without removing any capability.
+**RE-READ 2026-09-02 — the two halves went OPPOSITE ways, and the `rel` half is now MATCHED.**
+
+*The `rel` half — matched.* The original reason was *"reproducing that would reproduce a defect"*,
+which is retired, and the concern behind it turned out to be answerable without the divergence.
+`rel="noreferrer"` is gone from `MessageBody.svelte`; the only occurrence left in that file is this
+argument in a comment. What replaced it is a header — `hooks.server.ts` sets `Referrer-Policy:
+same-origin` on every response — which covers this link, every other link in the room, and every
+subresource, and needs no attribute the reference does not have.
+
+Worth recording that `rel` is a CHOICE upstream rather than an oversight, which is what makes it
+worth matching: `"rel",` occurs **8 times** in the 2,891,205-byte bundle — seven
+`"rel","noopener noreferrer"` (the avatar menu's outbound links among them) and one
+`"rel","required"`. So the reference puts `rel` on the links it wants it on and not on this one.
+`shell-body-rte-reference-contract.test.ts` holds the pair, the markup and the header together,
+because deleting the attribute WITHOUT the header is the change that leaks and a test asserting only
+the markup would pass on exactly that.
+
+*The `Sw.sanitize` half — held, escape 4, NOT A DIVERGENCE.* Upstream the return value is a STRING
+that becomes markup, so `Sw.sanitize` is what stops a crafted URL closing the anchor and opening a
+tag of its own. Here the link is a Svelte element and the url goes into a TEXT position, where the
+compiler escapes it — there is no markup boundary for a payload to cross. So the sanitiser's
+function is already discharged by the surrounding construction, and calling it would only mangle a
+URL a member can read. The reference-facing OUTPUT is the same rendered text either way, which is
+the escape on its own terms.
 
 **low** · `divergence` · reference byte **1,326,527**
 
@@ -9223,7 +9413,7 @@ attributes that will be missing from the seventh.
 
 ### SSM-2 — the capture splits the six clicks three on the `<li>` and three on the `<a>`; all six sit on the `<li>` here
 
-**DELIBERATE DIVERGENCE 2026-08-31.** This row was ADDED after this document was committed.
+**OWNER DECISION — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`; the same rule collision as `MTS-06` and to be answered with it.** This row was ADDED after this document was committed.
 
 Consts 185, 186 and 187 each end `3,"click"`, so Share Screen, OBS / XSPLIT and OBS / RTMP carry the
 handler on the list item. `l4e`, `c4e` and `d4e` instead do `d(2,"li")(3,"a",163)`, where const 163 is
@@ -9233,8 +9423,28 @@ Measured: `.dropdown-menu li` has no rule of its own in `css/complete-app-styles
 anchors are not `.dropdown-item` — they are bare inline `<a>` with no `href`, so an anchor's box is
 exactly its text. Upstream's "Stop Sharing All Screens" is therefore clickable on its words and dead
 on the rest of the row, while "Share Screen" two entries above is clickable across the whole row.
-Reproducing the split would reproduce a hit-target bug, and it would also put the focusable element
-SSM-1 adds onto the one node `aria-hidden` is on.
+**RE-READ 2026-09-02 — OWNER DECISION, the same fourth outcome as `MTS-06`, and the row's second
+clause is the whole of it.** The first clause — *"reproducing the split would reproduce a hit-target
+bug"* — is the retired argument. The second is not:
+
+matching puts the ONLY handler on `["aria-hidden","true",3,"click"]`, and `SSM-1`'s focusable element
+lands on that same node. An `aria-hidden` node carrying the only interactive binding is not a control
+announced wrongly; **it is a control that does not exist at all** for anyone using assistive
+technology. That collides with a rule `CLAUDE.md` states by name — *"semantic accessible HTML"* — and
+a conflict between two owner rules is the one thing an agent must not settle silently in either
+direction.
+
+Stronger than `MTS-06` in degree and identical in kind, so the two should be answered together: there
+the reference announces the wrong tab, here it hides the control entirely. **If the owner says
+transcribe:** the handler moves from the `<li>` to the `<a>` on the three affected entries (consts
+185/186/187 versus `l4e` / `c4e` / `d4e`), const 163 keeps its `aria-hidden="true"`, and `SSM-1`'s
+focusable element goes with it.
+
+The measurement behind the hit-target half stands and is worth keeping either way: `.dropdown-menu
+li` has no rule of its own in `css/complete-app-styles.css` and these anchors are not
+`.dropdown-item`, so an anchor's box is exactly its text — upstream's "Stop Sharing All Screens" is
+clickable on its words and dead on the rest of the row, while "Share Screen" two entries above is
+clickable across the whole row.
 
 **reference byte 2,479,632**
 
@@ -9460,8 +9670,19 @@ row was ADDED after this document was committed and is deliberately outside the 
 The element is a real `<button type="button">`. Enter on a focused button fires `click` natively, so
 upstream both handlers run for one keypress and `clear()` executes twice. It is idempotent — it sets
 `query` to `""`, re-searches and re-focuses — so the visible effect upstream is one extra search over
-1,821 entries per Enter, not a wrong result. Reproducing it would reproduce that, so the button
-carries `onclick` alone.
+1,821 entries per Enter, not a wrong result.
+
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the row already carries the proof in the word
+*idempotent*.** The old sentence, *"reproducing it would reproduce that"*, is the retired argument.
+What holds is that the two handlers produce **one rendered result**: `clear()` sets the same query,
+performs the same search and leaves the same focus whether it runs once or twice, so the duplicate is
+work the machine does and not something the reference's user sees. The marker is internal repetition
+rather than reference-facing output.
+
+The skin swatches are correctly NOT the same case and the row already separates them: those are
+`role="button"` spans where nothing is native, so the handler is the only way the key does anything —
+and they ARE transcribed, as `keydown` with `preventDefault`, because Space on `keydown` scrolls the
+page before a `keyup` handler ever sees it.
 
 The same pair appears on the skin swatches (`keyup.enter` and `keyup.space`, `Lee` at byte 719,148)
 and is NOT the same case: those are `role="button"` spans, where nothing is native and a handler is
@@ -9641,9 +9862,22 @@ identifies can move off the recording is not a watermark. It is kept inside
 `#video-screen-container-{id}` so it still goes fullscreen with the picture, which is the state a
 recording would be made in.
 
+**RE-READ 2026-09-02 — escape 2, EVIDENCE ABSENT, and this row had already shown the search before
+the rule asking for it was written.** Its own *"What the bundle proves and what it does not, kept
+apart"* paragraph is the escape: that the watermark sits INSIDE the transform is **inferred**, from
+where `<pan-zoom>` projects its content, and the library is third-party — its templates are in no
+capture this repository holds. There is no byte to match. Matching an inference would mean choosing
+one of two readings and calling it transcription.
+
+The anti-leak function is what decides which reading to build on rather than what excuses the
+divergence, and the distinction matters: if the bundle DID prove the watermark pans, this row would
+be `SECURITY` (escape 1) instead, and it would still not be built — a control the person it
+identifies can drag off the frame is not a control. Either way the row holds; it is escape 2
+because the evidence stops first.
+
 ### SP2-07 — the detached cluster is a sibling of the pan container upstream, in an unpositioned parent
 
-**DELIBERATE DIVERGENCE** — `apps/room/src/lib/components/ScreenPane.svelte`. This
+**BUILT 2026-09-02 — MATCHED. Recorded as `DELIBERATE DIVERGENCE` until then** — `apps/room/src/lib/components/ScreenPane.svelte`. This
 row was ADDED after this document was committed and is deliberately outside the tables above.
 
 Node 5 of the create block — `Y0e`, gated `O(5, o.isDetachedCtrl ? 5 : -1)` at byte 1,501,767 —
@@ -9660,6 +9894,34 @@ This component nests the cluster inside `#video-screen-container-{id}`, whose ca
 (reference sheet byte 441,996). So it anchors five pixels from that box's top-right corner —
 deterministically, from a rule this repository can point at.
 
+**RE-READ 2026-09-02 — MATCHED. The refusal was overturned by a measurement, not by an argument.**
+
+The paragraph below refused it on the ground that moving the cluster out means *"inventing the
+ancestor"* its `position: absolute` resolves against. That was a gap in the reading rather than a
+gap in the evidence, and closing it took two lookups:
+
+* `app-screenshare-view`'s const 0 is `[1,"h-inherit"]` — **no `position`**;
+* the popout wrapper's only two rules are `.detach-screen .webcamScreen{max-height:100vh!important}`
+  and `.detach-screen .overflow-hidden{overflow:initial!important}` — neither positions anything.
+
+So **upstream has no positioned ancestor inside the component either**, and `right: 5px; top: 5px`
+resolves against the popout window at both ends. Nothing is invented; the ancestor chain is the one
+the capture already has.
+
+`ScreenPane.svelte:546-563` now renders the cluster as a sibling immediately BEFORE
+`#video-screen-container-{id}`, which is the create block's own order — slot 5 (const 4, the
+cluster) closes before `d(6,…)` opens on const 5, the `appDoubleClick` box. Two things followed:
+`SZC-03`'s `swallowDoubleClick` and its six bindings are deleted, a workaround removed by matching
+rather than by being argued away; and the component's size ceiling went DOWN.
+
+The row's last worry — that the cluster now sits outside the element `toggleFullscreen` fullscreens,
+so the popout's magnifier would vanish when maximised — is answered by the same fact that made the
+move correct: **it is outside that element upstream too.** Whatever the reference does on fullscreen,
+this now does, which is the whole of what matching asks. `SV-SP-01`'s watermark is untouched, and was
+the row's other worry: it is opened after the `<video>` container closes, so it is a child of a
+different node and the move does not reach it.
+
+*The 2026-08-31 reasoning, for the record:*
 Kept, and the argument is that the reference's placement is not a specification. "Whichever ancestor
 happens to be positioned" is a value this bundle does not contain, so matching it would mean
 inventing the ancestor rather than transcribing it; and the one thing it definitely produces —
@@ -10126,8 +10388,7 @@ than one that opens onto "Nothing is scheduled."
 
 ### SCH-07 — The modal chrome — `modal-xl`, `table table-striped text-white`, the "Manage Scheduled Alerts" title and the Close footer — is not reproduced
 
-**DELIBERATE DIVERGENCE 2026-08-31; the argument already lives in the component and is not restated
-here.** `ScheduledAlerts.svelte`'s header records why the reference's two components are one here, and
+**BLOCKED — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`. No escape applies, so this is WORK; the change is specified in full below and what blocks it is tooling, named at the end.** `ScheduledAlerts.svelte`'s header records why the reference's two components are one here, and
 `ScheduledAlertsTable.svelte`'s header records why drawing a row is not the part of that decision
 being revisited. The chrome is what the merge costs: a pane embedded in `PostAlertModal`'s body cannot
 carry a second modal's dialog, title bar and Close button, because there is no second modal.
@@ -10136,6 +10397,45 @@ carry a second modal's dialog, title bar and Close button, because there is no s
 globals styling a table that is now inside a SCOPED sheet, and the room already runs two Bootstrap
 generations on two surfaces (recorded in `todo-next.md`). Borrowing a global table skin into a scoped
 component is how the row-striping in one modal starts depending on which generation loaded.
+
+**RE-READ 2026-09-02 — NO ESCAPE APPLIES. This is WORK, and it is the last of the twenty-nine.**
+
+Checked against the four and it fails each: not SECURITY; the chrome consts are quoted by value
+below, so not EVIDENCE ABSENT; a modal wrapper is ordinary markup, so not LANGUAGE IMPOSSIBLE; and
+`modal-xl`, a title bar and a Close button are reference-facing OUTPUT rather than internal
+structure.
+
+**The first argument is circular, in the same way `SZC-03`'s was.** *"A pane embedded in
+`PostAlertModal`'s body cannot carry a second modal's dialog, because there is no second modal"* — the
+absence of the second modal IS the divergence, so it cannot also be the reason for it. `SZC-03` was
+refused on exactly that shape (*"the guard is the price of a placement this repository chose"*) and
+did not survive the reading either.
+
+**The second argument is real and is a question for the build, not a reason against it.** Two
+Bootstrap generations do ship on two surfaces here, so a global `table-striped` inside a scoped sheet
+could take its striping from whichever loaded. That decides HOW the chrome is transcribed — whether
+the two globals are carried as-is or reproduced in the component's own sheet under the captured
+names — not whether the dialog exists.
+
+**The trigger already points at it.** `ScheduledAlerts.svelte:218` renders const 74's
+`data-bs-toggle="modal" data-bs-target="#scheduledAlertsModal"`, and there is no
+`#scheduledAlertsModal` in this room — the table renders inline instead. So the room already carries
+half of the reference's arrangement, aimed at a dialog that does not exist, and the room ships no
+Bootstrap JavaScript to notice.
+
+**What building it is, exactly**, from the consts already quoted above: a `#scheduledAlertsModal`
+with `tabindex="-1"`, `aria-labelledby="scheduledAlertsModalLabel"`, `aria-hidden="true"` and
+`class="modal fade text-white"`; inside it `modal-dialog modal-xl` > `modal-content` >
+`modal-header` carrying `#scheduledAlertsModalLabel.modal-title` and the
+`btn-close btn-close-white` dismiss; then `modal-body` holding the existing
+`ScheduledAlertsTable` with `class="table table-striped text-white w-100"`.
+
+**Not built in this session, and the reason is tooling rather than judgement.** `CLAUDE.md` makes the
+Svelte MCP mandatory on every task touching a `.svelte` file — `list-sections` and
+`get-documentation` before writing, `svelte-autofixer` until it returns nothing — and that MCP is not
+connected in this session. Splitting a pane into a new dialog component is precisely the class of
+change that rule exists for, so it is named here in full rather than attempted without it. `SCH-05`'s
+two non-chrome rules were built and are unaffected.
 
 The two rules that are NOT chrome — `remove-scheduled-alert-btn` and `alert-date-time-th` — were built
 rather than refused, and are SCH-05.
@@ -10410,7 +10710,7 @@ two-verifier pass the tables above describe, and therefore deliberately outside 
 
 ### RNB-04 — The Rec Preview item is offered after the recording stops, not while it runs
 
-**DELIBERATE DIVERGENCE 2026-08-31.** `KPe` at byte 2,475,295 is the reference's whole preview block —
+**BLOCKED — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`. Its RECEIVER half is separable work and is named below.** `KPe` at byte 2,475,295 is the reference's whole preview block —
 a `<li>` holding an `<hr class="dropdown-divider">`, then a `<li class="nav-item">` holding one of two
 anchors, `" Hide Rec Preview "` (byte 2,475,111) or `" Show Rec Preview"` (byte 2,475,265), whose
 asymmetric trailing spaces this room already transcribes character for character. Its gate, byte
@@ -10425,13 +10725,43 @@ once a second while it runs (byte 2,352,305 sets that interval). There is no suc
 Same control, different moment, and the later moment is the only one this room can honestly offer.
 Recorded rather than closed as "built", because a reader comparing the two gates will otherwise read
 ours as a mistake.
+**RE-READ 2026-09-02 — this is not a divergence to argue, it is a CONSEQUENCE of a blocked row, and
+the three recording rows share one root.**
+
+The reference selects its whole recording menu with
+`O(6, e.mediaService.useMTX || e.mediaService.mediaSoupService.recBotMethod ? 6 : 7)` — Start, Stop,
+Pause, Resume, Rec Preview and the absence of a download all belong to an **MTX or record-bot path**,
+where the recording is made server-side and reachable at a URL the server owns. This room records in
+the BROWSER with a `MediaRecorder`, because `TODO.md`'s `X` / `AC` / `R row 10` are blocked on a
+**MediaMTX host at `STREAM_SERVER_MTX`** (8889 WHIP/WHEP, 1935 RTMP, TLS) that this deployment does
+not have.
+
+So the menu differences are downstream of that one blocker, and matching them in isolation does not
+produce the reference's behaviour — it produces a THIRD one, present in neither application: a room
+that still records in the browser and has no way to reach what it recorded. The right disposition is
+therefore the blocker's, with what unblocks it named, rather than a per-item argument about taste.
+
+**What is separable, and is NOT excused by the blocker:** the RECEIVER half. *"Our server does not
+send that frame"* is not one of the four escapes — a receiver is transcribable whatever any server
+sends, and this repository has been wrong about that three times. `setRecPreview` (byte 1,023,752,
+`this.globals.sessData.recPreviewLocation = i.url`) and the gate at 2,476,206,
+`isRecording && sessData.recPreviewLocation`, are both transcribable today and would be inert rather
+than wrong: with no producer, `recPreviewLocation` stays unset and the item never draws — which is
+exactly what the reference does when its own server sends nothing. **That half is real work and is
+named here as such**, kept out of this pass only because it lands in the same commit as the host it
+is pointless without, and because doing it alone would mean deciding whether this room's own
+post-stop preview is removed with it — a capability question for the owner, not a transcription.
+
+**Unblocked by:** the MediaMTX host. At that point the recording is server-side, the download item
+has nothing local to hand back and goes, and the preview gate has a producer — all three rows close
+together and none of them needs an argument.
 
 *This row was ADDED after this document was committed — batch 3 on 2026-08-31, not part of the
 two-verifier pass the tables above describe, and therefore deliberately outside them.*
 
 ### RNB-05 — "Download Recording" has no counterpart anywhere in the bundle
 
-**DELIBERATE DIVERGENCE 2026-08-31.** The string `Download Recording` occurs ZERO times in 2,891,205
+**BLOCKED — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`; the same root as `NAV-10`, which is the same finding read twice.** The string `Download Recording` occurs ZERO times in 2,891,205
 bytes. That is measured, not grepped-and-shrugged: the sibling label `" Show Rec Preview"` from the
 very same menu occurs exactly once, at byte 2,475,265, so the method finds this menu's strings when
 they are there.
@@ -10440,6 +10770,37 @@ The item is ours because the RECORDING is ours. Upstream records server-side —
 `O(6, e.mediaService.useMTX || e.mediaService.mediaSoupService.recBotMethod ? 6 : 7)`, so the whole
 Start/Stop/Pause/Resume menu belongs to an MTX or record-bot path, and there is no blob in the
 browser to hand anybody. This room's `MediaRecorder` produces one, and without this item it is lost
+
+**RE-READ 2026-09-02 — this is not a divergence to argue, it is a CONSEQUENCE of a blocked row, and
+the three recording rows share one root.**
+
+The reference selects its whole recording menu with
+`O(6, e.mediaService.useMTX || e.mediaService.mediaSoupService.recBotMethod ? 6 : 7)` — Start, Stop,
+Pause, Resume, Rec Preview and the absence of a download all belong to an **MTX or record-bot path**,
+where the recording is made server-side and reachable at a URL the server owns. This room records in
+the BROWSER with a `MediaRecorder`, because `TODO.md`'s `X` / `AC` / `R row 10` are blocked on a
+**MediaMTX host at `STREAM_SERVER_MTX`** (8889 WHIP/WHEP, 1935 RTMP, TLS) that this deployment does
+not have.
+
+So the menu differences are downstream of that one blocker, and matching them in isolation does not
+produce the reference's behaviour — it produces a THIRD one, present in neither application: a room
+that still records in the browser and has no way to reach what it recorded. The right disposition is
+therefore the blocker's, with what unblocks it named, rather than a per-item argument about taste.
+
+**What is separable, and is NOT excused by the blocker:** the RECEIVER half. *"Our server does not
+send that frame"* is not one of the four escapes — a receiver is transcribable whatever any server
+sends, and this repository has been wrong about that three times. `setRecPreview` (byte 1,023,752,
+`this.globals.sessData.recPreviewLocation = i.url`) and the gate at 2,476,206,
+`isRecording && sessData.recPreviewLocation`, are both transcribable today and would be inert rather
+than wrong: with no producer, `recPreviewLocation` stays unset and the item never draws — which is
+exactly what the reference does when its own server sends nothing. **That half is real work and is
+named here as such**, kept out of this pass only because it lands in the same commit as the host it
+is pointless without, and because doing it alone would mean deciding whether this room's own
+post-stop preview is removed with it — a capability question for the owner, not a transcription.
+
+**Unblocked by:** the MediaMTX host. At that point the recording is server-side, the download item
+has nothing local to hand back and goes, and the preview gate has a producer — all three rows close
+together and none of them needs an argument.
 when the tab closes.
 
 Filed as a divergence rather than left implicit because "nothing exists without a consumer" cuts both
@@ -10836,8 +11197,7 @@ function wCe(t,n){1&t&&(d(0,"div",2),T(1,"i",15),v(2,"\xa0Loading Stream..."),u(
 
 ### STV-02 — Upstream reloads the whole HLS pipeline TWICE on one buffer-size click; ours reloads once
 
-**DELIBERATE DIVERGENCE — read and measured 2026-08-31. Matching the reference here would reproduce
-a defect, and the row exists so nobody restores it as "the reference's arrangement".**
+**OWNER DECISION — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE — read and measured 2026-08-31`; the same rule collision as `MTS-06` and `SSM-2`, to be answered with them.** The row exists so nobody restores the double as "the reference's arrangement" without that answer.
 
 **This row was ADDED after this document was committed**, by the batch that read the two alert panes
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
@@ -10862,9 +11222,32 @@ emit) and 1,902,321 (this subscription) — which is the control on "the subscri
 only other reader".
 
 **Ours reloads once per instance**, from the single `$effect` keyed on `videoSrc` and
-`bufferSizeLevel`. Halving it is not a preference: a second teardown drops the media element's
-buffered range on the floor a second time and the viewer sees two stalls where the reference's own
-design intends one.
+`bufferSizeLevel`. A second teardown drops the media element's buffered range on the floor a second
+time and the viewer sees two stalls where one would do.
+
+**RE-READ 2026-09-02 — OWNER DECISION, and the row's own last sentence is what rules escape 4 out.**
+
+The disposition said matching *"would reproduce a defect"*, which is retired. The natural next
+reading is `EMOJI2-07`'s — a duplicate call whose result is identical, therefore internal repetition
+rather than output — and it does **not** apply here, on this row's own measurement: *"the viewer sees
+two stalls"*. Two stalls is a different rendered experience from one, so the duplicate is
+reference-facing and none of the four escapes covers it. On the four alone, this is work.
+
+What stops it being work an agent may simply do is the collision, and it is with the owner's own
+standard rather than with taste: `CLAUDE.md` opens with *"maximized for the highest performance
+ALWAYS"*, and matching here means **deliberately doubling media-plane teardowns** — `preferenceChanged`
+is on the SHARED `guiEventBus`, so the cost is 2N teardowns and two stalls per click with N streams
+live. That is measurable rather than aesthetic, which is what distinguishes this from the arguments
+this pass retired.
+
+Answered with `MTS-06` and `SSM-2` as one question about how the standard's own rules rank against
+*"match the dump files exactly"*. **If the owner says transcribe:** the `preferenceChanged`
+subscription is reinstated on each player instance beside the existing `$effect`, both firing
+`loadStream()`, which reproduces `setBufferSize`'s own emit-then-reload order.
+
+The control on the third offset stands and is worth keeping: `preferenceChanged` occurs four times in
+the whole bundle — 996,829 and 1,025,558 (both `profilePic`), 1,155,238 (the emit) and 1,902,321
+(this subscription) — so the subscription really is the only other reader.
 
 **low** · `defect` · reference byte **1,908,582**
 
@@ -11383,6 +11766,32 @@ choice.**
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
 table above.
 
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the official documentation names this choice
+outright.**
+
+The disposition line said *"keying by identity here would reproduce a teardown the room does not
+need"*, which is a consequence rather than a reason and reads as the retired argument. The escape is
+that a track function is not reference-facing OUTPUT: **the rendered markup is byte-identical either
+way.** What differs is the reconciliation strategy — which DOM nodes are reused across a refetch —
+and the row's own measurement is that the two are equivalent within a render pass and diverge only
+in whether nodes are torn down. Neither pane puts a Svelte transition or an `animate:` on its rows,
+checked, so there is not even an animation through which the choice becomes visible.
+
+And the official `svelte/each` documentation, read for this re-reading rather than recalled, states
+the rule in these words:
+
+> The key can be any object, but strings and numbers are recommended since they allow identity to
+> persist when the objects themselves change.
+
+That is exactly this case — the log comes back as fresh objects behind the months `<select>`, and
+`row.id` is what lets identity persist through it. So matching the reference's track function would
+mean writing the thing the framework's own guidance advises against, to produce identical markup.
+
+Kept distinct from `each-key-contract.test.ts`, which is the opposite case and looks alike: that
+file REMOVED keys from `MessageBody`'s segments because a parsed segment **has no identity** and an
+index key would have claimed a safety it did not have. An alert row has `_id` upstream and `id`
+here, so the key is a real identity rather than a stand-in for one.
+
 `ht(32,Pwe,23,17,"tr",null,Li)` — `ɵɵrepeaterCreate`, whose seventh argument is the track function.
 `Li` is `function Li(t,n){return n}` at **100,136**: it takes `(index, item)` and returns the ITEM,
 so the reference tracks by object identity. `Li=` matches zero times in the bundle and
@@ -11586,6 +11995,12 @@ apps/room/src/lib/swing-alerts.ts:210-221.
 **DELIBERATE DIVERGENCE — read and measured 2026-08-31.** The swing half of `DTP-04`: the same
 `ht(32,_we,23,17,"tr",null,Li)` shape, the same `function Li(t,n){return n}` at **100,136**, the same
 refetch behaviour behind the months `<select>`.
+
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, on `DTP-04`'s reading and for the same reasons:
+the rendered markup is byte-identical either way, a track function is reconciliation rather than
+output, neither pane animates its rows, and the official `svelte/each` documentation recommends
+strings and numbers as keys precisely so that *"identity [can] persist when the objects themselves
+change"* — which is what the months `<select>`'s refetch does to them.**
 
 **This row was ADDED after this document was committed**, by the batch that read the two alert panes
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
