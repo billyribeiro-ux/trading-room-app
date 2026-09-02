@@ -310,17 +310,49 @@ pub async fn revoke_family_for_token(
     presented: &str,
     now: OffsetDateTime,
 ) -> Result<u64, DbError> {
-    let family_id: Option<Uuid> =
-        sqlx::query_scalar("SELECT family_id FROM refresh_tokens WHERE token_hash = $1")
-            .bind(hash_token(presented))
-            .fetch_optional(db.identity().pool())
-            .await
-            .map_err(DbError::from)?;
+    // ONE STATEMENT, and the two it replaced were not wrong - they were two round trips.
+    //
+    // This read `family_id` and then called `revoke_family` with it, outside a transaction. A
+    // carried-forward note called that a TOCTOU; RE-MEASURED 2026-09-02, and it was not one. Every
+    // way the row can change between the read and the write lands on the same answer: a concurrent
+    // rotation inserts into the SAME family, so the revoke still catches the successor; a family
+    // already revoked matches nothing under `revoked_at IS NULL`; and a deleted row does not make
+    // the `family_id` already in hand wrong. There was no window in which the wrong thing happened,
+    // and saying otherwise would have been inheriting a label instead of measuring one.
+    //
+    // What IS true is the shape, and `CLAUDE.md` states the rule without reference to races: one
+    // atomic conditional `UPDATE ... WHERE ... RETURNING`. Logout is on the request path, so the
+    // second round trip is a network hop a member waits for, and the subquery resolves through
+    // `refresh_tokens_token_hash_unique`.
+    //
+    // The refusal semantics are preserved exactly, and this was PROVED rather than reasoned: the
+    // statement was run against a throwaway PostgreSQL 16 on 2026-09-02, over a table holding one
+    // family of three rows (two live, one already revoked) plus a second family that must not be
+    // touched.
+    //
+    //   a known token         -> 2 rows affected  (the two LIVE rows; `revoked_at IS NULL` skips
+    //                                              the third, which keeps its original timestamp)
+    //   the second family     -> untouched, `updated_at` still NULL
+    //   an UNKNOWN token      -> 0 rows affected  (the subquery is NULL, `family_id = NULL` is
+    //                                              never true - this is the `Ok(0)` the `None` arm
+    //                                              returned, and logging out with a stale cookie
+    //                                              must not be an error)
+    //   replaying the same    -> 0 rows affected  (idempotent)
+    //
+    // Worth stating because `sqlx::query` is NOT compile-time checked: the compiler had nothing to
+    // say about this SQL, so running it was the only way to know.
+    let result = sqlx::query(
+        "UPDATE refresh_tokens SET revoked_at = $2, updated_at = $2 \
+         WHERE family_id = (SELECT family_id FROM refresh_tokens WHERE token_hash = $1) \
+           AND revoked_at IS NULL",
+    )
+    .bind(hash_token(presented))
+    .bind(now)
+    .execute(db.identity().pool())
+    .await
+    .map_err(DbError::from)?;
 
-    match family_id {
-        Some(id) => revoke_family(db, id, now).await,
-        None => Ok(0),
-    }
+    Ok(result.rows_affected())
 }
 
 #[cfg(test)]

@@ -45,6 +45,82 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 13:41 UTC — a logout revoke becomes one statement, and a control test that could not fail is fixed
+
+Two findings, and the second was found by the first going red.
+
+## The Rust finding was real; its LABEL was not
+
+A carried-forward note called `revoke_family_for_token` a **TOCTOU**. Re-measured rather than
+inherited, and it is not one. Every way the row can change between the read and the write lands on
+the same answer: a concurrent rotation inserts into the **same** family, so the revoke still catches
+the successor; a family already revoked matches nothing under `revoked_at IS NULL`; a deleted row
+does not make the `family_id` already in hand wrong. **There is no window in which the wrong thing
+happens.**
+
+Two other inherited claims about this file also failed re-measurement:
+
+- `refresh.rs:241`'s `min(created_at) WHERE family_id = $1` was called *unbounded*. There is an
+  index — `refresh_tokens_family_idx ON (family_id)`, `0001_baseline.sql:1062`.
+- `rotate` was called racy. It runs the whole operation in one transaction with
+  `SELECT … FOR UPDATE`, which its own docblock already explains.
+
+**What IS true is the shape**, and `CLAUDE.md` states that rule without reference to races: one
+atomic conditional `UPDATE`. Logout is on the request path, so the second round trip is a network hop
+a member waits for.
+
+**Proved rather than reasoned**, because `sqlx::query` is not compile-time checked — the compiler had
+nothing to say about this SQL. Run against a throwaway **PostgreSQL 16**, over one family of three
+rows (two live, one already revoked) plus a second family:
+
+| case | result |
+| --- | --- |
+| a known token | **2 rows** — the two LIVE rows; the third keeps its timestamp |
+| the second family | **untouched**, `updated_at` still NULL |
+| an UNKNOWN token | **0 rows** — the `Ok(0)` path the `None` arm returned |
+| a replay | **0 rows** — idempotent |
+
+Re-pinned in `verify-backend-provenance.mjs` with the reason at the entry, as editing a `services/**`
+file requires. PASS: 98 imported + 3 authored here.
+
+## A control test that could not fail for the reason it named
+
+`naming-boundary.test.ts` went red inside the controller gate and green on the next run and in
+isolation. The obvious reading is a flake. `CLAUDE.md` says *never report a failure without first
+ruling out your own tooling* — and the tooling was the fault.
+
+**`git grep` exits 1 when it finds nothing and 2+ when it fails, and `execFileSync` throws on both.**
+Measured in this container, not recalled: a search for an absent string gives `spawnSync` status
+`1`, and `execFileSync` on the same arguments throws with `status 1`.
+
+So a git that could not run and a genuinely empty sweep were **the same event** to a reader. Worse:
+the control — *"finds the reference at all, so an empty sweep cannot pass silently"* — **could never
+fire for the reason its own comment gave.** An empty sweep threw in the reader before the assertion
+was reached, so the `toBeGreaterThan(10)` guard was unreachable on the one input it exists for. It
+took going red once, on the real thing, to notice.
+
+Now `spawnSync` with an explicit status branch: `1` returns an empty array so the control is the
+thing that fires; `2+` throws naming itself a **tooling failure** with git's own stderr, so nobody
+spends a turn looking for a rename that did not happen.
+
+## Verification, and what could not be run
+
+`cargo fmt`, `cargo check -p tradingroom-api --features testing`, and
+`cargo clippy -p tradingroom-api --lib --features testing -- -D warnings` all clean. `pnpm run gate`
+exit 0 in **both** apps. Two negative controls seen RED **and they report differently**, which is the
+whole point: a no-match search fires the count assertion; a bad git flag reports *"exited 129, which
+is a TOOLING failure and not an empty sweep"*.
+
+**The Rust suite could not be run here**, stated rather than implied: `cargo test` links
+`mediasoup-sys`, whose build script fails to build `libmediasoup-worker` in this container.
+`--all-targets` clippy fails for the same reason, which is why clippy is scoped to `--lib`. That is
+an environment limit rather than the change — `cargo check` with the same feature set compiles the
+crate — and the SQL is covered by the Postgres run above instead, which is stronger evidence for this
+particular change than a compile would be. The **rust-analyzer MCP is also unavailable**, so its
+mandated `diagnostics` step was not performed.
+
+---
+
 ### 2026-09-02 12:49 UTC — the re-reading is complete: all twenty-nine rows, and four now need the owner
 
 Every `DELIBERATE DIVERGENCE` row in `room-surface-audit-2026-08-30.md` has been read against the
