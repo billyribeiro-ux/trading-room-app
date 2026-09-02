@@ -8249,7 +8249,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       Two offsets in the note were corrected before it shipped —
       `emoji-screen-citation-contract.test.ts` re-reads every byte a file cites and rejected both.
     */
-    max: 757,
+    /*
+      757 -> 790, 2026-09-02. SP2-07 / SZC-03 — the detached zoom cluster moves OUT of the
+      double-click box, where the capture has it.
+
+      Create block at byte 1,501,256: slot 5 is const 4, `zoom-controls-container-detached`, and it
+      CLOSES before `d(6,"div",5)` opens the `appDoubleClick` box. Sibling, and first. Ours nested
+      it inside.
+
+      Thirty-three lines, and they buy a DELETION elsewhere: six `ondblclick={swallowDoubleClick}`
+      bindings and their function existed only to stop a double-click on a zoom button reaching that
+      box and maximising the screen. Upstream needs none. A workaround removed by matching rather
+      than argued away.
+
+      Most of the note is the two things the row was refused on, both measured rather than reasoned:
+      the containing block (`app-screenshare-view`'s const 0 is `[1,"h-inherit"]` and `.detach-screen`
+      has no position rule, so upstream has no positioned ancestor inside the component either —
+      nothing is invented), and SV-SP-01 (the watermark is `H(10,…,"span",9)`, opened inside the
+      video container, a different node this move does not touch).
+    */
+    max: 790,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
@@ -8591,7 +8610,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/components/ScreenZoomControls.svelte',
-    max: 237,
+    /*
+      237 -> 222, 2026-09-02, and it goes DOWN — which is what this ratchet is for.
+      `swallowDoubleClick` and its six bindings are gone, and removing one attribute from each button
+      let prettier collapse six multi-line elements back onto single lines, so the file lost twenty
+      more than the note added.
+
+      The guard's own docblock already carried the finding — *"UPSTREAM IT IS NOT NESTED … so the
+      reference needs no guard"* — and `ScreenPane.svelte` now un-nests the cluster, so there is no
+      box to stop the event reaching.
+
+      The note is longer than the code it replaced because matching GIVES SOMETHING UP, and that has
+      to be recorded: the nesting kept these controls usable while the video was fullscreen, and
+      upstream's are not, because `onDoubleClicked` fullscreens the node the cluster now sits
+      outside.
+    */
+    max: 222,
     why: 'the zoom and pan controls over a shared screen'
   },
   {

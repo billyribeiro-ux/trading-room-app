@@ -486,6 +486,64 @@
     {onlargepreview}
   />
   <!--
+    SP2-07 / SZC-03 — the DETACHED cluster is a SIBLING of the double-click box, and comes BEFORE it.
+
+    The create block, read whole at bundle byte 1,501,256:
+
+      d(0,"div",0), H(1,z0e,…,"h3",1)(2,G0e,…,"h3",1)(3,W0e,…,"p",2)(4,q0e,…,"h3",3)
+                    (5,Y0e,6,4,"div",4),                          ← const 4, the cluster
+      d(6,"div",5)                                                ← const 5, `appDoubleClick`
+        (7,"pan-zoom",6)(8,"div",7)(9,"video",8), x("click",…), u(),
+        H(10,Q0e,2,1,"span",9), u()()()()
+
+    Slot 5 is const 4, `[1,"zoom-controls-container-detached",3,"ngClass"]` (table at 1,500,486), and
+    it closes before `d(6,…)` opens. Const 5 at 1,500,537 is
+    `["appDoubleClick","",1,"position-relative","h-inherit","overflow-hidden",3,"ngClass","id"]` —
+    the double-click box. **The cluster is outside it upstream, and was inside it here.**
+
+    ## That nesting was the whole reason `swallowDoubleClick` existed
+
+    Six `ondblclick={swallowDoubleClick}` bindings in `ScreenZoomControls.svelte` stopped a
+    double-click on a zoom button reaching the box and toggling fullscreen. Upstream needs none,
+    because the cluster is never inside the box. All six and the function are gone with this move —
+    a workaround deleted by matching rather than by being argued away.
+
+    ## The containing block, which is what made this look risky
+
+    The row refused it on the ground that moving the cluster out means "inventing the ancestor" its
+    `position: absolute` resolves against. Measured instead: `app-screenshare-view`'s const 0 is
+    `[1,"h-inherit"]` — no `position` — and the popout wrapper's only two rules are
+    `.detach-screen .webcamScreen{max-height:100vh!important}` and
+    `.detach-screen .overflow-hidden{overflow:initial!important}`. So upstream has NO positioned
+    ancestor inside the component either: `right: 5px; top: 5px` resolves against the popout window.
+    Nothing is invented; the ancestor chain is the one the capture already has.
+
+    ## SV-SP-01 is untouched, and that was the row's other worry
+
+    The watermark is `H(10,Q0e,…,"span",9)`, opened AFTER `d(9,"video",8)` closes and before the
+    `u()()()()` that closes node 8 — so it is a child of the video container, a different node from
+    this one. Moving the cluster leaves it exactly where it is.
+  -->
+  {#if detached}
+    <!--
+      `SV-SP-14` — `$0e = t => ({hidden: t})` at byte 1,492,696, bound at byte 1,493,972 over
+      `!e.isDetached && (…)`. That leading term is what makes this expression DIFFERENT from the
+      `<video>`'s, which is why `SP2-01` gives it its own derived rather than sharing one.
+    -->
+    <div class={['zoom-controls-container-detached', { hidden: detachedClusterHidden }]}>
+      <ScreenZoomControls
+        variant="detached"
+        showZoomCtrl={showZoomCtrlDetached}
+        ontoggle={togglePanZoomDetached}
+        oncapture={() => captureVideoImage(id)}
+        onzoomin={() => onzoomin?.()}
+        onzoomout={() => onzoomout?.()}
+        onreset={() => onreset?.()}
+      />
+    </div>
+  {/if}
+
+  <!--
     `SP2-02` — `overflow-hidden`, the clip the zoom needs.
 
     Const 5 of `app-screenshare-view` is
@@ -652,29 +710,6 @@
       <span class="overlay-userID-container"> {userIdWatermark} </span>
     {/if}
 
-    <!--
-      Only the popped-out window draws a cluster over the video. See the header comment: the
-      captured template gates const 4 on `isDetachedCtrl`, and in the attached case renders
-      nothing here at all.
-    -->
-    {#if detached}
-      <!--
-        `SV-SP-14` — `$0e = t => ({hidden: t})` at byte 1,492,696, bound at byte 1,493,972 over
-        `!e.isDetached && (…)`. That leading term is what makes this expression DIFFERENT from the
-        `<video>`'s, which is why `SP2-01` gives it its own derived rather than sharing one.
-      -->
-      <div class={['zoom-controls-container-detached', { hidden: detachedClusterHidden }]}>
-        <ScreenZoomControls
-          variant="detached"
-          showZoomCtrl={showZoomCtrlDetached}
-          ontoggle={togglePanZoomDetached}
-          oncapture={() => captureVideoImage(id)}
-          onzoomin={() => onzoomin?.()}
-          onzoomout={() => onzoomout?.()}
-          onreset={() => onreset?.()}
-        />
-      </div>
-    {/if}
   </div>
 </div>
 

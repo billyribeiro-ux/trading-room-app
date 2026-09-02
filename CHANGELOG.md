@@ -45,6 +45,61 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 04:03 UTC — a workaround deleted by matching, and a capability given up to do it
+
+SP2-07 and SZC-03 are the same finding from two directions, and one change closes both.
+
+## The structure
+
+Create block at bundle byte 1,501,256:
+
+```js
+d(0,"div",0), H(1,z0e,…)(2,G0e,…)(3,W0e,…)(4,q0e,…)(5,Y0e,6,4,"div",4),   ← const 4, the cluster
+d(6,"div",5)                                                              ← const 5, appDoubleClick
+  (7,"pan-zoom",6)(8,"div",7)(9,"video",8), x("click",…), u(),
+  H(10,Q0e,2,1,"span",9), u()()()()
+```
+
+Slot 5 is `[1,"zoom-controls-container-detached",3,"ngClass"]` and it CLOSES before `d(6,…)` opens
+`["appDoubleClick","",1,"position-relative",…]`. **Sibling, and first.** This room nested it inside.
+
+## It deletes a workaround rather than adding one
+
+Six `ondblclick={swallowDoubleClick}` bindings in `ScreenZoomControls.svelte` existed only to stop a
+double-click on a zoom button reaching that box and maximising the screen. Upstream needs none. All
+six and the function are gone — and **the component's own docblock had already written the finding
+down**: *"UPSTREAM IT IS NOT NESTED: `Y0e` is node 5 … and the `appDoubleClick` box (const 5) is node
+6, a SIBLING, so the reference needs no guard."* Measured again and still true.
+
+`ScreenZoomControls`'s ceiling goes **DOWN, 237 → 222**: removing one attribute from each button let
+prettier collapse six multi-line elements, so the file lost twenty more lines than the note added.
+
+## Both refusals measured rather than reasoned
+
+The row was refused on two grounds and neither survives:
+
+- *"Moving it out means inventing the ancestor its `position: absolute` resolves against."*
+  `app-screenshare-view`'s const 0 is `[1,"h-inherit"]` — no `position` — and the popout wrapper's
+  only two rules are `.detach-screen .webcamScreen{…}` and `.detach-screen .overflow-hidden{…}`. So
+  upstream has NO positioned ancestor inside the component either; `right: 5px; top: 5px` resolves
+  against the popout window. Nothing is invented.
+- *"It would undo SV-SP-01."* The watermark is `H(10,Q0e,…,"span",9)`, opened after the `<video>`
+  closes and inside the video container — a different node this move does not touch.
+
+## What matching gives up, stated rather than discovered
+
+The nesting was chosen so the controls **fullscreen with the picture**. Upstream's do not:
+`onDoubleClicked` fullscreens `#video-screen-container-${id}`, and the cluster sits outside that
+node there, so it disappears while the picture is maximised. That is now true here. A real
+capability given up to match, and the note says so at the code.
+
+**Runtime impact.** In a popped-out screen, the zoom cluster positions against the window rather than
+the video box, and disappears while the picture is fullscreen — as the reference's does. A
+double-click on a zoom button no longer needs swallowing, because it no longer reaches anything.
+
+**Verified:** room gate exit 0 at `d6a6f1b` — 341 files, 6,194 passed, 1 skipped. Two negative controls seen red: re-nesting the cluster, and
+restoring one of the six guards.
+
 ### 2026-09-02 03:46 UTC — the read-only note had no host element, and a rule of this repository's told me where its CSS goes
 
 ## NP-04

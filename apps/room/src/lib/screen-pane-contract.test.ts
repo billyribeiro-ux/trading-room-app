@@ -353,6 +353,52 @@ describe('SV-SP-10 — the screenshare element is silent, three ways as upstream
   });
 });
 
+describe('SP2-07 / SZC-03 — the detached cluster is a SIBLING of the double-click box', () => {
+  it('is the reference structure, read at the offsets', () => {
+    /*
+      The create block. Slot 5 is const 4 — the cluster — and it CLOSES before `d(6,"div",5)` opens
+      the `appDoubleClick` box, so the two are siblings and the cluster comes first.
+    */
+    expect(BUNDLE.slice(1_501_256, 1_501_256 + 85)).toBe(
+      'd(0,"div",0),H(1,z0e,2,0,"h3",1)(2,G0e,2,0,"h3",1)(3,W0e,2,1,"p",2)(4,q0e,3,2,"h3",3)'
+    );
+    expect(BUNDLE.slice(1_500_486, 1_500_486 + 50)).toBe(
+      '[1,"zoom-controls-container-detached",3,"ngClass"]'
+    );
+    expect(BUNDLE.slice(1_500_537, 1_500_537 + 42)).toBe(
+      '["appDoubleClick","",1,"position-relative"'
+    );
+  });
+
+  it('renders the cluster BEFORE the double-click box, and outside it', () => {
+    /*
+      Order and containment in one assertion, because the capture fixes both: slot 5 precedes node
+      6, and it is not inside it.
+    */
+    const cluster = pane.indexOf('{#if detached}');
+    const box = pane.indexOf('id="video-screen-container-{id}"');
+    expect(cluster, 'the detached cluster is gone').toBeGreaterThan(-1);
+    expect(box, 'the double-click box is gone').toBeGreaterThan(-1);
+    expect(cluster, 'the cluster is nested inside the box again').toBeLessThan(box);
+  });
+
+  it('and the workaround that nesting needed is gone with it', () => {
+    /*
+      THE ASSERTION WORTH HAVING. Six `ondblclick={swallowDoubleClick}` bindings existed only because
+      the cluster sat inside a box whose double-click maximises the screen. Upstream needs none, and
+      re-nesting the cluster without noticing would silently bring the bug back rather than the
+      handlers — so this pins the ABSENCE of the guard beside the structure that makes it needless.
+    */
+    const controls = read('./components/ScreenZoomControls.svelte');
+    expect(controls, 'the double-click guard is back').not.toContain(
+      'ondblclick={swallowDoubleClick}'
+    );
+    expect(codeOf('components/ScreenZoomControls.svelte', controls)).not.toContain(
+      'function swallowDoubleClick'
+    );
+  });
+});
+
 describe('SP2-05 — the controls binding, transcribed with the CSS that keeps it dead', () => {
   it('is the reference behaviour, read at both offsets', () => {
     /*
