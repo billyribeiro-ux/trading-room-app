@@ -269,6 +269,23 @@ export interface RoomSessionSettings {
    */
   styckyNonTradeAlert?: boolean;
   /**
+   * "Smaller image previews?" — the ROOM DEFAULT for a per-member image-size preference, applied to
+   * the member exactly once.
+   *
+   * ```js
+   * sessData.smallerImagePreview && !preferences.defaultImagePreview && (
+   *   preferences.defaultImagePreview = sessData.smallerImagePreview,
+   *   preferences.smallImagePreview   = sessData.smallerImagePreview,
+   *   setPreference('defaultImagePreview', preferences.defaultImagePreview))   // byte 1,436,631
+   * ```
+   *
+   * `defaultImagePreview` is a LATCH, not a second copy of the flag: it records that the room
+   * default has been applied, is the only half persisted, and is what lets a member who turned the
+   * preview off stay off against a room default that says on. `RoomPrefs.latchRoomImagePreview`
+   * carries the transcription.
+   */
+  smallerImagePreview?: boolean;
+  /**
    * "Room Title" — the room's own name, and the browser tab.
    *
    * `globals.sessionName = r.name` (byte 1,149,312), then

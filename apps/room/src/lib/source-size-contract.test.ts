@@ -776,7 +776,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the renamed local-recording window handlers, beside the capture's pair which keeps the
       unqualified name.
     */
-    max: 1891,
+    /*
+      RAISED 1,891 -> 1,918 on 2026-09-02, for USM-18. Twenty-seven lines, of which the code is
+      SEVEN: one `$effect` calling the latch, and four prop lines on the two chat components.
+
+      The twenty are the reason the effect is an effect. It has to be — the latch persists, and
+      `RoomPrefs` is constructed in this page's script, which runs during SSR, so a `setPreference`
+      equivalent issued from a server render would be a remote command called from a render. An
+      effect is the only browser-only hook this page has, and `svelte-autofixer` correctly flags
+      calling a state-assigning function from one. That flag is answered at the effect, because the
+      next reader will see the same warning and the alternative it proposes cannot write to a
+      server.
+    */
+    max: 1918,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   /*
@@ -2206,7 +2218,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       room introduced. `overlay-delivery-contract.test.ts` asserts both arms separately, because
       collapsing them reads like a tidy-up.
     */
-    max: 1241,
+    /*
+      1,241 -> 1,243, 2026-09-02. Two lines, both props: `smallImagePreview` and
+      `defaultImagePreview` reaching `ModalHost` for USM-18. No prose — the argument is at the
+      checkbox that reads them.
+    */
+    max: 1243,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -3955,7 +3972,8 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     /*
       6,335 -> 6,356, 2026-08-30, for USM-12 and USM-18. Twenty lines, nineteen of them the reason:
       three defects in one Recording Preview checkbox (persisting nothing, read by nothing, drawn
-      for everyone), and why USM-18's `defaultImagePreview` conjunct is refused rather than missed.
+      for everyone), and why USM-18's `defaultImagePreview` conjunct was refused at the time. That
+      refusal was reversed on 2026-09-02 and the conjunct is built; the entry below carries it.
 
       This file ALREADY paid for today's work twice over: `RestreamPane.svelte` and
       `SessionHistoryPane.svelte` took 225 lines out of it earlier in the day, against a ceiling
@@ -4103,7 +4121,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       genuinely holds. A pure predicate, the whole of one concept, and testable directly: the
       extraction this entry asks for rather than the raise the citation would otherwise have needed.
     */
-    max: 6038,
+    /*
+      RAISED 6,038 -> 6,092 on 2026-09-02, for USM-18, and fifty of the fifty-four lines are two
+      citations that each stop a specific wrong edit.
+
+      The first is at the checkbox: its two on/off spans compile to INDEPENDENT slots, `? 219 : -1`
+      and `? 220 : -1` with the second additionally requiring the latch, so with both flags false
+      neither word renders. Every neighbour in this modal compiles to `? n : m`. Writing this one
+      like its neighbours is the obvious edit, it looks tidier, and it is wrong — so the compiled
+      form is quoted where somebody would make it.
+
+      The second is at `updateSettingCheck`: `smallImagePreviewOnChange` negates the PREFERENCE and
+      the generic path sends `input.checked`, which is the negation of the CONJUNCTION. Those differ
+      in exactly one reachable state. A reader who deleted the special case and added a row to the id
+      table would be doing what this file's own rules ask for, and would lose the distinction
+      silently, so the reason sits at the special case rather than in a test file.
+
+      This entry has taken citation raises before and said each time that prose is never trimmed to
+      fit. What is NOT here is the argument for building the row at all, which is in
+      `setting-coverage-contract.test.ts`, or the byte evidence, which is in
+      `image-preview-latch-contract.test.ts`.
+    */
+    max: 6092,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -4968,7 +5007,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       rather than a stored click, so it is stated rather than left to be recounted; the five lines
       are the third bullet and the split of the other two.
     */
-    max: 764,
+    /*
+      RAISED 764 -> 850 on 2026-09-02, for USM-18, and it is the largest single raise this entry has
+      taken. Eighty-six lines for two preferences, and the ratio IS the argument rather than a
+      problem with it: the code is nineteen lines — two fields, two seeded `$state`s, two getters,
+      two `save` cases and a five-line method — and the rest is why each of those nineteen is shaped
+      the way it is.
+
+      That prose is not decoration here. This is the row this repository answered wrong four separate
+      times, and every wrong answer was recorded as settled prose somewhere else in the tree: that
+      the pair has no consumer, that it is one flag copied, that a class with no rule must never be
+      bound, and that "the toggle keeps them in step" was a complete account of the toggle. Two
+      comments in this file are what stop the fifth: the one saying the LATCH is persisted here and
+      the flag is not, and the one saying the toggle does the opposite. Delete either and the
+      remaining code reads like a bug worth fixing.
+
+      THE LONG FORM ALREADY MOVED. `image-preview-latch-contract.test.ts` carries the argument for
+      the two-field shape and for both asymmetries, where it is asserted — the same split
+      `ModalHost`/USM-12 and `refresh.svelte.ts`/G16 use. What is left at the code is the
+      transcription and one sentence of why.
+    */
+    max: 850,
     why: 'every viewer preference and the one write path; 25 of 27 have no public setter'
   },
   {
@@ -6949,7 +7008,9 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       1114 -> 1165, 2026-08-28 — the typing indicator. The indicator's markup, three props and the two composer handlers. Most of the growth is the
       citation for what is NOT drawn: `app-typing-indicator-dots` and its `.typing-indicator` class
       have no rule in any stylesheet this repository holds, so emitting three empty spans would be
-      markup with no consumer — the check `smallerImagePreview` failed.
+      markup with no consumer. `smallerImagePreview` fails the same check and IS drawn, and the two
+      are not in conflict: the dots are markup the reference does not emit either, and the class
+      USM-18 binds is one the reference does emit. Transcribe what ships; invent nothing.
     */
     /*
       RAISED 1165 -> 1188 on 2026-08-29, for `doChatLogSearch`, and argued here because the rule at the top of
@@ -7030,7 +7091,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       reproduced rather than an escape. Fifteen of the sixteen lines say exactly that, because an
       empty element with no note over it is the first thing a later reader deletes.
     */
-    max: 1559,
+    /*
+      RAISED 1,559 -> 1,587 on 2026-09-02, for USM-18. Three lines of code — two props and the
+      `class` object on the chat scroller — and twenty-five of citation, which is the same trade
+      `ChatArchiveLogPane` made for `btn-ligth` and for the same reason.
+
+      `chat-uploaded-img-sm` has no rule in any of the 52 stylesheets this repository holds. A
+      reader who finds a bound class that styles nothing will delete it, correctly, under this
+      repository's own rule against a class with no CSS — unless the comment beside it says the
+      class is TRANSCRIBED rather than invented, cites the two bundle offsets, and names the
+      precedent. It also has to establish that the binding is on the SCROLLER and not on a message,
+      which the component's input list settles and nothing else does.
+    */
+    max: 1587,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -7329,7 +7402,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       exactly one import plus one usage at each of its two call sites. Refusing it here would mean
       inlining eleven lines of transcribed CSS into both chat columns instead.
     */
-    max: 774,
+    /*
+      RAISED 774 -> 802 on 2026-09-02, for USM-18, and it is the same three lines and the same
+      twenty-five as `AlertChatArea` — the second column binds the same class through the same
+      conjunction, from its own component with its own offsets.
+
+      Duplicated deliberately. This column has its own bundle offsets, its own factory (`B3e`, not
+      `B_e`) and its own input list, and the whole point of a citation is that it names what THIS
+      file must match. A pointer to the other component would be a comment that goes stale the day
+      the two columns diverge, which is the thing this pane's own header spends its first page on.
+    */
+    max: 802,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {
@@ -7349,7 +7432,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       nothing left to compare against. The paragraph that explained why it could not be built from
       inside the component is now the paragraph explaining how its gate works.
     */
-    max: 309,
+    /*
+      309 -> 313, 2026-09-02. Four lines: `XCP-07` was re-dispositioned from refused to built, so
+      the entry now carries the measurement that stood, the conclusion that did not, and the
+      precedent that replaced it. The gap list below it went from two rows to one.
+    */
+    max: 313,
     why: 'the second chat column`s decoded const tables and the decisions taken against them'
   },
   {

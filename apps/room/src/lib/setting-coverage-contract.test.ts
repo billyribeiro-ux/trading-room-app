@@ -79,8 +79,11 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  *   regression wearing an enumeration's clothes, which is why `credentialShaped` below asserts they
  *   are still here.
  * - **NOT A GAP** — `h264Enabled` is `sessData.h264Enabled || !0`, unconditionally true upstream;
- *   `advancedSearchAlerts` is gated on one hard-coded owner id; `smallerImagePreview` seeds a
- *   preference whose only effect is a class with no rule in any of the 52 stylesheets we hold.
+ *   `advancedSearchAlerts` is gated on one hard-coded owner id. `smallerImagePreview` used to be
+ *   the third name in this bullet and it was the wrong answer twice over: the premise it rested on
+ *   (that the pair it seeds is one flag copied) was re-measured on 2026-09-02 and is false, and the
+ *   half that survived — a class with no rule in any of the 52 stylesheets — is a transcription
+ *   question this repository had already answered with `btn-ligth`. It was built on 2026-09-02.
  * - **ENUMERATION ARTEFACT** — a read count is not a size. `name` sat near the top of this list with
  *   a count that was almost entirely `this.name` on unrelated error classes; its ONE real read was a
  *   document title, and building it took two lines. Rank this list by what a row turns out to be,
@@ -170,7 +173,6 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  */
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
-  'smallerImagePreview',
   'allRoomsWelcomeMatPW',
   'isNewIndicatorOn',
   'openLoginLink',
@@ -261,12 +263,15 @@ const ANSWERED_BY_DERIVATION: readonly string[] = ['playChatMessageSoundFor'];
 const CREDENTIAL_DERIVATION_AWAITING_THE_OWNER = 'PAM-02 — hasTextAlerts from twillioApiSID';
 
 /**
- * THE SECOND ROW WAITING ON A SENTENCE, AND IT IS A CONFLICT BETWEEN TWO OWNER RULES.
+ * THE ROW THAT WAS WAITING ON A SENTENCE, AND WHAT ACTUALLY SETTLED IT — USM-18, 2026-09-02.
  *
- * `smallerImagePreview` (`room-settings-schema.ts:147`) is `wired: false`, and the reason recorded
- * against it was that the preference pair it feeds *"has no consumer"*. **That premise was
- * re-measured on 2026-09-02 and is wrong.** `defaultImagePreview` occurs fifteen times in the
- * bundle and is a ONE-SHOT LATCH, not a duplicate flag — `processSessData` at byte 1,436,631:
+ * `smallerImagePreview` sat here as a conflict between two owner rules, and the conflict was not
+ * real. Both halves of the case were re-measured; one collapsed and the other turned out to have
+ * been decided long ago.
+ *
+ * **The premise that collapsed.** The row said the pair it feeds *"has no consumer"*.
+ * `defaultImagePreview` occurs fifteen times in the bundle and is a ONE-SHOT LATCH, not a second
+ * copy of the flag — `processSessData` at byte 1,436,631:
  *
  *   sessData.smallerImagePreview && !preferences.defaultImagePreview && (
  *     preferences.defaultImagePreview = sessData.smallerImagePreview,
@@ -274,30 +279,30 @@ const CREDENTIAL_DERIVATION_AWAITING_THE_OWNER = 'PAM-02 — hasTextAlerts from 
  *     setPreference('defaultImagePreview', preferences.defaultImagePreview))
  *
  * The room's default is pushed into the member's own preference exactly once and the latch is
- * persisted, so a member who turned it off stays off against a room default that says on. Both
- * fields start `!1` at byte 979,150 and the toggle at 2,253,193 keeps them in step.
+ * persisted, so a member who turned it off stays off against a room default that says on. That is a
+ * real behaviour, and `RoomPrefs.latchRoomImagePreview` now carries it.
  *
- * What did NOT change is the other measurement, which is why this is not simply built: the one
- * thing the pair drives is `ngClass(B1e, smallImagePreview && defaultImagePreview)` with
- * `B1e = t => ({'chat-uploaded-img-sm': t})`, and that class has **no rule in any of the 52
- * stylesheets** this repository holds — proved against a control class the same search finds
- * immediately. So:
+ * **The half that stood, and why it was never this row's to decide.** `ngClass(B1e, smallImagePreview
+ * && defaultImagePreview)` with `B1e = t => ({'chat-uploaded-img-sm': t})` is the pair's only visible
+ * effect, and that class has no rule in any of the 52 stylesheets this repository holds — re-proved
+ * against `css/complete-app-styles.css`, 688,687 bytes, where the search finds `.chat-uploaded-img`
+ * with a real `max-height` rule and the `-sm` variant zero times.
  *
- *   - *"match the dump files exactly end to end"* asks for the latch, the conjunct and the class;
- *   - `CLAUDE.md` forbids *"a `.flipped` class with no CSS"* by name.
+ * So the reference renders a class that styles nothing. `CLAUDE.md` forbids *"a `.flipped` class with
+ * no CSS"*, and that rule governs classes this repository INVENTS. A class TRANSCRIBED from the
+ * capture has its consumer in the capture, and this repository had already made that call and tested
+ * it: `btn-ligth`, upstream's typo for `btn-light`, matches no rule anywhere and is rendered at
+ * `components/ChatArchiveLogPane.svelte:139` with `chat-archive-log-contract.test.ts` asserting both
+ * that it ships and that no stylesheet here defines it. Holding USM-18 for a sentence while
+ * `btn-ligth` shipped was the inconsistency, not the class.
  *
- * Both halves stand or fall together: seeding a preference whose only effect is a class that
- * styles nothing is precisely the scaffolding the second rule exists to stop. That is a decision
- * for the owner and not an agent, so it is written where it cannot go stale rather than acted on.
+ * The row is BUILT. `image-preview-latch-contract.test.ts` is its contract; the note that remains is
+ * the one thing the capture in this checkout cannot answer, and it is recorded at the checkbox in
+ * `ModalHost.svelte` rather than here: whether the toggle at byte 2,253,193 writes the latch as well
+ * as the flag.
  *
- * **If the owner says transcribe it anyway:** the latch belongs beside `processSessData`'s
- * equivalent in the room's session load, the conjunct replaces the two `settingChecks` reads in
- * `ModalHost.svelte`, and the class goes on the chat log container — and
- * `settings-preference-wiring-contract.test.ts`'s `not.toContain('chat-uploaded-img-sm')` is the
- * assertion that has to be turned around with it.
+ * With it built, `PAM-02` above is the ONLY row in this file still waiting on the owner.
  */
-const CLASS_WITH_NO_RULE_AWAITING_THE_OWNER =
-  'USM-18 — smallerImagePreview seeds a pair whose only effect is chat-uploaded-img-sm';
 
 /*
   The seven that must NEVER leave this list by being wired.
@@ -528,18 +533,20 @@ describe('room settings the reference reads and this room does not', () => {
     expect(CREDENTIALS_THE_REFERENCE_LEAKS).toContain('twillioApiSID');
   });
 
-  it('names the second row waiting on the owner against the setting it would wire', () => {
+  it('keeps the settled row settled — smallerImagePreview is wired and stays wired', () => {
     /*
-      Tied to the SCHEMA rather than left as prose, so the note cannot outlive its subject: the day
-      `smallerImagePreview` is wired, this line goes red and the paragraph above it is read again.
+      The inverse of the assertion that used to be here, and it is kept rather than deleted for the
+      reason the paragraph above gives: this row was answered wrong twice, and both wrong answers
+      were recorded as settled. If somebody flips it back to `wired: false`, that is a decision that
+      has to be argued at the paragraph rather than made by an edit to a generated file.
 
-      It is asserted HERE, and not in `settings-preference-wiring-contract.test.ts` where the
-      measurement lives, for the reason that file's own name gives away — it is one of the 42
+      It is asserted HERE, and not in `settings-preference-wiring-contract.test.ts` where the byte
+      evidence lives, for the reason that file's own name gives away — it is one of the 42
       `gate/evidence-bound-tests.mjs` excludes when the capture roots are absent, so an assertion
       added there does not run in this checkout and its negative control produces no output at all.
       This file runs.
     */
-    expect(CLASS_WITH_NO_RULE_AWAITING_THE_OWNER).toContain('smallerImagePreview');
+    expect(REFERENCE_READS_AND_WE_DO_NOT).not.toContain('smallerImagePreview');
 
     const schema = readFileSync(
       new URL('../../../controller/src/lib/room-settings-schema.ts', import.meta.url),
@@ -549,8 +556,8 @@ describe('room settings the reference reads and this room does not', () => {
     expect(row, 'the setting this note is about is gone from the schema').toBeDefined();
     expect(
       row,
-      'smallerImagePreview is no longer `wired: false` — the conflict above was settled somewhere ' +
-        'else and the paragraph naming it has to be read again'
-    ).toContain('wired: false');
+      'smallerImagePreview went back to `wired: false` — USM-18 was built on 2026-09-02 and the ' +
+        'paragraph above says why; unwiring it is an argument, not an edit'
+    ).toContain('wired: true');
   });
 });

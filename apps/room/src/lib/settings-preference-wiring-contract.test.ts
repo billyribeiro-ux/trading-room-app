@@ -444,65 +444,47 @@ describe('the wire has no silent break points', () => {
     expect(rootCode.match(/new RoomScrollFollow/g) ?? []).toHaveLength(3);
   });
 
-  it('small-image-preview stays UNWIRED, because its class has no rule anywhere', () => {
+  it('USM-18 — the wire exists now, and the id stays OUT of the mapping table', () => {
     /*
-      Closed by evidence on 2026-08-14 with no code, which is a real outcome and not a deferral.
+      THIS TEST WAS THE OPPOSITE ASSERTION UNTIL 2026-09-02, and both halves of the case it made
+      belong on the record, because one was wrong and the other was never the question.
 
-      `smallImagePreview` applies exactly one thing upstream:
-      `B1e = t => ({'chat-uploaded-img-sm': t})`, bound as
-      `ngClass(ut(12, B1e, preferences.smallImagePreview && preferences.defaultImagePreview))`
-      on the chat log container (`app-chat.full.js:5`).
+      It said: `smallImagePreview` drives exactly one thing, `B_e = t => ({'chat-uploaded-img-sm': t})`
+      bound on the chat log, and that class has NO RULE in any of the 52 stylesheets this repository
+      holds — proved against `chat-gif-muted`, a class we know is styled, which the same search finds
+      immediately. The nearest real rule targets a DIFFERENT class and a different mechanism:
+      `.alert-chat-box-sm .chat-uploaded-img .uploaded-img { max-height: 50px !important }`.
 
-      `chat-uploaded-img-sm` has NO RULE in any of the 52 stylesheets this repository holds — 46
-      component sheets, the shipped `styles.d622cb9ed2bbc221.css`, and our own. It appears in four
-      files and every one is a JavaScript class-map. The search was proved against
-      `chat-gif-muted`, a class we know is styled, which it finds in the CSS immediately.
+      That measurement is unchanged and is re-run in `image-preview-latch-contract.test.ts`. What was
+      wrong was the conclusion drawn from it — that binding the class would ship "a `.flipped` class
+      with no CSS", which `CLAUDE.md` forbids by name. That rule is about classes this repository
+      INVENTS. A class transcribed from the capture has its consumer in the capture, and the call was
+      already made and tested here for `btn-ligth`, upstream's typo for `btn-light`, which matches no
+      rule anywhere and is rendered at `components/ChatArchiveLogPane.svelte:139`.
 
-      The nearest real rule targets a DIFFERENT class and a different mechanism:
-      `.alert-chat-box-sm .chat-uploaded-img .uploaded-img { max-height: 50px !important }` — driven
-      by a size mode on an ancestor, not by this preference.
+      The other premise — that `defaultImagePreview` was a dead second copy of the flag — was simply
+      false. It is a ONE-SHOT LATCH.
 
-      So the checkbox toggles a class that styles nothing, upstream as well as here. Wiring it would
-      ship "a `.flipped` class with no CSS", which this repository forbids by name, and inventing the
-      rule would be worse. Asserted so that neither happens by accident.
-
-      ## RE-MEASURED 2026-09-02, and half of the reasoning above was WRONG
-
-      The measurement about the CLASS holds — it is re-run below. What did not hold is the sentence
-      this row carried everywhere else, that `defaultImagePreview` is a second copy of the flag and
-      that "neither preference has a consumer".
-
-      `defaultImagePreview` occurs FIFTEEN times in the bundle and is a ONE-SHOT LATCH.
-      `processSessData` at byte 1,436,631:
-
-        sessData.smallerImagePreview && !preferences.defaultImagePreview && (
-          preferences.defaultImagePreview = sessData.smallerImagePreview,
-          preferences.smallImagePreview   = sessData.smallerImagePreview,
-          setPreference('defaultImagePreview', preferences.defaultImagePreview))
-
-      `sessData.smallerImagePreview` is the ROOM SETTING at `room-settings-schema.ts:147`, marked
-      `wired: false`. The room's default is pushed into the member's preference exactly once and
-      the latch is persisted so it never re-applies — which is what lets a member who turned it off
-      stay off against a room default that says on. Both fields start `!1` (byte 979,150) and the
-      toggle at 2,253,193 keeps them in step.
-
-      So this row is not "a preference nothing reads". It is a real behaviour whose only VISIBLE
-      effect is a class with no rule, and that is a conflict between two owner rules rather than a
-      measurement: *"match the dump files exactly end to end"* asks for the class, and `CLAUDE.md`
-      forbids one with no CSS by name. The two halves stand or fall together — seeding a preference
-      that drives nothing is exactly the scaffolding the second rule is about — so neither is built
-      and the decision is named in `setting-coverage-contract.test.ts` beside the other rows waiting
-      on a sentence from the owner.
+      THE BYTE EVIDENCE IS NOT HERE, deliberately. This file reads `docs/source/components/`, which
+      `gate/evidence-bound-tests.mjs` excludes on any checkout without the capture symlinks, so an
+      assertion added here does not run and its negative control produces no output at all. The new
+      contract reads `docs/source-v4-2026-08-15/`, which ships, and it runs everywhere.
     */
-    expect(pageCode).not.toContain('chat-uploaded-img-sm');
+    expect(prefsCode).toContain("if (key === 'smallImagePreview') {");
+    expect(prefsCode).toContain('latchRoomImagePreview(roomDefault: boolean)');
+    expect(modalCode).toContain('setInputChecked(smallImagePreview && defaultImagePreview)');
+    expect(pageCode).toContain('prefs.latchRoomImagePreview(');
+
     /*
-      Scoped to the MAPPING TABLE. The first version of this asserted the id was absent from the
-      whole component and failed on `settingChecks`, where it correctly appears as a default — the
-      checkbox still renders and still remembers its own position, it simply persists nothing.
+      Scoped to the MAPPING TABLE, and it stays a NOT — for a different reason than the one that put
+      it here. The id is special-cased in `updateSettingCheck` ABOVE the table, because the reference
+      negates the preference rather than reading `input.checked`. A row here would route it through
+      the generic path and silently lose that distinction.
     */
     const table = /const preferenceKeyByInputId[\s\S]*?\n {4}\};/.exec(modalCode)?.[0] ?? '';
     expect(table, 'the mapping table must be findable').not.toBe('');
     expect(table).not.toContain('small-image-preview');
+    expect(modalCode).toContain("if (input.id === 'small-image-preview') {");
   });
 
   it('the consumers the wires feed are still there', () => {

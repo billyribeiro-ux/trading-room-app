@@ -28,11 +28,17 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, EIGHTY-FIVE by the room application
+  Eleven consumed by this repository's room-login page, EIGHTY-SIX by the room application
   through `internal/room-config/[code]`, ONE by the room but only for a presenter, and six by the
   WordPress SSO door at `(public)/sso/[code]`. `allowUsersToChangeUsername` is on the first two
   lists, and so now are `showPasswordField`, `usernameInstructions` and `hasRequiredPhoneInLogin`,
-  so the union is 105.
+  so the union is 106.
+
+  105 -> 106 on 2026-09-02: smallerImagePreview, the last row of the settings enumeration that was
+  answered NOT A GAP rather than built. The premise was re-measured and was wrong — the pair it
+  seeds is a one-shot latch, not a dead duplicate — and the half that stood (a class with no rule
+  anywhere) is answered by the `btn-ligth` precedent rather than by holding the row. `room-config.ts`
+  carries the whole argument at the entry.
 
   103 -> 104 on 2026-08-30: restreamToURL, and it is the first entry that does NOT cross to every
   member. It rides a FOURTH generator list, ROOM_PRESENTER_CONSUMED, mirroring the third allow-list
@@ -404,6 +410,15 @@ const EXPECTED_WIRED_SETTINGS = [
   'enableEditMessage',
   'enableEditAlerts',
   'recordingReminder',
+  /*
+    Added 2026-09-02 with USM-18, the last row of the settings enumeration that had been answered
+    NOT A GAP rather than built. `smallerImagePreview` is a one-shot seed: the room default is
+    pushed into the member own `smallImagePreview` exactly once and a persisted latch stops it ever
+    re-applying, so a member who turns the preview off is not overridden on their next load. The
+    argument for crossing it, including why a class with no rule in any stylesheet is transcribed
+    rather than corrected, is at its entry in `src/lib/room-config.ts`.
+  */
+  'smallerImagePreview',
   /*
     Added 2026-08-30 with SC-12 and SC-13 of the room-surface audit, and it is the FIRST wired
     setting that does not cross to every member.

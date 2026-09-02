@@ -238,8 +238,12 @@ Three arguments that read like escapes and are not, each of which has been found
 one of three: it holds under a valid escape and the row says WHICH; it does not, and the row is work;
 or matching collides with a rule `CLAUDE.md` states by name — a class with no CSS, a control whose
 only effect is changing its own label — in which case it is neither an escape nor an agent's call,
-and the row is named for the owner the way `USM-18` now is. A conflict between two owner rules is
-the one thing an agent must not settle silently in either direction.
+and the row is named for the owner. `USM-18` was named that way on 2026-09-02 and UNNAMED the same
+day, which is worth recording: the collision was not real. `CLAUDE.md`'s rule is about a class this
+repository invents, and `btn-ligth` was already the precedent for one transcribed from the capture.
+Look for an existing precedent before calling something a collision. A conflict between two owner
+rules is the one thing an agent must not settle silently in either direction, and a conflict that is
+not one must not be escalated.
 
 Rows re-read so far carry a `RE-READ 2026-09-02` line naming their escape. Rows without one have not
 been re-read against this table yet, and their disposition should be treated as **provisional**.
@@ -1875,11 +1879,39 @@ O(132,o.appService.globals.hasSpeechRecognition?132:-1)
 
 ### USM-18 — 'Smaller image preview' label has no on/off span and its checked term drops defaultImagePreview
 
-**HALF BUILT 2026-08-30 15:52 UTC, and the half NOT built is the row's own recorded reason.** The label carries `<span>on</span>` / `<span>off</span>` now — `v(218," Smaller image preview "), H(219,Cke,…)(220,Ske,…)` at byte 2,281,312, where both are bare `<span>`s. Every other checkbox in this modal already had the pair.
+**BUILT 2026-09-02, end to end, after being answered wrong four times.** The row was `HALF BUILT` on
+2026-08-30 and `NAMED FOR THE OWNER` on the morning of 2026-09-02; both dispositions rested on
+premises that did not survive being re-read.
 
-The `defaultImagePreview` conjunct is refused, not overlooked — but **the reason recorded on 2026-08-30 was wrong in its premise, and was corrected on 2026-09-02.** It said neither preference has a consumer. `defaultImagePreview` occurs fifteen times in the bundle and is a ONE-SHOT LATCH: `processSessData` at byte 1,436,631 reads `sessData.smallerImagePreview && !preferences.defaultImagePreview` and, when that holds, writes the ROOM setting into both preferences and persists the latch — so the room's default reaches a member exactly once and a member who turned it off stays off. `smallerImagePreview` is `room-settings-schema.ts:147`, `wired: false`. Both fields start `!1` at byte 979,150; the toggle at 2,253,193 keeps them in step.
+What was wrong, in the order it was found:
 
-What survives the re-measurement is the OTHER half, and it is why this is still unbuilt: the one thing the pair drives is `ngClass(B1e, smallImagePreview && defaultImagePreview)` with `B1e = t => ({'chat-uploaded-img-sm': t})`, and that class has no rule in any of the 52 stylesheets — proved against a control class the same search finds immediately. So the latch and the class stand or fall together, and the choice is between two owner rules rather than two readings of the evidence: *"match the dump files exactly end to end"* asks for both, and `CLAUDE.md` forbids a class with no CSS by name. **Named for the owner in `setting-coverage-contract.test.ts`, asserted against the schema row so it cannot go stale.**
+1. *"Neither preference has a consumer."* False. `defaultImagePreview` is a ONE-SHOT LATCH —
+   `processSessData` at byte 1,436,631 reads `sessData.smallerImagePreview &&
+   !preferences.defaultImagePreview` and, when that holds, writes the ROOM setting into both
+   preferences and persists the LATCH ONLY. The room's default reaches a member exactly once, and a
+   member who turned the preview off stays off.
+2. *"A class with no rule must not be bound."* A real rule applied to the wrong case. It governs
+   classes this repository INVENTS. `btn-ligth` — upstream's typo for `btn-light`, matching no rule
+   anywhere — has been transcribed, rendered and asserted at `ChatArchiveLogPane.svelte:139` since
+   that pane was written. A dead class from the capture has its consumer in the capture.
+3. *"The `checked` term and the two spans are one conjunct."* The `checked` term is; the SPANS are
+   not. They compile to two independent slots — `? 219 : -1` and, for OFF,
+   `!smallImagePreview && defaultImagePreview ? 220 : -1` — so with both flags false NEITHER word
+   renders. Every other checkbox in this modal compiles to `? n : m`. This one does not.
+4. *"The toggle at 2,253,193 keeps them in step."* True and incomplete, and the gap was hiding a
+   defect. `smallImagePreviewOnChange` at byte **2,253,020** negates the PREFERENCE, mirrors it into
+   the latch, and persists only the flag — so `input.checked`, which is the negation of the
+   CONJUNCTION, is the wrong value to send.
+
+The measurement that stood through all four is that `chat-uploaded-img-sm` has no rule in any of the
+52 stylesheets here — re-proved against `css/complete-app-styles.css`, where the same search finds
+`.chat-uploaded-img` with a real `max-height` rule and the `-sm` variant zero times. It is now the
+guard against somebody INVENTING the rule the reference does not have.
+
+`smallerImagePreview` crosses on `ROOM_VISIBLE_SETTINGS` and is `wired: true`.
+`image-preview-latch-contract.test.ts` reads every offset above out of the pinned bundle and executes
+the three behaviours no source-text assertion can reach; `prefs.svelte.test.ts` holds the latch's own
+unit cases.
 
 **low** · `divergence` · reference byte **2,286,816**
 
@@ -1887,7 +1919,7 @@ What survives the re-measurement is the OTHER half, and it is why this is still 
 z("checked",o.appService.globals.preferences.smallImagePreview&&o.appService.globals.preferences.defaultImagePreview),m(3),O(219,o.appService.globals.preferences.smallImagePreview&&o.appService.globals.preferences.defaultImagePreview?219:-1)
 ```
 
-**Ours:** ModalHost.svelte:3435-3446: checked comes from the local `settingChecks['small-image-preview']` and the label is plain text with no `<span>on/off</span>`. The persistence half is a DELIBERATE, evidenced closure — src/lib/settings-preference-wiring-contract.test.ts:427-462 proves the class it drives (`chat-uploaded-img-sm`) has no rule in any of the 52 stylesheets and asserts the id stays out of the mapping table. Only the missing label span and the dropped `defaultImagePreview` conjunct are unaccounted for; both are cosmetic.
+**Ours (2026-09-02):** `ModalHost.svelte` binds `checked` to `smallImagePreview && defaultImagePreview`, renders the two spans as two independent `{#if}` blocks, and special-cases the id in `updateSettingCheck` so the write negates the PREFERENCE rather than the rendered conjunction. `RoomPrefs` holds both fields, `latchRoomImagePreview` transcribes the session-load latch, and `save` carries the toggle's mirror. Both scrollers bind the class. The id stays OUT of the `preferenceKeyByInputId` table, and the reason changed: it is special-cased above it, not unwired.
 
 > Verified: I could not refute it. ModalHost.svelte:3578 is the ONLY render site of this control in all of src/ (verified by grepping `Smaller image`, `chatImagePreview`, `small-image-preview`, `smallImagePreview`, and by listing every file containing `form-check-label`), and its label is plain text: `<label for="small-image-preview" class="form-chec…
 
@@ -6201,16 +6233,20 @@ is in `app-chat`'s table and absent from this one.
 
 ### XCP-07 — the roomscroller's `ngClass` is not bound
 
-**MEASURED REFUSAL 2026-08-31.** The class it would apply has no rule in any of the 52 stylesheets
-this repository holds, and that measurement already exists — this row points at it rather than
-repeating it.
+**BUILT 2026-09-02.** It was a `MEASURED REFUSAL` from 2026-08-31 until USM-18 was re-read: the class
+it applies has no rule in any of the 52 stylesheets here, which is true and was never the question.
+That rule is about classes this repository INVENTS; `btn-ligth` is the standing precedent for one
+TRANSCRIBED from the capture, and it has shipped since `ChatArchiveLogPane` was written.
+
+The CSS measurement is kept and still asserted, with its meaning inverted: it is now what stops
+somebody adding the rule the reference does not have, which would be a worse divergence than binding
+a name nothing styles.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
 
 `USM-18` and `settings-preference-wiring-contract.test.ts` argued this pair for the settings checkbox
-that drives it and refused the same binding there. Binding it here would switch on a class name
-nothing reads, which is the "no `.flipped` class with no CSS" rule.
+that drives it, refused the same binding there, and reversed both on 2026-09-02.
 
 **low** · `divergence` · reference byte **2,400,160**
 
@@ -6218,10 +6254,13 @@ nothing reads, which is the "no `.flipped` class with no CSS" rule.
 ("ngClass",ct(13,B3e,o.appService.globals.preferences.smallImagePreview&&o.appService.globals.preferences.defaultImagePreview))
 ```
 
-**Ours:** ExtraChatPane.svelte's `<app-extra-roomscroller>` carries the three captured inline styles
-and no `class`. `B3e` at byte **2,367,305** is `t=>({"chat-uploaded-img-sm":t})`;
-`extra-chat-surface-contract.test.ts` reads both offsets and then asserts the class has no rule in
-`app.css` or `captured-runtime-components.css`.
+**Ours (2026-09-02):** `ExtraChatPane.svelte`'s `<app-extra-roomscroller>` carries the three captured
+inline styles and `class={{ 'chat-uploaded-img-sm': smallImagePreview && defaultImagePreview }}`.
+`B3e` at byte **2,367,305** is `t=>({"chat-uploaded-img-sm":t})`;
+`extra-chat-surface-contract.test.ts` still reads both offsets and still asserts the class has no rule
+in `app.css` or `captured-runtime-components.css`. The element is the SCROLLER and not a message,
+which its own input list settles — `inputs:{logType,displayMode,isPresenter,extraChatMsg}` at byte
+**2,366,597**, exactly the binding chain the update block carries.
 
 ### XCP-08 — the "Play YouTube For All" button is absent from this composer
 

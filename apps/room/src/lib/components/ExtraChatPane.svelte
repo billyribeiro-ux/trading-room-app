@@ -89,6 +89,31 @@
     unread?: ChatTabUnreadCounts;
     /** The chat surfaces' display mode, resolved on the page. `#lib/chat-display-mode.ts`. */
     displayMode: ChatDisplayMode;
+    /**
+     * USM-18 — the reference's own pair, bound as their AND on the chat log container:
+     *
+     * ```js
+     * z("logType","chat")("displayMode",…)("isPresenter",…)("extraChatMsg",…)
+     *   ("ngClass", ct(13, B3e, preferences.smallImagePreview && preferences.defaultImagePreview))
+     *                                                                            // byte 2,400,160
+     * B3e = t => ({ "chat-uploaded-img-sm": t })                                    // byte 2,367,305
+     * ```
+     *
+     * The element is `app-extra-roomscroller` — `inputs:{logType,displayMode,isPresenter,extraChatMsg}`
+     * at byte 2,366,597, which is what identifies the chain above as the SCROLLER and not a message.
+     *
+     * `smallImagePreview` is the member's switch; `defaultImagePreview` is the latch recording that
+     * the room's `smallerImagePreview` default has already been applied to them. Both are needed
+     * here because the reference renders the conjunction, not either half.
+     *
+     * `chat-uploaded-img-sm` HAS NO RULE in any of the 52 stylesheets this repository holds, and it
+     * is bound regardless. That is not an oversight and it is not scaffolding: it is what the
+     * capture ships, on the precedent `btn-ligth` set in `ChatArchiveLogPane.svelte` — upstream's
+     * typo for `btn-light`, matching nothing, transcribed and asserted. A dead class we INVENT is
+     * the thing CLAUDE.md forbids; a dead class we TRANSCRIBE has its consumer in the reference.
+     */
+    smallImagePreview: boolean;
+    defaultImagePreview: boolean;
     /** `#textAreaTxtExtra`'s value. Bindable for the same reason the main composer is. */
     composer: string;
     /** Already filtered to `tab` by the page, so this component never decides what it may show. */
@@ -273,6 +298,8 @@
     chatTabs,
     unread = {},
     displayMode,
+    smallImagePreview,
+    defaultImagePreview,
     composer = $bindable(''),
     messages,
     doNotDisturbOn,
@@ -516,11 +543,12 @@
     <!--
       `app-extra-roomscroller` — its own element, because the reference gives this column a separate
       scroller component for the same reason it gives it a separate chat one: two independent
-      positions. `XCP-07` — the `ngClass` it also binds (byte 2,400,160) is refused; see
-      `#lib/extra-chat-surface.ts`.
+      positions. `XCP-07` — the `ngClass` it also binds at byte 2,400,160 is the pair above, and it
+      is transcribed now rather than refused; `#lib/extra-chat-surface.ts` carries the reversal.
     -->
     <app-extra-roomscroller
       bind:this={scroller}
+      class={{ 'chat-uploaded-img-sm': smallImagePreview && defaultImagePreview }}
       style="overflow-y: scroll; overflow-x: hidden; height: 100%;"
       onscroll={(event: Event) => onscroll(event.currentTarget as HTMLElement)}
     >

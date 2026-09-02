@@ -30,10 +30,11 @@
  *
  * Every id below appears on exactly one `<input onchange={updateSettingCheck}>` in
  * `ModalHost.svelte` and NOWHERE else in `src/` — not in `+page.svelte`, not in any other
- * component. Five of them have since been given real preference names and now write those instead
+ * component. Six of them have since been given real preference names and now write those instead
  * (`recordingStartSound`, `recordingStopSound`, `pushToTalk`, `doSpeechReco`,
- * `showSpeechRecoOverlay`), plus `disableVideo`; their element ids stay on this list precisely
- * BECAUSE they were written under the old name before that, so the stale copy is still out there.
+ * `showSpeechRecoOverlay` and, on 2026-09-02 with USM-18, `smallImagePreview`), plus `disableVideo`;
+ * their element ids stay on this list precisely BECAUSE they were written under the old name before
+ * that, so the stale copy is still out there.
  *
  * Two entries at the end of the list are NOT element ids and say so where they sit: they are the two
  * invented preference names the Text Mode radios wrote before those radios were wired to the

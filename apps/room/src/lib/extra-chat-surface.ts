@@ -175,14 +175,19 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
  * matters far more than an id normally would — with the component sheet missing, `app.css`'s
  * `#textAreaHolder` family is the only thing left that styles this composer.
  *
- * ### `XCP-07` — the roomscroller's `ngClass` is refused rather than missing
+ * ### `XCP-07` LEFT THIS LIST on 2026-09-02, and it left for the reason `XCP-08` did
  *
  * `("ngClass", ct(13, B3e, preferences.smallImagePreview && preferences.defaultImagePreview))` at
  * byte **2,400,160**, where `B3e` at byte **2,367,305** is `t => ({"chat-uploaded-img-sm": t})`.
- * Not reproduced, and the argument is not restated here: it is the same pair `USM-18` and
- * `settings-preference-wiring-contract.test.ts` already measured and refused, because
- * `chat-uploaded-img-sm` has no rule in any of the 52 stylesheets this repository holds. Binding it
- * would switch on a class name nothing reads.
+ *
+ * It sat here as *"refused rather than missing"* because `chat-uploaded-img-sm` has no rule in any
+ * of the 52 stylesheets this repository holds — a measurement that still stands and was re-proved
+ * against `css/complete-app-styles.css`, where the search finds `.chat-uploaded-img` with a real
+ * rule and the `-sm` variant zero times. What was wrong was treating that as the question. A class
+ * this repository INVENTS with no rule is scaffolding and `CLAUDE.md` forbids it by name; a class
+ * TRANSCRIBED from the capture has its consumer in the capture, which is the call already made and
+ * tested for `btn-ligth` in `ChatArchiveLogPane.svelte`. The binding ships, on both columns.
+ * `image-preview-latch-contract.test.ts` and `USM-18` carry the whole argument.
  *
  * ### `XCP-08` LEFT THIS LIST on 2026-08-31, and that is what the list is for
  *
@@ -193,11 +198,10 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
  * and the button is gated on the HANDLER rather than on a flag, which is this column's own design
  * (see the `isPresenter` note below) rather than a shortcut.
  *
- * The two that remain are not of that kind. Neither is a scope problem, and no amount of owning
- * more files closes either: `XCP-07` needs a stylesheet rule that no capture here has ever
- * contained, and `XCP-09` needs a re-capture of a component this room has never dumped.
+ * The ONE that remains is not of that kind. It is not a scope problem, and no amount of owning more
+ * files closes it: `XCP-09` needs a re-capture of a component this room has never dumped.
  */
-export const EXTRA_CHAT_MEASURED_GAPS = ['XCP-07', 'XCP-09'] as const;
+export const EXTRA_CHAT_MEASURED_GAPS = ['XCP-09'] as const;
 
 /**
  * ## Decisions RELOCATED from `ExtraChatPane.svelte`, verbatim, on 2026-08-31

@@ -881,8 +881,8 @@ for reference behaviour.
 
 ### E.5 — The honest gap that is not a diff: `wired`
 
-Our schema carries a `wired` flag meaning "something actually consumes this value". **105 of 269 are
-wired. 164 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
+Our schema carries a `wired` flag meaning "something actually consumes this value". **106 of 269 are
+wired. 163 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
 
 **This section said "58 wired, 211 not" until 2026-08-29**, and listed those 58 by name. The count
 had nearly doubled underneath it. Both the number and the roster below are now regenerated from
@@ -891,7 +891,7 @@ checked against on every run — and that verifier now fails if this paragraph d
 105th wired setting cannot land without this text moving. It worked: `restreamToURL` was the 104th,
 on 2026-08-30, and this paragraph moved because the verifier refused the commit until it did.
 
-Wired (104), alphabetically:
+Wired (106), alphabetically:
 
 `alertLabels`, `alertSoundOff`, `alertsChatOnBottom`, `alertsOverlayOnScreenshare`,
 `allowUsersToChangeUsername`, `allowedMemberships`, `allowedPerms`, `allowedProducts`,
@@ -913,12 +913,13 @@ Wired (104), alphabetically:
 `positionsIframe`, `positionsIframeUrl`, `presenterMsgsOnTheRight`, `ptrMobileAppEnabled`,
 `recordingReminder`, `restreamToURL`, `rosterCountVisibleToViewers`, `rosterVisibleToViewers`,
 `showArchivesToSpecificPresenters`, `showArchivesToUsers`, `showBadgesToPresentersOnly`,
-`showOnlyUsernames`, `showPasswordField`, `simUserCount`, `simplifiedEditor`, `ssoJWTSecret`,
+`showOnlyUsernames`, `showPasswordField`, `simUserCount`, `simplifiedEditor`,
+`smallerImagePreview`, `ssoJWTSecret`,
 `styckyNonTradeAlert`, `tawkPresenterSupport`, `tipMeBtnEnabled`, `tipMeBtnTxt`, `tipMeBtnUrl`,
 `tokenExpiresIn`, `useMediaMTX`, `userJoinAndLeavePopup`, `userPM`, `userToPresenterPM`,
 `userUploads`, `usernameInstructions`, `usersCanDeleteOwnMsgs`, `usersPublicReply`, `webinarPW`.
 
-The 164 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
+The 163 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
 `saveRecsToVimeo` and the four Vimeo fields), most of the streaming fields (`obsBroadcastRoom`,
 `obsStreamKey`, `restreamToURLKey`, `hasYTStreaming` — `restreamToURL` beside them was wired on
 2026-08-30 and is the one exception), every SMS field
