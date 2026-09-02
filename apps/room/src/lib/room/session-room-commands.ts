@@ -2,6 +2,7 @@ import {
   hardReset,
   openSession,
   refreshRoster,
+  reloadSessionConfig,
   softReset
 } from '../../routes/session-commands.remote';
 import type { RoomDialogs } from './dialogs.svelte.js';
@@ -38,10 +39,17 @@ export interface SessionRoomCommandDeps {
 }
 
 export function handleSessionRoomCommand(action: string, deps: SessionRoomCommandDeps): boolean {
+  /*
+      IT NOW SENDS, 2026-09-01, and it is the LAST of the five. It ran `deps.reload()` — a refetch of
+      this presenter's own page — behind a sentence that describes the room. It outlived the four
+      below because the gate that catches that defect was blind to this file: the branch splitter in
+      `user-action-disposition-contract.test.ts` matched a FOUR-space indent and every branch here
+      sits at two. Evidence, and what the server does with the frame, on `reloadSessionConfig`.
+    */
   if (action === 'session-reload-config') {
     deps.dialogs.confirm('Are you sure you want to reload tge session config?', () => {
       deps.closeModal();
-      void deps.reload();
+      void reloadSessionConfig().catch(() => (deps.dialogs.alert = 'Command failed.'));
       deps.dialogs.alert = 'Session config reloaded...';
     });
     return true;

@@ -401,19 +401,65 @@ describe('every dispatched action has exactly one disposition', () => {
 
     const undeclared: string[] = [];
     /*
-      TOP-LEVEL branches only — `\n    if (action === `, at four spaces.
+      TOP-LEVEL branches only.
 
       Splitting on every `if (action === ` cut the `session-send-*` branch at its NESTED
       `if (action === 'session-send-video')`, which put that branch's `localStorage.setItem` in a
       different chunk from its header and reported working code as dialog-only. The instrument was
       wrong, not the code; fixed here rather than by adding a true entry to the list below, which
       would have buried a real defect under a false one.
+
+      ## The indent was the wrong discriminator, and it cost the one defect this gate exists for
+
+      That fix pinned the split to FOUR spaces, which is the indent of a method body in
+      `user-actions.svelte.ts`. `body` is not one file: it is six, concatenated. Five of them are
+      classes and match. `session-room-commands.ts` is a plain exported FUNCTION, so its five
+      branches sit at TWO spaces and the split never saw one of them — for the whole life of this
+      assertion, `session-reload-config`, `session-refresh-roster`, `session-soft-reset`,
+      `session-hard-reset` and `session-open` were scanned by nothing.
+
+      The vacuity guard below did not notice, and could not: it counted branches across the whole
+      concatenation, and seventeen from one file satisfies "more than ten" while a second file
+      contributes zero. A count is not coverage.
+
+      It was not harmless. `session-reload-config` raised a confirm, ran a LOCAL `reload()` and told
+      the presenter "Session config reloaded..." — the exact dialog-only defect in this assertion's
+      own failure message, sitting in the blind spot. Measured 2026-09-01: widening the split to two
+      spaces turned this test red on that one name and left the other four green, because they call
+      discovered `.remote` imports.
+
+      So the indent is widened AND the instrument now checks its own coverage. Every `if (action ===
+      '…')` in `body` must be either a chunk HEADER or a declared nested test. A future file at an
+      indent this regex does not match fails here, loudly, instead of disappearing.
     */
-    const branches = body.split(/(?=\n {4}if \(action === ')/g).slice(1);
+    const branches = body.split(/(?=\n {2,4}if \(action === ')/g).slice(1);
+
+    /*
+      Genuinely nested, and named rather than inferred from indentation — the depth that makes
+      `session-send-video` nested today is a formatting accident, and deny-by-default means the next
+      one has to be argued here rather than skipped by a number.
+    */
+    const NESTED_TESTS = new Set(['session-send-video']);
+
+    const headers = new Set(
+      branches
+        .map((branch) => /^\n +if \(action === '([a-z0-9-]+)'/.exec(branch)?.[1])
+        .filter((name): name is string => name !== undefined)
+    );
+    const unscanned = [
+      ...new Set(
+        [...body.matchAll(/\n +if \(action === '([a-z0-9-]+)'/g)]
+          .map((match) => match[1])
+          .filter((name) => !headers.has(name) && !NESTED_TESTS.has(name))
+      )
+    ];
     expect(
-      branches.length,
-      'the branch split matched nothing — this assertion would be vacuous'
-    ).toBeGreaterThan(10);
+      unscanned,
+      `The branch splitter did not scan these actions — they have an \`if (action === '…')\` in ` +
+        `one of the six sources and no chunk of their own, so every assertion below skipped them ` +
+        `silently. Widen the split or declare them in NESTED_TESTS with why.\n  ` +
+        `${unscanned.join('\n  ')}`
+    ).toEqual([]);
 
     for (const branch of branches) {
       if (ACTS.some((marker) => branch.includes(marker))) continue;

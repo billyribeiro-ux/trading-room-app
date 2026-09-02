@@ -1115,7 +1115,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `recording-frames.ts`. The router is now BELOW where it started the day (1,069), which is what
       "ceilings only go down" is supposed to look like when a file grows for a good reason.
     */
-    max: 1057,
+    /*
+      1,057 -> 1,066, 2026-09-01, for the `reloadSessionConfig` receiver — nine lines, four of code
+      and five of note.
+
+      It is the LAST of the five session controls that announced a server act and performed a local
+      one; the other four were each found and fixed here, and this one survived only because the gate
+      that catches the family split branches on an indent this file's sender does not use. So the
+      receiver has to exist, and it belongs on the `cmds` chain beside `chatArchiveChanged`, which is
+      the same shape for the same reason: re-read the page under a room that stays where it is.
+
+      Not extracted, and the reason is this entry's own standard for what an extraction has to be.
+      The three receivers that left for `recording-frames.ts` above shared a COLLABORATOR — all three
+      reach `RoomMedia` — which is what made them a module rather than three lines moved to satisfy a
+      count. This one shares nothing: it calls `invalidateAll()`, the same function the branch above
+      it calls, and a module holding two identical one-line bodies is a worse file than the chain.
+
+      The note is five lines because the evidence is elsewhere: the sender at bundle byte 2166484 and
+      the MEASURED absence of any upstream receiver are on `reloadSessionConfig` in
+      `session-commands.remote.ts`, pointed at rather than repeated.
+    */
+    max: 1066,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -4999,7 +5019,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       about sixty lines and should stay there: a FOURTH source is the thing this module exists to
       make obvious rather than to accommodate.
     */
-    max: 178,
+    /*
+      178 -> 204, 2026-09-01, and the twenty-six lines are the answer to a DEAD PREDICATE rather
+      than new mapping.
+
+      `permissions: user.role === 'user' ? 'r' : 'a'` compared against a value `RoomRole` does not
+      contain, so every roster-derived target was stamped `'a'` and three branches downstream became
+      constants. It is `user.isP` now — the row's own flag, which `private-chat.svelte.ts:444`
+      already used for the identical question — plus the `isP?: boolean` field and its note on why
+      `isPresenterRole(user.role)` is NOT the substitute.
+
+      **The first draft of that comment was 39 lines and this entry refused it**, which is the ratchet
+      doing its job rather than obstructing: it listed all four downstream consequences, and
+      `modal-target-permissions-contract.test.ts` already carries and ENFORCES them. Removing the
+      duplication between a comment and the test that enforces it is not the same act as shortening a
+      reason to look tidy, which CLAUDE.md forbids — the reason stayed, in one place, next to the
+      check that makes it true.
+
+      If this climbs again, the question is whether a field arrived or whether an argument is being
+      written twice.
+    */
+    max: 204,
     why: 'how a roster row, a message and a managed-chat row each become the modal’s target'
   },
   {
@@ -5831,7 +5871,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       local `invalidateAll()` while promising a command had gone out, and two wrote a preference and
       told nobody — which is the evidence that the seam is real rather than a line-count exercise.
     */
-    max: 107,
+    /*
+      107 -> 114, 2026-09-01, and it is the FIFTH of the five, found by repairing the gate that was
+      supposed to have found it. `session-reload-config` ran `deps.reload()` behind the captured
+      sentence "Session config reloaded...", which describes the room; the four above it were each
+      caught by `user-action-disposition-contract.test.ts`, and this one was not because that test
+      split branches on a FOUR-space indent and this file is a plain exported function whose branches
+      sit at two. A count is not coverage: the vacuity guard read seventeen branches from a sibling
+      file and passed while this one contributed zero.
+
+      Six of the seven lines are that note; the seventh is the import. The evidence — the sender at
+      bundle byte 2166484, the empty payload, and the measured ABSENCE of any upstream receiver —
+      lives once on `reloadSessionConfig` in `session-commands.remote.ts` and is pointed at rather
+      than repeated, which is what kept this to seven lines instead of forty.
+    */
+    max: 114,
     why: 'the session acts that send; the four that only write a preference are a table'
   },
   {

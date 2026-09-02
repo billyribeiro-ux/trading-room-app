@@ -392,6 +392,94 @@ describe('replace-only objects use $state.raw', () => {
     expect(raws.length, 'three raws on 2026-09-01: active, selected, monthly').toBe(3);
   });
 
+  it('catalogues every CALL-INITIALISED `$state`, which the scanner above cannot classify', () => {
+    /*
+      THE BLIND SPOT, closed 2026-09-01 — and it had a live defect in it.
+
+      `runeOf` decides an initialiser is an object by seeing an ARRAY OR OBJECT LITERAL, or a
+      `[]`/`Record<`/`Map<`/`Set<` type argument. `$state(walk.series(N))` is a CALL with neither, so
+      the scanner never saw it and the count above was three-of-four while a fifth and sixth field
+      sat outside the corpus entirely.
+
+      Both were in `TapeSection.svelte`, both arrays replaced wholesale on a 130ms and a 420ms
+      interval and read whole per tick by d3 — the exact shape CLAUDE.md names. They are `$state.raw`
+      now.
+
+      **Why a catalogue and not type inference.** Deciding what `walk.series(N)` returns needs the
+      type checker, and this file parses with `ts.createSourceFile`, which has no program and no
+      types. The alternative to inference is deny-by-default: every call-initialised site is listed
+      HERE with what its call returns, and an uncatalogued one fails. Measured across this app on
+      2026-09-01 there are exactly two, so the list is a fact a reader can check rather than a
+      pattern nobody can.
+
+      The ROOM has twelve of these and none is a defect, measured the same day: eleven are scalars
+      seeded through `untrack(...)`, and the twelfth — `ModalHost.svelte`'s
+      `advancedSearch = $state(emptySearch())` — is an object that IS mutated in place
+      (`advancedSearch.traders = …`), so its deep proxy is load-bearing and it is the counter-example.
+    */
+    /*
+      Each entry carries `raw`, and asserting it is the whole point — the first draft of this case
+      did not, and TWO OF ITS FOUR NEGATIVE CONTROLS CAME BACK GREEN. The site pattern matches
+      `$state(` and `$state.raw(` alike, so reverting `points` to a deep proxy left the catalogued
+      SET identical and the gate said nothing. A catalogue that records which sites exist but not
+      what they are is an inventory, not a guard.
+    */
+    const CALL_INITIALISED: Record<string, { raw: boolean; why: string }> = {
+      'src/lib/components/home/TapeSection.svelte:points': {
+        raw: true,
+        why:
+          'a 220-element array from `walk.series(N)`, replaced wholesale every 130ms and read whole ' +
+          'per tick by d3 min/max/line/area.'
+      },
+      'src/lib/components/home/TapeSection.svelte:sparks': {
+        raw: true,
+        why:
+          'four 60-element arrays from `sparkWalks.map(...)`, replaced wholesale every 420ms and ' +
+          'read whole per tick.'
+      }
+    };
+
+    const found: string[] = [];
+    const rawAt = new Map<string, boolean>();
+    for (const file of tracked) {
+      if (!file.endsWith('.svelte') && !file.endsWith('.ts')) continue;
+      if (file.endsWith('.test.ts') || file.endsWith('.d.ts')) continue;
+      /*
+        `existsSync` because `git ls-files` lists the INDEX, not the filesystem: a file deleted but
+        not yet committed is tracked and absent, and `readFileSync` on it throws ENOENT and takes the
+        whole gate down. That happened twice in the room on 2026-09-01, in two different sweeps.
+      */
+      if (!existsSync(file)) continue;
+      const text = readFileSync(file, 'utf8');
+      for (const match of text.matchAll(
+        /(?:let|const)\s+([A-Za-z_$][\w$]*)\s*=\s*\$state(\.raw)?\(\s*[A-Za-z_$][\w$.]*\s*\(/g
+      )) {
+        const site = `${file}:${match[1]}`;
+        found.push(site);
+        rawAt.set(site, match[2] === '.raw');
+      }
+    }
+
+    expect(
+      found.sort(),
+      'A `$state(someCall())` appeared that this file does not catalogue. The scanner above cannot ' +
+        'tell whether the call returns an object, so it cannot tell whether `$state.raw` applies — ' +
+        'decide it by reading the call, and add it here with what it returns.'
+    ).toEqual(Object.keys(CALL_INITIALISED).sort());
+
+    /*
+      AND EACH ONE IS THE DISPOSITION THE CATALOGUE CLAIMS. This is the assertion the first draft
+      was missing; without it the two entries below could both revert to a deep proxy silently.
+    */
+    for (const [site, entry] of Object.entries(CALL_INITIALISED)) {
+      expect(entry.why.length, `${site} needs a real reason`).toBeGreaterThan(60);
+      expect(
+        rawAt.get(site),
+        `${site} is catalogued as ${entry.raw ? '`$state.raw`' : '`$state`'} and is not. ${entry.why}`
+      ).toBe(entry.raw);
+    }
+  });
+
   it('and the toast list is deliberately NOT raw, which is the distinction this file turns on', () => {
     /*
       The room's copy pins three `ModalHost` fields that `bind:` writes through. This app's

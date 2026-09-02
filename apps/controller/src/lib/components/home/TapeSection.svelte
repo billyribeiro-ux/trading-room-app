@@ -22,13 +22,35 @@
   const N = 220;
 
   const walk = createWalk(0x7a9e2026, 18240, 6.2);
-  let points = $state(walk.series(N));
+  /*
+    `$state.raw`, not `$state`, and on a 130ms interval the difference is not academic.
+
+    `points` is a 220-element array that is only ever REPLACED — `points = [...points.slice(1),
+    walk.next()]` below, never a push or a splice — and it is read whole on every tick by d3:
+    `min`, `max`, `line()(points)` and `area()(points)` each walk all 220. A deep `$state` proxy
+    over it means every one of those reads goes through a proxy trap, and a fresh proxy is built
+    eight times a second, for a mutation granularity nothing here uses.
+
+    CLAUDE.md names this exact shape: *"`$state` on an object that only ever changes at the top
+    level → `$state.raw`. A deep proxy over a list that is replaced wholesale is pure overhead on
+    every read."*
+
+    It was invisible to `state-raw-contract.test.ts` until 2026-09-01: that scanner decides an
+    initialiser is an object by seeing an ARRAY OR OBJECT LITERAL, or a `[]`/`Record<`/`Map<`/`Set<`
+    type argument, and `$state(walk.series(N))` is a CALL with neither. The contract now catalogues
+    every call-initialised `$state` in this app by name, so the next one cannot hide the same way.
+  */
+  let points = $state.raw(walk.series(N));
 
   const SPARK_N = 60;
   const sparkWalks = TAPE_SPARKLINE_SYMBOLS.map((symbol, i) =>
     createWalk(0x1000 + i * 977, [5610, 18240, 61240, 1.0842][i], [4.2, 13, 160, 0.0011][i])
   );
-  let sparks = $state(sparkWalks.map((w) => w.series(SPARK_N)));
+  /*
+    The same, at 420ms: an array of four 60-element arrays, replaced wholesale by
+    `sparks = sparks.map(...)` and read whole per tick. Raw for the reason above.
+  */
+  let sparks = $state.raw(sparkWalks.map((w) => w.series(SPARK_N)));
 
   /**
    * Tick only while the section is on screen and motion is allowed. The intervals live inside the

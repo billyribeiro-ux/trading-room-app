@@ -396,6 +396,16 @@ export class RoomEventStream<Entry> {
           void invalidateAll();
           return;
         }
+        /*
+          The room's settings were re-read. NO UPSTREAM RECEIVER EXISTS to transcribe — the opcode
+          appears once in the whole bundle, at its sender — so this half is this room's own, and why
+          it is a broadcast rather than a local refetch is on `reloadSessionConfig`. Silent by
+          design: upstream tells only the presenter who pressed the button.
+        */
+        if (command?.cmd === 'reloadSessionConfig') {
+          void invalidateAll();
+          return;
+        }
         if (command?.cmd === 'openSession') {
           this.#alertThenReload('The session is now open, click here to reload the page and enter');
           return;

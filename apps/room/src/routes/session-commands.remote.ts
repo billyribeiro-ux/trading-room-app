@@ -126,6 +126,62 @@ export const softReset = command(z.void(), async () => {
 });
 
 /**
+ * `reloadSessionConfig` — the room's settings are re-read, for everybody in it.
+ *
+ * ```js
+ * reloadSession() {
+ *   bootbox.confirm("Are you sure you want to reload tge session config?", e => {
+ *     e && (this.done(),
+ *           this.appService.sendServerAdminCommand("reloadSessionConfig", {}),
+ *           bootbox.alert("Session config reloaded..."))
+ *   })
+ * }                                                                          // byte 2166484
+ * ```
+ *
+ * The misspelling is upstream's and is transcribed rather than corrected, for the same reason
+ * `ptr_clone` keeps its name: a captured string is evidence, and a tidied one no longer matches the
+ * thing it was captured from. `mechanical-rename-contract.test.ts` pins the pair.
+ *
+ * ## It was the fifth session control that announced a server act and performed a local one
+ *
+ * `refreshRoster`, `softReset`, `hardReset` and `openSession` were each found this way and each
+ * fixed. This one outlived all four because the gate that catches the family could not see it: the
+ * branch splitter in `user-action-disposition-contract.test.ts` matched a four-space indent, and
+ * `session-room-commands.ts` is a plain function whose branches sit at two. Widening that split on
+ * 2026-09-01 turned the gate red on this name and nothing else.
+ *
+ * What it did instead of sending: `void deps.reload()` — a refetch of the CALLING presenter's own
+ * page — behind the captured sentence "Session config reloaded...", which describes the room.
+ *
+ * ## What is evidenced, and what is not
+ *
+ * EVIDENCED, all from the sender above: the opcode `reloadSessionConfig`, its EMPTY payload `{}`,
+ * both captured sentences, and the ordering — `done()` closes the modal BEFORE the send, and there
+ * is no local reload anywhere in the handler.
+ *
+ * NOT EVIDENCED: what the reference SERVER does on receipt. That server is not in the capture, and
+ * `reloadSessionConfig` appears exactly once in the whole 2.89 MB bundle — at the sender. There is
+ * no client receiver upstream, so nothing can be transcribed for one; the absence was measured, not
+ * assumed.
+ *
+ * So the server half is this room's own, and it is stated as such. Upstream holds a room's config in
+ * its own process and this command makes it re-read; this room holds no such copy — the config lives
+ * on the controller and `room-config-client.ts` caches it per REQUEST, on a `WeakMap` keyed by the
+ * request object, so every request already re-reads it. There is nothing here to invalidate.
+ *
+ * What IS stale is the copy each connected client is holding in its page data, loaded when it
+ * entered. So the frame is broadcast and every client re-runs its load — which is the effect
+ * upstream's command has, reached the way this architecture reaches it. `chatArchiveChanged` is the
+ * same shape for the same reason.
+ */
+export const reloadSessionConfig = command(z.void(), async () => {
+  ensureDatabase();
+  const room = presenterRoom();
+  publishToRoom(room, { channel: 'cmds', data: { cmd: 'reloadSessionConfig' } });
+  recordSessionEvent(room, 'Session config reloaded', 'Every client re-read the room settings.');
+});
+
+/**
  * `hardReset` — every client drops its media and RELOADS.
  *
  * The heavier sibling of `softReset`, and the difference is what the client does after: a soft reset

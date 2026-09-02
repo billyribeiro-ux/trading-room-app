@@ -45,6 +45,258 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-01 23:51 UTC — the gate could not see a whole file, and the defect it exists for was in there
+
+`session-reload-config` raised a confirm, ran a LOCAL `deps.reload()` — a refetch of the calling
+presenter's own page — and told them *"Session config reloaded..."*, which describes the room. It is
+the fifth and last of the session controls that announced a server act and performed a local one;
+the other four were each caught by `user-action-disposition-contract.test.ts`, whose failure message
+names this exact defect.
+
+## Why this one survived four rounds of the gate that catches it
+
+That test concatenates SIX source files and splits them into branches on `\n    if (action === '` —
+a FOUR-space indent, which is a method body. Five of the six are classes. `session-room-commands.ts`
+is a plain exported function, so its five branches sit at TWO spaces and **the split never produced a
+chunk for any of them**. `session-reload-config`, `session-refresh-roster`, `session-soft-reset`,
+`session-hard-reset` and `session-open` were scanned by nothing, for the whole life of the assertion.
+
+The vacuity guard did not notice and could not: it counted branches across the whole concatenation,
+and seventeen from one file satisfies *"more than ten"* while a second file contributes zero. **A
+count is not coverage** — that is the reusable half of this, and it is the same failure shape as the
+three fail-open gates found on 2026-08-31.
+
+## What changed, and the two negative controls
+
+The split is widened to two spaces AND the instrument now checks its own coverage: every
+`if (action === '…')` in the concatenation must be either a chunk header or a member of
+`NESTED_TESTS`, which holds exactly one declared name (`session-send-video`, genuinely nested inside
+the `session-send-*` branch). A future file at an indent the regex misses now fails loudly.
+
+Both controls were run and seen RED:
+
+- **The repair, against the unfixed code.** Widening the split turned the assertion red on
+  `session-reload-config` and nothing else — the other four call discovered `.remote` imports and
+  pass. The gate found the real defect on its first honest run.
+- **The self-check, against the old split.** Narrowing back to four spaces fails the new coverage
+  assertion by name, listing all five branches it had been skipping.
+- **The receiver, in `events.svelte.test.ts`.** Renaming the opcode drops `invalidateAll` to zero
+  calls.
+
+## The command
+
+`reloadSessionConfig`, transcribed from the sender at bundle byte 2166484 —
+`sendServerAdminCommand("reloadSessionConfig", {})`, between `done()` and the alert, with no local
+reload anywhere in the handler. The misspelling in *"reload tge session config?"* is upstream's and
+is kept.
+
+**What is NOT evidenced is stated at the code rather than papered over:** the reference's server is
+not in the capture, and `reloadSessionConfig` appears exactly ONCE in the whole 2.89 MB bundle — at
+its sender. There is no upstream receiver to transcribe; that absence was measured, not assumed. So
+the server half is this room's own. Upstream keeps a room's config in its own process and this
+command makes it re-read; this room has no such copy — `room-config-client.ts` caches per REQUEST on
+a `WeakMap` keyed by the request object, so every request already re-reads from the controller.
+Nothing here is stale except the copy each connected client loaded on entry, so the frame is
+broadcast and every client re-runs its load. `chatArchiveChanged` is the same shape.
+
+## A third gate confirmed it independently, and a document was wrong
+
+`feature-coverage-contract.test.ts` went red on its own: `reloadSessionConfig` was no longer absent
+from our source. The name is deleted from that list.
+
+`docs/decoded/missing-commands-triage.md` had it under **"Built under another name"**, citing
+`+page.svelte`. What is in `+page.svelte` is the BUTTON. The same document claimed six commands of
+that family were *"ALREADY BUILT … in `ModalHost.svelte` and `+page.svelte`"*, and **none of the six
+had a command behind it when that was written** — two ran a local `invalidateAll()`, two wrote a
+preference and told nobody, one had a handler whose whole body was an alert, and this one reloaded a
+page. Dated by `git log -S` on `session-commands.remote.ts`: `refreshRoster` and `softReset`
+2026-08-26; `hardReset`, `openSession` and `saveCloseMessage` 2026-08-27; this one today. A markup
+search cannot tell a wired control from an inert one, which is what that document's own footer says
+about PRESENT rows being a floor.
+
+**Runtime impact.** A presenter pressing *Reload Session Config* now changes the room: every
+connected client re-reads the room's settings. Before this, the only page that moved was the
+presenter's own, which is why the control read as working from the one seat that could see it.
+
+**Verified:** `user-action-disposition-contract` 16/16 with both negative controls seen red;
+`events.svelte.test.ts` 36/36 with its control seen red; `feature-coverage-contract` 4/4;
+`source-size-contract` 681/681 after both ceilings were raised with their arguments at the entry;
+`svelte-check` 0 errors 0 warnings; `svelte-autofixer` clean on the modified `.svelte.ts`. Room gate exit 0 — 340 files,
+6124 passed, 1 skipped — at `7391e49`.
+
+### 2026-09-01 23:24 UTC — re-measuring the refusals, and proving the gate that holds one of them
+
+**Runtime impact: NONE.** Two recorded refusals re-tested against the match-exactly instruction; both
+survive, and one is now provably enforced rather than asserted.
+
+## The report modal: EVIDENCE ABSENT, and the gate that says so actually fires
+
+`RPT-01` and the five rows pointing at it refuse the alert-delivery report because the queue it views
+*"does not exist, is not written, and has no producer"* — no table across the migrations,
+`alerts.dispatch` being the REQUEST rather than the outcome, `getAlertReport` with no server half.
+
+Under match-exactly the markup alone would be transcribable and would render an empty state. What
+stops it is not markup: the six rows' entire CONTENT is per-recipient delivery data, and inventing a
+data source is forbidden by name. EVIDENCE ABSENT, not a preference.
+
+**The refusal claims to be gated, and I proved the gate fires** — I have found two vacuous gates
+today, so an ungated claim of gating is not evidence. Control: a real `alert_delivery_attempts` table
+carrying `status`, `sent_time`, `latency` and `fail_reason`, appended to a migration.
+`alert-report-modal-contract.test.ts` went **RED**, which is the designed behaviour — the six rows go
+live the moment the premise expires. Migration restored.
+
+## The roster star: still blocked, on ONE thing now instead of two
+
+`RS-03` refuses the stars/years indicator because `years` has no supply. Still true, and still a
+controller-side decision about what `years` MEANS rather than a transcription.
+
+What changed is its modal-side twin. `ModalHost.svelte:2341` reads `!disableStarYears &&
+targetUser.permissions !== 'a' && targetUser.years`, and until today the middle term was a CONSTANT —
+the dead `role === 'user'` predicate stamped every row `'a'`, so the block could not render whatever
+`years` held. That is fixed, so **`years` is now the only thing between that markup and a render**,
+and the audit row says so at itself.
+
+Recorded because it changes what the next person experiences: whoever supplies `years` tomorrow gets
+the star, where before today they would have supplied it, seen nothing, and gone hunting for a second
+reason nobody had written down.
+
+## What this pass did NOT establish, stated plainly
+
+The re-triage of all 115 non-code dispositions **did not complete**. Its agents died at 20:13 against
+the session usage limit having produced nothing, and the workflow sat at zero completions for three
+hours before I noticed. Four rows were re-measured by hand instead — the four whose recorded reason
+matches the shape that was wrong three times today (*"the server does not send it"*). Three are the
+Stream Player, an owner decision on anonymous playback authorisation rather than a transcription; the
+fourth is `RS-03`.
+
+**The remaining ~111 rows are still on their recorded reasons and have not been re-tested.**
+
+---
+
+### 2026-09-01 23:13 UTC — every roster row was stamped "Presenter / Admin", and four branches were constants
+
+**Runtime impact: YES.** The user-info modal drew the wrong Permissions for every ordinary member,
+and three branches gated on that value could never take their other arm.
+
+## The predicate compared against a value nothing can hold
+
+```ts
+permissions: user.role === 'user' ? 'r' : 'a'
+```
+
+`RoomRole` is `'admin' | 'staff' | 'member'` (`server/room-role.ts:22`). **There is no `'user'`.** So
+the true arm was unreachable and every roster-derived target was stamped `'a'`, which the modal
+renders as "Presenter / Admin". It typechecked on both sides — `string === string` — which is exactly
+why nothing caught it. `'user'` is the REFERENCE's role vocabulary, not this application's.
+
+Four consequences, measured:
+
+* the Permissions row read "Presenter / Admin" for an ordinary member;
+* `ModalHost.svelte:2341`'s membership-star block is gated on `permissions !== 'a'`, so it could
+  never render for anybody, whatever `years` supplied;
+* `:2371`'s `permissions === 'r'` arm was dead code;
+* `roster-private-chat.ts:36` reads `(permissions === 'a' || hasAdminChat === true)` — the first
+  disjunct always won, so `hasAdminChat` was never consulted and UIM-04's gate was short-circuited.
+
+**Severity bounded by measurement rather than assumed:** that helper decides VISIBILITY, server-side
+private-chat delivery has its own independent rules, and `media-grant.test.ts:296` asserts a grant
+"does not admit on hasAdminChat". It drew authority state wrongly; it granted nothing.
+
+## The fix is a sibling's, already argued
+
+`private-chat.svelte.ts:444` asks the identical question and had it right: `permissions: user.isP ?
+'a' : 'r'`, with *"The row's OWN flag, not `role !== 'user'`"* beside it. `isP` is supplied on both
+paths — `+page.server.ts:240` and `sess/[room]/events/+server.ts:201`, each `?.isP === true`.
+
+**NOT `isPresenterRole(user.role)`**, and that is measured rather than preferred: the roster frame
+deliberately moved OFF that expression, and `events/+server.ts:192` records why — a row's `role` is
+another account's `users` row, reconciled only on that account's next page load, so it goes stale
+where `isP` does not.
+
+## The test, which the fix did not have
+
+`modal-target-permissions-contract.test.ts` tests VALUES, not source: a source assertion pins today's
+expression and says nothing about the next one. What must hold is a property — **every role this
+application can mint maps to a real answer, and BOTH answers are reachable**. Asserting the SET of
+outcomes is what catches a dead predicate; asserting one outcome would not.
+
+`ROLES` is derived from `RoomRole` through `as const satisfies readonly RoomRole[]`, with an
+`Exclude<>` exhaustiveness check, so a fourth role added to the union without being added here fails
+to COMPILE. A hand-written array would have let the next role in unmeasured — the same drift as the
+defect.
+
+It also asserts the fail-CLOSED half: a row with no `isP` is a member, not an admin. The old
+expression failed OPEN there.
+
+**Four negative controls, four red** — the first restores the original defect exactly.
+
+Found by the whole-project audit and independently confirmed by its adversarial verifier; the fix
+shape, the `isPresenterRole` refusal and the two supply paths are the verifier's, checked here
+against the code before being applied.
+
+---
+
+### 2026-09-01 22:44 UTC — 184 components, two fixes, and a gate of mine that did not guard
+
+**Runtime impact: YES, one component.** `TapeSection` stops building a deep proxy eight times a
+second.
+
+## The Svelte sweep, and what it found is mostly that there was nothing to find
+
+Every `.svelte` and `.svelte.ts` in both apps — **184 files, 18 agents** — through
+`svelte-autofixer` and the official Svelte 5 docs. **Two fixes. Zero reverts. No shard with a dirty
+`svelte-check`.** Ninety-one suggestions were declined, each with a reason at the code: the standing
+`$effect`/`untrack` and `bind:this` nudges the components already argue, and twenty-five `{' '}`
+mustaches that preserve a trailing space the capture has and HTML whitespace folding would eat.
+
+The two fixes were both comments that had stopped matching their code:
+
+* `RoomNavbar.svelte` quoted `{:else if hasMic}` inside a markup comment — the rule CLAUDE.md
+  forbids by name, in the same file that argues that rule 150 lines earlier. Not a compiler hazard
+  (the agent probed it: markup-comment contents never reach the parser) but a source-scan one, and
+  `files-pane-contract.test.ts:138` records the run where exactly this made a guard walk report a
+  block that was never open.
+* `toasts.svelte.ts` was headed *"`$state`, not `$state.raw`, and that is a deliberate non-change"*
+  directly above `#notices = $state.raw(...)`. Commit `d2c9aa8` made that change and left the prose,
+  so the comment argued FOR reverting a measured optimisation — the *"a rule with no recorded WHY
+  gets simplified back into the bug it was fixing"* failure, in the file that names it.
+
+**Two files were too large to pass to the autofixer and the agent said so rather than implying
+coverage**: `ModalHost.svelte` (6,065 lines; its script block alone is 96KB) and the controller's
+account/rooms page (3,289 lines; its script block WAS checked and came back clean, its ~2,400 lines
+of markup were not). Both got `svelte-check`, eslint and targeted idiom scans instead.
+
+## The real defect was in the blind spot of the gate that governs it
+
+`state-raw-contract.test.ts` decides an initialiser is an object by seeing an array/object LITERAL or
+a `[]`/`Record<`/`Map<`/`Set<` type argument. `$state(walk.series(N))` is a CALL with neither, so the
+scanner never saw it — and `TapeSection.svelte` had two of them: a 220-element array replaced
+wholesale every **130ms**, and four 60-element arrays replaced every **420ms**, both read whole per
+tick by d3's `min`, `max`, `line()` and `area()`. A deep proxy over each, rebuilt eight times a
+second, for a mutation granularity nothing uses. CLAUDE.md names this shape exactly.
+
+Both are `$state.raw` now. The blind spot is measured and small: **14 call-initialised `$state` sites
+across both apps**, and the other twelve are all in the room and none is a defect — eleven scalars
+seeded through `untrack`, and `ModalHost`'s `advancedSearch = $state(emptySearch())`, an object that
+IS mutated in place (`advancedSearch.traders = …`) and whose deep proxy is therefore load-bearing.
+
+Deny-by-default rather than type inference: this file parses with `ts.createSourceFile` and has no
+type checker, so every call-initialised site is CATALOGUED by name with what its call returns, and an
+uncatalogued one fails.
+
+## And my catalogue did not guard the thing I wrote it for
+
+**Two of its four negative controls came back GREEN.** The site pattern matches `$state(` and
+`$state.raw(` alike, so reverting `points` to a deep proxy left the catalogued SET identical and the
+gate said nothing. A catalogue that records which sites exist but not what they ARE is an inventory,
+not a guard.
+
+Each entry now carries `raw: boolean` and the disposition is asserted. All four controls red. Written
+at the case, because this is the second time today a check of mine passed for the wrong reason — the
+first was a control that failed for the wrong reason, which is the same mistake mirrored.
+
+---
+
 ### 2026-09-01 22:12 UTC — a stored-XSS fix that had no test, and I committed an agent's scratch file
 
 **Runtime impact: NONE from this entry.** The fix it guards already shipped; what lands here is the
