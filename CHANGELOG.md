@@ -45,6 +45,59 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 21:32 UTC — seven evidence-gap rows were stale, and two comments were the only evidence they stood on
+
+`apps/room/TODO.md`'s evidence-gap table had not been swept this session. Seven rows were
+re-measured against the pinned v4 bundle (`docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`,
+2,891,205 bytes) and against the current source. **All seven were stale in the safe direction —
+built, or answered — and none of them was closed by work done today.** They moved to
+`docs/RESOLVED-ARCHIVE.md` with the measurement that closes each; the rows are deleted from `TODO.md`
+rather than struck through.
+
+| gap        | recorded                                                       | measured 2026-09-02                                                                                                                                                                                                                             |
+| ---------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **4 / 12** | "`O(83, …)` is the only reference"; "Not built"                | the bundle holds **nine**, three decisive: the button template at **1,946,166**, the sender at **1,977,411**, the room-state seed at **1,966,551**. `FilesPane.svelte:299` renders it gated on `isPresenter && mp3Playing`. Filed twice, built once. |
+| **5**      | "`app-privchatscroller` is a stub … writes an empty file"      | `PrivateChatPanel.svelte:474-495` renders `{#each log as message (message._id)}` with both paging branches; `loadLog` pages, settles `#paging` and dedupes on `_id`. `downloadLog()` maps over populated rows.                                     |
+| **10**     | "those two entry points are not built"                         | the roster path ships end to end. The user-info modal's copy is dead **upstream** too: `O(18, o.canPM && o.checkIsMe() ? 18 : -1)`, and `checkIsMe()` is true only when the target is NOT me (**2,087,485**).                                     |
+| **11**     | "no image sharing inside a private thread"                     | `beginImageUpload` / `confirmImagePaste` (from byte **2,212,274**) over an injected uploader. What remains is the empty `PUBLIC_PTR_UPLOAD_SERVER`, which is gap 7 and not per-feature.                                                            |
+| **24**     | "WHICH element calls it has not been located"                  | **not work.** All eight occurrences read; **no `x("click", … giveMicScreen …)` exists** anywhere in the bundle. A button would be a control the reference does not render.                                                                        |
+| **29**     | "Five of seven membership fields are dropped"                  | all six are consumed, and the three media ones are decided on the **server** (`/api/media/grant` reads the controller's membership), which is the divergence that matters.                                                                        |
+
+**Gap 18's reason was false and is withdrawn rather than closed.** It read *"nothing in this repo
+produces a transcript: `currentCaption` is never assigned … neither half is wired"*. All three halves
+are wired and were read end to end: `room/recording.ts:457` sends, `services/media/src/server.rs:1412`
+relays as `speechReco`, `room/media-transport.svelte.ts:734` receives, and `+page.svelte:648` commits
+every FINAL line to a 500-entry `captionHistory` the caption overlay already renders. What is missing
+is a transcript the **server** holds: the control opens a NEW WINDOW, which can read none of this
+tab's memory. The reference's own URL cannot be matched either — `#/session-transcript?token=${sesionToken}`
+puts the controller's session credential into an address bar, browser history and every outbound
+`Referer`, the refusal already recorded for the Benzinga default URL. The row stays open with the two
+pieces that would close it.
+
+**Runtime impact: one user-facing sentence changed.** `TRANSCRIPT_UNAVAILABLE` said *"speech
+recognition results are not being captured, so there is nothing to open"* — untrue, and it pointed a
+presenter away from the history that exists. It now names the window boundary and sends them to the
+overlay's history button. Nothing else here reaches a running room.
+
+**Two comments in shipped source were the origin of two of those rows.** `private-chat.svelte.ts`'s
+`downloadLog` docblock claimed the log "is still a stub here"; `alerts-pane.ts` claimed the caption
+relay was unbuilt. A comment asserting a feature is MISSING is the one kind that never fails a build,
+so both outlived their gap by weeks and seeded the same false claim into the tracker, where it stood
+as a blocker. That is why both size-ceiling raises here — `alerts-pane.ts` 332 → 344 and
+`private-chat.svelte.ts` 1148 → 1154 — are **entirely prose**, and each is argued at its own entry.
+
+**Verified:** `svelte-check` 1640 files, 0 errors, 0 warnings. `source-size-contract.test.ts` 683
+passed, and the `alerts-pane.ts` raise's **negative control was seen RED** at 343 before the ceiling
+was restored. The four private-chat suites pass (133 assertions). `prettier --check` clean on both
+documents, which were clean before the edit and were reformatted after it.
+
+**Not verified, and named:** `files-pane-contract.test.ts` and `roster-private-chat.test.ts` — the
+guards cited for gaps 4 and 10 — are two of the forty-two evidence-bound files
+`gate/evidence-bound-tests.mjs` excludes in this checkout. `discoverEvidenceBoundTests()` was called
+and both came back in its list. Those two closures rest on the SOURCE having been read and on the byte
+offsets, not on a green tick, and the archive entry says so at the top.
+
+
 ### 2026-09-02 21:17 UTC — the room was opened in a browser, and the CSS changes were verified there
 
 **Runtime impact: NO.** One new end-to-end case and one config docblock. What changed is what this
