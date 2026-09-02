@@ -45,6 +45,76 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 06:21 UTC — one Svelte, one SvelteKit, and a gate that keeps it that way
+
+## Measured first, against npm rather than recalled
+
+`npm view <pkg> dist-tags`, run in this container. A remembered version number is not evidence — the
+assistant's training predates these releases.
+
+| package | pinned here | newest published | tag |
+| --- | --- | --- | --- |
+| `svelte` | 5.57.0 | 5.57.0 | `latest` |
+| `@sveltejs/kit` | 3.0.0-next.25 | 3.0.0-next.25 | `next` |
+| `@sveltejs/vite-plugin-svelte` | 7.3.0 | 7.3.0 | `latest` |
+| `svelte-check` | 4.7.6 | 4.7.6 | `latest` |
+| `@sveltejs/adapter-node` | 6.0.0-next.10 | 6.0.0-next.10 | `next` |
+| `@sveltejs/adapter-vercel` | 7.0.0-next.8 | 7.0.0-next.8 | `next` |
+| `vite` | 8.2.2 | 8.2.2 | `latest` |
+
+**Every one was already the newest published, so no version changed.**
+
+Two of those tags read backwards and both matter. `svelte`'s `next` tag is `5.0.0-next.272` —
+**older** than `latest`, a stale tag left from the 5.0 pre-release, so `svelte@next` would be a
+downgrade of fifty-seven minors. And `@sveltejs/kit`'s `latest` is **2.70.3**, the stable 2.x line:
+this workspace is deliberately on the 3.x preview (migrated 2026-08-13), so *"upgrade to latest"*
+would **downgrade it off SvelteKit 3** and undo `#lib`, the flattened config and the remote-functions
+opt-in with it. For Kit, the latest is the newest `next`, and that is what is pinned.
+
+## The duplicate was never in the repository
+
+This container held two Svelte trees in its virtual store — `5.56.10` beside `5.57.0`, with Kit and
+`vite-plugin-svelte` peer-variants built against each. It looked like two versions and was not:
+
+- `pnpm-lock.yaml` names `svelte@5.57.0` **39 times and `5.56.10` zero times**;
+- **no symlink anywhere** resolved into the 5.56.10 tree — every live edge, in both apps and in the
+  virtual store's own root, pointed at 5.57.0;
+- neither `pnpm install --frozen-lockfile` nor `pnpm prune` removed it, because pnpm leaves
+  unreferenced virtual-store trees in place;
+- deleting `node_modules` and reinstalling **from the same committed lockfile** produced exactly one
+  tree each.
+
+That last one is the proof, and it is why nothing in the repository changed: **a fresh clone never
+had the duplicate.** The leftover was an artifact of upgrading in place, one bump behind.
+
+## So the deliverable is the gate, not a fix
+
+Three assertions added to `svelte-kit-sync-pin.test.ts`, which already reads workspace-wide
+`package.json` facts across both apps:
+
+1. the lockfile resolves **exactly one** version of `svelte`, `@sveltejs/kit`,
+   `@sveltejs/vite-plugin-svelte` and `svelte-check`;
+2. both apps pin each of them **exactly**, no range — a range is how a second version arrives
+   without anybody choosing it;
+3. what the two apps agree on is what the lockfile actually **resolved**, not merely agreement with
+   each other.
+
+The **lockfile** is read, not `node_modules`. A test that counts directories under `.pnpm` measures
+whatever the last install happened to leave on the machine it runs on — exactly the state that just
+proved misleading.
+
+One implementation note worth its comment: the version regex needs a lookbehind. `svelte@5.57.0`
+appears as a substring inside `eslint-plugin-svelte@`, `prettier-plugin-svelte@` and
+`svelte-eslint-parser@`, all three real packages in this lockfile with versions of their own, so a
+bare match would report a duplicate that does not exist. Both neighbours are asserted to be found,
+so the lookbehind is proved to separate them rather than the corpus merely lacking them.
+
+**Verification.** Three negative controls seen RED: a second `svelte` resolution appended to the
+lockfile, a caret range in one app, and the two apps declaring different versions. `pnpm run gate`
+exit 0 in **both** apps.
+
+---
+
 ### 2026-09-02 06:11 UTC — five audit rows re-read against the four escapes; three were stale, one is the owner's
 
 Continuing the re-reading the 06:03 entry set up. Five of the twenty-nine `DELIBERATE DIVERGENCE`
