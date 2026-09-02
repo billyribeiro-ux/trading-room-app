@@ -174,10 +174,34 @@ describe('SSM-2 — all six clicks sit on the list item, where the capture split
   });
 
   it('puts the handler on the list item here, for all six', () => {
+    /*
+      ── RE-CHALLENGED 2026-09-02 UNDER "match the dump exactly", AND HELD, WITH THE COST STATED ──
+
+      The split is real and both halves are read above: three entries carry the click on the `<li>`
+      (consts 185/186/187) and three on the `<a>` (const 163, `d(2,"li")(3,"a",163)`). The
+      observable difference is the padding: on the reference's last three rows a click beside the
+      text does nothing, and here it activates.
+
+      **Ours is a superset on three rows, and closing it would cost the keyboard path on those
+      three.** This component's structure already diverges from the capture's by a decision SSM-1
+      records and tests: the `<li>` is the `role="menuitem"` with the accessible name, and the `<a>`
+      keeps the capture's `aria-hidden="true"`. Moving `run` onto that anchor for three rows would
+      put activation on the node marked hidden from assistive technology, and `activateOnKey` — the
+      keyboard half — is bound to the `<li>`. That is the mouse-only defect NTC-2 was opened for.
+
+      So this is NOT one of the four escapes and it is not being claimed as one. It is a divergence
+      with a cost on each side, and the side with the cost to a member using a keyboard is the one
+      this room does not take. **Recorded for the owner rather than closed**, because "three menu
+      rows respond to a click in their padding" is a product judgement, not a measurement — and the
+      measurement, which is what this file is for, is above and unchanged.
+    */
     const snippet = entrySnippet();
     expect(snippet).toContain('onclick={run}');
     /* And never on the anchor, which is the node `aria-hidden` is on. */
     expect(snippet).not.toContain('<a aria-hidden="true" onclick');
+    /* The keyboard half is on the same element, which is the whole reason the click stays there. */
+    expect(snippet).toContain('onkeydown={(event) => activateOnKey(event, run)}');
+    expect(snippet).toContain('role="menuitem"');
   });
 });
 

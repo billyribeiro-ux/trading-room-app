@@ -7463,7 +7463,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       measurement that made it possible: `..` cannot rise above the root, so the reference's
       `../../assets/…` and this app's old `/assets/…` are the same request from every depth served.
     */
-    max: 898,
+    /*
+      898 -> 923, 2026-09-02, and NO code changed — the twenty-five lines are `poll-11`'s disposition
+      written at the effect that already satisfies it.
+
+      The row asks for the reference's two post-transition re-plots
+      (`setTimeout(() => calcPieData(), 100)` at bytes 2,109,087 and 2,109,678) to be transcribed at
+      the two sites they occupy. Both are already there, as one reactive dependency instead of two
+      timers, and the note records the measurement of all THREE paths rather than asserting it —
+      including the one that assigns no geometry, restore-from-normal, which needs no re-plot because
+      minimizing sets `display: none` rather than unmounting the canvas.
+
+      Worth the lines because the alternative reading is invisible: without them the next comparison
+      finds two `setTimeout`s upstream and none here and adds them, and the room paints the same
+      chart a second time 100ms after every minimize and every maximize.
+    */
+    max: 923,
     why: 'the poll UI - author, vote and results in one captured component'
   },
   {
