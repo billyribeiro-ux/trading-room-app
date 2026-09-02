@@ -228,6 +228,28 @@ describe('no dropdown waits for a Bootstrap that never arrives', () => {
  * That plugin is in `scripts.38973a242454fb27.js`, one of the three chunks `deployed-index.html`
  * names and this checkout does not hold — the same absence `ROV-03` bounds.
  *
+ * ## That Bootstrap is LOADED was an inference; on 2026-09-02 it became a measurement
+ *
+ * The paragraph above says where the plugin is. It did not establish that the chunk holding it is
+ * actually loaded and running, and "the reference renders `data-bs-toggle`" is not on its own proof
+ * that anything consumes it — this repository renders the same attributes and consumes none of them.
+ *
+ * Counted in the bundle, and the third row is the one that closes it:
+ *
+ * ```
+ *   bootbox.  call sites                                              348
+ *   definitions of `bootbox`                                            0
+ *   `window.$` reads                                                   13
+ *   definitions of jQuery                                               0
+ *   Bootstrap plugin code (bs.tab / SELECTOR_DATA_TOGGLE / class Tab)    0
+ * ```
+ *
+ * **bootbox is a wrapper over Bootstrap's modal component and cannot function without Bootstrap's
+ * JavaScript.** 348 call sites — `bootbox.confirm` on every destructive action in the reference —
+ * prove it functions. So the uncaptured chunk supplies jQuery, bootbox AND Bootstrap, and the Tab
+ * and Dropdown plugins are running. The inference is now a chain with no missing link except the
+ * bytes themselves.
+ *
  * The alternative reading has to be stated to be dismissed: if the rendered value really were the
  * const's, upstream's tab strip would announce **seven** selected tabs at once and every message
  * menu would announce itself permanently collapsed while open. Reproducing an upstream defect is
@@ -296,6 +318,40 @@ describe('the three aria rows the const table cannot settle', () => {
     for (const at of [1_994_264, 1_358_060, 2_002_640]) {
       expect(BUNDLE.slice(at, at + 400)).toContain('"data-bs-toggle"');
     }
+  });
+
+  it('proves the plugin is LOADED, not merely present in a chunk we do not hold', () => {
+    /*
+      The link the docblock above used to leave as an inference. `data-bs-toggle` in the markup does
+      not prove a plugin consumes it — this repository renders the same attributes and consumes
+      none of them, which is the first assertion in this file.
+
+      bootbox is what closes it: it wraps Bootstrap's modal and cannot run without Bootstrap's JS.
+      If it is CALLED and never DEFINED in the only chunk we hold, the chunk we do not hold supplies
+      it, and Bootstrap with it.
+    */
+    const calls = BUNDLE.match(/bootbox\./g) ?? [];
+    expect(
+      calls.length,
+      'bootbox is the load-bearing witness; if it is gone, re-argue this'
+    ).toBeGreaterThan(300);
+
+    for (const definition of [
+      /\bfunction bootbox\b/,
+      /\bbootbox\s*=/,
+      /\bvar bootbox\b/,
+      /\blet bootbox\b/
+    ]) {
+      expect(
+        definition.test(BUNDLE),
+        `bootbox is DEFINED in the captured chunk (${definition}), so it no longer witnesses a second one`
+      ).toBe(false);
+    }
+    /* And the plugin itself really is absent from what we hold, or the argument is unnecessary. */
+    expect(
+      /bs\.tab|SELECTOR_DATA_TOGGLE/.test(BUNDLE),
+      'the plugin IS here — re-read this block'
+    ).toBe(false);
   });
 
   it('so this room BINDS them, which is the only reading that renders what upstream renders', () => {

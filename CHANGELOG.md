@@ -45,6 +45,68 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 15:02 UTC — the `aria-selected` family is MATCHED, and my own owner-decision verdict was wrong
+
+## What I got wrong, and how
+
+This morning I re-read `MTS-06`, checked it against the four escapes, and marked it an **owner
+decision** — a collision between *"match the dump exactly"* and `CLAUDE.md`'s *"semantic accessible
+HTML"*. I accepted the row's premise that *"nothing in the update block writes the attribute"* and
+concluded the rendered attribute is the literal.
+
+**The premise is true. The conclusion does not follow — and
+`bootstrap-dropdown-contract.test.ts:200-245` had already said so**, in a disposition written the
+same day covering MTS-06, MSM-02 and NTC-3 together. I re-litigated a settled row without reading
+the contract that settled it, and would have sent a question that was already answered with
+evidence. The wrong verdict is recorded at the row and struck above rather than quietly replaced.
+
+## The evidence, re-measured independently and stronger than it was
+
+An Angular const is the element's attributes **at creation** — everything after the bare `3` marker
+is a binding, and `aria-selected` sits before it in all eight. So Angular never updates it. But every
+one of those consts also carries `data-bs-toggle="tab"`, which hands the anchor to **Bootstrap's Tab
+plugin**, and that plugin writes `aria-selected` on every show and hide.
+
+The contract already said the plugin lives in `scripts.38973a242454fb27.js` — one of four scripts
+`deployed-index.html` loads, and the one chunk this repository does not hold. What it did **not**
+establish is that the chunk is actually loaded, and *"the markup renders `data-bs-toggle`"* is not
+proof: this repository renders the same attributes and consumes none of them.
+
+| counted in `main.d1d09071be31f1ba.js` | |
+| --- | --- |
+| `bootbox.` call sites | **348** |
+| definitions of `bootbox` | **0** |
+| `window.$` reads | **13** |
+| definitions of jQuery | **0** |
+| Bootstrap plugin code (`bs.tab` / `SELECTOR_DATA_TOGGLE` / `class Tab`) | **0** |
+
+**bootbox is a wrapper over Bootstrap's modal and cannot function without Bootstrap's JavaScript.**
+348 call sites — `bootbox.confirm` on every destructive action upstream — prove it functions. So the
+uncaptured chunk supplies jQuery, bootbox **and Bootstrap**, and the Tab and Dropdown plugins are
+running. The inference is a chain now, with no missing link except the bytes themselves.
+
+## So the binding is the match
+
+Freeze the literals and this room renders a DOM the reference **never shows at any moment after
+first paint**: five tabs announcing themselves selected at once, which upstream shows for exactly as
+long as it takes the plugin to run. **There is no collision with `CLAUDE.md` here at all** —
+matching and accessibility agree, and the appearance of a conflict came entirely from reading the
+const table as if it were the rendered DOM.
+
+Governs **FP-04, PAM-15 and PAM-12** identically. All four already bind; nothing to build.
+
+The honest bound is unchanged and is the contract's own: **evidence absent for the rendered value**,
+settled either way by one capture of the running page's DOM.
+
+**Verification.** Three negative controls seen RED on the new assertions: the bootbox count raised
+past what the bundle holds; a definition pattern that DOES match (so bootbox would no longer witness
+a second chunk); a plugin pattern that DOES match (so the argument would be unnecessary). **Two
+earlier attempts at these controls PASSED because the `sed` never applied** — recorded because a
+negative control that silently does nothing is worse than none at all. `pnpm run gate` exit 0 in
+`apps/room`.
+
+---
+
 ### 2026-09-02 14:22 UTC — PAM-13 matched: the media guard tests whether a file list EXISTS
 
 The owner delegated the open decisions — decide them on hard evidence, in order to match the original
@@ -218,9 +280,14 @@ transcribable today and would be inert rather than wrong.
 What happens when *"match the dump files exactly"* collides with a rule `CLAUDE.md` states **by
 name** — which is the argument for putting it once rather than four times.
 
-- **MTS-06** — transcribing hardcoded `aria-selected` removes the attribute's whole function for its
-  whole audience. Governs **FP-04, PAM-15 and PAM-12** too: four components, so a convention in the
-  reference rather than a slip in one.
+- **MTS-06** — ~~transcribing hardcoded `aria-selected` removes the attribute's whole function for
+  its whole audience~~. **WRONG, and corrected the same day — see the 14:5x entry above.** The row's
+  premise (*"nothing in the update block writes the attribute"*) is true; the conclusion is not.
+  Every one of those consts carries `data-bs-toggle="tab"`, which hands the anchor to Bootstrap's
+  Tab plugin, and that plugin writes `aria-selected` on every show and hide. This was **already
+  disposed** in `bootstrap-dropdown-contract.test.ts`, and re-reading the audit row without reading
+  the contract is what produced the wrong verdict. Not an owner question at all. Same for **FP-04,
+  PAM-15 and PAM-12**.
 - **SSM-2** — the same collision in degree: the only handler lands on an `aria-hidden` node, so the
   control does not exist *at all* for assistive technology.
 - **STV-02** — escape 4 does **not** apply, on the row's own measurement: *"the viewer sees two

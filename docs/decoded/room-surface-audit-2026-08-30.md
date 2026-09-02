@@ -5217,7 +5217,7 @@ decoded by value: it carries no `tabindex` at all, and neither does any of its s
 
 ### MTS-06 — `aria-selected` is derived here and hardcoded on all eight anchors upstream
 
-**DELIBERATE DIVERGENCE 2026-08-31.** Recorded, not matched. Decoded by value from
+**BUILT — MATCHED; the BINDING is what reproduces the rendered attribute. Disposed with `MSM-02` and `NTC-3` in `bootstrap-dropdown-contract.test.ts`. Recorded as `DELIBERATE DIVERGENCE 2026-08-31`, and briefly and wrongly as an owner decision on 2026-09-02, until then.** Decoded by value from
 `app-presentationarea`'s consts table: const 5 (`screens-tab`), 9 (`streams-tab`), 61
 (`videoplayer-tab`), 63 (`swingAlerts-tab`) and 65 (`dayTradeAlerts-tab`) each carry a literal
 `"aria-selected","true"`; const 11 (`notes-tab`), 17 (the files anchor, which carries no id) and 59
@@ -5230,38 +5230,53 @@ reader and never announces the one actually showing. Ours binds it to `mainTab =
 anchors, and `main-tab-strip-gates.svelte.test.ts` asserts exactly one tab answers `true` and that
 it is the one showing.
 
-**RE-READ 2026-09-02 — this is the FOURTH OUTCOME, not an escape, and it is the OWNER's.** The
-reason recorded above was *"reproducing it would reproduce a defect"*, which is retired. Checked
-against the four:
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE. The binding is what MATCHES, and this row was
+DISPOSED with `MSM-02` and `NTC-3` in `bootstrap-dropdown-contract.test.ts:200-245`, where the
+measurement lives.**
 
-* not **SECURITY** — announcing the wrong tab discloses nothing;
-* not **EVIDENCE ABSENT** — the eight consts are read by value and quoted;
-* not **LANGUAGE IMPOSSIBLE** — a literal attribute is the easier thing to write;
-* not **NOT A DIVERGENCE** — `aria-selected` is reference-facing OUTPUT. It is not internal
-  structure, and the consts are plainly reachable: they are the tab strip the room opens on.
+**A correction to my own re-reading, made the same day.** An earlier pass today marked this row an
+OWNER DECISION — a collision between *"match the dump exactly"* and `CLAUDE.md`'s *"semantic
+accessible HTML"* — on the row's premise that *"nothing in the update block writes the attribute"*.
+That premise is true and the conclusion drawn from it is not, and the contract above had already
+said so. Re-litigating a settled disposition without reading it is the failure this document exists
+to prevent, so the wrong verdict is recorded here rather than quietly replaced.
 
-So on the four alone this is work. What stops it being work an agent may simply do is that matching
-collides with a rule `CLAUDE.md` states BY NAME — *"semantic accessible HTML"* — and the collision
-is total rather than partial: the attribute's only consumers are the users who cannot see which tab
-is active, so transcribing the literals removes the whole of its function for the whole of its
-audience. That is a conflict between two owner rules, and the standing rule for those is that an
-agent settles neither direction silently.
+**An Angular const is the element's attributes AT CREATION.** Everything after the bare `3` marker
+is a binding, and `aria-selected` sits BEFORE it in all eight — so Angular never updates it. It does
+not follow that the RENDERED attribute is static, and every one of those consts names who does
+update it: `"data-bs-toggle","tab"`, which hands the anchor to **Bootstrap's Tab plugin**, and that
+plugin writes `aria-selected` on every show and hide.
 
-**The same decision governs three rows, not one**, which is the argument for putting it to the owner
-once: `FP-04` (`FilesPane`), `PAM-15` and `PAM-12` (`PostAlertModal`, where the capture hardcodes
-`"true"` on TWO of three anchors), and this one. Finding the pattern four times is what makes it a
-convention in the reference rather than a slip in one component.
+**Bootstrap's JavaScript is not in this capture, and it is provably loaded.** Re-measured
+independently on 2026-09-02, and this is stronger than the "it is in a chunk we do not hold"
+argument the contract already carried:
 
-**If the owner says transcribe it:** the literals are const 5, 9, 61, 63, 65 → `"true"` and const 11,
-17, 59 → `"false"` here; `nav-tab-text` and `nav-tab-url` → `"true"` and `nav-tab-img` → `"false"` in
-`PostAlertModal`. `main-tab-strip-gates.svelte.test.ts` and `post-alert-render.test.ts` both assert
-the derived behaviour today and are the tests that have to be turned around with it.
+| measured in `main.d1d09071be31f1ba.js` | count |
+| --- | --- |
+| `bootbox.` call sites | **348** |
+| definitions of `bootbox` | **0** |
+| `window.$` reads | **13** |
+| definitions of jQuery | **0** |
+| Bootstrap plugin code (`bs.tab`, `SELECTOR_DATA_TOGGLE`, `class Tab`) | **0** |
 
-**The precedent is this document's own**, twice: `FP-04` and `PAM-15` refuted the identical claim
-against `FilesPane` and `PostAlertModal` — "the reference genuinely hardcodes aria-selected and ours
-genuinely binds it, and the claim's own remedy, that the divergence should stay recorded as
-deliberate, is ALREADY recorded". It was not recorded for this surface, which is why this row exists
-and is closed rather than refuted.
+`deployed-index.html` loads four scripts and this repository holds **one** of them. bootbox is a
+wrapper over Bootstrap's modal component and cannot function without Bootstrap's JavaScript; 348
+call sites prove it functions. So `scripts.38973a242454fb27.js` supplies jQuery, bootbox **and
+Bootstrap**, and the Tab plugin is running.
+
+**Therefore the derived binding is the match, not the divergence.** Freeze the literals and this
+room renders a DOM the reference never shows at any moment after first paint — five tabs announcing
+themselves selected at once, which upstream shows for exactly as long as it takes the plugin to
+run. There is no collision with `CLAUDE.md` here at all: matching and accessibility agree, and the
+appearance of a conflict came entirely from reading the const table as if it were the rendered DOM.
+
+**The bound remains honest and is the contract's own:** this is EVIDENCE ABSENT for the rendered
+value, and one capture of the running page's DOM settles it either way.
+
+**Governs `FP-04`, `PAM-15` and `PAM-12` identically** — all four are one question with one answer,
+and all four already bind. `post-alert-render.test.ts`'s `PAM-12` block should be read with this:
+its "reproducing it would reproduce a defect" framing is the retired argument, and the disposition
+it reaches is right for the reason given here.
 
 This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.
