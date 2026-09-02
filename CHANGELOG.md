@@ -45,6 +45,67 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 05:53 UTC — USM-18's refusal rested on a premise the bundle contradicts
+
+## What the row said, and what is actually there
+
+USM-18 was recorded HALF BUILT, its missing half refused because *"neither preference has a
+consumer"*. Re-measured against the bundle rather than inherited, and that premise is wrong.
+
+`defaultImagePreview` occurs **fifteen** times and is not a duplicate of the flag beside it. It is a
+**one-shot latch**. `processSessData` at byte 1,436,631:
+
+```js
+sessData.smallerImagePreview && !preferences.defaultImagePreview && (
+  preferences.defaultImagePreview = sessData.smallerImagePreview,
+  preferences.smallImagePreview   = sessData.smallerImagePreview,
+  setPreference('defaultImagePreview', preferences.defaultImagePreview))
+```
+
+`sessData.smallerImagePreview` is the **room setting** — `room-settings-schema.ts:147`, marked
+`wired: false`. The room's default is pushed into the member's own preference exactly once and the
+latch is persisted so it never re-applies, which is what lets a member who turned it off stay off
+against a room default that says on. Both fields start `!1` at byte 979,150; the toggle at
+2,253,193 keeps them in step.
+
+So the row is not "a preference nothing reads", and **one of the 202 unwired settings turns out to
+have a live consumer upstream**.
+
+## Why it is still not built
+
+The other half of the original measurement survives, and it is the blocker: the one thing the pair
+drives is `ngClass(B1e, smallImagePreview && defaultImagePreview)` with
+`B1e = t => ({'chat-uploaded-img-sm': t})`, and that class has **no rule in any of the 52
+stylesheets** — proved against a control class the same search finds immediately.
+
+That is a conflict between two owner rules rather than between two readings of the evidence:
+*"match the dump files exactly end to end"* asks for the latch, the conjunct and the class;
+`CLAUDE.md` forbids *"a `.flipped` class with no CSS"* by name. The two halves stand or fall
+together — seeding a preference whose only visible effect is a class that styles nothing is exactly
+the scaffolding the second rule exists to stop — so it is **recorded for the owner, not decided
+here**, beside PAM-02 and the two other rows waiting on a sentence.
+
+## Where it is asserted, and why there
+
+`setting-coverage-contract.test.ts`, against the schema row itself, so the day `smallerImagePreview`
+is wired the note goes red and is read again. That file is chosen deliberately: the measurement's
+natural home, `settings-preference-wiring-contract.test.ts`, is one of the **42** the evidence-bound
+gate excludes when the capture roots are absent — an assertion added there does not run in this
+checkout and its negative control produces no output at all. That mistake has been made once
+already this session (MSB-06) and is not repeated.
+
+## The ceiling held
+
+Writing the corrected measurement into `ModalHost.svelte` took it **30 lines over** its ceiling, and
+ceilings here only go down. So the argument lives where it is asserted and the component carries six
+lines and a pointer — which is the right shape anyway: a measurement kept in two places goes stale
+in one.
+
+**Verification.** Two negative controls seen RED: the setting flipped to `wired: true`, and its row
+deleted. `pnpm run gate` exit 0 in **both** apps; `svelte-check` 0/0.
+
+---
+
 ### 2026-09-02 05:35 UTC — the September Svelte post, item by item, with the measurement for each
 
 `apps/controller/docs/SVELTE-CONFORMANCE-AUDIT.md` §18, following §9's precedent for the August

@@ -465,6 +465,34 @@ describe('the wire has no silent break points', () => {
       So the checkbox toggles a class that styles nothing, upstream as well as here. Wiring it would
       ship "a `.flipped` class with no CSS", which this repository forbids by name, and inventing the
       rule would be worse. Asserted so that neither happens by accident.
+
+      ## RE-MEASURED 2026-09-02, and half of the reasoning above was WRONG
+
+      The measurement about the CLASS holds — it is re-run below. What did not hold is the sentence
+      this row carried everywhere else, that `defaultImagePreview` is a second copy of the flag and
+      that "neither preference has a consumer".
+
+      `defaultImagePreview` occurs FIFTEEN times in the bundle and is a ONE-SHOT LATCH.
+      `processSessData` at byte 1,436,631:
+
+        sessData.smallerImagePreview && !preferences.defaultImagePreview && (
+          preferences.defaultImagePreview = sessData.smallerImagePreview,
+          preferences.smallImagePreview   = sessData.smallerImagePreview,
+          setPreference('defaultImagePreview', preferences.defaultImagePreview))
+
+      `sessData.smallerImagePreview` is the ROOM SETTING at `room-settings-schema.ts:147`, marked
+      `wired: false`. The room's default is pushed into the member's preference exactly once and
+      the latch is persisted so it never re-applies — which is what lets a member who turned it off
+      stay off against a room default that says on. Both fields start `!1` (byte 979,150) and the
+      toggle at 2,253,193 keeps them in step.
+
+      So this row is not "a preference nothing reads". It is a real behaviour whose only VISIBLE
+      effect is a class with no rule, and that is a conflict between two owner rules rather than a
+      measurement: *"match the dump files exactly end to end"* asks for the class, and `CLAUDE.md`
+      forbids one with no CSS by name. The two halves stand or fall together — seeding a preference
+      that drives nothing is exactly the scaffolding the second rule is about — so neither is built
+      and the decision is named in `setting-coverage-contract.test.ts` beside the other rows waiting
+      on a sentence from the owner.
     */
     expect(pageCode).not.toContain('chat-uploaded-img-sm');
     /*

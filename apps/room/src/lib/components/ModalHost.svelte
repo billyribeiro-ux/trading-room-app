@@ -3747,12 +3747,12 @@
               where `Cke` and `Ske` are `<span>on</span>` and `<span>off</span>`. Every other
               checkbox in this modal carries that pair and this one did not.
 
-              The row's OTHER half is deliberately not reproduced. Upstream both the `checked`
-              binding and the span gate are `smallImagePreview && defaultImagePreview`; here neither
-              preference has a consumer, because the class the pair drives — `chat-uploaded-img-sm` —
-              has no rule in any of the 52 stylesheets. `settings-preference-wiring-contract.test.ts`
-              proves that and keeps the id out of `updateSettingCheck`'s table. Adding the conjunct
-              would be ANDing two values nothing reads.
+              The conjunct — `checked` and the span gate as `smallImagePreview &&
+              defaultImagePreview` — is not reproduced, and the reason that used to sit here was
+              re-measured on 2026-09-02 and was wrong in its premise: `defaultImagePreview` is a
+              one-shot latch seeding this preference from the ROOM setting `smallerImagePreview`,
+              not a dead duplicate. The measurement, and why it is still unbuilt, are in
+              `setting-coverage-contract.test.ts` beside the schema row and where they run.
             -->
             <label for="small-image-preview" class="form-check-label"
               >Smaller image preview
