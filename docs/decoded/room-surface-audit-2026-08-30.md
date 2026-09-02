@@ -11243,7 +11243,7 @@ function wCe(t,n){1&t&&(d(0,"div",2),T(1,"i",15),v(2,"\xa0Loading Stream..."),u(
 
 ### STV-02 — Upstream reloads the whole HLS pipeline TWICE on one buffer-size click; ours reloads once
 
-**OWNER DECISION — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE — read and measured 2026-08-31`; the same rule collision as `MTS-06` and `SSM-2`, to be answered with them.** The row exists so nobody restores the double as "the reference's arrangement" without that answer.
+**BUILT — MATCHED, and the row was stale. Re-labelled 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`, having been briefly and wrongly called an owner decision and then an escape on the way.** The row exists so nobody REMOVES the double as "a defect we need not reproduce".
 
 **This row was ADDED after this document was committed**, by the batch that read the two alert panes
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
@@ -11271,25 +11271,56 @@ only other reader".
 `bufferSizeLevel`. A second teardown drops the media element's buffered range on the floor a second
 time and the viewer sees two stalls where one would do.
 
-**RE-READ 2026-09-02 — OWNER DECISION, and the row's own last sentence is what rules escape 4 out.**
+**RE-READ 2026-09-02 — THIS ROW IS STALE. The double is BUILT and has been for some time.**
+`StreamingView.svelte:482-487` is
 
-The disposition said matching *"would reproduce a defect"*, which is retired. The natural next
-reading is `EMOJI2-07`'s — a duplicate call whose result is identical, therefore internal repetition
-rather than output — and it does **not** apply here, on this row's own measurement: *"the viewer sees
-two stalls"*. Two stalls is a different rendered experience from one, so the duplicate is
-reference-facing and none of the four escapes covers it. On the four alone, this is work.
+```ts
+function setBufferSize(level: number) {
+  if (level < 1 || level > 3) return;
+  if ((bufferSizeLevel || 3) === level) return;
+  onBufferSizeChange?.(level);
+  if (hls) void loadStream();          // <- the direct reload, ON TOP OF the effect
+}
+```
 
-What stops it being work an agent may simply do is the collision, and it is with the owner's own
-standard rather than with taste: `CLAUDE.md` opens with *"maximized for the highest performance
-ALWAYS"*, and matching here means **deliberately doubling media-plane teardowns** — `preferenceChanged`
-is on the SHARED `guiEventBus`, so the cost is 2N teardowns and two stalls per click with N streams
-live. That is measurable rather than aesthetic, which is what distinguishes this from the arguments
-this pass retired.
+and `streaming-view-and-alert-panes-citation-contract.test.ts` asserts that line by name. The row's
+*"Ours reloads once per instance"* describes the state before it was matched.
 
-Answered with `MTS-06` and `SSM-2` as one question about how the standard's own rules rank against
-*"match the dump files exactly"*. **If the owner says transcribe:** the `preferenceChanged`
-subscription is reinstated on each player instance beside the existing `$effect`, both firing
-`loadStream()`, which reproduces `setBufferSize`'s own emit-then-reload order.
+**Two wrong verdicts were written on this row today before that was noticed**, and both are recorded
+rather than replaced. The first made it an OWNER DECISION on the row's sentence *"the viewer sees two
+stalls"*, reasoning that matching would double media-plane teardowns against `CLAUDE.md`'s
+*"maximized for the highest performance ALWAYS"*. The second corrected that to escape 4. Both were
+arguing about whether to BUILD something already built — the failure this pass exists to stop, and
+the fourth stale row found today after `NTC-3`, `OVL-07`, `STB-06` and `PCC-07`.
+
+**What the correction is worth keeping for: the double costs nothing observable, and that is
+measured rather than assumed.** The bus is a plain emitter, read whole at byte 975,711:
+
+```js
+emit(n, ...e) {
+  return this.debug && P("Emitter.emit name: " + n),
+    this.events.has(n) && this.events.get(n).map(i => i(...e))
+}
+```
+
+`.map(i => i(...e))` invokes every handler **inline**, so both reloads happen in ONE synchronous
+tick: `setPreference` → `emit` → the subscriber's `loadStream()` → and then, back in
+`setBufferSize`, the tail's `loadStream()`. `loadStream` is
+`this.cleanup(), this.hls = new bf(…), … this.hls.attachMedia(e)` at byte 1,904,378, which reassigns
+`this.hls` synchronously — which is why the tail's guard still passes — and whose `cleanup()` then
+destroys the instance the subscriber had just built, **before the event loop turns**. `attachMedia`
+is event-driven, so that instance never issues a request and never touches the element's buffered
+range.
+
+So *"the viewer sees two stalls"* is not what happens: the cost is one wasted `new bf(…)` and its
+immediate teardown inside a single tick. Matching it was cheap, which is the honest reason to have
+matched it — and it is a better reason than the row's own, which framed it as reproducing a defect.
+
+*The row's original text, kept because the three offsets it reads are correct and only the
+conclusion drawn from them was not:*
+
+*The row's original text, kept because the three offsets it reads are correct and only the
+conclusion drawn from them was not:*
 
 The control on the third offset stands and is worth keeping: `preferenceChanged` occurs four times in
 the whole bundle — 996,829 and 1,025,558 (both `profilePic`), 1,155,238 (the emit) and 1,902,321

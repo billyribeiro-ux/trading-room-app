@@ -45,6 +45,56 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 17:12 UTC — STV-02 was already built, and "the viewer sees two stalls" was never true
+
+Two wrong verdicts were written on this row today before the right one. Both are recorded rather
+than replaced.
+
+## It is stale — the fourth time today
+
+`StreamingView.svelte:486` is `if (hls) void loadStream();` inside `setBufferSize`, on top of the
+effect that already reloads: the reference's double, **matched**, and asserted by name in
+`streaming-view-and-alert-panes-citation-contract.test.ts`. The row's *"Ours reloads once per
+instance"* describes the state before it was matched.
+
+So the first verdict (**owner decision** — *"matching doubles media-plane teardowns against
+maximized for the highest performance"*) and the second (**escape 4**) were both arguing about
+whether to BUILD something already built. Fourth stale row today after NTC-3, OVL-07, STB-06 and
+PCC-07.
+
+## And the claim underneath both verdicts was false
+
+The row says *"the viewer sees two stalls where one would do"*, and two verdicts rested on that
+sentence before anybody read the bus. It is a plain emitter, byte 975,711:
+
+```js
+emit(n, ...e) { … this.events.has(n) && this.events.get(n).map(i => i(...e)) }
+```
+
+`.map(i => i(...e))` invokes handlers **inline**. So `setPreference` → `emit` → the subscriber's
+`loadStream()` → and then the tail's `loadStream()` all run in **one synchronous tick**. `loadStream`
+at 1,904,378 is `this.cleanup(), this.hls = new bf(…), … this.hls.attachMedia(e)` — it reassigns
+`this.hls` synchronously, which is why the tail's guard still passes, and its `cleanup()` destroys
+the instance the subscriber just built **before the event loop turns**. `attachMedia` is
+event-driven, so that instance never issues a request and never touches the element's buffered range.
+
+**One wasted `new bf(…)` and its immediate teardown. Not two stalls.** That is the honest reason
+matching it was cheap, and a better reason than the row's own, which framed it as reproducing a
+defect.
+
+## The repository's own citation gate caught the new evidence
+
+Adding byte 975,711 to the register went red immediately — *"a byte citation with nothing asserting
+it is a citation that can be wrong for months"*. Pinned in the `CITED` table with its 24 bytes, and
+the emitter measurement is now **asserted** rather than only written, because an offset supporting a
+*"this costs nothing"* claim is exactly the kind that rots.
+
+**Verification.** Two negative controls seen RED, both with asserted anchors: the direct reload
+removed from `setBufferSize`, and the pinned offset moved by one byte. `pnpm run gate` exit 0 in
+`apps/room`.
+
+---
+
 ### 2026-09-02 16:07 UTC — SCH-07 built: the reference's second modal, on the project's own primitive
 
 The Svelte MCP reconnected, so the two obligations it was blocking are both discharged here.
@@ -407,9 +457,12 @@ name** — which is the argument for putting it once rather than four times.
   PAM-15 and PAM-12**.
 - **SSM-2** — the same collision in degree: the only handler lands on an `aria-hidden` node, so the
   control does not exist *at all* for assistive technology.
-- **STV-02** — escape 4 does **not** apply, on the row's own measurement: *"the viewer sees two
-  stalls"*. Matching deliberately doubles media-plane teardowns — 2N with N streams live, because
-  `preferenceChanged` is on the shared bus — against *"maximized for the highest performance ALWAYS"*.
+- **STV-02** — ~~escape 4 does not apply, on the row's own measurement~~. **WRONG TWICE, and
+  corrected the same day — see the 16:5x entry.** The row is STALE: the double reload is already
+  BUILT (`StreamingView.svelte:486`). And its *"the viewer sees two stalls"* is an inference that
+  does not survive reading the bus — `emit` invokes handlers inline, so both reloads land in one
+  synchronous tick and the first instance is destroyed before it issues a request. Not an owner
+  question, and nothing to build.
 - **PAM-13** — no escape; work, pending one answer. `fc` was traced to all three sites and is a
   **tri-state**: `undefined` at 2,122,856, non-empty at 2,123,302, and **empty at 2,128,421 — the
   modal's own reset**. So the misfire is the state the modal is left in after *every* reset, not a

@@ -76,6 +76,12 @@ const MY_SECTIONS = (() => {
  */
 const CITED: ReadonlyArray<readonly [number, string]> = [
   [100_136, 'function Li(t,n){return '],
+  /*
+    `STV-02`'s emitter. The class the whole `preferenceChanged` chain runs through, pinned because
+    the register now cites it for the measurement that the double reload happens in ONE tick — and
+    an offset supporting a "this costs nothing" claim is exactly the kind that must not rot.
+  */
+  [975_711, 'subscribe(n,e){return th'],
   [996_829, 'preferenceChanged",{key:"profilePic",value:xe.pr'],
   [1_025_558, 'preferenceChanged",{key:"profilePic",value:i.pro'],
   [1_155_143, 'setPreference(e,i){this.'],
@@ -623,6 +629,31 @@ describe('STV-02 — the buffer control reloads TWICE, as the reference does', (
     expect(BUNDLE.slice(1_908_711, 1_908_711 + 62)).toBe(
       'setPreference("bufferSizeLevel",e),this.hls&&this.loadStream()'
     );
+  });
+
+  it('costs one wasted construction and not a second stall, because the bus is synchronous', () => {
+    /*
+      Why matching this was CHEAP, measured 2026-09-02 rather than assumed — and written down
+      because the audit row said the opposite (*"the viewer sees two stalls"*) and two verdicts were
+      written on that sentence before anybody read the emitter.
+
+      `emit` invokes its handlers INLINE, so `setPreference` -> `emit('preferenceChanged')` -> the
+      subscriber's `loadStream()` -> and then the tail's `loadStream()` all run in ONE synchronous
+      tick. `loadStream` reassigns `this.hls` synchronously, which is why the tail's guard still
+      passes, and its `cleanup()` destroys the instance the subscriber just built — before the event
+      loop turns. `attachMedia` is event-driven, so that instance never issues a request.
+
+      One wasted construction and its immediate teardown. Not two stalls.
+    */
+    const at = BUNDLE.indexOf('emit(n,...e){');
+    expect(at, 'the emitter moved; re-read this before trusting the note above').toBeGreaterThan(
+      -1
+    );
+    expect(BUNDLE.slice(at, at + 120)).toContain('this.events.get(n).map(i=>i(...e))');
+
+    const load = BUNDLE.indexOf('loadStream(){');
+    expect(load, 'loadStream moved').toBeGreaterThan(-1);
+    expect(BUNDLE.slice(load, load + 200)).toContain('this.cleanup(),this.hls=new bf(');
   });
 
   it('calls loadStream directly, on top of the effect that already reloads', () => {
