@@ -47,6 +47,13 @@ describe('message bodies', () => {
     expect(source).toContain('class="linkColor"');
     expect(source).toContain('target="_blank"');
     expect(source).toContain('event.stopPropagation()');
+    /*
+      MSB-06's `rel` deletion and the `Referrer-Policy` header that replaces it are asserted in
+      `shell-body-rte-reference-contract.test.ts`, NOT here — this file is one of the 42 that
+      `gate/evidence-bound-tests.mjs` excludes when the capture roots are absent, so an assertion
+      added here would never have run in this checkout. Found by a negative control that produced
+      no output at all rather than a failure.
+    */
   });
 
   it("keeps the capture's URL pattern verbatim, range and all", () => {

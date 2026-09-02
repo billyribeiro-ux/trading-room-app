@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { codeOf } from './source-comments';
 
 import { parseConstTable } from './const-table.mjs';
 
@@ -288,6 +289,63 @@ describe('RoomShell.svelte cites the names the bundle has', () => {
        blanket rule, which is the shape that gets copied into the next file. */
     expect(SHELL).not.toContain('the areas carry no `order`');
     expect(SHELL).toContain('const 227');
+  });
+});
+
+describe('MSB-06 — the chat link carries the capture’s attributes and nothing this room added', () => {
+  /*
+    The reference's link pipe, read whole at bundle byte 1,326,550:
+
+      '<a href="' + e + '" target="_blank" class="linkColor" onclick="event.stopPropagation()">'
+
+    No `rel`, and that is a CHOICE upstream rather than an oversight: `"rel",` occurs 8 times in the
+    bundle — seven `"rel","noopener noreferrer"` (the avatar menu's outbound links among them) and
+    one `"rel","required"` — so it goes on the links upstream wants it on, and not on this one.
+
+    `rel="noreferrer"` here was ours, so the rendered attribute set differed.
+
+    ## Both halves are pinned together, deliberately
+
+    That attribute was doing real work: a chat link opens a third-party site a member chose, and
+    with no policy anywhere the browser sends a Referer carrying the room URL. So it is not deleted
+    but MOVED — `hooks.server.ts` sets `Referrer-Policy: same-origin` on every response, which
+    covers this link, every other link in the room, and every subresource.
+
+    Deleting the attribute WITHOUT the header is the change that leaks, and a test asserting only
+    the markup would pass on exactly that. Hence one describe block for the pair.
+
+    ## These assertions live here rather than in `message-links-contract.test.ts`
+
+    That file is the natural home and is one of the 42 `gate/evidence-bound-tests.mjs` excludes when
+    the capture roots are absent — so an assertion added there does not run in this checkout, and a
+    negative control against it produced no output rather than a failure. This file runs.
+  */
+  it('emits the four captured attributes', () => {
+    expect(BODY).toContain('target="_blank"');
+    expect(BODY).toContain('class="linkColor"');
+    expect(BODY).toContain('event.stopPropagation()');
+  });
+
+  it('and no `rel`, which the reference does not put on this link', () => {
+    /*
+      Comment-stripped first, and that is not incidental: the note AT the link explains the deletion
+      and quotes `rel="noreferrer"` to do it, so a raw slice of the branch matches its own prose.
+      This is the eighth time that has happened in this repository and the first draft of this
+      assertion was the ninth.
+    */
+    const code = codeOf('lib/components/MessageBody.svelte', BODY);
+    const at = code.indexOf("segment.kind === 'link'");
+    expect(at, 'the link branch is gone').toBeGreaterThan(-1);
+    const end = code.indexOf('</a', at);
+    expect(end, 'the link anchor is unterminated').toBeGreaterThan(at);
+    expect(code.slice(at, end), 'the `rel` this room invented is back').not.toContain('rel=');
+  });
+
+  it('and the protection it was doing is a response header instead', () => {
+    const hooks = readFileSync('src/hooks.server.ts', 'utf8');
+    expect(hooks, 'MSB-06: the header that replaces `rel="noreferrer"` is gone').toContain(
+      "response.headers.set('Referrer-Policy', 'same-origin')"
+    );
   });
 });
 

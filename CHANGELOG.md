@@ -45,6 +45,55 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 03:24 UTC — a security attribute deleted to match the capture, and moved rather than dropped
+
+MSB-06. The reference's chat-link pipe, read whole at bundle byte 1,326,550:
+
+```js
+'<a href="' + e + '" target="_blank" class="linkColor" onclick="event.stopPropagation()">'
+```
+
+No `rel` — and that is a CHOICE upstream rather than an oversight, which is what makes it worth
+matching. `"rel",` occurs 8 times in the bundle: seven `"rel","noopener noreferrer"` (the avatar
+menu's outbound links among them) and one `"rel","required"`. Upstream puts `rel` on the links it
+wants it on, and not on this one. `rel="noreferrer"` here was ours.
+
+**It was doing real work, so it moved rather than went.** A chat link opens a third-party site a
+member chose, and this application set no referrer policy anywhere — so deleting the attribute alone
+would have started sending the room URL as a `Referer` to whatever domain a member pastes.
+`hooks.server.ts` now sets `Referrer-Policy: same-origin` on every response, which covers this link,
+every other link in the room and every subresource. The `<a>` matches the capture character for
+character AND no room URL crosses to a pasted domain, which is strictly better than either half.
+
+`same-origin` rather than the browser's `strict-origin-when-cross-origin` default: that default
+still sends the ORIGIN cross-origin, and nothing outside this room needs to know it exists.
+
+## Three of my own mistakes, and how each was caught
+
+**A sweep in the wrong spelling.** The first draft of this note said *"`rel=` occurs nowhere in the
+2,891,205-byte bundle"*. That was a grep for the HTML form against a file storing attributes
+comma-separated — the same class of error this pass has now paid for three times. Corrected in
+place, and it makes the finding STRONGER: upstream uses `rel` seven times and omits it here.
+
+**An assertion in a file that cannot run.** The guard went into `message-links-contract.test.ts`,
+the natural home — and one of the 42 files `gate/evidence-bound-tests.mjs` excludes when the capture
+roots are absent. The negative control produced *no output at all* rather than a failure, which is
+how it was found. Both assertions now live in `shell-body-rte-reference-contract.test.ts`, which
+runs, and the excluded file carries a note saying where they went and why.
+
+**A slice that matched its own prose.** The `not.toContain('rel=')` assertion read the raw component,
+and the note explaining the deletion quotes `rel="noreferrer"` to explain it. Comment-stripped now.
+That is the ninth instance of this in the repository and the second in this pass.
+
+**Both halves are pinned in one describe block, deliberately.** Deleting the attribute WITHOUT the
+header is the change that leaks, and a test asserting only the markup would pass on exactly that.
+
+**Runtime impact.** Chat links render the capture's attribute set. No referrer leaves this origin,
+for any request.
+
+**Verified:** room gate exit 0 at `03cdc9d` — 341 files, 6,182 passed, 1 skipped. Both negative controls seen red: restoring the attribute,
+and removing the header.
+
 ### 2026-09-02 03:13 UTC — two rows measured and NOT built, with the cost of matching written down
 
 Not every row the re-triage confirms is work, and these two are the honest cases. Both are recorded

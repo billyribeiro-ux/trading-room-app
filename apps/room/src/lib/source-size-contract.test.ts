@@ -2285,7 +2285,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The other eight are the note on `onaction`'s type, which is the shared `MessageActionEvent`
       now rather than the fourth local restatement of two of its members.
     */
-    max: 196,
+    /*
+      196 -> 214, 2026-09-02. MSB-06 — `rel="noreferrer"` DELETED from the chat link, and eighteen
+      lines saying where the protection went, because a security attribute removed with no note over
+      it is the one a reviewer stops on.
+
+      The reference's pipe at bundle byte 1,326,550 is
+      `'<a href="'+e+'" target="_blank" class="linkColor" onclick="event.stopPropagation()">'` —
+      no `rel`, and that is a CHOICE: `"rel",` occurs 8 times in the bundle, seven of them
+      `"rel","noopener noreferrer"`. Upstream puts it where it wants it and not here.
+
+      The attribute was doing real work — a chat link opens a third-party site a member chose — so
+      it MOVED rather than went: `hooks.server.ts` sets `Referrer-Policy: same-origin` on every
+      response, which covers this link, every other link in the room and every subresource, and
+      leaves the markup matching the capture character for character. Strictly better than either
+      half alone, which is why this is a header and not a decision to keep the attribute.
+    */
+    max: 214,
     why: 'one parsed message body - six segment kinds, and the gif reveal that belongs to them'
   },
   {
