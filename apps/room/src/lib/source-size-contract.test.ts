@@ -1225,7 +1225,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       scroller's height. HERE and not in `RoomAlerts` for the reason that one gives — the scroller is
       this file's element.
     */
-    max: 332,
+    /*
+      332 -> 344, 2026-09-02, and every one of the twelve is prose. `TRANSCRIPT_UNAVAILABLE`'s
+      docblock asserted the caption relay was unbuilt — *"neither half is wired here"* — and all
+      three halves were wired: the send at `room/recording.ts:457`, the relay at
+      `services/media/src/server.rs:1412`, the receive at `room/media-transport.svelte.ts:734`.
+
+      The raise buys the correction AND the reason the correction was needed, which is the part
+      worth twelve lines: a comment claiming a feature is MISSING is the one kind that never fails
+      a build, so it outlived the gap and seeded the same false claim into `TODO.md`'s evidence-gap
+      table, where it sat as a blocker for three weeks. The rewritten block names what is actually
+      missing (a server-held transcript) and why the reference's URL cannot be matched.
+    */
+    max: 344,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
@@ -1263,7 +1275,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `arm()` and none had the release beside it, so each one-line `if` became a block carrying both
       calls and the citation for why they belong together. Three feeds, one mechanism, again.
     */
-    max: 343,
+    max: 344,
     why: 'the scroll and paging mechanism - three feeds, one set of moving parts'
   },
   {
@@ -5996,7 +6008,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       senders each holding their own copy of `canPost` is the shape this repository refuses one
       level up — the class's own comment already argues it for the client-versus-server split.
     */
-    max: 1148,
+    /*
+      1148 -> 1154, 2026-09-02. Six lines, all prose, in `downloadLog`'s docblock — which claimed
+      "the private-chat message log itself is still a stub here, so this currently writes an empty
+      file". It stopped being true when `.pc-messages` got its `{#each}` and `loadLog` got its
+      paging; nothing failed, because a comment cannot. The replacement records that it writes
+      `this.log`, and records the failure mode, because this file is now the second place today
+      where a stale "not built" comment was the only evidence a tracker row was standing on.
+    */
+    max: 1154,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*

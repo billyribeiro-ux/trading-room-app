@@ -42,14 +42,26 @@ const DETACHED_ALERTS_MESSAGE =
  * ```
  *
  * Both controls were dead links - no handler at all on the menu item, no button on the overlay.
- * They now report the same thing, honestly: there is no transcript page to open, because nothing
- * in this repo produces a transcript. `currentCaption` is never assigned (the Web Speech API runs
- * on the presenter's machine in the capture and the results are relayed over the socket; neither
- * half is wired here), so `lastSpeechReco` has no source and the page would render an empty
- * document. Recorded in TODO.md rather than papered over with a route that always says "empty".
+ * They report the gap instead, and on 2026-09-02 the REASON changed, so the sentence did too.
+ *
+ * It used to say the relay was unbuilt: *"`currentCaption` is never assigned … neither half is
+ * wired here"*. Both halves are wired, and were read end to end before this was rewritten - the
+ * presenter's browser sends at `room/recording.ts:457`, `services/media/src/server.rs:1412` relays
+ * it as `speechReco`, `room/media-transport.svelte.ts:734` receives it, and `+page.svelte:648`
+ * commits every FINAL line to a 500-entry `captionHistory` that the caption overlay renders today.
+ *
+ * What is still missing is a transcript the SERVER holds. `captionHistory` is one tab's memory and
+ * this control opens a NEW WINDOW, which can read none of it. The reference's own URL cannot be
+ * matched either: `#/session-transcript?token=${sesionToken}` puts the controller's session
+ * credential into an address bar, browser history and every outbound `Referer` - the refusal
+ * already recorded for the Benzinga default URL, for the same reason.
+ *
+ * So the honest message names the window boundary, not a missing feature: the captions exist, in
+ * THIS window, and the overlay's history toggle is where they are read. `TODO.md` gap 18 carries
+ * the two pieces that would close it.
  */
 const TRANSCRIPT_UNAVAILABLE =
-  'The transcript page is not available in this room: speech recognition results are not being captured, so there is nothing to open.';
+  'The full transcript page is not available in this room. Captions are held in this window only, so a separate page has nothing to read - use the history button on the caption overlay instead.';
 
 const alertExportFormatter = new Intl.DateTimeFormat('en-US', {
   year: '2-digit',

@@ -1116,8 +1116,14 @@ export class RoomPrivateChat<User extends { id: number; isP: boolean; hasAdminCh
    * named `${name}_${date}_${time}.txt` with the space in the name replaced (the capture calls
    * `replace(' ', '_')`, which replaces only the first - kept as-is).
    *
-   * The private-chat message log itself is still a stub here, so this currently writes an empty
-   * file. That is the honest state, not a placeholder transcript.
+   * It writes the rows the panel is showing. An earlier revision of this comment said the log was
+   * "still a stub here, so this currently writes an empty file" — that was true when the serialiser
+   * landed and stopped being true when `.pc-messages` got its `{#each}` and `loadLog` got its
+   * paging. A comment asserting a feature is missing is the one kind that never fails a build, so
+   * it outlived the gap by weeks and put the same claim into `TODO.md`'s evidence-gap table.
+   *
+   * `this.log` is the getter at `:426`: the open peer's thread, or the search bucket while a term
+   * is set. An empty file now means an empty thread, which is the honest thing for it to mean.
    */
   downloadLog() {
     const openTab = this.tabs.find((tab) => tab.uid === this.#peerId);
