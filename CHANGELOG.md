@@ -45,6 +45,44 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 03:30 UTC — `trackBy`, and the one row where Svelte's own documentation settles it
+
+DTP-04 and SWP-04 asked both alert panes to change `{#each visibleAlerts as row (row.id)}` to
+`(row)`, because the reference passes `Li(t,n){return n}` as `ɵɵrepeaterCreate`'s seventh argument
+(bytes 1,944,820 and 1,938,465) — Angular's identity `trackBy` — and a Svelte object key is its
+exact analogue. **The analogue is exact.** Measured and NOT changed, for two reasons that stand
+independently.
+
+**A key is not rendered output.** `trackBy` and a Svelte key are both reconciliation hints: they
+decide whether a DOM node is moved or re-created, and the resulting markup is identical either way.
+That is internal structure.
+
+**Svelte's documentation names this exact trade and recommends against it.** Read from the MCP
+rather than from memory, per this repository's own rule, `svelte/each` says verbatim: *"The key can
+be any object, but **strings and numbers are recommended since they allow identity to persist when
+the objects themselves change**."*
+
+The objects here change. `visibleAlerts` is `limitDayTradeLogs(searchDayTradeLogs(alerts, search),
+limit)` — `filter` and `slice`, which return new ARRAYS holding the SAME element references, so
+within one page's lifetime the two keys agree exactly. They part across a REFETCH, where the load
+produces new objects for the same alerts: `row.id` moves the existing rows and `row` destroys and
+re-creates every one of them, losing focus, selection and scroll position inside each row, on every
+new alert.
+
+`CLAUDE.md` makes official Svelte guidance the floor, so a change the framework's own documentation
+recommends against needs more than an analogue, and "the reference's reconciliation hint is spelled
+differently" is not more.
+
+Recorded in `each-key-contract.test.ts` rather than at either pane — one answer for both, and a copy
+in each is how the two would drift. The measurement it rests on is asserted too: if those helpers
+copied their rows the argument would be a different one, so `slice`/`filter` and the absence of a
+spread are pinned.
+
+**Runtime impact.** None. No code changed.
+
+**Verified:** room gate exit 0 at `5cbd8c8` — 341 files, 6,186 passed, 1 skipped. Negative control seen red: keying one pane by the object
+fails the new assertion.
+
 ### 2026-09-02 03:24 UTC — a security attribute deleted to match the capture, and moved rather than dropped
 
 MSB-06. The reference's chat-link pipe, read whole at bundle byte 1,326,550:

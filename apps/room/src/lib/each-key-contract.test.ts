@@ -183,3 +183,64 @@ describe('every {#each} key says something true', () => {
     unkeyedAt('src/lib/components/CompactMessageRow.svelte', 1);
   });
 });
+
+/**
+ * ── `DTP-04` AND `SWP-04` — `trackBy: (index, item) => item`, AND WHY THE ID KEY STAYS ───────────
+ *
+ * Both alert panes were asked to change `{#each visibleAlerts as row (row.id)}` to `(row)`, on the
+ * ground that the reference passes `Li(t,n){return n}` as `ɵɵrepeaterCreate`'s seventh argument
+ * (byte 1,944,820 for the day-trade pane, 1,938,465 for the swing twin) — Angular's identity
+ * trackBy — and that a Svelte object key is its exact analogue. The analogue is exact. Measured and
+ * NOT changed, 2026-09-02, for two reasons that stand independently.
+ *
+ * ## 1. A key is not rendered output
+ *
+ * `trackBy` and a Svelte key are both RECONCILIATION hints: they decide whether a DOM node is moved
+ * or re-created, and the resulting markup is identical either way. That is internal structure, which
+ * is the one thing that is not a divergence to close.
+ *
+ * ## 2. Svelte's own documentation names this exact trade and recommends against it
+ *
+ * From `svelte/each`, verbatim: *"The key can be any object, but **strings and numbers are
+ * recommended since they allow identity to persist when the objects themselves change**."*
+ *
+ * The objects here change. `visibleAlerts` is
+ * `limitDayTradeLogs(searchDayTradeLogs(alerts, search), limit)` — `filter` and `slice`, which
+ * return new ARRAYS holding the SAME element references, so within one page's lifetime the two keys
+ * agree exactly. They part across a REFETCH, where the load produces new objects for the same
+ * alerts: `row.id` moves the existing rows, and `row` destroys and re-creates every one of them —
+ * losing focus, selection and scroll position inside each row, on every new alert.
+ *
+ * `CLAUDE.md` makes official Svelte guidance the floor rather than the ceiling, so a change that
+ * this repository's framework documentation recommends against needs more than an analogue to
+ * justify it, and "the reference's reconciliation hint is spelled differently" is not more.
+ *
+ * NOT A DIVERGENCE. Recorded here rather than at either pane, because it is one answer for both and
+ * a copy in each is how the two would drift.
+ */
+describe('DTP-04 / SWP-04 — the alert panes key by id, and the reference’s trackBy does not change that', () => {
+  const pane = (file: string) => readFileSync(`src/lib/components/${file}`, 'utf8');
+
+  it('both panes key on the row id', () => {
+    for (const file of [
+      'day-trade-alerts/DayTradeAlertsPane.svelte',
+      'swing-alerts/SwingAlertsPane.svelte'
+    ]) {
+      expect(pane(file), `${file} lost its keyed each`).toContain(
+        '{#each visibleAlerts as row (row.id)}'
+      );
+    }
+  });
+
+  it('and the rows they key are the SAME objects the source holds, which is what makes it matter', () => {
+    /*
+      The measurement the disposition rests on: if these helpers copied their rows, the two keys
+      would differ on every render rather than only across a refetch, and the argument would be a
+      different one. `filter` and `slice` return new arrays of the same references.
+    */
+    const helpers = readFileSync('src/lib/day-trade-alerts.ts', 'utf8');
+    expect(helpers).toContain('rows.slice(0, limit)');
+    expect(helpers).toContain('rows.filter(');
+    expect(helpers, 'a copy here would change what the key means').not.toContain('...row');
+  });
+});
