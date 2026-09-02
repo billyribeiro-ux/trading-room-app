@@ -5077,9 +5077,36 @@ writes the attribute — the only per-tab binding is `ngClass`, `ct(46,mo,…)` 
 `mo=t=>({active:t})` at byte 1,916,345.
 
 So a room with both alert entitlements announces FIVE simultaneously-selected tabs to a screen
-reader and never announces the one actually showing. Reproducing it would reproduce a defect. Ours
-binds it to `mainTab === …` on all seven anchors, and `main-tab-strip-gates.svelte.test.ts` asserts
-exactly one tab answers `true` and that it is the one showing.
+reader and never announces the one actually showing. Ours binds it to `mainTab === …` on all seven
+anchors, and `main-tab-strip-gates.svelte.test.ts` asserts exactly one tab answers `true` and that
+it is the one showing.
+
+**RE-READ 2026-09-02 — this is the FOURTH OUTCOME, not an escape, and it is the OWNER's.** The
+reason recorded above was *"reproducing it would reproduce a defect"*, which is retired. Checked
+against the four:
+
+* not **SECURITY** — announcing the wrong tab discloses nothing;
+* not **EVIDENCE ABSENT** — the eight consts are read by value and quoted;
+* not **LANGUAGE IMPOSSIBLE** — a literal attribute is the easier thing to write;
+* not **NOT A DIVERGENCE** — `aria-selected` is reference-facing OUTPUT. It is not internal
+  structure, and the consts are plainly reachable: they are the tab strip the room opens on.
+
+So on the four alone this is work. What stops it being work an agent may simply do is that matching
+collides with a rule `CLAUDE.md` states BY NAME — *"semantic accessible HTML"* — and the collision
+is total rather than partial: the attribute's only consumers are the users who cannot see which tab
+is active, so transcribing the literals removes the whole of its function for the whole of its
+audience. That is a conflict between two owner rules, and the standing rule for those is that an
+agent settles neither direction silently.
+
+**The same decision governs three rows, not one**, which is the argument for putting it to the owner
+once: `FP-04` (`FilesPane`), `PAM-15` and `PAM-12` (`PostAlertModal`, where the capture hardcodes
+`"true"` on TWO of three anchors), and this one. Finding the pattern four times is what makes it a
+convention in the reference rather than a slip in one component.
+
+**If the owner says transcribe it:** the literals are const 5, 9, 61, 63, 65 → `"true"` and const 11,
+17, 59 → `"false"` here; `nav-tab-text` and `nav-tab-url` → `"true"` and `nav-tab-img` → `"false"` in
+`PostAlertModal`. `main-tab-strip-gates.svelte.test.ts` and `post-alert-render.test.ts` both assert
+the derived behaviour today and are the tests that have to be turned around with it.
 
 **The precedent is this document's own**, twice: `FP-04` and `PAM-15` refuted the identical claim
 against `FilesPane` and `PostAlertModal` — "the reference genuinely hardcodes aria-selected and ours
@@ -5320,16 +5347,21 @@ as this room's in that file, and are evidence of nothing.
 
 ### OVL-07 — Upstream raises the Q&A notice once per question the viewer asked, plus once more for a presenter; this room raises it once
 
-**DELIBERATE DIVERGENCE 2026-08-31.** Recorded, not matched. `updateAlertMsg` runs two sibling
-blocks over the same event: a LOOP over `o.qa` that fires for every entry whose `uid` is the
-viewer's, and then a separate `user.isPresenter && (…)` block with the identical body. So a member
-who has asked three questions on an alert gets three toasts and three `qaAlert` sounds when a fourth
-arrives, and a presenter who has also asked gets four.
+**BUILT 2026-09-02 — MATCHED, repeat notices and all.** Recorded as `DELIBERATE DIVERGENCE
+2026-08-31` until then, and this row is kept in full because the reason it carried is the retired
+one.
 
-Reproducing that would reproduce a defect: the notice says *who asked what on which alert*, and it
-says the same thing each time. `deliverQaNotice` in `RoomOverlays.svelte` resolves the audience once
-— never for your own post, otherwise every presenter plus anyone who has asked on that alert — and
-delivers once.
+`updateAlertMsg` runs two sibling blocks over the same event: a LOOP over `o.qa` that fires for
+every entry whose `uid` is the viewer's, and then a separate `user.isPresenter && (…)` block with
+the identical body. So a member who has asked three questions on an alert gets three toasts and
+three `qaAlert` sounds when a fourth arrives, and a presenter who has also asked gets four.
+
+**RE-READ 2026-09-02 — no escape applies, so it is matched.** The old reason was *"reproducing that
+would reproduce a defect"*, which is the definition retired above; the notice repeating itself is
+reference-facing OUTPUT and hits none of the four. `deliverQaNotice` in `RoomOverlays.svelte:619-636`
+now runs the same two blocks in the same order — `for (const other of data.alertQuestions)` firing
+`deliverOnce()` per entry the viewer owns on that alert, then `if (isPresenter) deliverOnce();`
+outside the loop, which is the reference's `globals.user.isPresenter && (…)` verbatim.
 
 This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.
@@ -7264,22 +7296,27 @@ This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
 ### STB-06 — `href="#{id}"` where const 57 is a literal `href="#"`
 
-**DELIBERATE DIVERGENCE, measured 2026-08-31.** Const 57 is `["href","#",1,"dropdown-item"]`, decoded
+**BUILT 2026-09-02 — both halves matched. Recorded as `DELIBERATE DIVERGENCE, measured 2026-08-31` until then.** Const 57 is `["href","#",1,"dropdown-item"]`, decoded
 by value, and it is the anchor of both dropdown items. Upstream nothing prevents its default: the
 click handler is on the `li` (const 56, `[3,"click"]`), the anchor has none, and neither
 `bringFocusToScreen` nor `toggleLockScreenMTX` returns `false`. So a menu click in the reference
 runs its command AND navigates to `#`, which scrolls the room to the top.
 
-Half of that is reproduced here and half is not. The BUBBLING is reproduced as of `STB-01` — the
-click reaches the `li` and selects the tab, exactly as upstream. The JUMP is not: `runItem` keeps
-`event.preventDefault()`, and the `href` is `#` plus the stream's own id rather than a bare `#`, so
-the fragment at least names the tab it belongs to. Matching the reference literally here would
-reproduce a defect that has nothing to do with the feature, and would do it on the only control in
-this menu that a viewer can reach by keyboard.
+**RE-READ 2026-09-02 — BOTH HALVES ARE NOW MATCHED, and this row is stale.** The paragraph it
+carried is kept below for what it explains.
 
-This is recorded rather than left in a handler comment because the previous comment explained the
-`preventDefault` and not the changed `href`, and an unexplained divergence is the one a future
-reader "corrects" back.
+`StreamTabs.svelte:273` and `:283` render the bare `href="#"` of const 57, and `runItem` no longer
+calls `event.preventDefault()` — so a stream-menu click runs its command AND follows the anchor,
+jumping the room to the top and pushing a history entry, exactly as upstream. The handler stays on
+the `<a>` rather than moving to the `<li>`, which is escape 4 and nothing more: `.dropdown-item` is
+a block filling its item, so the same element receives the event by bubbling either way, and an
+anchor is what a keyboard reaches. The component's own docblock at `:133-153` carries the byte
+offsets and says in as many words that the jump looks like a regression and is a match.
+
+*The 2026-08-31 state, for the record:* only the BUBBLING was reproduced. The JUMP was not — `runItem`
+kept `event.preventDefault()` and the `href` interpolated the stream's own id rather than being a
+bare `#` — on the reason *"matching would reproduce a defect that has nothing to do with the
+feature"*, which is the retired argument.
 
 This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
@@ -7721,6 +7758,18 @@ JS.
 Transcribing the literal would announce a collapsed menu to a screen reader every time the menu is
 open. `aria-haspopup` IS worn, so this is one divergence and not a rewrite of the trigger.
 
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the row already contains the proof.** The
+sentence above about screen readers is a consequence rather than a reason, and on its own it would
+be the retired argument. What carries is the two facts either side of it: the const has no
+`3,"aria-expanded"` binding marker, which makes it the element's CREATION-time value and not its
+rendered one; and the trigger hands itself to Bootstrap's Dropdown plugin with
+`data-bs-toggle="dropdown"`, which rewrites the attribute on every show and hide. So the reference's
+RENDERED `aria-expanded` tracks the menu, and a literal `false` here would diverge from the
+reference's output on every open menu. Binding it is what matches.
+
+The same reading closes `NTC-3`'s second half on the same evidence, and the pair is measured
+together in `bootstrap-dropdown-contract.test.ts` — which is the point of finding it twice.
+
 This row was ADDED after this document was committed.
 
 **low** · `divergence` · reference byte **1,358,083**
@@ -7730,19 +7779,29 @@ This row was ADDED after this document was committed.
 
 ### MSM-03 — `id="dropdownMenuLink"` is duplicated once per message, in both applications
 
-**DELIBERATE DIVERGENCE 2026-08-31.** The id is a static entry of all three trigger consts, and
+**BUILT — MATCHED all along; re-labelled 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`.** The id is a static entry of all three trigger consts, and
 `aria-labelledby="dropdownMenuLink"` is a static entry of both menu consts (`app-st-message` 11 at
 1,358,243, `app-st-compactmessage` 10 at 1,396,212). One instance is rendered per message in the
 reference and one per message here, so a 200-message log holds 200 elements carrying one DOM id and
 every menu's `aria-labelledby` resolves to the first of them — the kebab of the oldest message on
 screen.
 
-Recorded and not repaired. The change is two lines in this component — a per-instance id from
+Recorded and not repaired. The change would be two lines in this component — a per-instance id from
 `$props.id()` on the trigger and on the `aria-labelledby` — and it would break
 `room-message-render.test.ts`, which pins the captured DOM of eighteen kebabs including that
-attribute. That file is not this batch's to edit, and unlike NAV-08 the correction is not one line:
-the eighteen fixtures each carry the literal, so the right change is to teach that test to normalise
-the id rather than to rewrite eighteen captures.
+attribute.
+
+**RE-READ 2026-09-02 — this row is not a divergence in the direction the disposition implies, and
+the label was backwards.** `MessageMenu.svelte:117` carries the capture's literal
+`id="dropdownMenuLink"` and has all along. The room MATCHES the reference here, duplicate ids and
+all; what the row describes is a repair that was PROPOSED and declined. Under *"match the dump files
+exactly end to end"* declining it is simply correct, and the eighteen pinned fixtures are the
+evidence that the match is real rather than an accident. The practical harm is the same bounded one
+recorded at `NTC-3`: the ids collide, which is invalid HTML, but every kebab carries the same
+accessible name and only one menu is open at a time.
+
+Kept as a row because the duplicate id is worth knowing about, and re-labelled so the next reader
+does not go looking for an unmatched behaviour that is not there.
 
 This row was ADDED after this document was committed.
 
@@ -9083,7 +9142,7 @@ attribute order and `note-tab-content-contract.test.ts` asserting all four canno
 
 ### NTC-3 — the capture freezes one id on every note tab's gear, which is a duplicate id per open note
 
-**DELIBERATE DIVERGENCE 2026-08-31.** This row was ADDED after this document was committed.
+**BUILT 2026-09-02 — the id half is MATCHED, duplicate ids and all; the `aria-expanded` half stays bound under escape 4.** Recorded as `DELIBERATE DIVERGENCE 2026-08-31` until then. This row was ADDED after this document was committed.
 
 Const 126 names every gear `dropdownMenuNote`, and const 127 —
 `["aria-labelledby","dropdownMenuNote",1,"dropdown-menu"]` — points every menu's label at that same
@@ -9091,9 +9150,32 @@ literal. Two open notes are two elements sharing one id in one document, and bot
 label to the FIRST gear. `aria-expanded="false"` is frozen for the same reason: Bootstrap's plugin
 rewrote it at runtime, and nothing rewrites it here.
 
-Ours binds `id={menuId}` / `aria-labelledby={menuId}` from `NotesPane`'s
-`` `${componentId}-note-menu-${note.id}` `` and `aria-expanded={menuOpen}` from the state that
-actually opens the menu. Recorded rather than matched: reproducing it would reproduce a defect.
+**RE-READ 2026-09-02 — THIS ROW IS STALE. The two halves went opposite ways, and the id half is now
+MATCHED.** The paragraph below described the state on 2026-08-31 and is kept for what it explains,
+not as a verdict.
+
+`NoteTabContent.svelte:120` and `:132` now carry the capture's literals, `id="dropdownMenuNote"` and
+`aria-labelledby="dropdownMenuNote"` — the generated `` `${componentId}-note-menu-${note.id}` `` is
+gone. The old reason was the retired one, *"reproducing it would reproduce a defect"*, and the
+defect is real: N open notes render N elements with one id, and every menu's accessible label
+resolves to the first gear. It is reproduced anyway, because the reference's own rendered output is
+what is being matched, and the practical harm is bounded and worth stating — the ids collide, which
+is invalid HTML, but the accessible NAME does not change, because every gear carries the same
+`aria-label="Note options"` and only one `<ul>` takes `.show` at a time.
+
+`aria-expanded` stays BOUND, and that is **escape 4, NOT A DIVERGENCE**, rather than inconsistency.
+The const proves Angular never updates it — the pair sits BEFORE the `1` that opens the class names,
+which is the position this bundle uses for a write-once attribute — and the element hands itself to
+Bootstrap's Dropdown plugin with `data-bs-toggle`, which rewrites that attribute on every show and
+hide. So the const is the CREATION-time value and not the rendered one. This room ships no Bootstrap
+JavaScript, so the binding is what reproduces the RENDERED attribute; copying the literal `false`
+would diverge from the reference's output on every open menu.
+
+Measured for this row, `MSM-02` and `MTS-06` together in `bootstrap-dropdown-contract.test.ts`.
+
+*The 2026-08-31 state, for the record:* ours bound `id={menuId}` / `aria-labelledby={menuId}` from
+`NotesPane`'s `` `${componentId}-note-menu-${note.id}` `` and `aria-expanded={menuOpen}` from the
+state that actually opens the menu.
 
 **reference byte 2,002,764**
 

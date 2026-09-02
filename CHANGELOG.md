@@ -45,6 +45,51 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 06:11 UTC — five audit rows re-read against the four escapes; three were stale, one is the owner's
+
+Continuing the re-reading the 06:03 entry set up. Five of the twenty-nine `DELIBERATE DIVERGENCE`
+rows are done, and the pattern is worth naming: **the document is stale in the safe direction.**
+Three of the five describe divergences that no longer exist, because they were matched during this
+session and nothing updated the row.
+
+| row | outcome |
+| --- | --- |
+| **STB-06** | **stale — both halves matched.** `StreamTabs.svelte:273`/`:283` render the bare `href="#"` of const 57, and `runItem` no longer calls `preventDefault`, so a stream-menu click runs its command AND follows the anchor — jumping the room to the top and pushing a history entry, exactly as upstream. The component's docblock already says the jump looks like a regression and is a match. |
+| **OVL-07** | **stale — matched.** `deliverQaNotice` runs the reference's two sibling blocks in order: a loop firing per question the viewer owns on that alert, then the `isPresenter` block with the identical body outside it. A member who asked three questions gets three toasts, which is what upstream does. |
+| **NTC-3** | **stale — the id half matched.** `NoteTabContent.svelte` carries the capture's literal `id="dropdownMenuNote"` and `aria-labelledby="dropdownMenuNote"`, duplicate ids and all. |
+| **MSM-03** | **mis-labelled, and backwards.** `MessageMenu.svelte:117` has carried the capture's literal `id="dropdownMenuLink"` all along; what the row describes is a repair that was PROPOSED and declined. Under *"match the dump exactly"* declining it is simply correct, and the eighteen pinned fixtures in `room-message-render.test.ts` are the evidence that the match is real rather than accidental. |
+| **MSM-02** | **holds, escape 4** — on the proof already in the row rather than on the sentence it gave. |
+
+## MSM-02, and why the same reading closes NTC-3's second half
+
+The const carries no `3,"aria-expanded"` binding marker, which makes it the element's CREATION-time
+value; the trigger hands itself to Bootstrap's Dropdown plugin with `data-bs-toggle`, which rewrites
+the attribute on every show and hide. So the reference's **rendered** attribute tracks the menu, and
+a literal `false` here would diverge from its output on every open menu. **Binding it is what
+matches.** Measured for the pair in `bootstrap-dropdown-contract.test.ts` — which is the point of
+finding it twice.
+
+## MTS-06 is the fourth outcome, and it governs four rows
+
+Checked against all four escapes and it fails each: not SECURITY; the consts are read by value, so
+not EVIDENCE ABSENT; a literal attribute is the easier thing to write, so not LANGUAGE IMPOSSIBLE;
+and `aria-selected` is reference-facing OUTPUT on the tab strip the room opens on, so not NOT-A-
+DIVERGENCE.
+
+What stops it being work an agent may simply do is that matching collides with a rule `CLAUDE.md`
+states BY NAME — *"semantic accessible HTML"* — and the collision is **total** rather than partial:
+the attribute's only consumers are the users who cannot see which tab is active, so transcribing the
+literals removes the whole of its function for the whole of its audience.
+
+**That decision governs four rows, not one** — `FP-04`, `PAM-15`, `PAM-12` and `MTS-06`. The
+reference hardcodes `aria-selected` beside an `ngClass`-driven `active` in four separate components,
+so it is a convention there rather than a slip in one. Both directions are written into the row,
+with the literals and the two tests that would have to be turned around.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
 ### 2026-09-02 06:03 UTC — the audit's `DELIBERATE DIVERGENCE` category was defined by a reason the owner ruled out
 
 ## The systemic finding, larger than any row it contains
