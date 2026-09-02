@@ -45,6 +45,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 12:49 UTC — the re-reading is complete: all twenty-nine rows, and four now need the owner
+
+Every `DELIBERATE DIVERGENCE` row in `room-surface-audit-2026-08-30.md` has been read against the
+four escapes. The category was **defined** by *"matching would reproduce a defect"*, which the owner
+ruled out, so none could be left standing on the reason it carried.
+
+## Where they landed
+
+| outcome | rows |
+| --- | --- |
+| **MATCHED — stale** (12) | NTC-3, OVL-07, STB-06, MSM-03, MSB-06's `rel` half, PAM-14, SZC-03, SP2-07, RMSG-06, FP-09, PCC-07, SV-SP-09 — the divergence no longer existed and nothing had updated the row |
+| **MATCHED — this pass** (1) | G16's 10 000 ms arming delay |
+| **HELD, escape named** (12) | MSM-02 + NTC-3's second half (4 — the const is the creation-time value, Bootstrap rewrites it); AVD-04 (4 — late enumeration); MSB-06's `Sw.sanitize` (4 — text position); SP2-06 (2 — `<pan-zoom>`'s templates are in no capture); DTP-04 / SWP-04 (4, plus the official `svelte/each` guidance); poll-09 (4, and stronger than the row claimed); EMOJI2-07 (4 — idempotent); RM-19 (4 — our five-second poll); SRCH-05 (2 — the bundle shows only the request); G16's roster unload (4); dta-05 (**1** — the 2026-08-07 escalation's exact shape) |
+| **BLOCKED** (4) | NAV-10, RNB-04, RNB-05, SCH-07 |
+| **OWNER** (4) | MTS-06, SSM-2, STV-02, PAM-13 |
+
+## The three recording rows share one root
+
+NAV-10, RNB-04 and RNB-05 are consequences of **one blocker** — the MediaMTX host — rather than
+choices about a menu. The reference selects its whole recording menu with
+`O(6, useMTX || recBotMethod ? 6 : 7)`, so server-side recording is the premise for all of it.
+Matching them in isolation gives a room that still records in the browser and cannot reach what it
+recorded — a third behaviour, in neither application.
+
+**RNB-04's receiver half is separable work and is named as such**, because *"our server does not send
+that frame"* is not an escape: `setRecPreview` (byte 1,023,752) and the gate at 2,476,206 are
+transcribable today and would be inert rather than wrong.
+
+## The four owner rows are one question asked four ways
+
+What happens when *"match the dump files exactly"* collides with a rule `CLAUDE.md` states **by
+name** — which is the argument for putting it once rather than four times.
+
+- **MTS-06** — transcribing hardcoded `aria-selected` removes the attribute's whole function for its
+  whole audience. Governs **FP-04, PAM-15 and PAM-12** too: four components, so a convention in the
+  reference rather than a slip in one.
+- **SSM-2** — the same collision in degree: the only handler lands on an `aria-hidden` node, so the
+  control does not exist *at all* for assistive technology.
+- **STV-02** — escape 4 does **not** apply, on the row's own measurement: *"the viewer sees two
+  stalls"*. Matching deliberately doubles media-plane teardowns — 2N with N streams live, because
+  `preferenceChanged` is on the shared bus — against *"maximized for the highest performance ALWAYS"*.
+- **PAM-13** — no escape; work, pending one answer. `fc` was traced to all three sites and is a
+  **tri-state**: `undefined` at 2,122,856, non-empty at 2,123,302, and **empty at 2,128,421 — the
+  modal's own reset**. So the misfire is the state the modal is left in after *every* reset, not a
+  rare edge. What decides whether it is safe to build is what this room's uploader does with zero
+  files; an empty alert is a row in a fintech room a presenter did not mean to post.
+
+## SCH-07 — the one row I judge to be work and did not build
+
+The reason is **tooling, not judgement**. `CLAUDE.md` makes the Svelte MCP mandatory on every task
+touching a `.svelte` file, and it is not connected in this session; splitting a pane into a new
+dialog is exactly the class of change that rule exists for. The full transcription is specified in
+the row — modal ids, classes, title and dismiss button, from consts already quoted — so it is one
+sitting's work with the tooling present.
+
+Its first argument was **circular in the same way `SZC-03`'s was**: *"a pane embedded in
+`PostAlertModal`'s body cannot carry a second modal's dialog, because there is no second modal"* — the
+absence of the second modal IS the divergence. Its second argument is a real question about which
+Bootstrap generation styles a scoped table, and that decides **how** the chrome is transcribed, not
+whether the dialog exists. Worth noting: `ScheduledAlerts.svelte:218` already renders const 74's
+`data-bs-target="#scheduledAlertsModal"`, aimed at a dialog this room does not have.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
 ### 2026-09-02 12:36 UTC — five more rows re-read: two were stale, three had reasons that did not survive
 
 Twenty-four of the twenty-nine `DELIBERATE DIVERGENCE` rows are re-read. Every one of the five below
