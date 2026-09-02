@@ -45,6 +45,78 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 12:29 UTC — G16's arming delay is matched: the room now ignores its first ten seconds
+
+Nineteen of the twenty-nine `DELIBERATE DIVERGENCE` rows are re-read. This one carries real code.
+
+## G16 is compound, and its own verifier said so
+
+*"Only ONE of its two limbs survives; it must be split before it is acted on"* — 2026-08-30. Split
+now, and they went opposite ways.
+
+**MATCHED — the 10 000 ms arming delay.** `appVisibilityChange` puts the whole `addEventListener`
+inside `setTimeout(…, 1e4)` at byte 2,511,416, so for ten seconds after the room loads there is **no
+listener at all**: a flip in that window is not observed, not queued, and not replayed on arrival.
+
+The reason recorded against it was that the delay protects a socket handshake still in flight, that
+our five-second poll is idempotent so nothing needs protecting, and that arming immediately *"means
+a member who tabs away during the first ten seconds is actually noticed"*. Every clause is true and
+none is one of the four escapes. **Being better than the reference is still a divergence.**
+
+Implemented as a **clock, not a timer** — `VISIBILITY_ARMING_MS`, an `armedAt` stamp taken at
+construction, one gate at the top of `visibilityChanged`. No handle to leak, nothing to `unref` on
+the server where this factory is also constructed during SSR, identical behaviour. The
+`<svelte:document>` binding stays declarative: a late `addEventListener` would put back the
+hand-managed listener this file's own contract asserts is gone, to buy nothing.
+
+**Two things in that reference body are deliberately NOT reproduced, and neither is a divergence.**
+`clearInterval(this.visibilityChangeTimer)` on the show branch clears a `setTimeout` handle with the
+wrong clearer, on a timeout that has already fired. And the disarm branch hands `removeEventListener`
+a **fresh arrow function**, which matches no registered listener. Reproducing a call that does
+nothing is reproducing nothing.
+
+**HELD — `unloadRoster()` on hide, escape 4**, and its reason is now stated properly: matching the
+CODE would produce a DIFFERENT rendered result. Upstream the roster is a separate fetch, absent while
+hidden and invisibly reloaded on return; here it arrives with the page load, so unloading would empty
+the sidebar and repaint it on **every** return to the tab. Asserted as an absence *with* the reason,
+so "completing G16" cannot mean adding it back silently.
+
+## Three more re-read, all escape 4
+
+- **DTP-04 / SWP-04** — a track function is reconciliation, not output: the rendered markup is
+  byte-identical either way, and neither pane animates its rows. The official `svelte/each` doc
+  settles it: *"strings and numbers are recommended since they allow identity to persist when the
+  objects themselves change"* — exactly what the months `<select>`'s refetch does to them.
+- **poll-09** — and the evidence is **stronger than the row claimed**. All 18 `savedPolls`
+  occurrences in the bundle were read at their offsets: one READ, one `deleteKey`, thirteen an
+  in-memory field of the same name, three an HTML id. **There is no `localstorage.set("savedPolls", …)`
+  anywhere**, so upstream `loadStoredPolls()` always returns `[]` and the only path that runs is the
+  `else` — which reads the SERVER's copy, which is what this room does. The branch is dead at both
+  ends.
+- **PCC-07** — stale, MATCHED. `PrivateChatComposer` binds `onkeyup`, the only event const 55 binds.
+  The old refusal was right about the mechanism and wrong about the consequence: `preventDefault` on
+  a keyup does run after the newline is inserted, but nothing is lost — `chat-composer-enter.ts` took
+  a binding-mode parameter and the three-way branch survives on either event. Matching **fixed a real
+  defect**: Shift+Enter was swallowing a line break the reference keeps.
+
+## The ceiling, argued rather than raised quietly
+
+`refresh.svelte.ts` went **142 → 157**, argued at the entry as the ratchet requires — the first raise
+on this file that buys *behaviour* rather than prose. Half of what the 2026-08-30 raise recorded is
+now code. The long form of the argument moved to `visibility-change-contract.test.ts` where it is
+asserted; the module carries the short form. Same split `ModalHost.svelte` took for USM-18.
+
+**Verification.** Three negative controls seen RED: the gate removed, the window shortened to five
+seconds, and an `unloadRoster` call added. `pnpm run gate` exit 0 in `apps/room`.
+
+**Tooling, stated rather than implied:** the Svelte MCP is not connected in this session, so steps 1
+and 3 of the mandatory workflow could not be run for `refresh.svelte.ts`. The `svelte/each` and
+`svelte/best-practices` passages quoted are from documentation already read and quoted in these
+files. `svelte-check` is 0 errors / 0 warnings and the gate is green, but the autofixer pass was not
+performed.
+
+---
+
 ### 2026-09-02 12:14 UTC — six more audit rows re-read; five were stale, one refusal overturned by measurement
 
 Fourteen of the twenty-nine `DELIBERATE DIVERGENCE` rows are now re-read against the four escapes.

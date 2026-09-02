@@ -2063,7 +2063,13 @@ this.simUserCount>5e3&&(this.simUserCount=5e3),this.simUserCount<=0&&(this.simUs
 
 ### G16 — `visibilitychange` is armed immediately, not after the reference's 10 000 ms delay, and it does not unload/reload the roster
 
-**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 12:55 UTC, which is what the row asked for.** The row's own closing observation is the point: the SIBLING refusal (the 500 ms `alwaysShowRoster` timer) is recorded in `always-show-roster-contract.test.ts` and this one was not, which is how a deliberate divergence reads as an oversight to the next comparison. Both halves are now in `refresh.svelte.ts`. The 10 000 ms delay protects a socket handshake still in flight; this room's equivalent is `invalidateAll()` and an idempotent five-second poll, neither of which a mid-load visibility flip can corrupt — and arming immediately means a member who tabs away in the first ten seconds is actually noticed. `unloadRoster()` saves a subscription upstream because the roster is a separate fetch; here it arrives with the page load, so unloading it would buy an empty sidebar for one frame on every return to the tab.
+**HALF BUILT 2026-09-02 — the arming delay is MATCHED; the roster unload holds under escape 4. Recorded as `DELIBERATE DIVERGENCE 2026-08-30 12:55 UTC` until then, and the row's verifier had already said the claim is COMPOUND and must be split before it is acted on — which is what happened.**
+
+**The 10 000 ms arming delay — MATCHED.** The refusal was that the delay *"protects a socket handshake still in flight"*, that this room's five-second poll is idempotent so nothing needs protecting, and that arming immediately *"means a member who tabs away in the first ten seconds is actually noticed"*. Every clause is true and none is an escape: **being better than the reference is still a divergence.** `refresh.svelte.ts` now gates `visibilityChanged` on `Date.now() - armedAt < VISIBILITY_ARMING_MS`, so a flip inside the window is not observed, not queued and not replayed — which is what upstream's absent listener does. A clock rather than a timer because there is no handle to leak and nothing to `unref` on the server, where this factory is also constructed during SSR; and the `<svelte:document>` binding stays declarative, because a late `addEventListener` would put back the hand-managed listener this file's own contract asserts is gone.
+
+**Two things in that body are deliberately NOT reproduced, and neither is a divergence.** `clearInterval(this.visibilityChangeTimer)` on the show branch clears a `setTimeout` handle with the wrong clearer, on a timeout that has already fired — a no-op read either way. And the disarm branch hands `removeEventListener` a FRESH arrow function, which matches no registered listener and removes nothing. Reproducing a call that does nothing is reproducing nothing.
+
+**`unloadRoster()` / `showSidebar && loadRoster()` — escape 4, NOT A DIVERGENCE, because matching the CODE would produce a DIFFERENT rendered result.** Upstream the roster is a separate fetch: it is simply absent while hidden and its reload on return is invisible. Here it arrives with the page load, so unloading it would empty the sidebar and repaint it on **every** return to the tab — a flash the reference does not have. The divergence is in the surrounding data flow, and not unloading is what keeps the output matched. Asserted as an absence, with the reason, so that "completing G16" cannot mean adding it back silently.
 
 **low** · `divergence` · reference byte **2,511,416**
 
@@ -4451,6 +4457,29 @@ application never wrote one.
 Building it would mean reading a key nothing has ever written, and the `deleteSavedPoll` shape
 differs besides: by row id here, by array index plus a full JSON resend there.
 
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the evidence is stronger than the row
+claimed: the branch is dead UPSTREAM TOO.**
+
+The 2026-08-31 argument was that *this* application never wrote the key. True, and not the strongest
+thing available. All **18** occurrences of `savedPolls` in the 2,891,205-byte bundle were read at
+their offsets, and not one of them is a write:
+
+| what | where |
+| --- | --- |
+| the READ | `JSON.parse(localstorage.get("savedPolls",[]))` @ 2,111,077 |
+| the DELETE | `localstorage.deleteKey("savedPolls")` @ 2,111,334 |
+| an in-memory field named `this.savedPolls` — a different thing | 2,103,639 · 2,105,481 · 2,105,554 · 2,105,720 · 2,111,281 · 2,111,491 · 2,111,519 · 2,111,562 · 2,111,680 · 2,111,720 · 2,111,830 · 2,112,253 · 2,112,276 |
+| an HTML `id` / `aria-controls` / `data-bs-target` on the tab | 2,113,254 · 2,113,298 · 2,114,480 |
+
+**There is no `localstorage.set("savedPolls", …)` anywhere in the bundle.** So in the shipped
+reference `loadStoredPolls()` always returns `[]`, `e.length` is always 0, and the only path that
+ever runs is the `else` — which reads `sessData.savedSessionPolls`, the SERVER's copy. That is
+precisely what this room does.
+
+So the migration is not a behaviour this room lacks; it is a branch the reference cannot reach
+either, and the absence of a writer across the whole bundle is the proof escape 4 asks for.
+Transcribing it would add a read of a key nobody writes, at either end.
+
 **low** · `missing-behaviour` · reference byte **2,111,310**
 
 ```
@@ -6645,7 +6674,7 @@ x("keyup",…)("paste",function(o){return D(e),E(g(2).onImagePaste(o))})("focus"
 
 ### PCC-07 — The capture binds `keyup`; every composer in this room binds `keydown`
 
-**DELIBERATE DIVERGENCE 2026-08-31 02:15 UTC.** Const 55's binding section is `3,"keyup","paste","focus"` and it is not transcribed, for a reason this repository has already written down twice: `CarouselDialog.svelte:586-587` records `onkeydown` "rather than `onkeyup` so the Enter that confirms cannot also submit", and `AlertChatArea.svelte:985` binds `onkeydown` to a handler decoded from a `keyup` composer. Recorded here so the third reader does not file it as a gap.
+**BUILT 2026-09-02 — MATCHED. Recorded as `DELIBERATE DIVERGENCE 2026-08-31 02:15 UTC` until then.** Const 55's binding section is `3,"keyup","paste","focus"` and it is not transcribed, for a reason this repository has already written down twice: `CarouselDialog.svelte:586-587` records `onkeydown` "rather than `onkeyup` so the Enter that confirms cannot also submit", and `AlertChatArea.svelte:985` binds `onkeydown` to a handler decoded from a `keyup` composer. Recorded here so the third reader does not file it as a gap.
 
 **low** · `divergence` · reference byte **2,214,572** (const 55, decoded by value)
 
@@ -6653,7 +6682,15 @@ x("keyup",…)("paste",function(o){return D(e),E(g(2).onImagePaste(o))})("focus"
 3,"keyup","paste","focus"
 ```
 
-**Ours:** `onkeydown`. The measurement that settles it: `preventDefault()` on `keyup` runs after the browser has already inserted the newline, so PCC-01's swallow arm — the reference's own `i.val(i.val())` — could not swallow anything on the event the reference binds. Matching the event would reproduce a defect and lose the branch, which is the definition this document gives the disposition.
+**RE-READ 2026-09-02 — MATCHED, and the refusal's own measurement turned out to be the way IN rather than the reason against.** `PrivateChatComposer.svelte:215` binds `onkeyup`, which is the only event const 55 binds.
+
+The 2026-08-31 reasoning was right about the mechanism and wrong about what followed from it. `preventDefault()` on a `keyup` does run after the browser has inserted the newline — so the conclusion drawn was that matching the event *"would reproduce a defect and lose the branch"*. It loses nothing. What was missing was an input: `chat-composer-enter.ts` now takes a `ComposerEnterBinding` of `'keydown-and-keyup' | 'keyup-only'`, and both `composerEnterAction` and `composerEnterPrevents` read it, so the three-way branch survives on either event with the arms that can no longer fire on a keyup answered honestly rather than pretended.
+
+**What matching actually fixed, which is the point:** Shift+Enter in the private composer was swallowing a line break the reference KEEPS. Ours killed it on the way down; upstream binds `keyup`, where the newline is already in the field. The other two arms are unchanged in effect — plain Enter's newline is `.trim()`ed away by the send at byte 2,208,062, and Alt+Enter's explicit `+ "\n"` lands on top of the browser's, which is upstream's own double and is now reproduced.
+
+**And the row's premise was wrong twice over.** *"Every composer in this room binds `keydown`"* — only TWO of the six bind `keydown.enter` at all, and they are the two the reference also binds `keydown` on. The two cited precedents (`CarouselDialog.svelte`, `AlertChatArea.svelte`) are those two; neither governs this composer.
+
+*The 2026-08-31 state, for the record:* `onkeydown`, refused on the reasoning above.
 
 *This row was ADDED after this document was committed — a v4 re-read on 2026-08-31, not part of the two-verifier pass the tables above describe, and therefore deliberately outside them.*
 
@@ -11456,6 +11493,32 @@ choice.**
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
 table above.
 
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the official documentation names this choice
+outright.**
+
+The disposition line said *"keying by identity here would reproduce a teardown the room does not
+need"*, which is a consequence rather than a reason and reads as the retired argument. The escape is
+that a track function is not reference-facing OUTPUT: **the rendered markup is byte-identical either
+way.** What differs is the reconciliation strategy — which DOM nodes are reused across a refetch —
+and the row's own measurement is that the two are equivalent within a render pass and diverge only
+in whether nodes are torn down. Neither pane puts a Svelte transition or an `animate:` on its rows,
+checked, so there is not even an animation through which the choice becomes visible.
+
+And the official `svelte/each` documentation, read for this re-reading rather than recalled, states
+the rule in these words:
+
+> The key can be any object, but strings and numbers are recommended since they allow identity to
+> persist when the objects themselves change.
+
+That is exactly this case — the log comes back as fresh objects behind the months `<select>`, and
+`row.id` is what lets identity persist through it. So matching the reference's track function would
+mean writing the thing the framework's own guidance advises against, to produce identical markup.
+
+Kept distinct from `each-key-contract.test.ts`, which is the opposite case and looks alike: that
+file REMOVED keys from `MessageBody`'s segments because a parsed segment **has no identity** and an
+index key would have claimed a safety it did not have. An alert row has `_id` upstream and `id`
+here, so the key is a real identity rather than a stand-in for one.
+
 `ht(32,Pwe,23,17,"tr",null,Li)` — `ɵɵrepeaterCreate`, whose seventh argument is the track function.
 `Li` is `function Li(t,n){return n}` at **100,136**: it takes `(index, item)` and returns the ITEM,
 so the reference tracks by object identity. `Li=` matches zero times in the bundle and
@@ -11659,6 +11722,12 @@ apps/room/src/lib/swing-alerts.ts:210-221.
 **DELIBERATE DIVERGENCE — read and measured 2026-08-31.** The swing half of `DTP-04`: the same
 `ht(32,_we,23,17,"tr",null,Li)` shape, the same `function Li(t,n){return n}` at **100,136**, the same
 refetch behaviour behind the months `<select>`.
+
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, on `DTP-04`'s reading and for the same reasons:
+the rendered markup is byte-identical either way, a track function is reconciliation rather than
+output, neither pane animates its rows, and the official `svelte/each` documentation recommends
+strings and numbers as keys precisely so that *"identity [can] persist when the objects themselves
+change"* — which is what the months `<select>`'s refetch does to them.**
 
 **This row was ADDED after this document was committed**, by the batch that read the two alert panes
 and the player; it is not part of the two-verifier pass and is deliberately outside the surfaces
