@@ -36,6 +36,28 @@ import {
  * "already deleted" is a 404 and not a 500.
  */
 
+/*
+  IDEMPOTENT, and it is a FLAKE FIX rather than a style preference — measured 2026-09-02.
+
+  A bare `.insert` here failed the whole file with `SqliteError: UNIQUE constraint failed:
+  users.email` on roughly one full-suite run in three, while passing every time the file was run
+  alone. The database is per-PROCESS (`vitest.setup.ts` puts it at `tmpdir()/ptr-test-db-${pid}`),
+  so it is shared by every file a worker happens to serve and by anything reaching this module body
+  more than once in that process — which is what the comment below already warns about and what
+  these three emails were made unique to survive. Unique names stop a collision BETWEEN files; they
+  do not stop a second seed of the same row.
+
+  Reproduced deterministically before fixing, by calling `makeUser` twice with one email: red on
+  the bare insert, green with the conflict clause.
+
+  `stream-names.test.ts` had already reached this conclusion and carries the same
+  `onConflictDoUpdate` on `users.email`; this file is the one that did not get it. The `set` writes
+  back the value it would have inserted, so the row is identical either way and `returning` yields
+  the id on both paths.
+
+  It is not this test's subject: the file exists to prove that deleting a trade alert takes its
+  mirrored feed message with it. A seed that can fail is noise in front of that.
+*/
 function makeUser(email: string): number {
   return db
     .insert(users)
@@ -46,6 +68,7 @@ function makeUser(email: string): number {
       passwordHash: 'scrypt$00$00',
       createdAt: new Date()
     })
+    .onConflictDoUpdate({ target: users.email, set: { displayName: 'Mirror Delete Probe' } })
     .returning()
     .get().id;
 }

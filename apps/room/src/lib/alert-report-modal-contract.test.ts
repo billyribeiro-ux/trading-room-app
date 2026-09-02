@@ -428,7 +428,31 @@ describe('SRCH-05 — the truncation notice is ours, and stays', () => {
  * `.report-header-container`, `.report-body`, `#search-select-addon`, `.form-select`,
  * `.failed-reason`, `.sent-time` and `#pie-container` — every one of them an element the refusal
  * above means does not exist here, so transcribing them would be eleven rules matching zero
- * elements. The other two are `.modal-dialog`, and both already hold:
+ * elements.
+ *
+ * RE-CHALLENGED 2026-09-02 under "match the dump files exactly", and it SURVIVES — recorded here
+ * rather than dropped, because a refusal nobody re-tests is the shape this repository keeps finding
+ * wrong. Two things were put to it and neither carried:
+ *
+ *   The `stars-container` precedent. `lib/styles/captured-runtime-components.css` does ship
+ *   roster-scoped rules ahead of their producer, so orphan captured CSS is said to be established
+ *   practice here. It is not a precedent for this: that file is GENERATED WHOLESALE from a pinned
+ *   capture (`css/complete-app-styles.css`, SHA-256 in its own header, `pnpm css:sync-captured`),
+ *   so its orphans are a property of the generator rather than a choice anybody made rule by rule.
+ *   These eleven are not in that capture at all — they are in the JS bundle's `styles:[…]` array —
+ *   so porting them means hand-authoring eleven orphan rules into `app.css`, which is a different
+ *   act with a different rule over it: CLAUDE.md's "nothing exists without a consumer".
+ *
+ *   "A shipped stylesheet is reference-facing output." It is, when something renders. These eleven
+ *   style elements of the report LIST, and the list is refused on EVIDENCE ABSENT — no delivery
+ *   table, no writer, no sender, re-measured with the schema sweep below. CSS for markup that
+ *   cannot exist is not output; it is the decoration of a feature, and it would make the refusal
+ *   look decided in the direction of "nearly built".
+ *
+ * The premise-expiry assertions below are what make this safe to leave: the day a delivery record
+ * appears, the six rows come back and these eleven rules come with them.
+ *
+ * The other two are `.modal-dialog`, and both already hold:
  * `.modal-dialog{width:100%;max-width:800px}` is `app.css:1524`, and `width:auto` on a block box
  * with no padding or border resolves to the same used width as `width:100%`; and
  * `.modal-dialog{overflow-y:initial!important}` restates that property's own initial value, which

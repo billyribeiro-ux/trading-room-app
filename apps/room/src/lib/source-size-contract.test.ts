@@ -2975,7 +2975,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       recreated where upstream reuses it. Nothing else here would notice, so
       `roster-identity-contract.test.ts` pins both ends and this says why.
     */
-    max: 888,
+    /*
+      888 -> 939, 2026-09-02, for RS-04 and RS-03 — the `New` badge and the membership star.
+
+      THIS RAIL WAS THE ONLY ONE OF THREE SURFACES NOT DRAWING THEM. `ModalHost.svelte` draws Trial,
+      New and the star; `RoomMessage.svelte` draws all three; this drew Trial and stopped. So a
+      presenter saw "New" on a member's info card and in the message log and not in the list
+      between them, and a room that switched the membership star OFF still showed it here — this
+      rail was the third star in the room and the only one ignoring the owner's setting.
+
+      Fifty-one lines, of which eleven are markup and the rest are the two gates' byte citations,
+      read at 2,034,694 (both gates), 2,033,362 (both slot bodies) and 2,038,387 (consts 10, 11, 20,
+      21). Two arguments that already live elsewhere are POINTED AT rather than repeated: why the
+      third term of the `New` gate is deliberately absent (`moderation-badge-contract.test.ts`) and
+      why a star gate is written over an absent `years` supply (`ModalHost.svelte:2313`). That is
+      what kept this to fifty-one instead of a hundred.
+
+      Six mount tests, and each of the three gate TERMS has its own negative control: dropping
+      `isPresenter` fails only the member test, dropping `disableStarYears` only the owner test,
+      dropping `isP` only the presenter-row test.
+
+      It goes DOWN when the roster row's badge cluster and the per-row menu find components of their
+      own, which is the next real extraction here.
+    */
+    max: 939,
     why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
@@ -3925,7 +3948,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       every time. `RecordingPreviewCard` left for `RoomOverlays`: it is not a modal, and this host
       has neither `media` nor `prefs`, so it could not have fed the card the state its gate reads.
     */
-    max: 6066,
+    /*
+      6,066 -> 6,038, 2026-09-01, and it is a LOWERING that came out of a one-line divergence fix.
+
+      The reference emits a user's `pic` verbatim (byte 2,095,604, a plain `||`); this file rewrote
+      the stored URL's `s` parameter through a local `gravatarAtSize`. Deleting that rewrite left its
+      helper `isGravatar` with a single caller and a fifteen-line argument — why "is it a gravatar"
+      is the only "did they set one" signal this room has — sitting inside six thousand lines where
+      no test could reach it without a mount.
+
+      It is now `#lib/avatar-source.ts` with four cases, every input a value `users.avatar_url`
+      genuinely holds. A pure predicate, the whole of one concept, and testable directly: the
+      extraction this entry asks for rather than the raise the citation would otherwise have needed.
+    */
+    max: 6038,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -5039,7 +5075,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this climbs again, the question is whether a field arrived or whether an argument is being
       written twice.
     */
-    max: 204,
+    /*
+      204 -> 232, 2026-09-01, for UIM-09's `location` — and every one of the twenty-eight lines is
+      the record of a REFUSAL THAT WAS FALSE, which is what makes it worth the ceiling.
+
+      Two files stated that `location` *"needs a geo-IP service this repository does not have"* and
+      called it an owner decision about an external dependency. The reference's geo lookup is
+      CLIENT-side (bundle 1,145,213), this room has run the same lookup since it was built —
+      `events.svelte.ts` POSTs to `api/roster/location`, which calls `setRosterLocation` — and
+      `RoomSidebar.svelte:870` has been rendering the answer on screen the whole time. The value was
+      on the very object this mapping reads; the interface omitted the field.
+
+      The mapping itself is one line. The other twenty-seven are the corrected reason and the
+      `||`-not-`??` argument, and both are load-bearing: a reader who trusts the old refusal never
+      looks, and `??` would push the roster's own empty string into a cell that renders `n/a` for
+      absent, drawing a blank where "we do not know" belongs.
+
+      It goes DOWN when the five permission checkboxes and their history find a module of their own,
+      which is the next real extraction here. It does not go up again for prose.
+    */
+    max: 232,
     why: 'how a roster row, a message and a managed-chat row each become the modal’s target'
   },
   {

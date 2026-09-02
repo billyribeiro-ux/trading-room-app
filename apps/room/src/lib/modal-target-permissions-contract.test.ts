@@ -61,6 +61,45 @@ const row = (over: Partial<Parameters<typeof modalTargetFromRosterRow>[0]> = {})
     ...over
   });
 
+describe("the modal's `location` cell, and the empty string that is not a place", () => {
+  /*
+    UIM-09's `location`, wired 2026-09-01 after the recorded refusal was RE-MEASURED and did not
+    survive. Two files said it *"needs a geo-IP service this repository does not have"*; the
+    reference's own geo lookup is client-side (bundle 1,145,213), this room already runs it
+    (`events.svelte.ts` → `api/roster/location` → `setRosterLocation`), and `RoomSidebar.svelte:870`
+    has been rendering the answer. The field was simply missing from `RosterRowForTarget`.
+
+    Values, not source text: this asserts what the mapping RETURNS, so a refactor that keeps the
+    behaviour keeps the test.
+  */
+  it('carries a real city line through to the cell', () => {
+    expect(row({ locStr: 'Waterbury, CT, US' }).location).toBe('Waterbury, CT, US');
+  });
+
+  it('turns the EMPTY STRING into absent, because the cell renders `n/a` for absent', () => {
+    /*
+      THE ASSERTION WORTH HAVING, and the reason the mapping is `||` rather than `??`.
+
+      `patchRosterUser` clears this field to `''`, never to null — so `''` is a value the roster
+      genuinely produces. `ModalHost.svelte:2324` renders `{targetUser.location ?? 'n/a'}`, and `??`
+      passes an empty string straight through: the cell would draw BLANK where "we do not know"
+      belongs, which reads as a fact rather than a gap. `??` in the mapping would do exactly that.
+    */
+    expect(row({ locStr: '' }).location).toBeUndefined();
+    expect(row({ locStr: null }).location).toBeUndefined();
+    expect(row({}).location).toBeUndefined();
+  });
+
+  it("a member's redacted row stays empty rather than borrowing somebody's city", () => {
+    /*
+      `locStr` is redacted to a member at the hub, together with `email` — `room-events.ts` argues
+      the pair. So this mapping must never invent a value for a row that arrived without one, which
+      is the same reason the five permission checkboxes default false rather than true.
+    */
+    expect(row({ locStr: undefined, isP: false }).location).toBeUndefined();
+  });
+});
+
 describe('the Permissions the user-info modal draws', () => {
   it('is exercised at all — the floor', () => {
     expect(_exhaustive).toBe(true);

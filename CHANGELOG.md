@@ -45,6 +45,116 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 00:45 UTC — five re-measured refusals, three of which were wrong, and a gate that found this repository disagreeing with itself
+
+The re-triage pass over the audit's non-code dispositions, under the standing instruction to match
+the capture. Five rows were put back against the bundle. **Two were built, one escape reason was
+replaced with a stronger one, one measurement was corrected, and one refusal survived a challenge I
+was told it would lose.** Every reference byte below was read in this session, not quoted from a row.
+
+## UIM-16 — the avatar `src` was rewritten, and the reference emits it verbatim
+
+`z("src", o.user.pic || "…/avatar/" + o.user.emailHash + "?d=mm&s=80", Mt)` at byte 2,095,604: a
+plain `||`. This room ran `gravatarAtSize(targetUser.pic, 80)`, which parsed the stored URL and
+rewrote its `s` parameter — so for the gravatar it actually stores (`?d=mm&s=50`, `connection.ts`)
+the two emitted DIFFERENT `src` strings for one input.
+
+The refutation that had kept this open was right about its own premise and stopped one step short:
+`pic` is `text('avatar_url').notNull()`, so the fallback arm is indeed dead — but the divergence is
+in the arm that always runs. The same file already writes the `||` form twice, at s=30.
+
+**Not a raise but a LOWERING**, which is the ratchet's other half. Deleting the rewrite left
+`isGravatar` with one caller and a fifteen-line argument sitting inside six thousand lines where no
+test could reach it without a mount. It is now `#lib/avatar-source.ts` with four cases, every input
+a value `users.avatar_url` genuinely holds — including `/avatar.svg`, the column default, which is
+why the `try`/`catch` is the answer for a real value rather than padding. **ModalHost.svelte
+6,066 → 6,038.**
+
+## UIM-09 `location` — the refusal named a dependency this repository already has
+
+Two files recorded that `location` *"needs a geo-IP service this repository does not have"*. It does
+not. The reference's own geo lookup is CLIENT-side (byte 1,145,213) and ships on its login frame at
+993,662; this room does the same thing at `events.svelte.ts`, POSTing to `api/roster/location` →
+`setRosterLocation`, and `RoomSidebar.svelte` has been RENDERING the answer. The value was on the
+very object the mapping reads and `RosterRowForTarget` omitted the field.
+
+`|| undefined`, not `??`, and the negative control is the reason: `patchRosterUser` clears this to
+the EMPTY STRING, and the cell renders `{targetUser.location ?? 'n/a'}` — so `??` would push `''`
+through and draw a BLANK where "we do not know" belongs. Both corrected paragraphs are at their code.
+
+## RS-04 and RS-03 — this rail was the only one of three surfaces not drawing them
+
+`ModalHost.svelte` draws Trial, New and the membership star; `RoomMessage.svelte` draws all three;
+`RoomSidebar.svelte` drew Trial and stopped. So a presenter saw "New" on a member's info card and in
+the message log and not in the list between them, and a room that switched the membership star OFF
+still showed it here — this rail was the third star in the room and the only one ignoring the
+owner's setting. Gates at 2,034,694, slot bodies at 2,033,362, consts 10/11/20/21 at 2,038,387.
+
+`isNewIndicatorOn` is deliberately left off, on this repository's own recorded reasoning: `isNew` has
+no producer and a gate with nothing to gate is not a consumer.
+
+**The interesting part is what stopped it.** `roster-identity-contract.test.ts` asserted those four
+class names must be ABSENT, *"so that building them without the supply fails here"* — and it went
+red immediately. What it exposed is that **this repository held two answers to one question**: two
+surfaces rendered by an argued reason, the third forbade by test. Resolved toward the capture and
+the majority, and the assertion is NOT deleted — it now refuses the UNGATED spellings, because the
+real risk was never markup with no supply. It is markup with no gate: an unconditional star
+discloses tenure the owner switched off, and an unconditional `New` tells a member a moderation fact
+about another member. Six mount tests, and **each of the three gate terms has its own negative
+control** — dropping `isPresenter` fails only the member test, `disableStarYears` only the owner
+test, `isP` only the presenter-row test.
+
+## RS-06 — the refusal stands and its REASON was the weaker of two
+
+The row blocked "Recording" on *"there is no archive service here"*. True, and CONTINGENT — it
+expires the day one exists, and says nothing about whether the client half is separable, which is
+the question this repository has now been wrong about three times.
+
+The escape that actually holds is SECURITY, already named by hand here: the URL's last segment is
+`sesionToken`, this room's session is an httpOnly cookie, and
+`session-cookie-httponly-contract.test.ts` fails any client file naming one. `alerts-pane.ts`
+already refuses the identical `tok=` clause on the detach-chat popout. The item stays inert for a
+reason an archive service would not change.
+
+## RTE-05 — the row's own measurement was scoped to the wrong file
+
+It read *"over `main.d1d09071be31f1ba.js`, `note-color` has zero occurrences"*. Correct about the JS
+bundle and wrong about this repository: the SIBLING capture in the same pinned directory,
+`styles.ee2a710065b60389.css`, holds **49** `note-color` and **22** `note-palette`, and gives the
+palette's whole class skeleton. A sweep of one capture file was reported as a sweep of the evidence.
+
+The refusal survives on the narrower and correct ground: what decides the control is its VALUES —
+the swatch colours and three label strings — and those are in summernote's own JavaScript, which is
+in neither capture. Recorded so whoever revisits knows one capture run closes the row.
+
+## ASR-1 — challenged, and it SURVIVES
+
+Put to me as matchable on the ground that `captured-runtime-components.css` already ships orphan
+captured CSS. It is not a precedent: that file is GENERATED WHOLESALE from a pinned capture, so its
+orphans are a property of the generator, not a rule-by-rule choice — and these eleven are not in
+that capture at all. Porting them means hand-authoring eleven orphan rules into `app.css` for a
+report list refused on EVIDENCE ABSENT. The re-challenge and both counter-arguments are recorded at
+the test, because a refusal nobody re-tests is the shape this repository keeps finding wrong.
+
+## A CI flake, reproduced and fixed
+
+`trade-alerts-mirror-delete.test.ts` failed the whole file with `UNIQUE constraint failed:
+users.email` on roughly **one full-suite run in three**, and passed every time it ran alone. The
+test database is per-PROCESS, so unique emails stop a collision between files and not a second seed
+of the same row. Reproduced deterministically by seeding one email twice — red on the bare insert,
+green with the conflict clause — and fixed with the `onConflictDoUpdate` that `stream-names.test.ts`
+already carries for the same reason. **Four consecutive full-suite runs green afterwards.**
+
+**Runtime impact.** A presenter's user-info modal shows the member's city instead of `n/a`, and the
+modal avatar requests the URL the room stored rather than a rewritten one. The roster now shows the
+`New` badge and the membership star on the same terms as the other two surfaces, and obeys the
+owner's `disableStarYears` switch, which it previously ignored.
+
+**Verified:** room gate exit 0 at `67a6eca` — 341 files, 6,139 passed, 1 skipped. Negative controls seen red for the location mapping
+(`??` for `||`), all three roster gate terms, the ungated-spelling refusal, and the seed flake.
+`svelte-check` 0 errors 0 warnings across 1,635 files; `svelte-autofixer` clean on the badge markup.
+Nothing in the controller was touched, so its gate was not run.
+
 ### 2026-09-01 23:51 UTC — the gate could not see a whole file, and the defect it exists for was in there
 
 `session-reload-config` raised a confirm, ran a LOCAL `deps.reload()` — a refetch of the calling
