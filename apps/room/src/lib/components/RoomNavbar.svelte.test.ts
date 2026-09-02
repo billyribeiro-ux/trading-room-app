@@ -474,7 +474,16 @@ describe('G05, G06 and G07 — the three new screenshare entries', () => {
       (li) => (li.textContent ?? '').includes('Reopen Screenshare Preview')
     );
     expect(entry, 'the entry is missing while sharing').not.toBeUndefined();
-    entry?.click();
+    /*
+      Clicked on the ANCHOR and not the `<li>`, and that is the assertion rather than an
+      implementation detail. `SSM-2` was matched on 2026-09-02: `c4e` binds this row's click to
+      `a` const 163, so upstream the pointer surface is the anchor's text and the rest of the row is
+      dead. Clicking the `<li>` here used to work and no longer does, which is the point — this case
+      went red on the change and was updated to the reference's hit target rather than around it.
+
+      The keyboard path is still on the `<li>`; `screen-share-menu-contract.test.ts` holds that pair.
+    */
+    entry?.querySelector<HTMLElement>('a')?.click();
     flushSync();
     expect(calls.reopenpreview).toBe(1);
   });
@@ -505,8 +514,10 @@ describe('G05, G06 and G07 — the three new screenshare entries', () => {
       ],
       onstoplocalscreen: (id: string) => stopped.push(id)
     });
+    /* The ANCHOR, per `SSM-2` — `d4e` binds the per-screen row's click to const 163. */
     [...root.querySelectorAll<HTMLElement>('.screen-options-start-screen li')]
       .find((li) => (li.textContent ?? '').includes('Screen 2'))
+      ?.querySelector<HTMLElement>('a')
       ?.click();
     flushSync();
     expect(stopped).toEqual(['p2']);

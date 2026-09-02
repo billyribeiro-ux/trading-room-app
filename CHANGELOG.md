@@ -45,6 +45,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 15:23 UTC — SSM-2 matched: the six menu clicks split three and three
+
+## The refusal rested on a false dichotomy
+
+Two verdicts were written on this row before the right one. The contract test said moving `run` onto
+the anchor *"would put activation on the node marked hidden from assistive technology, and
+`activateOnKey` — the keyboard half — is bound to the `<li>`"*, and concluded the two must travel
+together. My re-reading this morning inherited that and marked it an owner decision.
+
+**A click handler and a keydown handler are independent bindings.** Putting them on different nodes
+is exactly what reproduces the reference:
+
+| | goes on | reproduces |
+| --- | --- | --- |
+| the CLICK, three rows | the `<a>` | the pointer surface is the anchor's text — the reference's own hit target |
+| the KEYDOWN, all six | the `<li>` | `SSM-1`'s addition, which its own note calls *"an addition, not a replacement"* |
+
+So there is no cost on either side and nothing left to judge. The focusable node stays the `<li>` and
+never becomes the `aria-hidden` `<a>` — `tabindex` inside an `aria-hidden` subtree would be a defect
+of **ours**, since the capture has no focusable node there to transcribe.
+
+**Why it is worth matching:** this is a HIT TARGET. `.dropdown-menu li` has no rule in
+`css/complete-app-styles.css` and these anchors are not `.dropdown-item` — bare inline `<a>` with no
+`href`, so the box is exactly the text. Upstream three rows respond on their words and three across
+the whole row; that asymmetry was flattened here.
+
+**Which three**, read from the sub-templates rather than the row's prose: `l4e` is
+`" Stop Sharing All Screens"`, `c4e` is `" Reopen Screenshare Preview"`, `d4e` is the per-screen
+`" Stop Sharing {screenName}"`. The `<li>`-bound three are Share Screen, the OBS virtual cam and
+OBS / RTMP.
+
+One parameter on the shared snippet decides it — `clickTarget: 'item' | 'anchor'` — so the split
+cannot drift row by row, and the contract asserts the mode at every one of the six **call sites**
+rather than only in the snippet: a parameter every site passes `'item'` for is the old behaviour
+wearing new syntax.
+
+## Two mount tests went red, which is the behavioural proof
+
+`RoomNavbar.svelte.test.ts` clicked the `<li>` for two of the anchor-bound rows. That no longer
+activates them — so both were updated to the reference's hit target rather than around it. The source
+assertions alone could not have shown the change is real.
+
+**Verification.** Three negative controls seen RED: flattening every row back to `'item'`, moving one
+row to the wrong side, and removing the keyboard path from the `<li>`. **The second PASSED on its
+first attempt because the mutation never applied** — caught by asserting the anchor exists before
+mutating, which is the lesson recorded in the 15:02 entry, now applied. Two of the repository's own
+gates caught me again and both were right: an inlined `indexOf` (bound and asserted found now), and
+the ceiling **204 → 230**, argued at the entry — eleven of the 26 lines are the comment, and it is
+the short form, with the argument living where it is asserted.
+
+The Svelte MCP is still not connected, so its mandated steps could not be run for
+`ScreenShareMenu.svelte`. `svelte-check` 0/0, eslint clean, 26 mount tests green, `pnpm run gate`
+exit 0 in `apps/room`; the autofixer pass was not performed.
+
+---
+
 ### 2026-09-02 15:02 UTC — the `aria-selected` family is MATCHED, and my own owner-decision verdict was wrong
 
 ## What I got wrong, and how

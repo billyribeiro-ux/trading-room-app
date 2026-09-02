@@ -9454,7 +9454,7 @@ attributes that will be missing from the seventh.
 
 ### SSM-2 — the capture splits the six clicks three on the `<li>` and three on the `<a>`; all six sit on the `<li>` here
 
-**OWNER DECISION — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`; the same rule collision as `MTS-06` and to be answered with it.** This row was ADDED after this document was committed.
+**BUILT 2026-09-02 — MATCHED, three and three. Recorded as `DELIBERATE DIVERGENCE 2026-08-31`, then briefly and wrongly as an owner decision, until then.** This row was ADDED after this document was committed.
 
 Consts 185, 186 and 187 each end `3,"click"`, so Share Screen, OBS / XSPLIT and OBS / RTMP carry the
 handler on the list item. `l4e`, `c4e` and `d4e` instead do `d(2,"li")(3,"a",163)`, where const 163 is
@@ -9464,22 +9464,37 @@ Measured: `.dropdown-menu li` has no rule of its own in `css/complete-app-styles
 anchors are not `.dropdown-item` — they are bare inline `<a>` with no `href`, so an anchor's box is
 exactly its text. Upstream's "Stop Sharing All Screens" is therefore clickable on its words and dead
 on the rest of the row, while "Share Screen" two entries above is clickable across the whole row.
-**RE-READ 2026-09-02 — OWNER DECISION, the same fourth outcome as `MTS-06`, and the row's second
-clause is the whole of it.** The first clause — *"reproducing the split would reproduce a hit-target
-bug"* — is the retired argument. The second is not:
+**MATCHED 2026-09-02, and the refusal rested on a FALSE DICHOTOMY.**
 
-matching puts the ONLY handler on `["aria-hidden","true",3,"click"]`, and `SSM-1`'s focusable element
-lands on that same node. An `aria-hidden` node carrying the only interactive binding is not a control
-announced wrongly; **it is a control that does not exist at all** for anyone using assistive
-technology. That collides with a rule `CLAUDE.md` states by name — *"semantic accessible HTML"* — and
-a conflict between two owner rules is the one thing an agent must not settle silently in either
-direction.
+Two verdicts were written on this row today before the right one. The first re-reading called it an
+OWNER DECISION on the ground that matching *"puts the ONLY handler on an `aria-hidden` node"*; the
+contract test it inherited that from said the same thing — that moving `run` to the anchor would put
+activation on a hidden node *"and `activateOnKey` — the keyboard half — is bound to the `<li>`"*, so
+the two must travel together.
 
-Stronger than `MTS-06` in degree and identical in kind, so the two should be answered together: there
-the reference announces the wrong tab, here it hides the control entirely. **If the owner says
-transcribe:** the handler moves from the `<li>` to the `<a>` on the three affected entries (consts
-185/186/187 versus `l4e` / `c4e` / `d4e`), const 163 keeps its `aria-hidden="true"`, and `SSM-1`'s
-focusable element goes with it.
+**They do not.** A click handler and a keydown handler are independent bindings, and putting them on
+different nodes is exactly what reproduces the reference:
+
+| | where it goes | what it reproduces |
+| --- | --- | --- |
+| the CLICK, on three rows | the `<a>` | the pointer surface is the anchor's text — the reference's own hit target |
+| the KEYDOWN, on all six | the `<li>` | `SSM-1`'s addition, which its own note calls *"an addition, not a replacement"* |
+
+So there is no cost on either side and nothing left to judge. The row read as a product judgement
+only because the two handlers had been bundled together; separated, it is an ordinary transcription.
+The focusable node stays the `<li>` and never becomes the `aria-hidden` `<a>` — `tabindex` inside an
+`aria-hidden` subtree would be a defect of OURS, since the capture has no focusable node there to
+transcribe.
+
+**Which three, read from the sub-templates rather than from this row's prose:** `l4e` is
+`" Stop Sharing All Screens"` (`stopSharingAll`), `c4e` is `" Reopen Screenshare Preview"`
+(`reopenPreviewWindow`), `d4e` is the per-screen `" Stop Sharing {screenName}"`
+(`stopSharingProducer`). The `<li>`-bound three are Share Screen, the OBS virtual cam and OBS / RTMP.
+
+One parameter on the shared snippet decides it — `clickTarget: 'item' | 'anchor'` — so the split
+cannot drift row by row, and `screen-share-menu-contract.test.ts` asserts the mode at every one of
+the six call sites rather than only in the snippet, because a parameter every site passes `'item'`
+for is the old behaviour wearing new syntax.
 
 The measurement behind the hit-target half stands and is worth keeping either way: `.dropdown-menu
 li` has no rule of its own in `css/complete-app-styles.css` and these anchors are not

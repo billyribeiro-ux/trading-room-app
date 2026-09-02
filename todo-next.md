@@ -112,7 +112,7 @@ guessed.
 | 36 | `lib/components/ScreenZoomControls.svelte` | 221 | `## ScreenZoomControls.svelte` in the v4 register — Four rows, appended 2026-08-31. |
 | 37 | `lib/components/ScreenVolumeControl.svelte` | 227 | `## ScreenVolumeControl.svelte` in the v4 register — Four rows, appended 2026-08-31. |
 | 38 | `lib/components/GiphyPicker.svelte` | 315 | `## GiphyPicker.svelte` in the v4 register — Six rows, from decoding all four Giphy templates in the bundle rather than the one the file's own GIF-04 added 2026-09-01: the fourth mount is `app-note`'s MODAL and its three chrome values are the other column — `form-control` without `border`, `input-group-text text-dark`, plain `fa-search`/`fa-times`. This component hardcoded the popover column, so the note editor's Giphy icons were `text-white` on a light body. One `variant` prop, because upstream has two chromes rather than three independent choices. **GIF-07 the same day: the chrome around them was the wrong KIND.** `opengifSerachModal()` at byte 1,482,730 is `modalService.open(this.giphySearchPopOver,{ariaLabelledBy:"modal-basic-title"})`, `L0e` draws `modal-header`/`modal-title`/`modal-body modal-lg`@`77vh`/`modal-footer`/`btn btn-outline-dark`, and there is no `giphy-search` const in `app-note` at all — so the note editor's picker had been a popover portaled to `<body>` at `inset: auto auto 0px 0px`. The hint, the form and the grid are snippets now, rendered by either chrome. |
-| 39 | `lib/components/ScreenShareMenu.svelte` | 203 | `## ScreenShareMenu.svelte` in the v4 register — 4 rows (SSM-01…04) read end to end 2026-08-31. The whole dropdown had no focusable element; SSM-04 corrected all four byte offsets in its own entry table, each of which landed INSIDE the function it named. |
+| 39 | `lib/components/ScreenShareMenu.svelte` | 229 | `## ScreenShareMenu.svelte` in the v4 register — 4 rows (SSM-01…04) read end to end 2026-08-31. The whole dropdown had no focusable element; SSM-04 corrected all four byte offsets in its own entry table, each of which landed INSIDE the function it named. |
 | 40 | `lib/components/NavbarSoundCloud.svelte` | 200 | §NAV — born 2026-08-31 out of `RoomNavbar`, carrying `NAV-02` and the presenter dropdown it belongs beside. |
 | 41 | `lib/components/RichTextEditor.svelte` | 190 | `## components/RichTextEditor.svelte` in the v4 register — 6 rows (RTE-01…06) against `app-rich-text-editor`, read end to end 2026-08-31. |
 | 42 | `lib/components/MessageBody.svelte` | 213 | `## components/MessageBody.svelte` in the v4 register — 7 rows (MSB-01…07) against `urlwrapImg` and `showChatGif`, read end to end 2026-08-31. |
@@ -168,7 +168,7 @@ guessed.
 | 84 | `lib/components/KickedPage.svelte` | 114 | `TODO.md` row 6's one residual, built 2026-08-31 — `app-kicked-page` decoded whole from byte 2,561,780, plus the five-way `IRe` page switch it is arm 2 of. `kicked-page-contract.test.ts`. |
 | 85 | `lib/components/ReplyModal.svelte` | 217 | `reply-modal-v4-contract.test.ts` — born 2026-08-31 out of `ModalHost` when `RPL-01`…`RPL-03` put that file over its ceiling. Read end to end against `app-reply-modal` (byte 2,324,180); three defects found and fixed. |
 
-**93 of 93 surfaces audited · 40,204 of 40,204 lines · 100.0%.**
+**93 of 93 surfaces audited · 40,230 of 40,230 lines · 100.0%.**
 
 > **⚠️ WHAT 100% MEANS HERE, AND WHAT IT DOES NOT.** Closed 2026-09-01, from 2 of 42 on 2026-08-16.
 > Every row above has been read against the reference evidence that governs it and carries the

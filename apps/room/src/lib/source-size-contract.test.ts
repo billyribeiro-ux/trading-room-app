@@ -2241,6 +2241,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `streamingTabAvailable` and `localScreens` are all resolved before they arrive. And has it
       acquired knowledge of the OTHER top-level menus? `menuOpen` is one boolean because the navbar
       owns which menu is open; a second such prop means that ownership has leaked.
+
+      204 -> 230, 2026-09-02, and it passes both of those checks: nothing was decided here and no
+      second menu became visible to it. A raise is a conversation, so here is what the 26 bought.
+
+      `SSM-2` is matched. The capture splits the six clicks three on the `<li>` and three on the
+      `<a>`, and this flattened all six onto the `<li>`. That is a HIT TARGET — these anchors are
+      bare inline `<a>` with no `href` and `.dropdown-menu li` has no rule, so upstream three rows
+      respond on their words and three across the whole row.
+
+      The cost is structural rather than prose: `clickTarget: 'item' | 'anchor'` on the shared
+      snippet takes its signature from one line to seven, two attributes become ternaries, and two
+      call sites reflow past the print width once they carry a fourth argument. Eleven of the 26 are
+      the comment, and it is the SHORT form — the argument, the false dichotomy it corrects, and
+      which three rows are which live in `screen-share-menu-contract.test.ts` where they are
+      asserted. Same split `ModalHost.svelte` took for `USM-18` and `refresh.svelte.ts` for `G16`.
+
+      One parameter and not six call-site handlers, deliberately: a per-row binding is how a split
+      like this drifts back to five-and-one without anybody deciding, and the contract asserts the
+      mode at every call site precisely because a parameter nobody varies is the old behaviour
+      wearing new syntax.
     */
     /*
       208 -> 204, 2026-08-31, SSM-1: `role`/`tabindex`/`aria-label` and an Enter/Space handler on a
@@ -2251,7 +2271,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       them: `role="button"` satisfies the rule its missing `href` used to break, and eslint's
       `no-unused-svelte-ignore` is what noticed.
     */
-    max: 204,
+    max: 230,
     why: 'the navbar screen-sharing dropdown; six entries and the four gates between them'
   },
   {

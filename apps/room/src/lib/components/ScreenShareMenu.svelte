@@ -69,17 +69,36 @@
   `screen-share-menu-contract.test.ts` — which is also what fails if a seventh row is written
   longhand beside this snippet instead of through it.
 -->
-{#snippet entry(label: string, title: string | undefined, run: () => void, badge?: Snippet)}
+{#snippet entry(
+  label: string,
+  title: string | undefined,
+  run: () => void,
+  clickTarget: 'item' | 'anchor',
+  badge?: Snippet
+)}
+  <!--
+    SSM-2 — the capture splits the six clicks three and three, and as of 2026-09-02 so does this.
+    Consts 185/186/187 end `3,"click"` (the `<li>`); const 163 is `["aria-hidden","true",3,"click"]`
+    (the `<a>`). `l4e`, `c4e` and `d4e` are the three anchor-bound rows.
+
+    The CLICK moves and the KEYDOWN does not, which is the whole design: the pointer surface becomes
+    the anchor's text as upstream, while `SSM-1`'s keyboard path stays on the `<li>` — its own note
+    calls that "an addition, not a replacement". The focusable node is therefore never the
+    `aria-hidden` one. Why that is not the dichotomy this row was refused on, and which three rows
+    are which, are in `screen-share-menu-contract.test.ts` where they are asserted.
+  -->
   <li
     {title}
     role="menuitem"
     tabindex="0"
     aria-label={label.trim()}
-    onclick={run}
+    onclick={clickTarget === 'item' ? run : undefined}
     onkeydown={(event) => activateOnKey(event, run)}
   >
     <!-- svelte-ignore a11y_missing_attribute -->
-    <a aria-hidden="true">{label}{@render badge?.()}</a>
+    <a aria-hidden="true" onclick={clickTarget === 'anchor' ? run : undefined}
+      >{label}{@render badge?.()}</a
+    >
   </li>
 {/snippet}
 
@@ -116,11 +135,14 @@
     class={['screen-options-start-screen dropdown-menu dropdown-menu-end', { show: menuOpen }]}
     style={menuOpen ? 'display: block;' : undefined}
   >
-    {@render entry(shareScreenText, '(Regular Bandwidth) ** RECOMMENDED', () =>
-      onpromptforscreenname('screen')
+    {@render entry(
+      shareScreenText,
+      '(Regular Bandwidth) ** RECOMMENDED',
+      () => onpromptforscreenname('screen'),
+      'item'
     )}
     <div class="dropdown-divider"></div>
-    {@render entry(virtualCamText, 'OBS', () => onpromptforscreenname('camera'))}
+    {@render entry(virtualCamText, 'OBS', () => onpromptforscreenname('camera'), 'item')}
     <!--
       `e4e` in the capture, verbatim - TWO dividers, then a bare `li > a` with no
       icon, bound to `mediaService.stopSharingAll()`:
@@ -159,13 +181,14 @@
         ' OBS / RTMP / Stream / Restream ',
         'OBS / RTMP / Stream / Restream',
         onopenstreamingtab,
+        'item',
         newBadge
       )}
     {/if}
     {#if screenSharing}
       <div class="dropdown-divider"></div>
       <div class="dropdown-divider"></div>
-      {@render entry(stopSharingAllText, undefined, onstopscreensharing)}
+      {@render entry(stopSharingAllText, undefined, onstopscreensharing, 'anchor')}
       <!--
         G06 — ` Reopen Screenshare Preview`, `c4e` at byte 2,479,832, gated on the same
         `isScreenSharing`. Its divider comes AFTER the item, which is why it is written here
@@ -178,7 +201,7 @@
         `if (!mediaService.isScreenSharing) return !1; emit("reopenPreviewWindow")`
         (byte 2,519,083); the gate is the same one this branch already carries.
       -->
-      {@render entry(' Reopen Screenshare Preview', undefined, onreopenpreview)}
+      {@render entry(' Reopen Screenshare Preview', undefined, onreopenpreview, 'anchor')}
       <div class="dropdown-divider"></div>
     {/if}
     <!--
@@ -195,8 +218,11 @@
       identity, unlike the body segments next door.
     -->
     {#each localScreens as screen (screen.id)}
-      {@render entry(` Stop Sharing ${screen.screenName}`, undefined, () =>
-        onstoplocalscreen(screen.id)
+      {@render entry(
+        ` Stop Sharing ${screen.screenName}`,
+        undefined,
+        () => onstoplocalscreen(screen.id),
+        'anchor'
       )}
     {/each}
   </ul>
