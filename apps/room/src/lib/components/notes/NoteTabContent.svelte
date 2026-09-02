@@ -18,7 +18,6 @@
   let {
     canEdit,
     dirty,
-    menuId,
     menuOpen,
     note,
     onDelete,
@@ -94,13 +93,31 @@
         `dropdown-toggle` span with no text, and no Bootstrap ships here to adopt it, so every note
         action behind this gear was mouse-only. `note-tab-chrome.ts` carries the measurement.
 
-        NTC-3 — `id` and `aria-expanded` are LIVE where the capture freezes them at
-        `dropdownMenuNote` / `"false"`. Two open notes would be two elements with one id, and every
-        menu's `aria-labelledby` would resolve to the first gear. A deliberate divergence: matching
-        it here would reproduce a defect.
+        NTC-3 — the two halves went opposite ways on 2026-09-02, and the reason is the same one.
+
+        `id` IS the capture's literal now. Const 126 at byte 2,002,666 is
+        `["id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false",1,
+        "dropdown-toggle"]` and const 127 is `["aria-labelledby","dropdownMenuNote",1,
+        "dropdown-menu"]` — both fixed strings, on a component the reference repeats once per note
+        tab exactly as this one does. So upstream renders N elements with one id, and every menu's
+        `aria-labelledby` resolves to the first gear.
+
+        That was refused as "a deliberate divergence: matching it here would reproduce a defect",
+        and it is a defect — the reference's, in rendered output, which is not one of the four things
+        that excuse a divergence. The practical harm is bounded and worth stating: the ids collide
+        (invalid HTML), and the accessible NAME does not change, because every gear carries the same
+        `aria-label="Note options"` and only one `<ul>` takes `.show` at a time.
+
+        `aria-expanded` stays BOUND, and that is not inconsistency. The const proves Angular never
+        updates it — the pair sits before the `1` that opens the class names — and the element hands
+        itself to Bootstrap's Dropdown plugin with `data-bs-toggle`, which writes that attribute on
+        every show and hide. The const is the creation-time value, not the rendered one; this room
+        ships no Bootstrap JavaScript, so the binding is what reproduces the rendered attribute.
+        Measured once for this row, MSM-02 and MTS-06 together in
+        `bootstrap-dropdown-contract.test.ts`.
       -->
       <span
-        id={menuId}
+        id="dropdownMenuNote"
         role="button"
         tabindex="0"
         aria-label="Note options"
@@ -112,7 +129,7 @@
       >
         <i class="fas fa-cog"></i>
       </span>
-      <ul aria-labelledby={menuId} class={['dropdown-menu', { show: menuOpen }]}>
+      <ul aria-labelledby="dropdownMenuNote" class={['dropdown-menu', { show: menuOpen }]}>
         {@render menuItem(' Edit Note', 'fa-edit', onStartEditing)}
         <li>
           <!-- svelte-ignore a11y_invalid_attribute -->

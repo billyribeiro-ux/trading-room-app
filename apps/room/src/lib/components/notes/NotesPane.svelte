@@ -80,7 +80,6 @@
     simplifiedEditor
   }: Props = $props();
 
-  const componentId = $props.id();
   let requestedNoteId = $state<number | null>(null);
   let editingNoteId = $state<number | null>(null);
   let openMenuNoteId = $state<number | null>(null);
@@ -333,7 +332,6 @@
 <ul id="notesTabs" role="tablist" class="nav nav-tabs noteTabset">
   {#each notes as note (note.id)}
     {const tabId = $derived(String(note.id))}
-    {const menuId = $derived(`${componentId}-note-menu-${note.id}`)}
     <!--
       THE CLICK IS ON THE `<li>`, WHICH IS WHERE THE CAPTURE PUTS IT — and it is not a preference.
 
@@ -382,7 +380,6 @@
           <NoteTabContent
             {canEdit}
             dirty={dirtyNoteIds.has(note.id)}
-            {menuId}
             menuOpen={openMenuNoteId === note.id}
             {note}
             onDelete={() => requestDelete(note.id)}

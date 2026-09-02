@@ -30,11 +30,26 @@ import { WELCOME_MAT_TOOLTIP, activateNoteMenuOnKey } from './components/notes/n
  * `bootstrap`, so the attribute is inert and every note action behind that gear — Edit, Rename,
  * Bring everyone here, both Welcome Mat items and Delete — was mouse-only.
  *
- * ## NTC-3 — the capture's hard-coded id would be a duplicate id per tab
+ * ## NTC-3 — the capture's hard-coded id IS a duplicate id per tab, and is reproduced
  *
  * Const 126 names every gear `dropdownMenuNote` and const 127 points every menu's
- * `aria-labelledby` at that same literal. Two open notes are two elements with one id and two menus
- * labelled by the first gear. `menuId` is per-note here. Recorded as a deliberate divergence.
+ * `aria-labelledby` at that same literal. This component is rendered once per note tab in both
+ * codebases, so upstream really does emit N elements with one id and N menus labelled by the first
+ * gear.
+ *
+ * That was a deliberate divergence — *"matching it here would reproduce a defect"* — and it is a
+ * defect, in rendered output, which is not one of the four things that excuse one. **Reproduced
+ * 2026-09-02**, with the harm bounded rather than waved at: the ids collide, which is invalid HTML;
+ * the accessible NAME does not change, because every gear carries the same `aria-label="Note
+ * options"` and only one `<ul>` takes `.show` at a time.
+ *
+ * `aria-expanded` went the OTHER way in the same pass, and the reason is the same const. It sits
+ * before the `1` that opens the class names, so Angular never updates it — and the element hands
+ * itself to Bootstrap's Dropdown plugin with `data-bs-toggle`, which writes that attribute on every
+ * show and hide. The const is the creation-time value and not the rendered one; this room ships no
+ * Bootstrap JavaScript, so a binding is what reproduces what upstream renders and a literal would
+ * freeze a DOM the reference never shows after its first paint. Measured for this row, MSM-02 and
+ * MTS-06 together in `bootstrap-dropdown-contract.test.ts`.
  *
  * ## Negative controls, run before this file was committed
  *
@@ -42,7 +57,8 @@ import { WELCOME_MAT_TOOLTIP, activateNoteMenuOnKey } from './components/notes/n
  * * `WELCOME_MAT_TOOLTIP`'s "noboby" corrected to "nobody" → the verbatim assertion goes RED, which
  *   is the point: the misspelling is the capture's.
  * * `tabindex="0"` deleted from the gear → the keyboard assertion goes RED.
- * * `menuId` replaced by the literal `dropdownMenuNote` → the per-tab assertion goes RED.
+ * * the literal `dropdownMenuNote` replaced by a per-note id → the assertion below goes RED
+ *   (it asserted the opposite until 2026-09-02).
  * * `activateNoteMenuOnKey`'s `event.key !== ' '` term dropped → the Space case goes RED.
  */
 
@@ -168,18 +184,39 @@ describe('NTC-3 — the menu ids are per tab, where the capture freezes one lite
     expect(BUNDLE).toContain('["aria-labelledby","dropdownMenuNote",1,"dropdown-menu"]');
   });
 
-  it('binds them to this note instead', () => {
-    expect(TAB).toContain('id={menuId}');
-    expect(TAB).toContain('aria-labelledby={menuId}');
-    expect(TAB).toContain('aria-expanded={menuOpen}');
-    expect(TAB, 'the frozen literal is back').not.toContain('dropdownMenuNote');
+  it('writes the capture’s literal on BOTH elements', () => {
+    expect(TAB).toContain('id="dropdownMenuNote"');
+    expect(TAB).toContain('aria-labelledby="dropdownMenuNote"');
+    /*
+      Both, because they are separable and half of this is worse than either whole: a literal `id`
+      with a per-note `aria-labelledby` points every menu at an element that does not exist.
+    */
+    expect(TAB, 'a per-note id came back').not.toContain('id={menuId}');
+    expect(TAB, 'a per-note aria-labelledby came back').not.toContain('aria-labelledby={menuId}');
   });
 
-  it('is fed a unique menuId per note by the pane that owns the list', () => {
+  it('and `aria-expanded` stays BOUND, which the same const decides', () => {
+    /*
+      Not an inconsistency. `aria-expanded` sits in the const's static section, so Angular never
+      updates it — and `data-bs-toggle` hands the element to Bootstrap's Dropdown plugin, which
+      does. The const is the creation-time value; the rendered one is dynamic upstream and this room
+      ships no Bootstrap JavaScript to make it so. `bootstrap-dropdown-contract.test.ts` carries the
+      measurement for this row, MSM-02 and MTS-06.
+    */
+    expect(TAB).toContain('aria-expanded={menuOpen}');
+    expect(TAB, 'the attribute was frozen with the id').not.toContain('aria-expanded="false"');
+  });
+
+  it('and the pane no longer mints an id nothing reads', () => {
+    /*
+      The other end. Leaving `menuId` computed and unpassed would be exactly the dead scaffolding
+      this repository refuses — and `dead-export-contract` would not see it, because it was a
+      template-local `{const}`.
+    */
     const pane = codeOf(
       'lib/components/notes/NotesPane.svelte',
       readFileSync(`${ROOT}lib/components/notes/NotesPane.svelte`, 'utf8')
     );
-    expect(pane).toContain('`${componentId}-note-menu-${note.id}`');
+    expect(pane).not.toContain('note-menu-');
   });
 });

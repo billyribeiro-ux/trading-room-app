@@ -197,3 +197,114 @@ describe('no dropdown waits for a Bootstrap that never arrives', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * ── THE CONST TABLE IS NOT THE RENDERED DOM, and three audit rows turn on that ───────────────────
+ *
+ * `MTS-06`, `MSM-02` and `NTC-3` each ask this room to replace a BOUND `aria-selected` /
+ * `aria-expanded` with the static literal the reference's const table carries. Measured 2026-09-02
+ * and DISPOSED here, once, because it is one question with one answer:
+ *
+ * ```
+ * MTS-06  1,994,264  ["id","screens-tab","data-bs-toggle","tab","data-bs-target","#screens",
+ *                     "role","tab","aria-controls","screens","aria-selected","true",
+ *                     1,"nav-link",3,"ngClass"]                             … and six more like it
+ * MSM-02  1,358,083  ["role","button","id","dropdownMenuLink","data-bs-toggle","dropdown",
+ *                     "aria-haspopup","true","aria-expanded","false",1,"msgMenu","dropright","pt-1",
+ *                     3,"ngStyle"]
+ * NTC-3   2,002,666  ["id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false",
+ *                     1,"dropdown-toggle"]
+ * ```
+ *
+ * ## What the const proves, and what it does not
+ *
+ * An Angular const is the element's attributes AT CREATION. Everything after the bare `3` marker is
+ * a binding — and in all three, `aria-selected` / `aria-expanded` sits BEFORE it. **So Angular never
+ * updates these attributes upstream.** That is the part the rows read correctly.
+ *
+ * It does not follow that the rendered attribute is static, and in all three the element declares
+ * who does update it: `data-bs-toggle="tab"` and `data-bs-toggle="dropdown"` hand it to Bootstrap's
+ * Tab and Dropdown plugins, which write `aria-selected` and `aria-expanded` on every show and hide.
+ * That plugin is in `scripts.38973a242454fb27.js`, one of the three chunks `deployed-index.html`
+ * names and this checkout does not hold — the same absence `ROV-03` bounds.
+ *
+ * The alternative reading has to be stated to be dismissed: if the rendered value really were the
+ * const's, upstream's tab strip would announce **seven** selected tabs at once and every message
+ * menu would announce itself permanently collapsed while open. Reproducing an upstream defect is
+ * matching — but that is a claim about the RENDERED DOM, and the const is not evidence of it.
+ *
+ * ## Why the binding is the match rather than the divergence
+ *
+ * This room ships no Bootstrap JavaScript — the first assertion in this file, for the reason its
+ * own docblock gives. So nothing here would ever write the attribute after creation, and freezing
+ * the literal would produce a DOM the reference never shows at any moment after its first paint.
+ * The binding is what reproduces the rendered attribute; it is not an accessibility improvement
+ * layered over the capture, though it is also that.
+ *
+ * **EVIDENCE ABSENT for the rendered value**, and bounded: one capture of the running page's DOM
+ * settles it either way, and `docs/decoded/room-surface-audit-2026-08-30.md` carries that as the
+ * unblocking condition on all three rows.
+ */
+describe('the three aria rows the const table cannot settle', () => {
+  const BUNDLE = readFileSync(
+    fileURLToPath(
+      new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url)
+    ),
+    'utf8'
+  );
+
+  it('reads each const at its offset, so the rows are argued against the real bytes', () => {
+    expect(BUNDLE.slice(1_994_264 + 155, 1_994_264 + 300)).toContain(
+      '"data-bs-toggle","tab","data-bs-target","#screens","role","tab"'
+    );
+    expect(BUNDLE.slice(1_358_060, 1_358_060 + 200)).toContain(
+      '"data-bs-toggle","dropdown","aria-haspopup","true","aria-expanded","false"'
+    );
+    expect(BUNDLE.slice(2_002_640, 2_002_640 + 200)).toContain(
+      '"id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false"'
+    );
+  });
+
+  it('finds the aria attribute in the STATIC section of each, so Angular never updates it', () => {
+    /*
+      The half the rows got right, asserted so it cannot quietly stop being true. An Angular const
+      runs attribute pairs, then a bare `1` opening the class names, then a bare `3` opening the
+      bindings. An attribute before the `1` is written once and never again.
+
+      The class marker is the boundary tested rather than the binding one, because NTC-3's const has
+      NO binding section at all — `[…,"aria-expanded","false",1,"dropdown-toggle"]` simply ends. That
+      is the strongest form of the same fact and an assertion looking for `,3,"` misses it.
+    */
+    for (const [at, aria] of [
+      [1_994_264, '"aria-selected","true"'],
+      [1_358_060, '"aria-expanded","false"'],
+      [2_002_640, '"aria-expanded","false"']
+    ] as const) {
+      const table = BUNDLE.slice(at, at + 400);
+      const ariaAt = table.indexOf(aria);
+      expect(ariaAt, `${aria} moved`).toBeGreaterThan(-1);
+      /* The class marker that closes the attribute run, immediately after this pair. */
+      expect(table.slice(ariaAt + aria.length, ariaAt + aria.length + 3)).toBe(',1,');
+    }
+  });
+
+  it('and finds `data-bs-toggle` on every one, which is who DOES update it', () => {
+    /*
+      The half the rows missed. `data-bs-toggle` is Bootstrap's own hook: the element is declared as
+      owned by a plugin whose documented job is to write these two attributes on show and hide.
+    */
+    for (const at of [1_994_264, 1_358_060, 2_002_640]) {
+      expect(BUNDLE.slice(at, at + 400)).toContain('"data-bs-toggle"');
+    }
+  });
+
+  it('so this room BINDS them, which is the only reading that renders what upstream renders', () => {
+    const strip = readFileSync(`${ROOT}lib/components/MainTabStrip.svelte`, 'utf8');
+    const menu = readFileSync(`${ROOT}lib/components/MessageMenu.svelte`, 'utf8');
+    const note = readFileSync(`${ROOT}lib/components/notes/NoteTabContent.svelte`, 'utf8');
+    expect(strip, 'MTS-06: the tab strip froze aria-selected').toContain('aria-selected={');
+    expect(strip, 'seven tabs cannot all be selected').not.toContain('aria-selected="true"');
+    expect(menu, 'MSM-02: the message menu froze aria-expanded').toContain('aria-expanded={');
+    expect(note, 'NTC-3: the note menu froze aria-expanded').toContain('aria-expanded={');
+  });
+});
