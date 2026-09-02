@@ -826,8 +826,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'routes/+layout.svelte',
-    max: 28,
-    why: 'the root layout: the stylesheet import and the three preloaded icon faces'
+    /*
+      LOWERED 28 -> 27 on 2026-09-02, and the lowering is the record of the change. The three
+      hand-written `<link rel="preload" as="font">` tags and the `?url` imports feeding them went;
+      `hooks.server.ts` already emitted the identical tags for the same faces. What replaced them
+      is a docblock saying so, which is why the file barely shrank — the code did.
+    */
+    max: 27,
+    why: 'the root layout: a stylesheet import, and the note saying where font preloading lives'
   },
   {
     file: 'routes/logout/+page.svelte',

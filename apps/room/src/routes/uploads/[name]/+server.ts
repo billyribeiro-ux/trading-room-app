@@ -30,7 +30,8 @@ import type { RequestHandler } from './$types';
  * `userUploads` setting is on.
  *
  * Serving that back as `Content-Disposition: inline` meant a member could upload
- * `evil.svg` — `<svg><script>fetch('/api/...')</script></svg>` — post the link in chat, and have
+ * `evil.svg` — an `<svg>` carrying a `<script>` child that fetches from this room's own API —
+ * post the link in chat, and have
  * every reader who clicked it execute the uploader's script as a DOCUMENT in the room's own
  * origin, with the room session cookie. `nosniff` does not help: the type is not being sniffed,
  * it is being asserted by the attacker, and `image/svg+xml` and `text/html` are honoured exactly

@@ -848,3 +848,81 @@ mobile, forced-WebGL, and reduced-motion. `fonts:verify` and the evidence-bound
 gates cannot run in this clone (owner-local captures); the font contract's
 in-repo requirements — exact Roboto preload lines and no remote fonts — are
 asserted by `home:contract` reading the same sources.
+
+## 18. September 2026 official update review — 2026-09-02
+
+The complete official post
+[What's new in Svelte: September 2026](https://svelte.dev/blog/whats-new-in-svelte-september-2026)
+was read end to end and every item in it was put against this repository. This section is the
+record: what applied and where it landed, and what did not apply with the measurement that says so.
+The precedent is section 9, which did the same for the August post.
+
+Versions in place while this was measured: `svelte` 5.57.0, `@sveltejs/kit` 3.0.0-next.25,
+`@sveltejs/vite-plugin-svelte` 7.3.0, `svelte-check` 4.7.6, `vite` 8.2.2.
+
+### Applied
+
+| item                                                                                    | what changed                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **next.24 — the `preload` filter's font branch receives a project-relative `filename`** | `apps/room/src/hooks.server.ts` now matches fonts by SOURCE name against a four-entry allow-list instead of `path.endsWith('.woff2')`. Applying it found a duplicate: `+layout.svelte` was hand-writing three `<link rel="preload" as="font">` tags for faces the filter already emitted, so each was preloaded twice per page, and the two lists had drifted (three against four). The layout's tags are gone. `font-preload-contract.test.ts`. |
+| **sv 1.0-next — `sv migrate` gains a `sveltekit-3` task**                               | Run, and it could not read the repository: a literal script-closing tag inside a comment in `src/routes/uploads/[name]/+server.ts` made it report an unterminated comment in a file that has none. Four such comments across both apps were repaired and a gate added — `comment-safety-contract.test.ts`. The migration then ran clean.                                                                                                         |
+| **next.17 — `use:enhance` supports form actions on another page**                       | The one cross-page form in either app — the impersonation banner's `action="/admin?/stopImpersonating"` — is deliberately NOT enhanced, and now says so with a test. `use:enhance` calls `goto` on a redirect, and an identity change must not survive as a client-side navigation. `impersonation-banner-contract.test.ts`.                                                                                                                     |
+
+### Already in place before the post
+
+| item                                           | evidence                                                                                                                                                                     |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **sv 1.0-next uses `#lib` rather than `$lib`** | **Zero** `$lib` import specifiers in either app. The 24 remaining occurrences are all prose inside block comments, which is deliberate — they describe the migration itself. |
+| **The flattened SvelteKit 3 configuration**    | No `svelte.config.js` in either app; configuration is inline in `sveltekit({...})` in `vite.config.ts`, with no `alias` block.                                               |
+| **Current versions throughout**                | The table above. The `svelte@5.56.10` directories under the pnpm store are orphans — zero occurrences in `pnpm-lock.yaml`.                                                   |
+
+### Measured, and NOT applicable — each with what was counted
+
+| item                                                                 | measurement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SvelteMap `getOrInsert` / `getOrInsertComputed`**                  | 53 `SvelteMap`/`SvelteSet` usages, searched two ways for the shape these replace: a `.has(k)` guard followed within five lines by `.set(k`, and a `.get(k) ?? default` followed by a `.set(k`. **Zero** sites. The nearest, `media-transport.svelte.ts:1272`, is a plain `Map` (correctly — nothing renders from it) and writes a DIFFERENT value than it read.                                                                                                                                                   |
+| **`createContext`'s third `has` function**                           | `createContext` appears 4 times in this repository and every one is prose explaining why it is NOT used: the eight state classes are passed as props. `PrivateChatPanel.svelte:17`, `+page.svelte:1826`.                                                                                                                                                                                                                                                                                                          |
+| **`<select defaultValue>`**                                          | 17 `<select>` elements across both apps; **zero** `<option ... selected>`, which is what `defaultValue` replaces. The one unbound form select (`#mg-fromroom`) opens on an empty placeholder, which is the correct default.                                                                                                                                                                                                                                                                                       |
+| **`svelte/server`'s new `RenderOutput` / `SyncRenderOutput` types**  | **Zero** non-test modules import `svelte/server`. Every use is a test calling `render(...)` and destructuring `.body` inline, so there is no helper whose return type needs annotating.                                                                                                                                                                                                                                                                                                                           |
+| **`svelte/server`'s new `Csp` / `Sha256Source` types**               | No CSP is configured in either app — zero `csp` keys in either `vite.config.ts` and no `Content-Security-Policy` set in either `hooks.server.ts`. (The one CSP header in the repository is `default-src 'none'; sandbox` on the uploads download branch, which is a literal, not a Kit config.) Adding a CSP is real work with an owner decision behind it — the room embeds third-party frames — and is not what this post asked for.                                                                            |
+| **next.19 — `+`-prefixed files ignore `test` / `spec` / `stories`**  | **Zero** `+*.test.*`, `+*.spec.*` or `+*.stories.*` files under either app's `routes/`. The tests live in `src/lib`.                                                                                                                                                                                                                                                                                                                                                                                              |
+| **next.19 — `defineParams` moved to `@sveltejs/kit/params`**         | Zero occurrences of `defineParams`; no param matchers in either app.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **next.24 — `applyReroute`**                                         | Zero occurrences of `reroute` or `applyReroute`; neither app has a `src/hooks.js`.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **next.24 — the `+server.js` `QUERY` handler**                       | 10 `GET` and 19 `POST` handlers. Every READ is already a `GET` — `internal/room-config` included. The `POST`s that are semantically queries are the credential checks (`room-entry`, `room-notes-auth`, `room-alert-delete-auth`, `mobile-pin`, `stream-read`) and they must stay `POST`: **`QUERY` is defined as safe and cacheable**, and making a password check cacheable by an intermediary is the fail-open this repository refuses. Recorded here so a later sweep does not reconsider it as an oversight. |
+| **next.18 — adapter Vite plugins can declare `pre` / `post` groups** | An adapter-author API. Neither app authors an adapter; they consume `adapter-node` and `adapter-vercel`.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **next.20 / next.25 — the Vite logger reports responses**            | Dev-server behaviour with no configuration surface and nothing to adopt.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **`@sveltejs/vite-plugin-svelte` `dynamicCompileOptions`**           | Zero occurrences. Neither app needs per-file compile options; both compile under one `runes: true`.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **The `mcp` add-on becomes `ai-tools`**                              | Neither app carries an `sv` add-on entry, so there is nothing to rename.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **`sv-utils` — `isKit3` / `resolveLibPrefix` / `libSubpathImports`** | Zero occurrences. These are helpers for add-on and tooling authors; this repository authors no add-on.                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+### Two `sv migrate sveltekit-3` tasks that must NOT be run again
+
+Recorded because "the official migration is idempotent" is the assumption that would lose work.
+The full run was made once, its diff read line by line, and reverted.
+
+1. **`tsconfig`** strips every comment from `apps/room/tsconfig.json` — 26 lines recording why there
+   is no `paths` block (it used to overwrite the generated one, and `vite build` said so outright)
+   and why `include` is stated — for **zero** semantic change.
+2. **`lib-alias`** rewrites `$lib` inside **prose**, which corrupts the very sentences describing the
+   migration: _"SvelteKit 3 replaced the `#lib` alias with Node subpath imports"_, _"rewrote
+   `#lib/mention` to `#lib/mention`"_, _"the `#lib` → `#lib` migration"_.
+   `apps/room/src/lib/lib-subpath-imports.test.ts` already recorded the 2026-08-16 codemod making
+   this exact mistake; the official tool made it again, to that sentence.
+
+Every other task — `package-json`, `svelte-config`, `environment`, `paths`, `external-redirects`,
+`shallow-routing`, `params`, `imports`, `app-state` — is a **no-op** here. That, rather than
+recollection, is the answer to whether the SvelteKit 3 migration is finished in this repository.
+
+### One thing the post's own documentation does not yet say
+
+The published `kit/hooks` page still documents the pre-next.24 signature,
+`preload(input: { type: 'js' | 'css' | 'font' | 'asset', path: string })`, with no union and no
+`filename`. The installed declaration at `@sveltejs/kit/types/index.d.ts:1334-1349` carries the new
+shape and the sentence explaining it. The installed types are the authority for what these apps
+compile against, and `font-preload-contract.test.ts` reads them at their bytes rather than quoting
+them, so the day that shape changes the room suite goes red.
+
+**Verification for this section.** `pnpm run gate` exit 0 in both apps; `svelte-check` 0 errors /
+0 warnings in both. Every count above was produced by a command run in this container on
+2026-09-02, not recalled. Nothing was opened in a browser: the preload claims are read from the
+built server bundle (`.svelte-kit/output/server/nodes/0.js`) and the emitted asset directory.

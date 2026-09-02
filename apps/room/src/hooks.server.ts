@@ -72,6 +72,67 @@ if (!building) {
   startVideoScheduler();
 }
 
+/**
+ * THE FOUR WEBFONT SOURCES THIS ROOM PRELOADS, NAMED — AND WHY IT IS A LIST RATHER THAN A RULE.
+ *
+ * ## What preloading fonts buys, which is the reason the `font` type is opted into at all
+ *
+ * Font Awesome's faces are ICON fonts: every `.fas`/`.far`/`.fab` glyph is laid out from the
+ * webfont's own metrics, so a face that arrives after first paint resizes the navbar and both tab
+ * strips in front of the member. SvelteKit preloads only `js` and `css` by default; accepting
+ * `font` here emits the `<link rel="preload" as="font">` (or the `Link` header, under
+ * `output.linkHeaderPreload`) that gets the faces into cache before the first frame instead.
+ *
+ * ## Why the extensions are filtered, with the measurement
+ *
+ * Each `@font-face` lists several sources — the Font Awesome rule offers eot/woff2/woff/ttf/svg —
+ * and a browser downloads exactly ONE of them. `type === 'font'` matches every emitted font asset,
+ * so an unfiltered filter preloaded the woff and ttf siblings as well. Measured against the built
+ * client (`.svelte-kit/output/client/_app/immutable/assets`) on 2026-09-02: node 0 carries TWELVE
+ * fonts, of which these four are the woff2. The eight others are 573,164 bytes — 559 KiB — of
+ * never-used preload on every cold load.
+ *
+ * (The comment this replaces said "6 extra requests / ~540 KB". That was right when it was written
+ * and is now short by two: it counted the six Font Awesome siblings, before the note editor's
+ * `summernote` face entered the layout's CSS graph and brought a woff and a ttf of its own. A
+ * number in a comment is exactly the thing that goes stale silently, so it is asserted below.)
+ *
+ * ## Why an allow-list of SOURCE names, and not `path.endsWith('.woff2')`
+ *
+ * Two reasons, and the first is the one that matters.
+ *
+ * **It is deny-by-default.** An extension test is an open rule: any woff2 that any future
+ * stylesheet drags into the root layout's CSS graph gets preloaded on every page of the room with
+ * nobody having decided that it should. Preload is a claim on the critical path — the whole point
+ * of `preloadStrategy` and of the paragraph above is that preloading the wrong thing COSTS — so
+ * the set belongs in a list somebody has to edit. `CLAUDE.md`: every allow-list is deny-by-default.
+ *
+ * **It can be written down at all.** Matching by name needs a name that survives a build, and the
+ * `path` does not — it is the hashed output (`fa-solid-900.OMe8Chpq.woff2`), different on every
+ * build. SvelteKit 3.0.0-next.24 added `filename` to the `font` branch of this filter for exactly
+ * this: the installed type at `@sveltejs/kit/types/index.d.ts:1334-1349` documents it as "the
+ * source file's pathname relative to the project root, so that a filter can match on it instead of
+ * the hashed path", and `filter_fonts` in the kit build resolves a package asset to its
+ * project-local `node_modules/…` form. It is announced in the September 2026 Svelte blog.
+ *
+ * The published `kit/hooks` doc still shows the pre-next.24 signature, `{ type, path }` with no
+ * union. The INSTALLED types are what this app compiles against and are what the above is read
+ * from; `font-preload-contract.test.ts` reads them too, so the day they change, this goes red.
+ *
+ * ## Staleness fails LOUD, not silent
+ *
+ * A name here that no longer exists on disk stops preloading a face and nothing renders
+ * differently — the glyphs still arrive, just late, which is the defect this whole block exists to
+ * prevent and is invisible to every other check in the repository. So the contract test asserts
+ * each of these four paths resolves to a real file.
+ */
+const PRELOADED_FONT_SOURCES: ReadonlySet<string> = new Set([
+  'node_modules/@fortawesome/fontawesome-free/webfonts/fa-brands-400.woff2',
+  'node_modules/@fortawesome/fontawesome-free/webfonts/fa-regular-400.woff2',
+  'node_modules/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2',
+  'src/lib/styles/summernote.a838752e64c7ba6a.woff2'
+]);
+
 export const handle: Handle = async ({ event, resolve }) => {
   const connection = resolveConnectedIdentity(event.cookies);
   event.locals.user = connection.user;
@@ -89,18 +150,11 @@ export const handle: Handle = async ({ event, resolve }) => {
     error(403, 'Open this room from your account page.');
   }
 
-  // The Font Awesome faces are icon fonts: every `.fas`/`.far`/`.fab` glyph is laid out from the
-  // webfont's metrics, so swapping it in after first paint resizes the navbar and the tab strips.
-  // SvelteKit only preloads `js` and `css` by default; adding `font` emits the <link rel=preload>
-  // that lets the faces arrive before first paint instead of shifting the layout afterwards.
-  //
-  // Only the woff2 files are preloaded: each @font-face lists eot/woff2/woff/ttf/svg sources and
-  // Chrome uses exactly one (woff2), but `type === 'font'` matches every emitted font asset, so
-  // the unfiltered form made the Link header preload woff AND ttf too - measured as 6 extra
-  // requests / ~540 KB of never-used bytes on every cold load.
   const response = await resolve(event, {
-    preload: ({ type, path }) =>
-      type === 'js' || type === 'css' || (type === 'font' && path.endsWith('.woff2'))
+    preload: (input) =>
+      input.type === 'js' ||
+      input.type === 'css' ||
+      (input.type === 'font' && PRELOADED_FONT_SOURCES.has(input.filename))
   });
 
   /*

@@ -260,6 +260,45 @@ const ANSWERED_BY_DERIVATION: readonly string[] = ['playChatMessageSoundFor'];
  */
 const CREDENTIAL_DERIVATION_AWAITING_THE_OWNER = 'PAM-02 — hasTextAlerts from twillioApiSID';
 
+/**
+ * THE SECOND ROW WAITING ON A SENTENCE, AND IT IS A CONFLICT BETWEEN TWO OWNER RULES.
+ *
+ * `smallerImagePreview` (`room-settings-schema.ts:147`) is `wired: false`, and the reason recorded
+ * against it was that the preference pair it feeds *"has no consumer"*. **That premise was
+ * re-measured on 2026-09-02 and is wrong.** `defaultImagePreview` occurs fifteen times in the
+ * bundle and is a ONE-SHOT LATCH, not a duplicate flag — `processSessData` at byte 1,436,631:
+ *
+ *   sessData.smallerImagePreview && !preferences.defaultImagePreview && (
+ *     preferences.defaultImagePreview = sessData.smallerImagePreview,
+ *     preferences.smallImagePreview   = sessData.smallerImagePreview,
+ *     setPreference('defaultImagePreview', preferences.defaultImagePreview))
+ *
+ * The room's default is pushed into the member's own preference exactly once and the latch is
+ * persisted, so a member who turned it off stays off against a room default that says on. Both
+ * fields start `!1` at byte 979,150 and the toggle at 2,253,193 keeps them in step.
+ *
+ * What did NOT change is the other measurement, which is why this is not simply built: the one
+ * thing the pair drives is `ngClass(B1e, smallImagePreview && defaultImagePreview)` with
+ * `B1e = t => ({'chat-uploaded-img-sm': t})`, and that class has **no rule in any of the 52
+ * stylesheets** this repository holds — proved against a control class the same search finds
+ * immediately. So:
+ *
+ *   - *"match the dump files exactly end to end"* asks for the latch, the conjunct and the class;
+ *   - `CLAUDE.md` forbids *"a `.flipped` class with no CSS"* by name.
+ *
+ * Both halves stand or fall together: seeding a preference whose only effect is a class that
+ * styles nothing is precisely the scaffolding the second rule exists to stop. That is a decision
+ * for the owner and not an agent, so it is written where it cannot go stale rather than acted on.
+ *
+ * **If the owner says transcribe it anyway:** the latch belongs beside `processSessData`'s
+ * equivalent in the room's session load, the conjunct replaces the two `settingChecks` reads in
+ * `ModalHost.svelte`, and the class goes on the chat log container — and
+ * `settings-preference-wiring-contract.test.ts`'s `not.toContain('chat-uploaded-img-sm')` is the
+ * assertion that has to be turned around with it.
+ */
+const CLASS_WITH_NO_RULE_AWAITING_THE_OWNER =
+  'USM-18 — smallerImagePreview seeds a pair whose only effect is chat-uploaded-img-sm';
+
 /*
   The seven that must NEVER leave this list by being wired.
 
@@ -487,5 +526,31 @@ describe('room settings the reference reads and this room does not', () => {
     */
     expect(CREDENTIAL_DERIVATION_AWAITING_THE_OWNER).toContain('twillioApiSID');
     expect(CREDENTIALS_THE_REFERENCE_LEAKS).toContain('twillioApiSID');
+  });
+
+  it('names the second row waiting on the owner against the setting it would wire', () => {
+    /*
+      Tied to the SCHEMA rather than left as prose, so the note cannot outlive its subject: the day
+      `smallerImagePreview` is wired, this line goes red and the paragraph above it is read again.
+
+      It is asserted HERE, and not in `settings-preference-wiring-contract.test.ts` where the
+      measurement lives, for the reason that file's own name gives away — it is one of the 42
+      `gate/evidence-bound-tests.mjs` excludes when the capture roots are absent, so an assertion
+      added there does not run in this checkout and its negative control produces no output at all.
+      This file runs.
+    */
+    expect(CLASS_WITH_NO_RULE_AWAITING_THE_OWNER).toContain('smallerImagePreview');
+
+    const schema = readFileSync(
+      new URL('../../../controller/src/lib/room-settings-schema.ts', import.meta.url),
+      'utf8'
+    );
+    const row = /\{ name: "smallerImagePreview",[^}]*\}/.exec(schema)?.[0];
+    expect(row, 'the setting this note is about is gone from the schema').toBeDefined();
+    expect(
+      row,
+      'smallerImagePreview is no longer `wired: false` — the conflict above was settled somewhere ' +
+        'else and the paragraph naming it has to be read again'
+    ).toContain('wired: false');
   });
 });

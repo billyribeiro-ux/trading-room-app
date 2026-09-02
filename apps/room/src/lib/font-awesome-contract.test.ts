@@ -71,14 +71,6 @@ const FONT_AWESOME = fileURLToPath(
  */
 const UPSTREAM_UNDEFINED: readonly string[] = ['fa-waveform', 'fa-pause-circle-o'];
 
-/**
- * `fa-brands-400`, `fa-regular-400`, `fa-solid-900` — the woff2 FILENAMES that `+layout.svelte`
- * imports with `?url` to preload the faces. They are not class names and never reach a `class`
- * attribute; excluded by name rather than by a cleverer scan, because the alternative is parsing
- * Svelte's class syntax and a parser is a thing that can be wrong quietly.
- */
-const FONT_FILES = /^fa-(brands|regular|solid)-\d+$/;
-
 const definedByFontAwesome = (): ReadonlySet<string> => {
   const css = readFileSync(FONT_AWESOME, 'utf8');
   return new Set([...css.matchAll(/\.(fa[\w-]*)(?=[:,{ .])/g)].map((match) => match[1]));
@@ -99,8 +91,14 @@ const usedInMarkup = (): Map<string, string[]> => {
   const used = new Map<string, string[]>();
   for (const file of globSync('**/*.svelte', { cwd: ROOT })) {
     const source = codeOf(file, readFileSync(`${ROOT}${file}`, 'utf8'));
+    /*
+      No `fa-brands-400` / `fa-solid-900` exclusion any more, and its removal is the point.
+      It existed because `+layout.svelte` imported those woff2 FILENAMES with `?url` to hand-write
+      three preload links, and a filename is not a class. Those imports are gone — the preload set
+      lives in `hooks.server.ts` now (`font-preload-contract.test.ts`) — so the exclusion had no
+      remaining subject, and an exclusion nothing reaches is a hole that only widens.
+    */
     for (const match of source.matchAll(/\bfa-[a-z0-9-]+/g)) {
-      if (FONT_FILES.test(match[0])) continue;
       used.set(match[0], [...new Set([...(used.get(match[0]) ?? []), file])]);
     }
   }

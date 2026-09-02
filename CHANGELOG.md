@@ -45,6 +45,448 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 06:21 UTC — one Svelte, one SvelteKit, and a gate that keeps it that way
+
+## Measured first, against npm rather than recalled
+
+`npm view <pkg> dist-tags`, run in this container. A remembered version number is not evidence — the
+assistant's training predates these releases.
+
+| package | pinned here | newest published | tag |
+| --- | --- | --- | --- |
+| `svelte` | 5.57.0 | 5.57.0 | `latest` |
+| `@sveltejs/kit` | 3.0.0-next.25 | 3.0.0-next.25 | `next` |
+| `@sveltejs/vite-plugin-svelte` | 7.3.0 | 7.3.0 | `latest` |
+| `svelte-check` | 4.7.6 | 4.7.6 | `latest` |
+| `@sveltejs/adapter-node` | 6.0.0-next.10 | 6.0.0-next.10 | `next` |
+| `@sveltejs/adapter-vercel` | 7.0.0-next.8 | 7.0.0-next.8 | `next` |
+| `vite` | 8.2.2 | 8.2.2 | `latest` |
+
+**Every one was already the newest published, so no version changed.**
+
+Two of those tags read backwards and both matter. `svelte`'s `next` tag is `5.0.0-next.272` —
+**older** than `latest`, a stale tag left from the 5.0 pre-release, so `svelte@next` would be a
+downgrade of fifty-seven minors. And `@sveltejs/kit`'s `latest` is **2.70.3**, the stable 2.x line:
+this workspace is deliberately on the 3.x preview (migrated 2026-08-13), so *"upgrade to latest"*
+would **downgrade it off SvelteKit 3** and undo `#lib`, the flattened config and the remote-functions
+opt-in with it. For Kit, the latest is the newest `next`, and that is what is pinned.
+
+## The duplicate was never in the repository
+
+This container held two Svelte trees in its virtual store — `5.56.10` beside `5.57.0`, with Kit and
+`vite-plugin-svelte` peer-variants built against each. It looked like two versions and was not:
+
+- `pnpm-lock.yaml` names `svelte@5.57.0` **39 times and `5.56.10` zero times**;
+- **no symlink anywhere** resolved into the 5.56.10 tree — every live edge, in both apps and in the
+  virtual store's own root, pointed at 5.57.0;
+- neither `pnpm install --frozen-lockfile` nor `pnpm prune` removed it, because pnpm leaves
+  unreferenced virtual-store trees in place;
+- deleting `node_modules` and reinstalling **from the same committed lockfile** produced exactly one
+  tree each.
+
+That last one is the proof, and it is why nothing in the repository changed: **a fresh clone never
+had the duplicate.** The leftover was an artifact of upgrading in place, one bump behind.
+
+## So the deliverable is the gate, not a fix
+
+Three assertions added to `svelte-kit-sync-pin.test.ts`, which already reads workspace-wide
+`package.json` facts across both apps:
+
+1. the lockfile resolves **exactly one** version of `svelte`, `@sveltejs/kit`,
+   `@sveltejs/vite-plugin-svelte` and `svelte-check`;
+2. both apps pin each of them **exactly**, no range — a range is how a second version arrives
+   without anybody choosing it;
+3. what the two apps agree on is what the lockfile actually **resolved**, not merely agreement with
+   each other.
+
+The **lockfile** is read, not `node_modules`. A test that counts directories under `.pnpm` measures
+whatever the last install happened to leave on the machine it runs on — exactly the state that just
+proved misleading.
+
+One implementation note worth its comment: the version regex needs a lookbehind. `svelte@5.57.0`
+appears as a substring inside `eslint-plugin-svelte@`, `prettier-plugin-svelte@` and
+`svelte-eslint-parser@`, all three real packages in this lockfile with versions of their own, so a
+bare match would report a duplicate that does not exist. Both neighbours are asserted to be found,
+so the lookbehind is proved to separate them rather than the corpus merely lacking them.
+
+**Verification.** Three negative controls seen RED: a second `svelte` resolution appended to the
+lockfile, a caret range in one app, and the two apps declaring different versions. `pnpm run gate`
+exit 0 in **both** apps.
+
+---
+
+### 2026-09-02 06:11 UTC — five audit rows re-read against the four escapes; three were stale, one is the owner's
+
+Continuing the re-reading the 06:03 entry set up. Five of the twenty-nine `DELIBERATE DIVERGENCE`
+rows are done, and the pattern is worth naming: **the document is stale in the safe direction.**
+Three of the five describe divergences that no longer exist, because they were matched during this
+session and nothing updated the row.
+
+| row | outcome |
+| --- | --- |
+| **STB-06** | **stale — both halves matched.** `StreamTabs.svelte:273`/`:283` render the bare `href="#"` of const 57, and `runItem` no longer calls `preventDefault`, so a stream-menu click runs its command AND follows the anchor — jumping the room to the top and pushing a history entry, exactly as upstream. The component's docblock already says the jump looks like a regression and is a match. |
+| **OVL-07** | **stale — matched.** `deliverQaNotice` runs the reference's two sibling blocks in order: a loop firing per question the viewer owns on that alert, then the `isPresenter` block with the identical body outside it. A member who asked three questions gets three toasts, which is what upstream does. |
+| **NTC-3** | **stale — the id half matched.** `NoteTabContent.svelte` carries the capture's literal `id="dropdownMenuNote"` and `aria-labelledby="dropdownMenuNote"`, duplicate ids and all. |
+| **MSM-03** | **mis-labelled, and backwards.** `MessageMenu.svelte:117` has carried the capture's literal `id="dropdownMenuLink"` all along; what the row describes is a repair that was PROPOSED and declined. Under *"match the dump exactly"* declining it is simply correct, and the eighteen pinned fixtures in `room-message-render.test.ts` are the evidence that the match is real rather than accidental. |
+| **MSM-02** | **holds, escape 4** — on the proof already in the row rather than on the sentence it gave. |
+
+## MSM-02, and why the same reading closes NTC-3's second half
+
+The const carries no `3,"aria-expanded"` binding marker, which makes it the element's CREATION-time
+value; the trigger hands itself to Bootstrap's Dropdown plugin with `data-bs-toggle`, which rewrites
+the attribute on every show and hide. So the reference's **rendered** attribute tracks the menu, and
+a literal `false` here would diverge from its output on every open menu. **Binding it is what
+matches.** Measured for the pair in `bootstrap-dropdown-contract.test.ts` — which is the point of
+finding it twice.
+
+## MTS-06 is the fourth outcome, and it governs four rows
+
+Checked against all four escapes and it fails each: not SECURITY; the consts are read by value, so
+not EVIDENCE ABSENT; a literal attribute is the easier thing to write, so not LANGUAGE IMPOSSIBLE;
+and `aria-selected` is reference-facing OUTPUT on the tab strip the room opens on, so not NOT-A-
+DIVERGENCE.
+
+What stops it being work an agent may simply do is that matching collides with a rule `CLAUDE.md`
+states BY NAME — *"semantic accessible HTML"* — and the collision is **total** rather than partial:
+the attribute's only consumers are the users who cannot see which tab is active, so transcribing the
+literals removes the whole of its function for the whole of its audience.
+
+**That decision governs four rows, not one** — `FP-04`, `PAM-15`, `PAM-12` and `MTS-06`. The
+reference hardcodes `aria-selected` beside an `ngClass`-driven `active` in four separate components,
+so it is a convention there rather than a slip in one. Both directions are written into the row,
+with the literals and the two tests that would have to be turned around.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
+### 2026-09-02 06:03 UTC — the audit's `DELIBERATE DIVERGENCE` category was defined by a reason the owner ruled out
+
+## The systemic finding, larger than any row it contains
+
+Line 205 of `docs/decoded/room-surface-audit-2026-08-30.md`'s legend defines the disposition as
+*"matching the reference here would reproduce a defect"*. That is the exact sentence the owner's
+standing instruction excludes: **match the dump files exactly end to end**, and reproducing an
+upstream defect **is** matching.
+
+So this is not one questionable row. **Sixteen rows** rest on that sentence, and every one of them
+reads as settled while resting on a reason that no longer carries. The legend row is marked
+`RE-DEFINED` rather than quietly reworded — a silent redefinition is precisely what would leave
+them looking settled.
+
+## What replaced it
+
+The four escapes that do excuse not matching, written into the document under the legend:
+
+| # | escape | what it takes to claim it |
+| --- | --- | --- |
+| 1 | SECURITY | matching would reintroduce something `CLAUDE.md` forbids BY NAME |
+| 2 | EVIDENCE ABSENT | the value is in no capture we hold, **and the search is shown** |
+| 3 | LANGUAGE IMPOSSIBLE | proved with the actual compiler error |
+| 4 | NOT A DIVERGENCE | internal structure rather than reference-facing OUTPUT, or unreachable upstream |
+
+And the three arguments that read like escapes and are not, each already found wrong here:
+*"it reproduces an upstream defect"*; *"our server does not send that frame"* (a RECEIVER is
+transcribable whatever any server sends — wrong three times); *"it is blocked on a host we do not
+have"* (check whether the CLIENT half is separable).
+
+A **fourth outcome** is named beside them, because two rows have now landed on it: where matching
+collides with a rule `CLAUDE.md` states by name — a class with no CSS, a control whose only effect
+is changing its own label — it is neither an escape nor an agent's call. It goes to the owner. **A
+conflict between two owner rules is the one thing an agent must not settle silently in either
+direction.**
+
+Rows re-read against the table carry a `RE-READ 2026-09-02` line naming their escape; rows without
+one are marked **provisional** in as many words, so the document now says which of its own verdicts
+have been re-measured and which have not.
+
+## The first re-reading: AVD-04 holds, but not on the reason it gave
+
+It cited the retired sentence. The argument that actually carries was already one paragraph further
+down: **this pane deliberately enumerates LATE**, before permission, so `s.label` is empty for every
+device — while upstream enumerates after permission, where a blank row is a rare edge. Copying the
+expression would render a dropdown blank in the COMMON case, which is a *different rendered result*
+than the reference produces. That is escape 4 on its own terms: the divergence is in the surrounding
+timing, and using the label the reference itself computes and then discards is what keeps the OUTPUT
+matched.
+
+## One mechanical note worth keeping
+
+The new section heading is `####`, not `###`. `room-surface-audit-counts.test.ts` attributes every
+`### ` line to a row and demands each carry a disposition, so a section heading at that level is a
+row no count can see — it went red on exactly that first.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
+### 2026-09-02 05:53 UTC — USM-18's refusal rested on a premise the bundle contradicts
+
+## What the row said, and what is actually there
+
+USM-18 was recorded HALF BUILT, its missing half refused because *"neither preference has a
+consumer"*. Re-measured against the bundle rather than inherited, and that premise is wrong.
+
+`defaultImagePreview` occurs **fifteen** times and is not a duplicate of the flag beside it. It is a
+**one-shot latch**. `processSessData` at byte 1,436,631:
+
+```js
+sessData.smallerImagePreview && !preferences.defaultImagePreview && (
+  preferences.defaultImagePreview = sessData.smallerImagePreview,
+  preferences.smallImagePreview   = sessData.smallerImagePreview,
+  setPreference('defaultImagePreview', preferences.defaultImagePreview))
+```
+
+`sessData.smallerImagePreview` is the **room setting** — `room-settings-schema.ts:147`, marked
+`wired: false`. The room's default is pushed into the member's own preference exactly once and the
+latch is persisted so it never re-applies, which is what lets a member who turned it off stay off
+against a room default that says on. Both fields start `!1` at byte 979,150; the toggle at
+2,253,193 keeps them in step.
+
+So the row is not "a preference nothing reads", and **one of the 202 unwired settings turns out to
+have a live consumer upstream**.
+
+## Why it is still not built
+
+The other half of the original measurement survives, and it is the blocker: the one thing the pair
+drives is `ngClass(B1e, smallImagePreview && defaultImagePreview)` with
+`B1e = t => ({'chat-uploaded-img-sm': t})`, and that class has **no rule in any of the 52
+stylesheets** — proved against a control class the same search finds immediately.
+
+That is a conflict between two owner rules rather than between two readings of the evidence:
+*"match the dump files exactly end to end"* asks for the latch, the conjunct and the class;
+`CLAUDE.md` forbids *"a `.flipped` class with no CSS"* by name. The two halves stand or fall
+together — seeding a preference whose only visible effect is a class that styles nothing is exactly
+the scaffolding the second rule exists to stop — so it is **recorded for the owner, not decided
+here**, beside PAM-02 and the two other rows waiting on a sentence.
+
+## Where it is asserted, and why there
+
+`setting-coverage-contract.test.ts`, against the schema row itself, so the day `smallerImagePreview`
+is wired the note goes red and is read again. That file is chosen deliberately: the measurement's
+natural home, `settings-preference-wiring-contract.test.ts`, is one of the **42** the evidence-bound
+gate excludes when the capture roots are absent — an assertion added there does not run in this
+checkout and its negative control produces no output at all. That mistake has been made once
+already this session (MSB-06) and is not repeated.
+
+## The ceiling held
+
+Writing the corrected measurement into `ModalHost.svelte` took it **30 lines over** its ceiling, and
+ceilings here only go down. So the argument lives where it is asserted and the component carries six
+lines and a pointer — which is the right shape anyway: a measurement kept in two places goes stale
+in one.
+
+**Verification.** Two negative controls seen RED: the setting flipped to `wired: true`, and its row
+deleted. `pnpm run gate` exit 0 in **both** apps; `svelte-check` 0/0.
+
+---
+
+### 2026-09-02 05:35 UTC — the September Svelte post, item by item, with the measurement for each
+
+`apps/controller/docs/SVELTE-CONFORMANCE-AUDIT.md` §18, following §9's precedent for the August
+post. Every item in
+[What's new in Svelte: September 2026](https://svelte.dev/blog/whats-new-in-svelte-september-2026)
+was put against this repository, and the section records the result of each: what landed, what was
+already here, and what does not apply **with the count that says so** rather than a recollection.
+
+## Three items applied, each with its own commit
+
+- **next.24, `filename` on the preload filter's font branch** — 04:59 UTC above.
+- **`sv migrate sveltekit-3`** — 05:24 UTC above; it could not read the repository until four
+  comments stopped carrying a script-closing tag.
+- **next.17, `use:enhance` on a cross-page form action** — this entry.
+
+## The one cross-page form in either app, and why it stays unenhanced
+
+The impersonation banner posts to `action="/admin?/stopImpersonating"` from the root layout. It is
+the only cross-page action in the repository, so it is the only place next.17 could land, and it
+deliberately does not take it: `use:enhance` **calls `goto` on a redirect** — the official
+`kit/form-actions` doc's own word — and a client-side navigation keeps the document, and with it
+every module-level and component-level value the impersonated identity was already written into.
+The operator would arrive at `/admin` as themselves with parts of the screen still holding the
+person they were viewing as. A full document load throws all of it away, which is the correct
+behaviour for an identity change specifically.
+
+**Nothing covered that banner before now.** So `impersonation-banner-contract.test.ts` also asserts
+the two requirements its own comment states and nothing enforced — that it sits ABOVE the chrome
+branches, so it reaches every page an impersonated session can, and that it offers no way to
+dismiss it — plus both halves of the cross-page post: the action exists, and it redirects, which is
+what makes the unenhanced POST land somewhere.
+
+## Two corrections to my own earlier measurements
+
+Both from globs that reached build sourcemaps rather than source, which is the same class of error
+this session has already recorded four times:
+
+- `createContext` appears **4** times, not 20 — and all four are prose explaining why it is NOT
+  used; the eight state classes are passed as props.
+- `$lib` appears **24** times, not zero — and all 24 are prose. **Zero import specifiers**, which is
+  what the migration claim actually needs, and what `lib-subpath-imports.test.ts` guards.
+
+## Not applicable, with the count in each row
+
+`getOrInsert`/`getOrInsertComputed` (53 `SvelteMap`/`SvelteSet` usages, searched two ways for the
+shape they replace, **zero** sites); `<select defaultValue>` (17 selects, **zero**
+`<option selected>`); `svelte/server`'s new `RenderOutput`/`SyncRenderOutput` (zero non-test
+importers) and `Csp`/`Sha256Source` (no CSP configured in either app); next.19's `+`-file naming
+and `defineParams`; `applyReroute`; the adapter `pre`/`post` groups; the Vite logger;
+`dynamicCompileOptions`; the `mcp` → `ai-tools` rename; and `sv-utils`.
+
+## The one refused on a REASON rather than on absence
+
+**The `+server.js` `QUERY` handler.** Every read in both apps is already a `GET` —
+`internal/room-config` included. The `POST`s that are semantically queries are the credential
+checks (`room-entry`, `room-notes-auth`, `room-alert-delete-auth`, `mobile-pin`, `stream-read`), and
+they must stay `POST`: **`QUERY` is defined as safe and cacheable**, and making a password check
+cacheable by an intermediary is the fail-open this repository refuses. Written down so a later sweep
+does not reconsider it as an oversight.
+
+**Verification.** Three negative controls seen RED on the new contract: `use:enhance` added to the
+form, a dismiss button added to the banner, and the action returning data instead of redirecting.
+`pnpm run gate` exit 0 in **both** apps. Nothing was opened in a browser.
+
+---
+
+### 2026-09-02 05:24 UTC — the official Svelte CLI could not read this repository, and four characters were why
+
+## Found by running the September blog's `sv migrate sveltekit-3` as a check
+
+`sv 1.0.0-next.6`, task `imports`:
+
+```
+Task 'imports' failed: Unable to process 'src/routes/uploads/[name]/+server.ts'.
+Reason: Unterminated comment — https://svelte.dev/e/js_parse_error
+```
+
+**The file has no unterminated comment.** Its five block comments open and close in order, and a
+lexer tracking strings, template literals and both comment forms walks it to EOF in state `code`
+with zero unclosed blocks. `tsc`, `esbuild`, `svelte-check` and `vite build` are all silent. What it
+has is a security note quoting an attack payload, with a literal script-closing tag inside it.
+Removing that one sequence — nothing else — let the task and the two after it run to completion.
+
+`CLAUDE.md` already states this rule twice, for two other parsers, each earned by a shipped defect:
+no Svelte block inside a comment, no HTML comment marker inside an HTML comment. **This is the third
+parser.** An HTML tokenizer reading script-element content has no notion of comments, strings or
+template literals; the first closing tag it meets ends the element wherever it sits.
+
+## Comments were where it was found, not what the rule is
+
+Probed in that same file, one run each, because *"it was in a comment"* is a hypothesis:
+
+| the tag placed in | what the tool reported |
+| --- | --- |
+| a `//` line comment | `Expected token }` |
+| a single-quoted string | `Unterminated string constant` |
+
+Two different errors, both fatal, neither naming the cause. The new gate in
+`comment-safety-contract.test.ts` is written about the SEQUENCE rather than about where it sits.
+
+Four repairs, each naming the element in prose instead of pasting the tag —
+`uploads/[name]/+server.ts`, `chat-safe-html.ts`, `server/chat-html.ts`, and the controller's
+`sanitize-html.test.ts`. The whole migration then ran clean.
+
+`.test.ts` is exempt, and that is a **measurement**: twelve occurrences remain, every one an XSS
+fixture whose subject IS the payload, and the full migration ran clean with them in place because
+the task does not read test files. Recorded at the gate as the first thing to revisit if a future
+`sv` does read them.
+
+## What the migration found otherwise: nothing
+
+`package-json`, `tsconfig`, `svelte-config`, `environment`, `paths`, `external-redirects`,
+`shallow-routing`, `params`, `imports` and `app-state` are all **no-ops** on this repository — which
+is the answer to "is the SvelteKit 3 migration finished here", measured rather than assumed.
+
+**Two of its tasks must not be run again**, and the reason is written at the gate:
+
+- `tsconfig` strips every comment from `apps/room/tsconfig.json` — 26 lines recording why there is
+  no `paths` block and why `include` is stated — for zero semantic change.
+- `lib-alias` rewrites `$lib` inside **prose**, which corrupts the sentences describing the
+  migration itself: *"SvelteKit 3 replaced the `#lib` alias with Node subpath imports"*, *"rewrote
+  `#lib/mention` to `#lib/mention`"*, *"the `#lib` → `#lib` migration"*.
+  `lib-subpath-imports.test.ts`'s own docblock already recorded the 2026-08-16 codemod making this
+  exact mistake. The tool made it again, to that sentence.
+
+## And a regression of mine, worth naming for how it hid
+
+A comment added in `28b7a53` made a point by writing the reference database name, which
+`naming-boundary.test.ts` refuses. **That test lives in the CONTROLLER suite and polices both
+apps** — so a room change verified with the room gate alone does not see it. The controller gate was
+red on this branch before this commit. The sentence now makes the same argument by naming
+`ops/naming-provenance.md` instead.
+
+**Verification.** Two negative controls seen RED — the sequence in a comment and in a string, both
+in a shipped module — restored green. `svelte-check` 0/0. `pnpm run gate` exit 0 in **both** apps.
+
+---
+
+### 2026-09-02 04:59 UTC — font preloading matches on source names, from one place instead of two
+
+## The September 2026 Svelte blog item, applied: `filename` on the `preload` filter's font branch
+
+SvelteKit 3.0.0-next.24 added a `filename` to the `font` member of the `preload` filter's input —
+the source file's pathname relative to the project root, "so that a filter can match on it instead
+of the hashed path" (installed declaration, `@sveltejs/kit/types/index.d.ts:1334-1349`). The
+PUBLISHED `kit/hooks` doc still shows the pre-next.24 signature with no union, so the installed
+types are the authority here and `font-preload-contract.test.ts` reads them at their bytes rather
+than transcribing them.
+
+## Applying it found a duplicate
+
+`hooks.server.ts` accepted `type === 'font' && path.endsWith('.woff2')`. `+layout.svelte`
+SEPARATELY hand-wrote three `<link rel="preload" as="font">` tags, `?url`-importing the faces so the
+hashed name stayed in sync. SvelteKit emits the identical tag — `rel`, `as`, `type`, `crossorigin`
+all the same — for every font the filter accepts, so **each face carried two preload links on every
+page**, and the two lists had already drifted: three in the layout against the filter's four,
+because the note editor's `summernote` face is in the root layout's CSS graph too.
+
+The filter is the half that stays. It is fed by the build's own font list, so a face entering or
+leaving the CSS graph is a fact it already knows and the layout would have had to be told. Two
+places recording one decision is how one of them goes stale, and this pair had already proved it.
+
+## And the filter became an allow-list
+
+Four source names, not an extension test. An extension test is an open rule: any woff2 a future
+stylesheet drags into the root layout gets preloaded on every page of the room with nobody having
+decided, and preload is a claim on the critical path. Deny-by-default, per `CLAUDE.md`. Naming
+sources is only possible because of `filename` — `path` is the hashed output
+(`fa-solid-900.OMe8Chpq.woff2`), different on every build.
+
+Staleness fails loud rather than silent: a name that no longer resolves stops preloading a face and
+nothing renders differently, so the contract resolves all four against the disk.
+
+## What was measured, against a real build
+
+| claim | evidence |
+| --- | --- |
+| the `?url` imports were not what put the faces in the graph | node 0's font list is **byte-identical** before and after — 12 fonts, same sources. `filter_fonts` walks the stylesheet map, not the imports |
+| no change to what is preloaded | the allow-list accepts exactly the four woff2 the extension test accepted |
+| the rejected siblings are worth rejecting | 8 files, **573,164 bytes**, statted from `.svelte-kit/output/client/_app/immutable/assets` |
+| the layout emits no preload markup now | the two `rel="preload"` strings left in the built `_layout.svelte.js` are inside the new docblock |
+
+The comment this replaces said "6 extra requests / ~540 KB" — right when written, and short by two
+once `summernote` brought a woff and a ttf of its own. The number is asserted now, not recited.
+
+## Two things fell out
+
+`font-awesome-contract.test.ts` carried a `FONT_FILES` exclusion for `fa-solid-900` and its siblings,
+there because the layout imported those woff2 FILENAMES and a filename is not a class. With the
+imports gone the exclusion had no subject, and an exclusion nothing reaches is a hole that only
+widens — deleted. And `routes/+layout.svelte`'s size ceiling went **down**, 28 to 27.
+
+## The honest consequence
+
+From the official `kit/hooks` doc: *"in dev mode `preload` is not called, since it depends on
+analysis that happens at build time."* So `pnpm dev` now emits no font preload at all. Correct
+trade — dev serves the woff2 unhashed off local disk, and a first-paint reflow there is not a
+shipped defect.
+
+**Verification.** Four negative controls seen RED: a name not on disk, the extension test restored,
+a face dropped from the list, and a preload tag put back in the layout. `svelte-check` 0/0.
+`pnpm run gate` exit 0 in `apps/room`. Nothing was opened in a browser; the rendered-output claims
+above are read from the built server bundle and the emitted asset directory.
+
+---
+
 ### 2026-09-02 04:35 UTC — a checkbox nobody had noticed is inert, and one row that needs a sentence from the owner
 
 ## PAM-17 — the refusal holds, and it was hiding an inert control

@@ -169,3 +169,102 @@ describe('svelte template comments', () => {
     ).toEqual([]);
   });
 });
+
+describe('no shipped module in either app closes a `<script>` element', () => {
+  /*
+    THE THIRD PARSER, AND IT WAS FOUND BY THE OFFICIAL SVELTE CLI REFUSING TO READ THIS REPOSITORY.
+
+    `CLAUDE.md` states this rule twice already, for two different parsers, each earned by a shipped
+    defect:
+
+      - no Svelte block inside a comment — *"prose to a human and an unclosed block to any parser
+        reading the file"*;
+      - no HTML comment marker inside an HTML comment — the rule the block above enforces, which
+        shipped paragraphs of prose into `<ul id="mainTabs">`.
+
+    This is the same rule for the third one. An HTML tokenizer reading script-element content has NO
+    notion of comments, strings or template literals: the first script-closing tag it meets ends the
+    element, wherever it sits. A `.ts` file is not itself wrapped in a script tag, so `tsc`,
+    `esbuild`, `svelte-check` and `vite build` are all silent — which is why this sat unnoticed in
+    FOUR comments across both apps.
+
+    ## What actually broke, 2026-09-02
+
+    `sv migrate sveltekit-3 --tasks imports` (sv 1.0.0-next.6) died on
+    `src/routes/uploads/[name]/+server.ts`:
+
+        Task 'imports' failed: Unable to process 'src/routes/uploads/[name]/+server.ts'.
+        Reason: Unterminated comment — https://svelte.dev/e/js_parse_error
+
+    The file has no unterminated comment. Its five block comments open and close in order, and a
+    lexer tracking strings, template literals and both comment forms walks it to EOF in state
+    `code` with zero unclosed blocks. What it has is a security note quoting an attack payload,
+    with a literal script-closing tag in it. Removing THAT one sequence — nothing else — let the
+    task and the two after it run to completion.
+
+    ## Comments are not the rule; they were only where it was found
+
+    Probed in that same file, one run each, because "it was in a comment" is a hypothesis and not a
+    measurement:
+
+      | the tag placed in | what the tool reported |
+      | --- | --- |
+      | a `//` line comment | `Expected token }` |
+      | a single-quoted string | `Unterminated string constant` |
+
+    Two different errors, both fatal, neither naming the real cause. So the rule is about the
+    SEQUENCE and not about where it sits, and this gate is written that way.
+
+    ## Why `.test.ts` is exempt, and why that is a measurement rather than a preference
+
+    Twelve occurrences remain, every one in a `*.test.ts`, and every one an XSS fixture whose
+    subject IS the payload — `sanitizeHtml('<' + 'script>alert(1)</' + 'script>')` reads worse than
+    what it replaces. They are exempt because the full migration ran clean across the app with
+    those twelve in place: the task does not read test files. That is a property of one tool's file
+    selection today, not of the rule, so if a future `sv` reads tests this exemption is the first
+    thing to revisit — split the literal across a `+`, which is what the four repairs above did in
+    prose instead.
+  */
+  const shipped = (['room', 'controller'] as const).flatMap((app) => {
+    const root = `${REPOSITORY_ROOT}apps/${app}/src/`;
+    return globSync('**/*.{ts,svelte}', { cwd: root })
+      .filter((file) => !file.endsWith('.test.ts') && !file.endsWith('.test.svelte'))
+      .map((file) => `${root}${file}`);
+  });
+
+  it('finds shipped modules in both apps to check', () => {
+    /* A glob matching nothing would make the assertion below vacuous, and both roots separately. */
+    for (const app of ['room', 'controller']) {
+      expect(
+        shipped.filter((path) => path.includes(`apps/${app}/src/`)).length,
+        `no shipped modules were found for apps/${app}`
+      ).toBeGreaterThan(50);
+    }
+  });
+
+  it("carries the sequence nowhere but a component's own closing tag", () => {
+    const offenders: string[] = [];
+    const CLOSER = '</' + 'script>';
+
+    for (const file of shipped) {
+      /*
+        `codeOf` is deliberately NOT used: it removes comments, and the probe above proved a string
+        breaks the tool exactly as a comment does. The raw bytes are the subject.
+      */
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .forEach((line, index) => {
+          /* A `.svelte` file's own closing tag, alone on its line, is the legitimate one. */
+          if (line.trim() === CLOSER) return;
+          if (line.includes(CLOSER)) offenders.push(`${file}:${index + 1}`);
+        });
+    }
+
+    expect(
+      offenders,
+      `A script-closing tag sits where an HTML tokenizer will act on it, which is how ` +
+        `\`sv migrate\` was made to report an unterminated comment in a file that has none. Name ` +
+        `the element in prose, or split the literal across a \`+\`:\n  ${offenders.join('\n  ')}`
+    ).toEqual([]);
+  });
+});
