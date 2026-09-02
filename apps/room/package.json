@@ -20,6 +20,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "schema:verify": "node gate/verify-postgres-schema-artifacts.mjs",
+    "css:sync-extra-chat": "node gate/sync-extra-chat-styles.mjs",
     "test": "pnpm privacy:verify && pnpm schema:verify && vitest run",
     "privacy:verify": "node gate/verify-privacy-boundary.mjs",
     "lint": "eslint .",

@@ -6310,7 +6310,7 @@ which is why `AlertChatArea` reaches its host through a prop and why this column
 
 ### XCP-09 — `app-extra-chat` has no transcribed stylesheet at all, and the capture it would come from never saw the component
 
-**BLOCKED 2026-08-31, AND THE BLOCKER WAS RE-NAMED ON 2026-09-02 because the first one was wrong.**
+**BUILT 2026-09-02, and the blocker had named the wrong missing thing.**
 It was filed as needing a re-capture of `apps/room/css/complete-app-styles.css`, and that premise was
 about the wrong file. The 5,818 bytes are not missing from this repository at all: they are in the
 `styles:` array of the pinned bundle at byte **2,400,462**, in
@@ -6331,13 +6331,28 @@ The remaining question is mechanical rather than evidential and is NOT a hand-ed
 forbids editing the generated sheet, so the styles reach it through the generator or through a second
 generated artifact with its own pinned input. That is the work.
 
-**What it is actually blocked on, named correctly:** the generator. `AGENTS.md` forbids hand-editing
-a generated artifact, and `captured-runtime-components.css`'s own header names the command that wrote
-it — `pnpm css:sync-captured` — which **no longer exists in `apps/room/package.json` and is among the
-78 evicted `apps/room/scripts/` files that `git ls-files` returns zero for**. So the rules are here,
-the destination is here, and the only thing missing is a published generator that reads the bundle's
-`styles:` array and performs the same `[_ngcontent-%COMP%]` → captured-host translation the existing
-sheet's header describes. That is the work, it is named, and it is separable from any capture run.
+**What actually closed it is one measurement, and it made the generator small.** `app-chat` and
+`app-extra-chat` ship **byte-identical** style arrays — 5,807 bytes each, at offsets 1,454,430 and
+2,400,462 — and so does the scroller pair, 49 bytes each at 1,419,485 and 2,367,140. The reference
+builds the second column by re-declaring the same component under a second selector and does not vary
+one declaration.
+
+So the translation of the FIRST of each pair was already here, in `captured-runtime-components.css`
+sections 34 and 35, performed from a live document's CSSOM with the value normalisation only a CSSOM
+can do (`border: none` expanded to five longhands, `#fff` to `rgb(255, 255, 255)`). Re-deriving that
+from the bundle's text would have produced a DIFFERENT sheet for identical input, and the difference
+would have been the new generator's opinion rather than the reference's.
+
+`apps/room/gate/sync-extra-chat-styles.mjs` renames those two sections and **re-proves the identity on
+every run** — that is the whole licence for the substitution, not a sanity check: if a future bundle
+makes the two differ by a byte it fails loudly and the answer becomes a real `[_ngcontent-%COMP%]`
+translator. Output: `src/lib/styles/captured-extra-chat.css`, its own artifact with both inputs hashed
+in its header, imported by `app.css` immediately after its twin so the two columns land in the same
+place in the cascade. `extra-chat-styles-contract.test.ts` regenerates in memory and compares byte for
+byte, so a hand-edit of the output fails rather than shipping.
+
+`pnpm css:sync-captured` is still gone and is still unresurrected — it read a live document, which is
+not what this needed.
 
 *Superseded text, kept because a wrong blocker is worth being able to recognise again:* "**BLOCKED
 2026-08-31.** A re-capture unblocks it; a hand-edit is forbidden."
@@ -7925,16 +7940,30 @@ produce the reference's behaviour — it produces a THIRD one, present in neithe
 that still records in the browser and has no way to reach what it recorded. The right disposition is
 therefore the blocker's, with what unblocks it named, rather than a per-item argument about taste.
 
-**What is separable, and is NOT excused by the blocker:** the RECEIVER half. *"Our server does not
-send that frame"* is not one of the four escapes — a receiver is transcribable whatever any server
-sends, and this repository has been wrong about that three times. `setRecPreview` (byte 1,023,752,
-`this.globals.sessData.recPreviewLocation = i.url`) and the gate at 2,476,206,
-`isRecording && sessData.recPreviewLocation`, are both transcribable today and would be inert rather
-than wrong: with no producer, `recPreviewLocation` stays unset and the item never draws — which is
-exactly what the reference does when its own server sends nothing. **That half is real work and is
-named here as such**, kept out of this pass only because it lands in the same commit as the host it
-is pointless without, and because doing it alone would mean deciding whether this room's own
-post-stop preview is removed with it — a capability question for the owner, not a transcription.
+**The RECEIVER half was named here as unbuilt work on 2026-09-02, and it was ALREADY BUILT — the
+correction is kept because the paragraph was written without re-reading what ships.** *"Our server
+does not send that frame"* is not one of the four escapes, a receiver is transcribable whatever any
+server sends, and this repository has been wrong about that three times; what it got wrong THIS time
+was the opposite direction. All three pieces ship:
+
+* `setRecPreview` — `lib/room/recording-frames.ts:67-93`, which quotes byte 1,023,704 verbatim and
+  assigns `deps.media.recPreviewLocation = command.url`;
+* the state — `RoomMedia.recPreviewLocation` (`lib/room/media.svelte.ts:122-143`), whose own docblock
+  names all three consumers the frame arms and says in as many words that this room's server does not
+  send it, so it stays empty;
+* the gate — `RoomNavbar.svelte:679`, `media.roomRecording && media.recPreviewLocation`, byte
+  2,476,206 term for term, with `RecordingPreviewCard.svelte` behind it.
+
+The capability question that paragraph deferred to the owner had already been answered in the code:
+this room's own post-stop preview is KEPT, beside the reference's pair, relabelled *"Local
+Recording"* because *"the reference owns the unqualified name"*. The two can never both draw — one
+needs a recording in progress on the SERVER, the other a finished LOCAL one.
+
+**So what remains here is a divergence of MOMENT and the absent download destination, nothing else.**
+The sixth stale claim found this week, and the pattern is the same every time: prose about what is
+missing, written without re-reading what is there.
+
+*Corrected 2026-09-02.*
 
 **Unblocked by:** the MediaMTX host. At that point the recording is server-side, the download item
 has nothing local to hand back and goes, and the preview gate has a producer — all three rows close
@@ -10865,16 +10894,30 @@ produce the reference's behaviour — it produces a THIRD one, present in neithe
 that still records in the browser and has no way to reach what it recorded. The right disposition is
 therefore the blocker's, with what unblocks it named, rather than a per-item argument about taste.
 
-**What is separable, and is NOT excused by the blocker:** the RECEIVER half. *"Our server does not
-send that frame"* is not one of the four escapes — a receiver is transcribable whatever any server
-sends, and this repository has been wrong about that three times. `setRecPreview` (byte 1,023,752,
-`this.globals.sessData.recPreviewLocation = i.url`) and the gate at 2,476,206,
-`isRecording && sessData.recPreviewLocation`, are both transcribable today and would be inert rather
-than wrong: with no producer, `recPreviewLocation` stays unset and the item never draws — which is
-exactly what the reference does when its own server sends nothing. **That half is real work and is
-named here as such**, kept out of this pass only because it lands in the same commit as the host it
-is pointless without, and because doing it alone would mean deciding whether this room's own
-post-stop preview is removed with it — a capability question for the owner, not a transcription.
+**The RECEIVER half was named here as unbuilt work on 2026-09-02, and it was ALREADY BUILT — the
+correction is kept because the paragraph was written without re-reading what ships.** *"Our server
+does not send that frame"* is not one of the four escapes, a receiver is transcribable whatever any
+server sends, and this repository has been wrong about that three times; what it got wrong THIS time
+was the opposite direction. All three pieces ship:
+
+* `setRecPreview` — `lib/room/recording-frames.ts:67-93`, which quotes byte 1,023,704 verbatim and
+  assigns `deps.media.recPreviewLocation = command.url`;
+* the state — `RoomMedia.recPreviewLocation` (`lib/room/media.svelte.ts:122-143`), whose own docblock
+  names all three consumers the frame arms and says in as many words that this room's server does not
+  send it, so it stays empty;
+* the gate — `RoomNavbar.svelte:679`, `media.roomRecording && media.recPreviewLocation`, byte
+  2,476,206 term for term, with `RecordingPreviewCard.svelte` behind it.
+
+The capability question that paragraph deferred to the owner had already been answered in the code:
+this room's own post-stop preview is KEPT, beside the reference's pair, relabelled *"Local
+Recording"* because *"the reference owns the unqualified name"*. The two can never both draw — one
+needs a recording in progress on the SERVER, the other a finished LOCAL one.
+
+**So what remains here is a divergence of MOMENT and the absent download destination, nothing else.**
+The sixth stale claim found this week, and the pattern is the same every time: prose about what is
+missing, written without re-reading what is there.
+
+*Corrected 2026-09-02.*
 
 **Unblocked by:** the MediaMTX host. At that point the recording is server-side, the download item
 has nothing local to hand back and goes, and the preview gate has a producer — all three rows close
@@ -10911,16 +10954,30 @@ produce the reference's behaviour — it produces a THIRD one, present in neithe
 that still records in the browser and has no way to reach what it recorded. The right disposition is
 therefore the blocker's, with what unblocks it named, rather than a per-item argument about taste.
 
-**What is separable, and is NOT excused by the blocker:** the RECEIVER half. *"Our server does not
-send that frame"* is not one of the four escapes — a receiver is transcribable whatever any server
-sends, and this repository has been wrong about that three times. `setRecPreview` (byte 1,023,752,
-`this.globals.sessData.recPreviewLocation = i.url`) and the gate at 2,476,206,
-`isRecording && sessData.recPreviewLocation`, are both transcribable today and would be inert rather
-than wrong: with no producer, `recPreviewLocation` stays unset and the item never draws — which is
-exactly what the reference does when its own server sends nothing. **That half is real work and is
-named here as such**, kept out of this pass only because it lands in the same commit as the host it
-is pointless without, and because doing it alone would mean deciding whether this room's own
-post-stop preview is removed with it — a capability question for the owner, not a transcription.
+**The RECEIVER half was named here as unbuilt work on 2026-09-02, and it was ALREADY BUILT — the
+correction is kept because the paragraph was written without re-reading what ships.** *"Our server
+does not send that frame"* is not one of the four escapes, a receiver is transcribable whatever any
+server sends, and this repository has been wrong about that three times; what it got wrong THIS time
+was the opposite direction. All three pieces ship:
+
+* `setRecPreview` — `lib/room/recording-frames.ts:67-93`, which quotes byte 1,023,704 verbatim and
+  assigns `deps.media.recPreviewLocation = command.url`;
+* the state — `RoomMedia.recPreviewLocation` (`lib/room/media.svelte.ts:122-143`), whose own docblock
+  names all three consumers the frame arms and says in as many words that this room's server does not
+  send it, so it stays empty;
+* the gate — `RoomNavbar.svelte:679`, `media.roomRecording && media.recPreviewLocation`, byte
+  2,476,206 term for term, with `RecordingPreviewCard.svelte` behind it.
+
+The capability question that paragraph deferred to the owner had already been answered in the code:
+this room's own post-stop preview is KEPT, beside the reference's pair, relabelled *"Local
+Recording"* because *"the reference owns the unqualified name"*. The two can never both draw — one
+needs a recording in progress on the SERVER, the other a finished LOCAL one.
+
+**So what remains here is a divergence of MOMENT and the absent download destination, nothing else.**
+The sixth stale claim found this week, and the pattern is the same every time: prose about what is
+missing, written without re-reading what is there.
+
+*Corrected 2026-09-02.*
 
 **Unblocked by:** the MediaMTX host. At that point the recording is server-side, the download item
 has nothing local to hand back and goes, and the preview gate has a producer — all three rows close
