@@ -2337,7 +2337,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `chat-display-mode-contract.test.ts` requires `TRIGGER_CLASS`'s three strings to stay in this
       file's own code.
     */
-    max: 252,
+    /*
+      252 -> 263, 2026-09-02. MSM-01 — the Add Reaction icon's captured tooltip.
+
+      Const 40 at byte 1,359,726 and const 37 at 1,397,773 are the same value:
+      `["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]`. STATIC attribute pairs,
+      not a binding — which is what decides the spelling: `ngbTooltipWith` is for the five hosts
+      whose text the reference binds and which therefore carry no `ngbtooltip` attribute at all, and
+      using it here would have shown the right bubble on an element the reference marks differently.
+
+      Six lines of note, four of markup and one import. The tooltip repeats the entry's own label,
+      which reads as redundant and is the capture's.
+    */
+    max: 263,
     why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
   },
   {
@@ -4815,7 +4827,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       copy-on-write Set convention into a guarantee — raw state cannot be mutated, so the pattern is
       enforced by the rune instead of by everyone remembering it.
     */
-    max: 401,
+    /*
+      401 -> 421, 2026-09-02. FP-09, and the twenty lines bought a real behaviour fix, not a
+      transcription.
+
+      The reference's filter pipe, read whole at byte 1,914,488, has NO `.trim()` and returns the
+      array UNCHANGED for an empty term. Ours trimmed, and ran the `Object.values` walk with `''`.
+
+      The empty-term half is the one that mattered. `''.includes('')` is true for any string, so the
+      walk agreed for every row holding at least one string field and DROPPED any row holding none —
+      in the state the pane opens in. The short-circuit is also the cheaper path: no allocation and
+      no walk on the render that happens most, which is the shape question `CLAUDE.md` asks of every
+      read path.
+
+      Seventeen of the twenty-three lines are that explanation, and it is the half a reader cannot
+      recover: "removed a trim" looks cosmetic until somebody works out what an empty query did.
+
+      Three of those seventeen are a CORRECTION to my own first draft of the note, kept rather than
+      quietly rewritten: it claimed the empty-term walk DROPPED rows holding no string field. True
+      of the expression and unreachable through the type — `RoomFileRow` declares four fields as
+      `string`. The visible effect was the wait, not the result, and the note now says so.
+    */
+    max: 424,
     why: 'the file drive; the first slice to collapse a prop list at TWO call sites rather than one'
   },
   {
@@ -6786,7 +6819,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       gate there. A reader adding a gate here for consistency would remove a control from every
       member.
     */
-    max: 1543,
+    /*
+      1,543 -> 1,559, 2026-09-02. ACA-04 — `T(4,"i")` at byte 1,424,607, a BARE `<i>` closing the
+      Webinar Mode block: no const index, so no class and no attribute, and no text.
+
+      Refused on the ground that nothing in either stylesheet selects a bare `<i>`, so it is
+      invisible. True, and true UPSTREAM for the same reason — which makes it an upstream defect
+      reproduced rather than an escape. Fifteen of the sixteen lines say exactly that, because an
+      empty element with no note over it is the first thing a later reader deletes.
+    */
+    max: 1559,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -7922,7 +7964,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       an HTML comment, which CLAUDE.md forbids by name — prose to a human, an unclosed block to any
       parser reading the file. The branch is named rather than quoted now, and the reason is at it.
     */
-    max: 1134,
+    /*
+      1,134 -> 1,156, 2026-09-02. NAV-05 and NAV-11, two dead-on-arrival values the reference ships
+      and this room did not.
+
+      NAV-05 — `recIndicatorStart`, the second key of `iPe` (byte 2,465,900). Its only rule is
+      `app-room .recIndicatorStart a`, a DESCENDANT selector, and the `<i>` it is bound to has no
+      children — so it paints nothing. The refusal said so and recorded, in its own last sentence,
+      that it paints nothing upstream either. That sentence is the answer: dead there and dead here
+      is a defect reproduced, and the rendered `class` attribute is reference-facing output.
+
+      NAV-11 — `audiovolslider=""`, the first entry of const 200 (byte 2,545,086). An attribute with
+      an empty value that nothing anywhere reads.
+
+      Both notes state that the value is EXPECTED to do nothing, which is the only thing that stops
+      the next reader removing them as dead code — and is why they are notes rather than one line
+      each.
+    */
+    max: 1156,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {
@@ -8526,7 +8585,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/alert-chat-nav.ts',
-    max: 83,
+    /*
+      83 -> 85, 2026-09-02. `WEBINAR_MODE_TRAILING_ICON_REFUSED` became
+      `WEBINAR_MODE_TRAILING_ICON_BUILT` and grew two lines saying why the refusal did not survive.
+      The constant is kept rather than deleted for the reason it was exported in the first place: the
+      contract test reads it, so the history cannot be lost by deleting a comment.
+    */
+    max: 85,
     why: 'ACA-03/ACA-04: the poll indicator class map, on the anchor the update block actually selects, and the refused trailing icon'
   },
   {

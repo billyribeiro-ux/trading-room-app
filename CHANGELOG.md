@@ -45,6 +45,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 01:09 UTC — five values the reference ships and this room did not, four of them refused for being inert
+
+The re-triage's second batch. Every one of these was a MEASURED REFUSAL whose measurement was
+correct, and four of the five were refused on the same reasoning: *the value paints nothing / does
+nothing here.* True in every case — and true UPSTREAM for the same reason in every case, which makes
+each one an upstream defect reproduced rather than an escape from matching. The rendered attribute,
+class or element is reference-facing output, and it differed.
+
+Every byte below was read in this session from the pinned bundle, not quoted from a row.
+
+| row | value | why it was refused | why that did not survive |
+| --- | --- | --- | --- |
+| NAV-05 | `recIndicatorStart` on the recording icon (byte 2,465,900) | its only rule is `app-room .recIndicatorStart a`, a DESCENDANT selector, and the `<i>` has no children | the refusal's own last sentence read *"It is inert in the reference for the same reason"* |
+| NAV-11 | `audiovolslider=""` on the music slider (2,545,086) | an empty attribute nothing anywhere reads | nothing reads it upstream either |
+| ACA-04 | a bare `<i></i>` closing the Webinar Mode block (1,424,607) | no stylesheet here or there selects a bare `<i>` | invisible upstream for the same reason |
+| MSM-01 | `ngbtooltip="Add Reaction"` `placement="left"` (1,359,726 / 1,397,773) | the bubble repeats a label four characters to its right | that is an argument about whether the reference's choice is GOOD, which is not one of the four escapes |
+| FP-09 | the file-search pipe (1,914,488) | — | not a refusal; a real behaviour difference, below |
+
+Each note at the code now states that the value is EXPECTED to do nothing, because that is the only
+thing stopping the next reader deleting it as dead.
+
+## MSM-01's spelling was the part worth getting right
+
+Both consts are STATIC attribute pairs — they sit before the `1,` class marker — so the reference
+writes `ngbtooltip="Add Reaction"` into the DOM, and the transcription is the attribute plus
+`{@attach ngbTooltip}`. `ngbTooltipWith` would have been wrong: `#lib/ngb-tooltip`'s own docblock
+records that it exists for the five hosts whose text the reference BINDS, which therefore carry no
+`ngbtooltip` attribute at all. Using it would have shown the right bubble on an element marked
+differently from the capture. The first draft here used it; the docblock caught it.
+
+## FP-09 — the file search, and a claim of mine that was too strong
+
+The pipe read whole at 1,914,488 has NO `.trim()` and returns the input array UNCHANGED for a falsy
+term. Ours trimmed and ran the `Object.values` walk with `''`.
+
+The trim is user-visible and not academic: with the space kept, ` png` matches nothing, and this
+pipe is the only way the Files pane is searched.
+
+**My first note on the empty-term half was wrong and is corrected rather than rewritten.** It said
+the walk DROPPED rows holding no string field. True of the expression, unreachable through the type
+— `RoomFileRow` declares four fields as `string`. The visible effect was the WAIT, not the result:
+the pane opens with an empty box and this allocated and walked every row to arrive at the list it
+started with. The short-circuit is the reference's own and it is the cheaper path on the render that
+happens most.
+
+## Two of my own gates caught my own test code
+
+`slice-anchor-contract.test.ts` refused two slices I wrote that inlined their `indexOf`, and it was
+right: `lastIndexOf` returning -1 makes `slice(-1, …)` a one-character window, and every assertion
+downstream then fails for the wrong reason. Both bounds are bound and asserted now.
+
+`navbar-decoded-rows-contract.test.ts` had NO assertion for NAV-11 at all — the negative control came
+back GREEN, which is how that was found. It has one now, plus a positive control asserting the
+slider still carries `title`, `class` and `type`, because an assertion that only checks the new
+attribute passes just as well on a slider that has lost the rest of its const.
+
+**Runtime impact.** The presenter's recording icon carries the capture's starting class, the music
+slider carries its inert attribute, the Webinar Mode block emits its trailing element, and the Add
+Reaction icon shows the capture's left-placed tooltip. The Files search now behaves as the reference
+does for a term with spaces, and does no work at all for an empty one.
+
+**Verified:** room gate exit 0 at `532390a` — 341 files, 6,145 passed, 1 skipped. Negative controls seen red for all five: dropping the
+`recIndicatorStart` term, the `audiovolslider` attribute, the bare `<i>` (and giving it a class),
+the tooltip (and the tooltip without its placement), and restoring the `.trim()`. Controller
+untouched, so its gate was not run.
+
 ### 2026-09-02 00:45 UTC — five re-measured refusals, three of which were wrong, and a gate that found this repository disagreeing with itself
 
 The re-triage pass over the audit's non-code dispositions, under the standing instruction to match

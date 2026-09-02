@@ -1200,6 +1200,22 @@
               >
                 <i class="fas fa-question-circle"></i>
               </span>
+              <!--
+                ACA-04 — `T(4,"i")`, byte 1,424,607, read whole:
+
+                  function e0e(t,n){1&t&&(d(0,"div",24), v(1," Webinar Mode "),
+                                          d(2,"span",56), T(3,"i",57), u(), T(4,"i"), u())}
+
+                A BARE `<i>` closing the block: no const index, so no class and no attribute, and no
+                text. It was a MEASURED REFUSAL on the ground that nothing in either stylesheet
+                selects a bare `<i>`, so the element is invisible.
+
+                It is invisible UPSTREAM too, for the same reason, which is what turns that
+                measurement from an escape into the match: an empty element the reference emits is
+                reference-facing output whether or not anything paints it. Stated so nobody removes
+                it as dead markup — it is expected to render nothing, and that is the point.
+              -->
+              <i></i>
             </div>
           {/if}
           <!--

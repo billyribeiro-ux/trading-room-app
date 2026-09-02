@@ -230,6 +230,47 @@ describe('searching and sorting, as the reference composes them', () => {
     expect(files.searchedFiles().map((f) => f.id)).toEqual([3]);
   });
 
+  it('does NOT trim the term, which is the reference and is user-visible', () => {
+    /*
+      FP-09. The pipe read whole at byte 1,914,488 has no `.trim()`:
+
+        transform(e, i) { return e ? i ? (i = i.toLowerCase(), e.filter(o => { … })) : e : [] }
+
+      Ours trimmed, so a member typing a trailing space got a DIFFERENT list from the one the
+      capture gives — and not an academic difference: with the space kept, ` png` matches nothing,
+      and this pipe is the only way the Files pane is searched.
+    */
+    const { files } = make();
+    files.search('png');
+    expect(
+      files.searchedFiles().map((f) => f.id),
+      'the term itself must still match'
+    ).toEqual([1]);
+    files.search(' png');
+    expect(files.searchedFiles()).toEqual([]);
+    files.search('png ');
+    expect(files.searchedFiles()).toEqual([]);
+  });
+
+  it('short-circuits an empty term to the whole list instead of walking every row', () => {
+    /*
+      The other half of the same pipe: `e ? i ? … : e : []` returns the input array UNCHANGED when
+      the term is falsy. This ran the full `Object.values` walk with `''`.
+
+      The RESULT was already right — `''.includes('')` is true and `RoomFileRow` types four fields
+      as `string`, so no row this type can express was ever dropped. What was wrong is the work: the
+      pane opens with an empty box, and this allocated and walked every row to arrive at the list it
+      started with. Asserted as an equality on the whole list rather than on identity, because the
+      sort downstream copies either way — this pins the behaviour the short-circuit must preserve,
+      and the cost it removes is argued at the code.
+    */
+    const { files } = make();
+    files.search('png');
+    expect(files.searchedFiles()).toHaveLength(1);
+    files.search('');
+    expect(files.searchedFiles().map((f) => f.id)).toEqual([3, 1, 2]);
+  });
+
   it('searches FIRST and sorts second, and opens on date/desc', () => {
     const { files } = make();
     expect(files.fileSort).toEqual({ field: 'date', direction: 'desc' });

@@ -575,18 +575,32 @@
               docblock said the class map was on the recording `ul`; it is not, and the correction is
               recorded there.
 
-              **The second half of `iPe` is a MEASURED REFUSAL, NAV-05.** `recIndicatorStart` is not
-              worn here. Its only rule anywhere is `app-room .recIndicatorStart a` — a DESCENDANT
-              selector, `captured-runtime-components.css:988` — and an `<i>` with no children has no
-              descendant `a`, so the class would paint nothing. Const 94 puts the same name on the
-              starting badge's `li`, which does have the `a` the rule needs, and that is where this
-              room already wears it. Adding it here would be a class with no CSS, which this
-              repository refuses by name.
+              **The second half of `iPe` is now WORN, 2026-09-02, and it was a refusal until then.**
+
+              The refusal's measurement was right and its conclusion was not. `recIndicatorStart`'s
+              only rule anywhere is `app-room .recIndicatorStart a` — a DESCENDANT selector,
+              `captured-runtime-components.css:988` — and an `<i>` with no children has no
+              descendant `a`, so the class paints nothing here. That was read as "a class with no
+              CSS, which this repository refuses by name".
+
+              It paints nothing UPSTREAM either, for the identical reason: same selector, same
+              childless `<i>`, same `iPe` binding at byte 2,477,678. So this is not a class we would
+              be inventing — it is a dead class the reference ships, and reproducing an upstream
+              defect is matching rather than an escape from it. The rendered `class` attribute is
+              reference-facing output, and it differed.
+
+              Stated here so nobody deletes it as dead code later: **the second key is expected to
+              have no visual effect, and that is the match.** Const 94 puts the same name on the
+              starting badge's `li`, which does have the `a` the rule needs; that is where the class
+              actually paints, and `NavbarRecIndicator.svelte` wears it there.
             -->
             <i
               class={[
                 'far fa-2x fa-dot-circle',
-                { 'breathing-rec': media.roomRecording && blinkingRec }
+                {
+                  'breathing-rec': media.roomRecording && blinkingRec,
+                  recIndicatorStart: media.roomRecordingStarting
+                }
               ]}
             ></i>
             <span class="ml-2 mainNavItem">Start/Stop Recording</span>
@@ -984,7 +998,15 @@
             <div style="text-align: center;">
               <hr />
               <p class="m-0">Background Music:</p>
+              <!--
+                NAV-11 — `audioVolSlider` is the FIRST entry of const 200 (byte 2,545,086), an
+                attribute with an empty value and no CSS or script anywhere that reads it. Carried
+                because the rendered attribute set is reference-facing output; it is inert here
+                exactly as it is inert there. HTML attribute names are case-insensitive and Svelte
+                emits them lowercased, so the DOM carries `audiovolslider` in both.
+              -->
               <input
+                audiovolslider=""
                 id="background-volume"
                 name="backgroundVolume"
                 type="range"

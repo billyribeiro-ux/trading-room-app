@@ -77,6 +77,8 @@ export function pollNavAnchorClasses(
  * A `const`, and exported, because a refusal nothing imports is a refusal nobody can see: the
  * contract test asserts against this value, so deleting the note breaks the test that guards it.
  */
-export const WEBINAR_MODE_TRAILING_ICON_REFUSED =
-  'T(4,"i") at bytes 1,424,607 and 2,371,066 carries no const index, no class and no text; no ' +
-  'stylesheet in this repository or in the reference selects a bare <i>.';
+export const WEBINAR_MODE_TRAILING_ICON_BUILT =
+  'T(4,"i") at bytes 1,424,607 and 2,371,066 carries no const index, no class and no text. It was ' +
+  'REFUSED on the ground that no stylesheet here or in the reference selects a bare <i>, which is ' +
+  'true and is not an escape: it is invisible upstream for the same reason, so emitting it is the ' +
+  'match. Built 2026-09-02 in AlertChatArea.svelte, at the tail of the Webinar Mode block.';
