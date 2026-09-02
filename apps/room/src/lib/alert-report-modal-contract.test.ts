@@ -650,10 +650,19 @@ describe('ASR-2 — the self-referential aria-labelledby, and the count that kee
       editor's Giphy picker the modal chrome the capture opens it in, with `titleId` and
       `ariaLabelledby` both `modal-basic-title` — const 82. So the ratio moved the right way, and
       the ten self-referential ones are still ten.
+
+      23 -> 24 on 2026-09-02, and the same again: `SCH-07` restored the reference's SECOND modal,
+      `#scheduledAlertsModal`, which the pane had been rendering as an inline table. It is named —
+      `titleId="scheduledAlertsModalLabel"`, which is const 4 — so `named` moves with `total` and
+      the self-referential ten are untouched.
+
+      **This count going red is the point of it.** It is what noticed that a dialog had been added
+      at all, in a file nobody would have thought to open for a scheduling change, and it is the
+      reason the ratio is asserted as a triple rather than as three separate numbers.
     */
     expect({ total, named, selfReferential }).toEqual({
-      total: 23,
-      named: 10,
+      total: 24,
+      named: 11,
       selfReferential: 10
     });
   });

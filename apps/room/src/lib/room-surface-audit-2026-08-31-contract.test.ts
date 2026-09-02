@@ -280,6 +280,134 @@ describe('AVD-02 — a fallback choice reaches the saved preference', () => {
   });
 });
 
+describe('SCH-07 — the second modal, and the chrome that comes with it', () => {
+  /*
+    ── BUILT 2026-09-02, AND THE REFUSAL WAS CIRCULAR ──────────────────────────────────────────────
+
+    `app-scheduled-alerts`'s const table, read by value from byte 2,407,520, with its create block
+    at 2,408,290:
+
+      [0]  ["id","scheduledAlertsModal","tabindex","-1",
+            "aria-labelledby","scheduledAlertsModalLabel","aria-hidden","true",
+            1,"modal","fade","text-white"]
+      [1]  [1,"modal-dialog","modal-xl"]        [4]  ["id","scheduledAlertsModalLabel",1,"modal-title"]
+      [5]  ["type","button","data-bs-dismiss","modal","aria-label","Close",
+            1,"btn-close","btn-close-white"]
+      [7]  [1,"table","table-striped","text-white","w-100"]
+      [10] [1,"modal-footer"]                   [11] ["type","button","data-bs-dismiss","modal",
+                                                      1,"btn","btn-primary"]
+
+      d(0,"div",0)(1,"div",1)(2,"div",2)(3,"div",3)(4,"h5",4), v(5," Manage Scheduled Alerts "),
+      u(), T(6,"button",5), u(), d(7,"div",6)(8,"table",7) … d(24,"div",10)(25,"button",11),
+      v(26," Close ")
+
+    The pane rendered this table INLINE. The row was refused because *"a pane embedded in
+    `PostAlertModal`'s body cannot carry a second modal's dialog, because there is no second
+    modal"* — circular, since the absence of the second modal IS the divergence, and the same shape
+    `SZC-03` was refused on.
+
+    ## Why it is the project's `Modal` and not a hand-rolled dialog
+
+    That primitive already renders this exact chrome — `modal-dialog` + `dialogClass`,
+    `modal-content`, `modal-header`, a `btn-close btn-close-white` dismiss, `modal-body`,
+    `modal-footer`. Reusing it keeps the focus trap, the `inert` handling and `ASR-3`'s
+    focus-on-open, all of which the reference got from Bootstrap's plugin and this room ships itself
+    because it loads no Bootstrap JavaScript. A second hand-rolled dialog would be a second copy of
+    all three.
+
+    ## `aria-hidden` is the creation-time value
+
+    Const 0 carries `"aria-hidden","true"` and Bootstrap's Modal plugin rewrites it on show — the
+    same reading `MTS-06`, `MSM-02` and `NTC-3` were disposed on, and `bootstrap-dropdown-contract`
+    holds the proof that the plugin is loaded upstream. `closedAriaHidden` is the primitive's name
+    for it, so a CLOSED dialog carries it and an open one does not. Freezing the literal would
+    announce an open dialog as hidden.
+
+    ## The table classes, and the row's one real argument
+
+    `table table-striped text-white w-100` are Bootstrap GLOBALS on a table inside a SCOPED sheet,
+    and the room runs two Bootstrap generations. **That measures true** — `.table-striped` is
+    defined in `app.css` AND in `src/lib/styles/protradingroom-source.css` — so which sheet supplies
+    the striping depends on load order.
+
+    Carried anyway, because the concern is not new: this component already depends on global
+    Bootstrap for its `text-bg-*` badge colours, deliberately, and its own sheet says so. A rule the
+    file does not follow for the badges cannot decide the table.
+  */
+  const openPane = () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const component = mount(ScheduledAlertsTable, {
+      target: host,
+      props: {
+        rows: [
+          {
+            id: 1,
+            senderName: 'Ada',
+            body: 'AAPL long',
+            repeat: '' as const,
+            ignoreWeekends: false,
+            sendOn: 1_788_000_000_000
+          }
+        ],
+        onremove: () => {}
+      }
+    });
+    flushSync();
+    return { host, component };
+  };
+
+  it('gives the table the four captured classes', () => {
+    const { host, component } = openPane();
+    const table = host.querySelector('table');
+    expect(table, 'the table is gone').not.toBeNull();
+    for (const cls of ['table', 'table-striped', 'text-white', 'w-100']) {
+      expect(table?.classList.contains(cls), `const 7 carries ${cls}`).toBe(true);
+    }
+    void unmount(component);
+    host.remove();
+  });
+
+  it('wires the pane to the project Modal with the captured chrome', () => {
+    /*
+      Read from the SOURCE rather than mounted: `ScheduledAlerts` needs the whole scheduling
+      surface to mount, and what this row is about is the chrome it hands the primitive — every
+      value here is a const the create block above names.
+    */
+    const code = SCHEDULED_ALERTS;
+
+    expect(code, 'the second modal is gone').toContain('id="scheduledAlertsModal"');
+    expect(code).toContain('ariaLabelledby="scheduledAlertsModalLabel"');
+    expect(code).toContain('rootClass="modal fade text-white"');
+    expect(code).toContain('dialogClass="modal-xl"');
+    expect(code).toContain('titleId="scheduledAlertsModalLabel"');
+    expect(code).toContain('titleClass="modal-title"');
+    /* The capture's own spaces, which `AGENTS.md` keeps as `{\' \'}` or an attribute value. */
+    expect(code, 'v(5," Manage Scheduled Alerts ")').toContain('title=" Manage Scheduled Alerts "');
+    expect(code, 'v(26," Close ")').toContain("{' Close '}");
+    /* The footer button is const 11, `data-bs-dismiss` and all. */
+    expect(code).toContain('data-bs-dismiss="modal"');
+    expect(code).toContain('class="btn btn-primary"');
+
+    /*
+      And the table is no longer rendered inline beside the button. This is the assertion that the
+      row actually closed rather than the modal being added next to what was already there.
+    */
+    const inline = code.indexOf('<ScheduledAlertsTable');
+    const modal = code.indexOf('<Modal');
+    expect(inline, 'the table is gone entirely').toBeGreaterThan(-1);
+    expect(modal, 'the Modal is gone').toBeGreaterThan(-1);
+    expect(inline, 'the table must render INSIDE the modal, not beside it').toBeGreaterThan(modal);
+  });
+
+  it('opens rather than toggles, because a dialog is closed from inside it', () => {
+    const code = SCHEDULED_ALERTS;
+    expect(code, 'the trigger still toggles').not.toContain('managing = !managing');
+    expect(code).toContain('async function openManage()');
+    expect(code).toContain('onclick={openManage}');
+  });
+});
+
 describe('SCH-03, SCH-04 and SCH-05 — the manage table row', () => {
   const rows = [
     {

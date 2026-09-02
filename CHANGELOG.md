@@ -45,6 +45,67 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 16:07 UTC — SCH-07 built: the reference's second modal, on the project's own primitive
+
+The Svelte MCP reconnected, so the two obligations it was blocking are both discharged here.
+
+## The retroactive autofixer pass I said I owed
+
+`ScreenShareMenu.svelte`, `PostAlertModal.svelte` and `refresh.svelte.ts` all return **no issues**.
+
+Two suggestions came back on `PostAlertModal` and both were **artifacts of the extract I hand-wrote
+for the tool**, not findings in the file: `SvelteSet` over a mutable `Set`, and an attachment over
+`bind:this`. The real component already uses `SvelteSet` (line 117) and already uses an attachment
+(lines 197-201) — it is ahead of both.
+
+`ScheduledAlerts` and `ScheduledAlertsTable` return no issues and one suggestion each —
+*"Unexpected mustache interpolation with a string literal value"* on `{' Close '}` and
+`{' Remove '}`. **Declined**, and it is one of the two declines `apps/room/AGENTS.md:99-111` records
+by name: the capture's strings are `v(5," Manage Scheduled Alerts ")` and `v(26," Close ")`, and
+those spaces are evidence every capture comparison here diffs.
+
+## The refusal was circular
+
+*"A pane embedded in `PostAlertModal`'s body cannot carry a second modal's dialog, because there is
+no second modal"* — the absence of the second modal **is** the divergence. Same shape `SZC-03` was
+refused on.
+
+`ScheduledAlerts.svelte` now renders `<Modal id="scheduledAlertsModal">` with the eight captured
+chrome values, read by value from const 0 at byte 2,407,520 and the create block at 2,408,290:
+`modal fade text-white`, `modal-dialog modal-xl`, the `modal-title` `" Manage Scheduled Alerts "`,
+`aria-labelledby="scheduledAlertsModalLabel"`, the `btn-close btn-close-white` dismiss, and a footer
+carrying const 11's `btn btn-primary` `" Close "`. The trigger **opens** rather than toggles, which
+is what `data-bs-toggle="modal"` means and what the inline table had made impossible.
+
+**It is the project's own `Modal` primitive rather than a hand-rolled dialog**, and that is the
+load-bearing choice: the primitive already renders this exact chrome *and* carries the focus trap,
+the `inert` handling and `ASR-3`'s focus-on-open — all of which the reference got from Bootstrap's
+plugin and this room ships itself. A second dialog would have been a second copy of all three.
+`aria-hidden` is the creation-time value via `closedAriaHidden`, on the reading MTS-06/MSM-02/NTC-3
+were disposed on this morning.
+
+## The second argument measured TRUE and was still not a reason to refuse
+
+`.table-striped` really is defined **twice** here — `app.css` and
+`src/lib/styles/protradingroom-source.css` — so which sheet supplies the striping depends on load
+order. Const 7's four classes are carried anyway, because `ScheduledAlertsTable` **already** depends
+on global Bootstrap for its `text-bg-*` badge colours, deliberately and with the reason in its own
+scoped sheet. A rule the file does not follow for the badges cannot decide the table.
+
+## A gate noticed on its own that a dialog had appeared
+
+`alert-report-modal-contract`'s modal census went **23 → 24** and named **10 → 11**, in a file
+nobody would have opened for a scheduling change. That is exactly what asserting the ratio as a
+triple is for, and its comment now says so.
+
+**Verification.** Three negative controls seen RED, each with an asserted anchor so a no-op mutation
+cannot pass as a control: the table classes reverted, the table rendered beside the modal instead of
+inside it, and the trigger back to toggling. Two ceilings argued at their entries — `ScheduledAlerts`
+264 → 310 (the dialog it did not have) and `ScheduledAlertsTable` 164 → 173 — with both comments in
+the short form and the argument beside the assertions. `pnpm run gate` exit 0 in **both** apps.
+
+---
+
 ### 2026-09-02 15:23 UTC — SSM-2 matched: the six menu clicks split three and three
 
 ## The refusal rested on a false dichotomy

@@ -2,6 +2,7 @@
   import { removeScheduledAlertQuestion } from '#lib/scheduled-alert-table.js';
   import { type RepeatMode } from '#lib/scheduled-alert.js';
   import ScheduledAlertFields from './ScheduledAlertFields.svelte';
+  import Modal from './Modal.svelte';
   import ScheduledAlertsTable from './ScheduledAlertsTable.svelte';
   import {
     listScheduledAlerts,
@@ -87,9 +88,16 @@
     pending = await listScheduledAlerts();
   }
 
-  async function toggleManage() {
-    managing = !managing;
-    if (managing) await refresh();
+  /*
+    `SCH-07` — OPENS, and no longer toggles.
+
+    The reference's control is `data-bs-toggle="modal" data-bs-target="#scheduledAlertsModal"`: it
+    opens a dialog, and a dialog is closed from inside it. Toggling was a consequence of rendering
+    the table inline, which is the divergence this row closed.
+  */
+  async function openManage() {
+    managing = true;
+    await refresh();
   }
 
   /**
@@ -217,7 +225,7 @@
       data-bs-toggle="modal"
       data-bs-target="#scheduledAlertsModal"
       class="btn btn-outline-success mx-1"
-      onclick={toggleManage}
+      onclick={openManage}
     >
       <i class="fas fa-calendar"></i>{' See Scheduled Alerts '}
     </button>
@@ -226,15 +234,53 @@
   {#if problem}
     <p class="problem" role="alert">{problem}</p>
   {/if}
-
-  {#if managing}
-    {#if pending.length === 0}
-      <p class="empty">Nothing is scheduled.</p>
-    {:else}
-      <ScheduledAlertsTable rows={pending} onremove={requestRemove} />
-    {/if}
-  {/if}
 </section>
+
+<!--
+  `SCH-07` — the reference's SECOND modal, which this pane had been rendering as an inline table.
+
+  Const 0 of `app-scheduled-alerts` (byte 2,407,520) is
+  `["id","scheduledAlertsModal","tabindex","-1","aria-labelledby","scheduledAlertsModalLabel",
+  "aria-hidden","true",1,"modal","fade","text-white"]`, its dialog is `modal-dialog modal-xl`, its
+  title `h5.modal-title#scheduledAlertsModalLabel` reads `v(5," Manage Scheduled Alerts ")`, and its
+  footer button is `["type","button","data-bs-dismiss","modal",1,"btn","btn-primary"]` with
+  `v(26," Close ")`.
+
+  `Modal` is the project's own primitive and already renders exactly that chrome, so reusing it is
+  what keeps the focus trap, the `inert` handling and `ASR-3`'s focus-on-open rather than making a
+  second copy of all three. `aria-hidden` is the creation-time value — `closedAriaHidden` — for the
+  reason `MTS-06`/`MSM-02`/`NTC-3` were disposed on.
+
+  The full argument, the circular refusal it replaces, and the table-class measurement are in
+  `room-surface-audit-2026-08-31-contract.test.ts` where they are asserted.
+-->
+<Modal
+  id="scheduledAlertsModal"
+  open={managing}
+  ariaLabelledby="scheduledAlertsModalLabel"
+  rootClass="modal fade text-white"
+  dialogClass="modal-xl"
+  title=" Manage Scheduled Alerts "
+  titleId="scheduledAlertsModalLabel"
+  titleClass="modal-title"
+  onclose={() => (managing = false)}
+  {footer}
+>
+  {#if pending.length === 0}
+    <p class="empty">Nothing is scheduled.</p>
+  {:else}
+    <ScheduledAlertsTable rows={pending} onremove={requestRemove} />
+  {/if}
+</Modal>
+
+{#snippet footer()}
+  <button
+    type="button"
+    data-bs-dismiss="modal"
+    class="btn btn-primary"
+    onclick={() => (managing = false)}>{' Close '}</button
+  >
+{/snippet}
 
 <style>
   .scheduler {

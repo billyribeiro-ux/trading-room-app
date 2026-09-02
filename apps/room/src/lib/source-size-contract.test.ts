@@ -8635,7 +8635,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `app-post-alert-modal` rather than in the table's component. Splitting there follows the
       reference; splitting pane from table would cut across it.
     */
-    max: 264,
+    /*
+      264 -> 310, 2026-09-02, and the 46 are a DIALOG this pane did not have.
+
+      `SCH-07`: the reference opens the manage table in a second modal, `#scheduledAlertsModal`, and
+      this pane rendered it inline. The refusal was circular — "a pane embedded in `PostAlertModal`'s
+      body cannot carry a second modal's dialog, because there is no second modal" — which is the
+      shape `SZC-03` was refused on and did not survive either.
+
+      The lines are the `<Modal>` element with the eight captured chrome values, the footer snippet
+      carrying const 11's button, and a pointer. The ARGUMENT is not here: it lives in
+      `room-surface-audit-2026-08-31-contract.test.ts` beside the assertions, which is the split
+      `ModalHost.svelte` took for `USM-18` and `refresh.svelte.ts` for `G16`.
+
+      What to check if this climbs again: the dialog must stay the project's `Modal`. A hand-rolled
+      second dialog would be a second copy of the focus trap, the `inert` handling and `ASR-3`'s
+      focus-on-open, all of which this room ships itself because it loads no Bootstrap JavaScript.
+    */
+    max: 310,
     why: 'the send-later pane and the manage table; one question, one component'
   },
   {
@@ -8652,7 +8669,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       If this climbs, the question is whether the table has started deciding something.
     */
-    max: 164,
+    /*
+      +9, 2026-09-02. `SCH-07`'s const 7 — `[1,"table","table-striped","text-white","w-100"]` — and
+      the note recording that `.table-striped` is defined TWICE in this room, so which sheet
+      supplies the striping depends on load order. Carried because this component already borrows
+      global Bootstrap for its `text-bg-*` badge colours, deliberately.
+    */
+    max: 173,
     why: 'the manage table rows, decoded cell by cell from app-scheduled-alerts-modal'
   },
   {

@@ -10444,7 +10444,7 @@ than one that opens onto "Nothing is scheduled."
 
 ### SCH-07 — The modal chrome — `modal-xl`, `table table-striped text-white`, the "Manage Scheduled Alerts" title and the Close footer — is not reproduced
 
-**BLOCKED — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`. No escape applies, so this is WORK; the change is specified in full below and what blocks it is tooling, named at the end.** `ScheduledAlerts.svelte`'s header records why the reference's two components are one here, and
+**BUILT 2026-09-02 — MATCHED. Recorded as `DELIBERATE DIVERGENCE 2026-08-31`, then briefly BLOCKED on tooling while the Svelte MCP was disconnected, until then.** `ScheduledAlerts.svelte`'s header records why the reference's two components are one here, and
 `ScheduledAlertsTable.svelte`'s header records why drawing a row is not the part of that decision
 being revisited. The chrome is what the merge costs: a pane embedded in `PostAlertModal`'s body cannot
 carry a second modal's dialog, title bar and Close button, because there is no second modal.
@@ -10454,47 +10454,37 @@ globals styling a table that is now inside a SCOPED sheet, and the room already 
 generations on two surfaces (recorded in `todo-next.md`). Borrowing a global table skin into a scoped
 component is how the row-striping in one modal starts depending on which generation loaded.
 
-**RE-READ 2026-09-02 — NO ESCAPE APPLIES. This is WORK, and it is the last of the twenty-nine.**
+**BUILT 2026-09-02.** The Svelte MCP reconnected and the mandated workflow was run; the row is
+closed rather than deferred.
 
-Checked against the four and it fails each: not SECURITY; the chrome consts are quoted by value
-below, so not EVIDENCE ABSENT; a modal wrapper is ordinary markup, so not LANGUAGE IMPOSSIBLE; and
-`modal-xl`, a title bar and a Close button are reference-facing OUTPUT rather than internal
-structure.
+**The first argument was circular, in the same way `SZC-03`'s was.** *"A pane embedded in
+`PostAlertModal`'s body cannot carry a second modal's dialog, because there is no second modal"* —
+the absence of the second modal IS the divergence, so it cannot also be the reason for it.
 
-**The first argument is circular, in the same way `SZC-03`'s was.** *"A pane embedded in
-`PostAlertModal`'s body cannot carry a second modal's dialog, because there is no second modal"* — the
-absence of the second modal IS the divergence, so it cannot also be the reason for it. `SZC-03` was
-refused on exactly that shape (*"the guard is the price of a placement this repository chose"*) and
-did not survive the reading either.
+`ScheduledAlerts.svelte` now renders `<Modal id="scheduledAlertsModal">` with the eight captured
+chrome values — `modal fade text-white`, `modal-dialog modal-xl`, the `modal-title`
+`" Manage Scheduled Alerts "`, `aria-labelledby="scheduledAlertsModalLabel"`, the
+`btn-close btn-close-white` dismiss, and a footer carrying const 11's
+`btn btn-primary` `" Close "`. The trigger OPENS rather than toggles, which is what
+`data-bs-toggle="modal"` means and what the inline table had made impossible.
 
-**The second argument is real and is a question for the build, not a reason against it.** Two
-Bootstrap generations do ship on two surfaces here, so a global `table-striped` inside a scoped sheet
-could take its striping from whichever loaded. That decides HOW the chrome is transcribed — whether
-the two globals are carried as-is or reproduced in the component's own sheet under the captured
-names — not whether the dialog exists.
+**It is the project's own `Modal` primitive and not a hand-rolled dialog**, because that primitive
+already renders this exact chrome and carries the focus trap, the `inert` handling and `ASR-3`'s
+focus-on-open — all of which the reference got from Bootstrap's plugin and this room ships itself.
+A second dialog would have been a second copy of all three. `aria-hidden` is the creation-time value
+(`closedAriaHidden`), on the reading `MTS-06`, `MSM-02` and `NTC-3` were disposed on.
 
-**The trigger already points at it.** `ScheduledAlerts.svelte:218` renders const 74's
-`data-bs-toggle="modal" data-bs-target="#scheduledAlertsModal"`, and there is no
-`#scheduledAlertsModal` in this room — the table renders inline instead. So the room already carries
-half of the reference's arrangement, aimed at a dialog that does not exist, and the room ships no
-Bootstrap JavaScript to notice.
+**The second argument measured TRUE and was still not a reason to refuse.** `.table-striped` really
+is defined twice in this room — `app.css` and `src/lib/styles/protradingroom-source.css` — so which
+sheet supplies the striping depends on load order. The four classes are carried anyway, because
+`ScheduledAlertsTable` **already** depends on global Bootstrap for its `text-bg-*` badge colours,
+deliberately and with the reason in its own scoped sheet. A rule the file does not follow for the
+badges cannot decide the table, and the two-generations problem is `todo-next.md`'s rather than
+something matching creates.
 
-**What building it is, exactly**, from the consts already quoted above: a `#scheduledAlertsModal`
-with `tabindex="-1"`, `aria-labelledby="scheduledAlertsModalLabel"`, `aria-hidden="true"` and
-`class="modal fade text-white"`; inside it `modal-dialog modal-xl` > `modal-content` >
-`modal-header` carrying `#scheduledAlertsModalLabel.modal-title` and the
-`btn-close btn-close-white` dismiss; then `modal-body` holding the existing
-`ScheduledAlertsTable` with `class="table table-striped text-white w-100"`.
-
-**Not built in this session, and the reason is tooling rather than judgement.** `CLAUDE.md` makes the
-Svelte MCP mandatory on every task touching a `.svelte` file — `list-sections` and
-`get-documentation` before writing, `svelte-autofixer` until it returns nothing — and that MCP is not
-connected in this session. Splitting a pane into a new dialog component is precisely the class of
-change that rule exists for, so it is named here in full rather than attempted without it. `SCH-05`'s
-two non-chrome rules were built and are unaffected.
-
-The two rules that are NOT chrome — `remove-scheduled-alert-btn` and `alert-date-time-th` — were built
-rather than refused, and are SCH-05.
+**One gate noticed on its own that a dialog had appeared.** `alert-report-modal-contract`'s
+modal census went 23 → 24 and named 10 → 11, in a file nobody would have opened for a scheduling
+change. That is what the triple is asserted for, and its comment now says so.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
