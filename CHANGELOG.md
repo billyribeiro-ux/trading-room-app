@@ -47,6 +47,13 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ### 2026-09-02 22:33 UTC — the transcript window, and the second reason it was blocked
 
+`22e71e9`. **The commit that closed the tracker row for this work, `8347c13`, cites the hash
+`4d21b13` for it, and no such commit exists** — the TIMESTAMP in this heading was read with
+`git show -s --format=%cI` as the rule at the top of this file requires, and the hash beside it in
+that message was written from memory rather than read. Corrected here rather than by rewriting a
+pushed message, because the rule this file states is that a number is measured or it is wrong, and
+that applies to my own citations first.
+
 `TODO.md` gap 18 is CLOSED, five hours after its first reason was withdrawn as false. Both halves of
 that day are the record: the morning corrected what the row said, and the evening found that the
 OTHER document blocking it was resting on the same kind of mistake.
