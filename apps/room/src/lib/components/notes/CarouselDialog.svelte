@@ -594,7 +594,7 @@
                   type="button"
                   class="btn btn-sm btn-outline-secondary mt-1"
                   onclick={() => requestClearCarouselImage(index)}
-                  ><i class="fas fa-times"></i> Change image</button
+                  ><i class="fas fa-times"></i> Change image{' '}</button
                 >
               </div>
             {:else}
@@ -624,7 +624,7 @@
                     onchange={(event) => uploadCarouselImage(event, index)}
                   />
                   <label class="btn btn-sm btn-outline-secondary mb-0" for="cfi_{index}"
-                    ><i class="fas fa-upload"></i> Upload</label
+                    ><i class="fas fa-upload"></i> Upload{' '}</label
                   >
                   <button
                     type="button"
@@ -634,7 +634,7 @@
                     title={sessionImages.length === 0
                       ? 'No images have been uploaded to this room yet.'
                       : 'Choose an image already uploaded to this room'}
-                    ><i class="fas fa-folder-open"></i> Browse</button
+                    ><i class="fas fa-folder-open"></i> Browse{' '}</button
                   >
                   <span class="text-muted small mx-2">or paste a URL:</span>
                 </div>

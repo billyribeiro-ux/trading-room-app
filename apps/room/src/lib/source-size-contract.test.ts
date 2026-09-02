@@ -2181,7 +2181,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       not a modal and why this is the layer that can feed it — `media`, `prefs` and `isPresenter`
       are already props here and are exactly the terms the capture's arming test reads.
     */
-    max: 1199,
+    /*
+      1,199 -> 1,241, 2026-09-02. OVL-07 — the Q&A notice REPEATS upstream and delivered once here.
+
+      Read at bytes 1,408,880-1,410,100: the body runs inside `for (let _ of o.qa)` for every entry
+      whose `uid` is the viewer's, and then AGAIN, outside that loop, under
+      `globals.user.isPresenter`. This room resolved the audience once — "have I asked on this
+      alert, or am I a presenter" — and delivered one notice.
+
+      **Thirty-five of the forty-two lines are the amplification, written out because it is severe.**
+      A viewer with N of their own entries on an alert gets N notices and N sounds for one new
+      question; a PRESENTER with N gets N + 1. A presenter who has answered five times on a busy
+      alert hears six dings for the sixth reply.
+
+      That is the reference's behaviour and reproducing it is matching. The note is that long so the
+      owner reads a sentence rather than discovering it from a room, and so that anybody who later
+      wants one notice per event knows they are choosing to diverge rather than fixing something this
+      room introduced. `overlay-delivery-contract.test.ts` asserts both arms separately, because
+      collapsing them reads like a tidy-up.
+    */
+    max: 1241,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.

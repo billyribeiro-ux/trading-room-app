@@ -73,7 +73,7 @@ describe('the three states, one at a time', () => {
     expect(DIALOG).toContain('<div class="carousel-img-preview mb-2">');
     expect(DIALOG).toContain('<img class="carousel-preview-img" src={slide.url}');
     expect(DIALOG).toContain('class="btn btn-sm btn-outline-secondary mt-1"');
-    expect(DIALOG).toContain('><i class="fas fa-times"></i> Change image</button');
+    expect(DIALOG).toContain('><i class="fas fa-times"></i> Change image{\' \'}</button');
   });
 
   it('carries the reference s own CSS for both, and no invented rule', () => {

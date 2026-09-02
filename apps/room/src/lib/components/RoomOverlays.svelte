@@ -571,27 +571,69 @@
   const reactorName = (emailHash: string) =>
     roster.users.find((user) => user.emailHash === emailHash)?.displayName ?? 'Someone';
 
+  /**
+   * `OVL-07` — the notice is delivered ONCE PER ENTRY the viewer owns, and then once more to a
+   * presenter. That is a repeat, and it is the reference's.
+   *
+   * Read whole at bundle bytes 1,408,880-1,410,100:
+   *
+   * ```js
+   * const f = s.isA ? "answer" : "question";
+   * for (let _ of o.qa)
+   *   _.uid === globals.user.userXrefID && (
+   *     doNotDisturbOn || (!l && qaSoundOn && qaAlert.play(), …),
+   *     !l && alertPopup && info(`"${s.txt}" for alert: "${o.txt}" by ${o.n}`, `Alert ${f} from @${s.n}`),
+   *     …);
+   * globals.user.isPresenter && (          // ← the SAME body again, outside the loop
+   *     doNotDisturbOn || (…), !l && alertPopup && info(…same two strings…), …);
+   * ```
+   *
+   * This room resolved the audience ONCE — *"have I asked on this alert, or am I a presenter"* — and
+   * delivered one notice. The two are the same for a member with one question and diverge sharply
+   * otherwise.
+   *
+   * ## The amplification, stated plainly because it is severe
+   *
+   * A viewer with N of their own entries on an alert gets **N notices and N sounds** for one new
+   * question or answer, and a PRESENTER with N gets **N + 1** — the loop runs for each, then the
+   * presenter arm runs again unconditionally. A presenter who has answered five times on a busy
+   * alert hears six dings for the sixth reply.
+   *
+   * That is upstream's behaviour and reproducing it is matching; "it would reproduce an upstream
+   * defect" is not one of the four things that excuse a divergence. It is written here at this
+   * length so the owner reads a sentence rather than discovering it from a room, and so that anybody
+   * who later wants one notice per event knows they are choosing to diverge rather than fixing a bug
+   * we introduced.
+   *
+   * The two arms are kept SEPARATE rather than collapsed to a count, because that is what the
+   * capture does: the loop's guard is `uid === me` and the second arm's is `isPresenter`, and a
+   * presenter who has asked nothing still gets exactly one.
+   */
   function deliverQaNotice(question: (typeof data.alertQuestions)[number]) {
     if (question.senderId === data.user.id) return;
 
     const alert = data.alerts.find((item) => item.id === question.alertId);
     if (!alert) return;
 
-    const askedOnThisAlert = data.alertQuestions.some(
-      (other) => other.alertId === question.alertId && other.senderId === data.user.id
-    );
-    if (!isPresenter && !askedOnThisAlert) return;
-
-    if (!prefs.doNotDisturbOn && prefs.qaSoundOn) playSoundEffect('qaAlert');
-    if (!prefs.alertPopup) return;
-
     const senderIsPresenter = question.senderRole === 'staff' || question.senderRole === 'admin';
-    toasts.show({
-      kind: 'info',
-      title: `Alert ${senderIsPresenter ? 'answer' : 'question'} from @${question.senderName}`,
-      message: `"${question.body}" for alert: "${alert.body}" by ${alert.senderName}`,
-      enableHtml: false
-    });
+    const deliverOnce = () => {
+      if (!prefs.doNotDisturbOn && prefs.qaSoundOn) playSoundEffect('qaAlert');
+      if (!prefs.alertPopup) return;
+      toasts.show({
+        kind: 'info',
+        title: `Alert ${senderIsPresenter ? 'answer' : 'question'} from @${question.senderName}`,
+        message: `"${question.body}" for alert: "${alert.body}" by ${alert.senderName}`,
+        enableHtml: false
+      });
+    };
+
+    /* `for (let _ of o.qa) _.uid === globals.user.userXrefID && (…)` — once per entry I own. */
+    for (const other of data.alertQuestions) {
+      if (other.alertId === question.alertId && other.senderId === data.user.id) deliverOnce();
+    }
+
+    /* `globals.user.isPresenter && (…)` — the same body again, outside the loop. */
+    if (isPresenter) deliverOnce();
   }
 
   $effect(() => {

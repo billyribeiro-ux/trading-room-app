@@ -129,7 +129,7 @@ describe('the browser', () => {
     */
     expect(editorCode).toContain('onclick={() => openFileBrowser(index)}');
     expect(editorCode).toContain('class="btn btn-sm btn-outline-info mb-0 ml-1"');
-    expect(editorCode).toContain('><i class="fas fa-folder-open"></i> Browse</button');
+    expect(editorCode).toContain('><i class="fas fa-folder-open"></i> Browse{\' \'}</button');
     /* And the invented label is gone from the BUTTON — it survives only as the modal's title. */
     expect(editorCode).not.toContain('>Select Image</button');
   });
@@ -265,7 +265,7 @@ describe('the per-slide upload', () => {
     expect(editorCode).toContain(
       '<label class="btn btn-sm btn-outline-secondary mb-0" for="cfi_{index}"'
     );
-    expect(editorCode).toContain('><i class="fas fa-upload"></i> Upload</label');
+    expect(editorCode).toContain('><i class="fas fa-upload"></i> Upload{\' \'}</label');
   });
 
   it('takes the FIRST file only, as upstream does even though the input is not `multiple`', () => {

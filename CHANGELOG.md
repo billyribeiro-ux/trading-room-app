@@ -45,6 +45,57 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 04:13 UTC — a notification that repeats once per question you have asked, and an exception that expired as designed
+
+## OVL-07 — and the amplification is severe, so it is stated first
+
+Read whole at bundle bytes 1,408,880-1,410,100:
+
+```js
+const f = s.isA ? "answer" : "question";
+for (let _ of o.qa)
+  _.uid === globals.user.userXrefID && ( …sound…, !l && alertPopup && info(…), … );
+globals.user.isPresenter && ( …the SAME body again, outside the loop… );
+```
+
+The notice is delivered **once per entry of the alert's Q&A that the viewer owns**, and then once
+more if the viewer is a presenter. This room resolved the audience once — *"have I asked on this
+alert, or am I a presenter"* — and delivered one notice.
+
+The two agree for a member with one question and diverge sharply otherwise: **a viewer with N of
+their own entries gets N notices and N sounds for one new question, and a PRESENTER with N gets
+N + 1.** A presenter who has answered five times on a busy alert hears six dings for the sixth reply.
+
+That is upstream's behaviour and reproducing it is matching; "it would reproduce an upstream defect"
+is not one of the four things that excuse a divergence. **It is written out at length at the code and
+here so the owner reads a sentence rather than discovering it from a room** — and so that anybody who
+later wants one notice per event knows they are choosing to diverge, not fixing something this room
+introduced.
+
+The two arms stay separate rather than collapsing to a count, because the capture's guards differ:
+the loop's is `uid === me`, the second arm's is `isPresenter`, and a presenter who has asked nothing
+still gets exactly one. `overlay-delivery-contract.test.ts` asserts both, because collapsing them
+reads like a tidy-up.
+
+## CD-07 — a recorded exception that named its own expiry, and met it
+
+` Upload `, ` Browse ` and ` Change image ` in `CarouselDialog.svelte` lost their trailing space.
+The capture pads all three — `v(9," Upload ")` and `v(12," Browse ")` at byte 1,462,593,
+`v(4," Change image ")` at 1,463,600 — and **the exception was never a measurement**: three
+assertions in two other contract files pinned the unpadded spelling, and the change that recorded it
+was not permitted to edit them.
+
+`note-padded-labels-contract.test.ts` had written that exception as an ASSERTION rather than a
+comment, *"so the exception is recorded where it can expire"*. Six edits later it expired exactly as
+written, and the block is kept — inverted — because a recorded exception that says how it ends and
+then ends that way is the shape this repository wants for the ones still open.
+
+**Runtime impact.** A Q&A notice now repeats as the reference's does. Three carousel labels carry the
+capture's trailing space.
+
+**Verified:** room gate exit 0 at `355958b` — 341 files, 6,196 passed, 1 skipped. Two negative controls seen red: collapsing the two delivery
+arms back into one audience test, and dropping one of the three pads.
+
 ### 2026-09-02 04:03 UTC — a workaround deleted by matching, and a capability given up to do it
 
 SP2-07 and SZC-03 are the same finding from two directions, and one change closes both.
