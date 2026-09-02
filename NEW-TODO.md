@@ -14,16 +14,28 @@ established it says so.
 
 ---
 
-> ## ⛳ WHERE THIS FILE STANDS, 2026-09-01
+> ## ⛳ WHERE THIS FILE STANDS, 2026-09-02
 >
-> **Three items remain and all three are blocked on something outside this repository.** Parts 1, 2,
-> 4 and 5 are built; the "suggested order" below records each landing.
+> **Two items remain and both are blocked on something outside this repository.** Parts 1, 2, 4 and 5
+> are built; the "suggested order" below records each landing.
 >
 > | remaining | blocked on |
 > | --- | --- |
 > | `presAreaTabs-recordings` | an archive service. Fully SPECIFIED 2026-08-31 so building it is a transcription — the entitlement, the URL and a measured MediaMTX candidate are all recorded — but zero recordings or archive tables exist in either database |
 > | Part 3, v5 | an account the vendor has cleared for v5. Re-tested 2026-08-31: the `/v5` 404 now distinguishes nothing (every version path 404s), and the conclusion rests on its other measurement instead |
-> | the five operator reset commands | a central console AND a media plane. What is missing is REACH, not the commands |
+>
+> **THIS TABLE HAD A THIRD ROW UNTIL 2026-09-02 AND THE BODY OF THIS FILE HAD ALREADY DELETED IT.**
+> It read *"the five operator reset commands | a central console AND a media plane. What is missing is
+> REACH, not the commands"*. The section below re-measured that on 2026-09-01 and answered NOT WORK:
+> `resetAudioBridge`, `resetAudioBridgeOnServer`, `resetAllMediaServers`, `hardResetMediaServer`,
+> `hardResetMediaServerOnServer` and `getMediaServerLost` have **no call site anywhere in the
+> bundle** — every occurrence is the declaration or the command string inside its own body.
+> Re-swept independently on 2026-09-02 and the counts are 2, 2, 3, 1, 1 and 1, every one of them
+> accounted for. Building senders would INVENT controls the reference does not have.
+>
+> The summary going stale against its own body is the failure this file warns about two hundred lines
+> below — *"two places recording one thing is how one of them goes stale, and the stale one is always
+> the summary"* — so the correction is left visible rather than quietly applied.
 >
 > `TODO.md`'s header carries the same statement for the whole repository, and `todo-next.md` closed
 > at 93 of 93 room surfaces on the same day.

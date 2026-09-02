@@ -71,8 +71,34 @@ pub async fn create(
     name: &str,
     author_user_id: Uuid,
 ) -> Result<Note, DbError> {
-    // `position` is computed in the statement rather than read and incremented, so two tabs
-    // created at once cannot both land on the same number.
+    /*
+      THE ROOM ROW IS LOCKED FIRST, and it is the only thing that actually orders these.
+
+      This used to be one statement with the comment *"`position` is computed in the statement
+      rather than read and incremented, so two tabs created at once cannot both land on the same
+      number"*. The premise is right and the conclusion is wrong, and the difference was measured on
+      a throwaway PostgreSQL 16 rather than argued: four inserts released at the same clock instant
+      produced `first@1, tab-1@2, tab-2@2, tab-3@2, tab-4@2` — two distinct positions for five rows.
+      At `READ COMMITTED` each statement takes its own snapshot, and computing the maximum INSIDE the
+      statement does not serialise anything; it only makes the window one statement wide.
+
+      `FOR UPDATE` inside the same statement does not fix it either, and that was measured too: the
+      same four inserts with the room row locked in a CTE produced the same two distinct positions.
+      The lock is taken during a statement whose snapshot is already fixed, so the blocked writer
+      resumes and still reads the maximum it read before.
+
+      Taken as its OWN statement it does fix it, because the next statement takes a fresh snapshot
+      after the lock is granted: seven simultaneous creates produced seven distinct positions. The
+      lock is one row of `rooms`, held for the rest of a transaction that creates one note tab, and
+      it serialises exactly the thing that has to be serialised — tab creation within one room.
+    */
+    sqlx::query("SELECT id FROM rooms WHERE id = $1 FOR UPDATE")
+        .bind(room_id)
+        .fetch_optional(tx.conn())
+        .await
+        .map_err(DbError::from)?
+        .ok_or(DbError::NotFound)?;
+
     sqlx::query_as(
         "INSERT INTO notes (enterprise_id, room_id, name, position, updated_by_id) \
          VALUES ($1, $2, $3, \

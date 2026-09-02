@@ -72,9 +72,15 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   Moved again 2026-08-31, 67 -> 66: `api/src/config.rs`, whose doc comment on `database_url` still
   named `ptr_clone_app` as the role the runtime MUST authenticate as — the one role the startup check
   beside it exists to REFUSE. Its own seal below, with the measurement.
+
+  Moved again 2026-09-02, 66 -> 62: FOUR read-then-write races, each proved on a live PostgreSQL 16
+  rather than argued, and three of them contradicted by a comment sitting on top of them.
+  `db/repo/poll.rs`, `db/repo/alert.rs`, `db/repo/note.rs` and `auth/login.rs` each take their own
+  pin below with the measurement beside the hash. Nothing became unsealed; four seals moved from the
+  aggregate onto their own lines.
 */
-const EXPECTED_UNTOUCHED_COUNT = 66;
-const EXPECTED_MANIFEST_SHA256 = 'b0b2aef59bff70a51051edcf668287141e540c3c487f42f738f8e9f33b68e0c2';
+const EXPECTED_UNTOUCHED_COUNT = 62;
+const EXPECTED_MANIFEST_SHA256 = '7c3e41fc8913b238c9736b01835bf8363915cf281181ad10d2053a437180dd0f';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -223,6 +229,44 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/Cargo.toml', '0d155ff4b1d976fa5b0eb675c71a26f4e2a23c77abacf5b28d45d02aa06a2b1a'],
   ['services/api/Cargo.toml', '1756786fe07a5e2efddbba28b6c75514dcd14c52862daf057ef978f2b69d37d5'],
   ['services/api/Dockerfile', '23bb473a3f8f0b4478e3b9232405f19b7debb1be734b5ca2159c320f29fd841c'],
+  /*
+    FOUR READ-THEN-WRITE RACES, all four pinned 2026-09-02, all four PROVED on a throwaway
+    PostgreSQL 16 rather than reasoned — `sqlx::query` is not compile-checked, and three of these
+    carried a comment asserting the very property the code did not have.
+
+      db/repo/poll.rs    `answer` was a SELECT to validate, a DELETE, and an INSERT, under a docblock
+                         reading "refused by the WHERE, not by a read-then-write that another request
+                         can slip between". Sharing a transaction does not close that window: at READ
+                         COMMITTED each statement takes its own snapshot. With the poll closed one
+                         second in, the old shape recorded 1 response and the one-statement CTE
+                         records 0; the happy path still records one and a re-vote still replaces.
+
+      db/repo/alert.rs   `ask` was a SELECT then an INSERT under a docblock reading "resolved through
+                         room_id in the same statement". With the alert soft-deleted one second in,
+                         the old shape wrote 1 question and the INSERT ... SELECT ... FOR SHARE
+                         writes 0, while a live alert still takes one. `fetch_optional` keeps the
+                         refusal arriving as NotFound rather than sqlx's RowNotFound, which the
+                         caller would have answered 500 for.
+
+      db/repo/note.rs    `create` computed MAX(position)+1 inside the INSERT under a comment reading
+                         "two tabs created at once cannot both land on the same number". Four inserts
+                         released at one clock instant produced two distinct positions for five rows.
+                         FOR UPDATE inside the same statement does NOT fix it — measured, same two
+                         distinct — because the lock is granted against a snapshot already fixed.
+                         Taken as its own statement first, seven simultaneous creates produced seven
+                         distinct positions.
+
+      auth/login.rs      the transparent rehash UPDATE had no guard, and hashing takes real time by
+                         design. A password CHANGE committing inside that window was overwritten with
+                         a hash of the OLD password: the member's new password stopped working, the
+                         old one kept working, silently. `AND password_hash = $4` leaves the member's
+                         own value in place; with nothing else touching the row the upgrade still
+                         lands.
+  */
+  ['services/api/src/auth/login.rs', 'f163aba72fee0005306b0da84070e832814a6865f8e375d066a5901a1031874d'],
+  ['services/api/src/db/repo/alert.rs', '91955afd31c383c9ea31665c4291c41f57dc6f3c6370d19ec0dbdf7e1bbfe574'],
+  ['services/api/src/db/repo/note.rs', 'af6f4ea2685a9fd2d6866ca53cee76be2e8cb43db6259f0acf61472b5c0ab8e2'],
+  ['services/api/src/db/repo/poll.rs', 'e0426a33c79cfaa311b07d8b03d582284a7d4f845289b2872bde050587f733db'],
   ['services/api/src/auth/password.rs', 'c6b6ce785e1dd22477e1927819c451554baf90291bacb34366cf83502ccd4bb1'],
   ['services/api/src/auth/refresh.rs', '1dfee4a4f31c85ffe68189482bbf072703e83a9292b487c1e0c751cf94e30eb2'],
   ['services/media/Cargo.toml', 'e386a431215a4ebedb958f35ca2bc52ac760b1910fdb4f83663a3e9110179b7d'],

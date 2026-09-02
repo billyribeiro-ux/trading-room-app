@@ -30,13 +30,22 @@
  *
  * `#seen` accumulates an id per row for the life of the page, while the lists it is fed are BOUNDED
  * server-side — `loadNewestChatPages` and `loadAlertPage` return `CHAT_LOG_PAGE_SIZE` (50) rows.
- * A bound here would therefore be safe for those two. It is deliberately NOT added, because the
- * third list is not bounded: the `alertQuestions` read in `+page.server.ts` is a `.select(...).all()`
- * with no `.limit()`, so it returns every question the room has ever had. Evicting an id that is
- * still in the list would re-announce it — a toast and a sound for a question from last week.
+ * A bound here would therefore be safe for those two.
  *
- * The honest order is: bound the server read first, then bound this. Recorded in `TODO.md` rather
- * than guessed at with a number that looks big enough.
+ * THE THIRD LIST'S DESCRIPTION HERE WAS STALE, and is corrected 2026-09-02. It said the
+ * `alertQuestions` read in `+page.server.ts` was a `.select(...).all()` with no `.limit()` that
+ * "returns every question the room has ever had". It is not: `loadQuestionsForAlerts`
+ * (`#lib/server/alert-log.ts`) takes an id list and filters `inArray(alertQuestions.alertId, …)`,
+ * and that list is the loaded alert page plus the captured fixtures. So the read is scoped to about
+ * fifty alerts rather than to the room's history.
+ *
+ * The CONCLUSION is unchanged, and it is worth saying why a corrected premise did not move it:
+ * scoped to fifty alerts is not the same as bounded by a row count. One busy alert can carry an
+ * unbounded thread, so a page left open in a heavy Q&A still grows this set — and evicting an id
+ * that is still in the list would re-announce it, a toast and a sound for a question from last week.
+ *
+ * The honest order is unchanged too: bound the QUESTIONS PER ALERT first, then bound this. Recorded
+ * in `TODO.md` rather than guessed at with a number that looks big enough.
  */
 
 /**

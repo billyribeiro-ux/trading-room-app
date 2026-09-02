@@ -33,6 +33,34 @@ import { setTyping } from '../../routes/typing.remote';
  * key" fall out rather than needing the timestamp comparison the reference also carries. That
  * comparison exists upstream because its timer can fire while a `blur` handler is also racing it;
  * here the debounce and the explicit `stop()` are the only two paths.
+ *
+ * ## The caller that chooses between the two, which this file used to quote neither of
+ *
+ * `onKey`, byte 1,440,194 — and its `.trim()` is the reference's own, not this room's improvement:
+ *
+ * ```js
+ * this.showTyping && (0 === $("#textAreaTxt").val().trim().length
+ *   ? this.refreshTypingStatus(!0)
+ *   : this.updateLastTypedTime())
+ * ```
+ *
+ * So a box holding only spaces is a STOP upstream too. What that means is worth stating, because it
+ * is the reason {@link stop} is guarded: with `force = true` the reference re-sends `notyping` on
+ * every keystroke for as long as the box stays whitespace, and it does the same on every blur. The
+ * extra column's copy at 2,386,514 is identical but for the element id.
+ *
+ * ## Where this deliberately sends FEWER frames than the reference, and why that is not a divergence
+ *
+ * Upstream those redundant `notyping` frames ride a websocket that is already open. Here every frame
+ * is an HTTP round trip through a remote function, so reproducing them would mean one POST per
+ * keystroke for as long as somebody leans on the space bar — the "two frames per burst" property
+ * this whole class exists for, defeated by a control character.
+ *
+ * {@link stop} therefore sends only when there is a burst to stop, and **no member can observe the
+ * difference**: `notyping` is idempotent at the receiver, which removes an entry from a map and does
+ * nothing when there is none. What changes is the number of redundant frames on the wire, which is
+ * internal rather than reference-facing. The first draft of that method claimed to be idempotent in
+ * its own doc comment and was not — it cleared the timer under a guard and then sent unconditionally.
  */
 export class TypingSignal {
   readonly #channel: () => string;
@@ -74,12 +102,23 @@ export class TypingSignal {
     if (this.#announce()) void this.#send(true);
   }
 
-  /** The box emptied, lost focus, or five seconds passed. Idempotent. */
+  /**
+   * The box emptied, lost focus, or five seconds passed.
+   *
+   * IDEMPOTENT, and now actually so: a second call sends nothing, because the timer is the marker
+   * for "a burst is live" and the first call cleared it. `typed()` arms it on every keystroke,
+   * including the ones that do not announce, so it is true for exactly the span between the first
+   * key of a burst and its end — which is exactly the span in which a `notyping` means anything.
+   *
+   * The header argues why this diverges from the reference's unconditional re-send. In one line: a
+   * frame here is an HTTP round trip and there it is a websocket write, `notyping` is idempotent at
+   * the receiver, and no member can see the difference.
+   */
   stop(): void {
-    if (this.#timer !== null) {
-      clearTimeout(this.#timer);
-      this.#timer = null;
-    }
+    if (this.#timer === null) return;
+
+    clearTimeout(this.#timer);
+    this.#timer = null;
     this.#clear();
     void this.#send(false);
   }

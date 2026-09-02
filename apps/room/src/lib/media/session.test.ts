@@ -16,6 +16,7 @@
  * are the whole claim - the server leads with VP9, and the client reads the leader.
  */
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { RtpCapabilities } from 'mediasoup-client/types';
 import {
@@ -161,6 +162,55 @@ describe('the useSharingSimulcast guard, reproduced', () => {
     expect(
       selectScreenShareEncodings({ recvRtpCapabilities: OUR_ROUTER, useSharingSimulcast: true })
     ).toEqual([{ scalabilityMode: 'S3T3', dtx: true }]);
+  });
+
+  it('names no bitrate anywhere, which is streaming-choices row 8 DECIDED rather than deferred', () => {
+    /*
+      ROW 8 WAS OPEN UNTIL 2026-09-02 and is now answered by a number rather than by taste.
+      Its `Pro` read *"removes reliance on libvpx's own heuristic, which is the thing currently
+      deciding 525 kbps was enough"*. **525 kbps was never a ceiling** — it was the heuristic
+      spending what nearly-static content needed.
+
+      Measured: a loopback `RTCPeerConnection` in one page (so the number is the ENCODER's, not an
+      SFU's), capturing a deliberately busy 1920×1080 surface, `contentHint = 'detail'` set, codec
+      preferences applied BEFORE `createOffer` — applying them after is silently ignored, which is
+      how the first run measured VP8 while believing it had asked for VP9. Over twelve two-second
+      samples: `targetBitrate` 2,500,000, send 2,476–2,613 kbps, `qualityLimitationReason: none`,
+      `encoderImplementation: libvpx`, `video/VP9`, 1920×1080.
+
+      So libvpx already has 2.5 Mbps of headroom and spends it when the content asks. A `maxBitrate`
+      at or below that only takes headroom away; above it, it does nothing. A `minBitrate` would
+      force spending on frames that do not need it — bandwidth billed to every member so a static
+      slide can be sent expensively, which is this row's own `Con` and the thing that hurts the
+      member on the worst connection.
+
+      **And doing nothing is also the match**: the capture passes `encodings: undefined`.
+
+      Asserted over the whole module rather than one return value, because the way this decision
+      would be undone is somebody adding a constant next to the ones above.
+    */
+    const source = readFileSync(new URL('./session.ts', import.meta.url), 'utf8');
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code, 'the module was not read').toContain('selectScreenShareEncodings');
+
+    /*
+      `maxBitrate` DOES appear twice, and both are transcribed rather than chosen: `QS` at bundle
+      byte 1,071,656 is `[{dtx:!0,maxBitrate:15e5},{dtx:!0,maxBitrate:6e6}]`. The assertion is
+      therefore about INVENTION, not absence — exactly two occurrences, exactly those two numbers,
+      and no `minBitrate` at all, which the capture has nowhere.
+    */
+    expect(code.match(/maxBitrate/g) ?? []).toHaveLength(2);
+    expect(code).toContain('maxBitrate: 1_500_000');
+    expect(code).toContain('maxBitrate: 6_000_000');
+    expect(code).not.toContain('minBitrate');
+
+    /*
+      And the path the capture actually takes returns NO encodings key at all, so nothing is spent
+      or floored by default. `useSharingSimulcast` is `!1` in the bundle's only assignment.
+    */
+    expect(
+      selectScreenShareEncodings({ recvRtpCapabilities: OUR_ROUTER, useSharingSimulcast: false })
+    ).toBeUndefined();
   });
 
   it('honours forceVP9 only when a codec was actually resolved', () => {

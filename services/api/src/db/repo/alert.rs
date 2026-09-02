@@ -174,8 +174,23 @@ pub struct AlertQuestion {
 
 /// Asks a question against an alert, or answers one.
 ///
-/// The alert is resolved through `room_id` in the same statement, so a question cannot be
-/// attached to another room's alert.
+/// The alert is resolved through `room_id` in the same statement, so a question cannot be attached
+/// to another room's alert, and cannot be attached to one that has been deleted.
+///
+/// # It was two statements until 2026-09-02, and the docblock already claimed otherwise
+///
+/// *"in the same statement"* was the intent and not the code: a `SELECT` established that the alert
+/// belonged to the room and was not deleted, and a separate `INSERT` wrote the question. Sharing a
+/// transaction does not close that window - at `READ COMMITTED` each statement takes its own
+/// snapshot, so a presenter deleting the alert between the two committed and the question landed on
+/// it anyway, visible to nobody and attached to a row the room no longer shows.
+///
+/// Proved on a throwaway PostgreSQL 16 rather than reasoned, because `sqlx::query` is not
+/// compile-checked: with the alert soft-deleted one second into the transaction, the old shape wrote
+/// **1** question and this one writes **0**, while a live alert still takes one.
+///
+/// `FOR SHARE` on the alert row makes the check hold rather than merely narrow the window: a
+/// concurrent soft-delete waits for this question instead of overtaking it.
 #[allow(clippy::too_many_arguments)]
 pub async fn ask(
     tx: &mut TenantTx<'_>,
@@ -189,20 +204,12 @@ pub async fn ask(
     is_answer: bool,
     parent_id: Option<Uuid>,
 ) -> Result<AlertQuestion, DbError> {
-    let belongs: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM alerts WHERE id = $1 AND room_id = $2 AND deleted_at IS NULL",
-    )
-    .bind(alert_id)
-    .bind(room_id)
-    .fetch_optional(tx.conn())
-    .await
-    .map_err(DbError::from)?;
-    belongs.ok_or(DbError::NotFound)?;
-
     let question: AlertQuestion = sqlx::query_as(
         "INSERT INTO alert_questions \
            (enterprise_id, alert_id, user_id, member_id, display_name, body, is_answer, parent_id) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) \
+         SELECT $1,$2,$3,$4,$5,$6,$7,$8 FROM alerts \
+         WHERE id = $2 AND room_id = $9 AND deleted_at IS NULL \
+         FOR SHARE \
          RETURNING id, alert_id, member_id, display_name, body, is_answer, parent_id, created_at",
     )
     .bind(enterprise_id)
@@ -213,9 +220,17 @@ pub async fn ask(
     .bind(body)
     .bind(is_answer)
     .bind(parent_id)
-    .fetch_one(tx.conn())
+    .bind(room_id)
+    /*
+      `fetch_optional`, not `fetch_one`. Zero rows is the refusal - a foreign room, or an alert
+      deleted - and it has to keep arriving as `DbError::NotFound`, which is what the separate
+      `SELECT` used to return. `fetch_one` would raise sqlx's own `RowNotFound` instead and the
+      caller would answer 500 for a question asked on a deleted alert.
+    */
+    .fetch_optional(tx.conn())
     .await
-    .map_err(DbError::from)?;
+    .map_err(DbError::from)?
+    .ok_or(DbError::NotFound)?;
 
     // An answered alert is marked as such, so the roster can show it without counting rows.
     if is_answer {

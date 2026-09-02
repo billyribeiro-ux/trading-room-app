@@ -45,6 +45,328 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 20:44 UTC — a blocker written three times as an inference, and row 8 closed on a number
+
+**Runtime impact: NO.** No shipped behaviour changed. What changed is that a question recorded as
+unanswerable for four weeks now has an answer, and the reason it was recorded as unanswerable was
+wrong three times running.
+
+## `getDisplayMedia` works in this container
+
+The blocker on `streaming-choices.md` rows 6 and 8 has been rewritten twice and was wrong both times:
+
+1. *"needs a human at an OS screen picker; no amount of tooling removes that"* — corrected
+   2026-09-01. `--auto-select-desktop-capture-source` exists for exactly this.
+2. *"blocked on a CAPTURABLE DISPLAY, not on a PERSON"*, on six attempts returning
+   `NotReadableError: Could not start video source` — **corrected 2026-09-02, measured.** Same
+   container, same Chromium 1194, `xvfb-run -a -s "-screen 0 1920x1080x24 +extension COMPOSITE
+   +extension DAMAGE +extension RANDR"`:
+   `{displaySurface:"monitor", width:1920, height:1080, frameRate:30, deviceId:"screen:399:0"}`.
+
+**The way this probe FIRST failed is the more useful half**, because it is how a wrong blocker gets
+written: on `about:blank`, `navigator.mediaDevices` is `undefined` — the page is not a secure
+context. The error has nothing to do with the display and reads like it has everything to do with it.
+Serving the probe from `http://127.0.0.1` fixed it.
+
+So the corrections run three deep, each replacing a confident sentence with another confident
+sentence. **The lesson is not about screen capture: a blocker is a MEASUREMENT, and this one was
+written three times as an inference.**
+
+## Row 8 — DECIDED, and the `Pro` was refuted rather than out-weighed
+
+It read *"removes reliance on libvpx's own heuristic, which is the thing currently deciding 525 kbps
+was enough"*. **525 kbps was never a ceiling.** It was the heuristic spending what nearly-static
+content needed.
+
+Measured on a loopback `RTCPeerConnection` inside one page — so the number is the ENCODER's rather
+than an SFU's — capturing a deliberately busy 1920×1080 surface (three columns of hex and random text
+repainting at 30 Hz, because a static desktop measures libvpx's floor and not its ceiling), with
+`contentHint = 'detail'` as `startScreenSharing` sets it. Twelve two-second samples:
+
+| field | value |
+| --- | --- |
+| `targetBitrate` | **2,500,000** (2,487,392 – 2,500,000) |
+| measured send | 2,476 – 2,613 kbps |
+| `qualityLimitationReason` | `none` |
+| `encoderImplementation` | `libvpx` |
+| codec | `video/VP9` |
+| frame size | 1920×1080 |
+
+**Codec preferences have to be applied BEFORE `createOffer`.** Applied after, they are silently
+ignored — which is how the first run of this probe measured VP8 while believing it had asked for VP9,
+and it is recorded because a measurement of the wrong codec would have looked exactly as convincing.
+
+The decision follows from the number: libvpx already has 2.5 Mbps of headroom and spends it when the
+content asks. A `maxBitrate` at or below that only takes headroom away; above it, it does nothing. A
+`minBitrate` would force spending on frames that do not need it — bandwidth billed to every member so
+a static slide can be sent expensively, which is the row's own `Con`. **And the capture passes
+`encodings: undefined`, so doing nothing is also the match.**
+
+Pinned in `media/session.test.ts`: exactly two `maxBitrate` occurrences, both the transcribed `QS`
+constants from bundle byte 1,071,656, no `minBitrate` anywhere, and the captured path still returning
+no encodings key at all. The assertion is about INVENTION rather than absence, because the two that
+are there are the reference's. Two negative controls seen red.
+
+## Row 6 — still open, blocker named correctly for the first time
+
+**A HIGH-DPI SOURCE and a person judging legibility.** An Xvfb framebuffer at 1920×1080 has no pixels
+for a 1920 cap to remove, and *"is the text sharper"* has no automated answer. The human procedure in
+`MEASURE-SHARE-QUALITY.md` is exactly right for that question and is kept; it is no longer the only
+way anything in that document gets measured.
+
+## Two stale summaries, corrected in the same change
+
+`NEW-TODO.md`'s header table still listed **the five operator reset commands** as blocked on *"a
+central console AND a media plane"*, and `TODO.md`'s header repeated it — while the body of
+`NEW-TODO.md` had retired that row on 2026-09-01 as NOT WORK. Re-swept independently:
+`resetAudioBridge` 2, `resetAudioBridgeOnServer` 2, `resetAllMediaServers` 3, `hardResetMediaServer`
+1, `hardResetMediaServerOnServer` 1, `getMediaServerLost` 1 — **every occurrence is the declaration
+or the command string inside its own body, and there is no call site anywhere in 2,891,205 bytes.**
+Building senders would invent controls the reference does not have.
+
+That file warns two hundred lines below its own header that *"two places recording one thing is how
+one of them goes stale, and the stale one is always the summary"*. It was the summary. Both are
+corrected, and the correction is left visible.
+
+`pnpm run gate` exit 0 in both apps.
+
+---
+
+### 2026-09-02 20:25 UTC — four read-then-write races in the Rust API, three of them denied by a comment
+
+**Runtime impact: YES.** A vote could land on a closed poll, a question on a deleted alert, two note
+tabs on one position, and a login could silently revert a member's password change.
+
+Every one was proved on a live PostgreSQL 16.13 before being touched, running the SOURCE's own
+statement text with the source's own bind order and a second connection racing it. `sqlx::query` is
+not compile-checked, and three of these carried a comment asserting the very property the code did
+not have — so reasoning about them was exactly what had already failed.
+
+## `poll::answer` — a vote on a closed poll
+
+A `SELECT` to validate, a `DELETE`, an `INSERT`, under a docblock reading *"refused by the `WHERE`,
+not by a read-then-write that another request can slip between"*. Sharing a transaction does not
+close that window: at `READ COMMITTED` each statement takes its own snapshot. **With the poll closed
+one second in, the old shape recorded 1 response and the one-statement CTE records 0.** The happy
+path still records one, a re-vote still replaces rather than duplicating, and an out-of-range choice,
+a foreign room and an unknown poll each insert nothing and leave an existing vote untouched.
+
+`FOR SHARE` on the poll row is the other half: without it the `WHERE` is only as good as the
+statement's snapshot; with it a concurrent close waits for the vote instead of overtaking it.
+
+## `alert::ask` — a question on a deleted alert
+
+A `SELECT` then an `INSERT`, under a docblock reading *"resolved through `room_id` in the same
+statement"*. **With the alert soft-deleted one second in, the old shape wrote 1 question and the
+`INSERT … SELECT … FOR SHARE` writes 0**, while a live alert still takes one.
+
+`fetch_optional` rather than `fetch_one` is not a detail: zero rows has to keep arriving as
+`DbError::NotFound`, and `fetch_one` would raise sqlx's own `RowNotFound` — a 500 for a question
+asked on a deleted alert, which is a worse outcome than the race, arrived at while fixing it.
+
+## `note::create` — two tabs on one position
+
+`MAX(position)+1` computed inside the `INSERT`, under a comment reading *"two tabs created at once
+cannot both land on the same number"*. The premise is right and the conclusion is wrong: **four
+inserts released at one clock instant produced `first@1, tab-1@2, tab-2@2, tab-3@2, tab-4@2` — two
+distinct positions for five rows.**
+
+`FOR UPDATE` inside the same statement does not fix it, and that was MEASURED rather than assumed:
+the same four inserts with the room row locked in a CTE produced the same two distinct positions,
+because the lock is granted against a snapshot the statement has already fixed. Taken as its own
+statement first, **seven simultaneous creates produced seven distinct positions.** That measurement
+is why the fix is two statements and not the tidier one.
+
+## The transparent rehash could revert a password change
+
+The upgrade `UPDATE` had no guard, and hashing takes real time by design — a permit and
+`spawn_blocking` see to that. A password CHANGE committing inside that window was overwritten with a
+hash of the OLD password: **the member's new password stopped working, the old one kept working, and
+nothing anywhere reported it.** With a change committing one second into the login, the unguarded
+statement left `OLD-strong-params` and the guarded one left the member's own
+`NEW-password-chosen-by-the-member`; with nothing else touching the row the upgrade still lands.
+
+The result stays ignored on purpose: zero rows means somebody else won the race and their write is
+the correct one, and neither outcome may turn a correct password into an error.
+
+## Verified, and what could not be
+
+`cargo check -p tradingroom-api`, `cargo clippy -p tradingroom-api --lib -- -D warnings` and
+`cargo fmt --all --check` all clean. **The Rust integration suite could not be run and that is stated
+rather than implied:** `cargo test -p tradingroom-api` pulls `mediasoup-sys`, whose build script
+pip-installs `invoke` and compiles a C++ worker, and it fails here for want of the toolchain and the
+disk. None of the three that DID run can see a TOCTOU, which is why the semantics were proved against
+a real database instead.
+
+All four files leave the provenance aggregate for their own pins — 66 untouched to 62 — each with its
+measurement beside its hash, which is the rule that file states for itself. Six negative controls
+seen red against the seal and six more against `backend-race-guards.test.ts`, a new controller
+contract that pins the SHAPE where the hash pins the BYTES: a re-pin made for an unrelated change
+would otherwise carry a removed `FOR SHARE` with it.
+
+`pnpm run gate` exit 0 in both apps — and the counts verifier added an hour ago caught its first
+drift on this commit, which is what it is for.
+
+---
+
+### 2026-09-02 19:56 UTC — two check-then-await races in the media session
+
+**Runtime impact: YES.** Both leaked server-side resources under overlap, and both leaked silently.
+
+## A second transport nobody could close
+
+`createSendTransport` was `if (this.#sendTransport) return it; this.#sendTransport = await
+this.#createTransport('send')`. The field stays null for the whole round trip, so two concurrent
+callers both passed the guard and both asked the server for a transport. **The second assignment
+won, and the first transport was orphaned** — never closed here, unreachable by `close()`, which
+closes the field, and still allocated on the server. `createRecvTransport` was the same shape.
+
+Both directions race for real. The page produces mic and camera from two separate handlers, and
+`consume` calls `createRecvTransport` on a `newProducer` the server sends once per remote producer —
+so a room two people join in the same second issues two before either resolves.
+
+Fixed by memoising the PROMISE, not a boolean: the second caller awaits the first caller's transport
+rather than starting its own. Cleared in `finally`, so a failed attempt does not poison every later
+call with the same error.
+
+## A second consumer for one producer
+
+`consume` guarded on `#consumers.has(producerId)` and then awaited three round trips before writing
+that map. Its own docblock says the dedupe exists because the server's `newProducer` is
+**at-least-once** (`server.rs:88-92`) — a duplicate notification is the EXPECTED case, and two arrive
+back to back, well inside one round trip. So two consumers were built for one producer, the second
+overwrote the first in the map, and the first stayed open and receiving with `stopConsuming` unable
+to name it.
+
+The docblock's own words were already right — *"already being consumed"* — and only the code read
+that as *"already consumed"*. A set of in-flight producer ids now answers the other half, cleared in
+`finally` so a failed negotiation frees the id instead of wedging it for the life of the session:
+without that, every later `newProducer` for it would be deduped away and the stream never drawn.
+`close()` clears both markers with the maps.
+
+## Why this needed a new test file
+
+`session.test.ts` covers the encoding selection, which is pure; everything else in that class is
+three round trips deep, so every existing assertion about it was about SOURCE. **A race is invisible
+to source-reading, to `svelte-check` and to the type system** — both versions type-check, both work
+when called once, and both leak only when two calls overlap.
+
+`session-concurrency.test.ts` mocks the mediasoup `Device` and defers every signalling request, so
+the request COUNT is observed while both calls are still inside the window the old code left open —
+2 before, 1 after. Six cases: both transport directions, the cached path, a failed creation that must
+not poison the next call, the duplicate consume, and a failed consume that must free its id.
+
+Four negative controls seen red, each with its anchor asserted present first: both transports
+restored to check-then-await, the consume dedupe restored to the map alone, and the `finally` that
+frees a failed producer id removed.
+
+`pnpm run gate` exit 0 in both apps. Nothing was opened in a browser: the races are exercised against
+a mocked device, which is what makes them deterministic rather than timing-dependent.
+
+---
+
+### 2026-09-02 19:40 UTC — six carried findings closed, and a twelfth unenforced verifier
+
+**Runtime impact: YES for two of them** — the typing indicator stops sending a frame per keystroke,
+and the unread badge stops reading the prototype chain. The rest are a deleted script, a deleted
+export, four corrected documented totals and two corrected comments.
+
+Each was re-measured before being touched. Two of the carried claims turned out to be wrong about
+the reference and are recorded as refuted rather than fixed.
+
+## The typing indicator sent one POST per keystroke
+
+`TypingSignal.stop()` cleared its timer under a guard and then sent UNCONDITIONALLY, while its own
+doc comment said *"Idempotent."*
+
+The reference makes a whitespace-only box a STOP — `onKey`, byte **1,440,194**:
+`0 === $("#textAreaTxt").val().trim().length ? refreshTypingStatus(!0) : updateLastTypedTime()`. So
+the carried claim that our `.trim()` was a divergence is REFUTED: upstream trims too, and this file
+had never quoted the caller that proves it. What follows from it is the defect: every keystroke into
+a box holding only spaces took the stop path, and `refreshTypingStatus(!0)` re-sends. Upstream those
+redundant frames ride an open websocket; here each is an HTTP round trip through a remote function.
+The class exists to make a burst cost two frames, and a control character defeated it.
+
+`stop()` now returns early when there is no burst to stop. **A deliberate divergence in frame count
+and not in output**: `notyping` is idempotent at the receiver, so no member can observe the
+difference. Argued at the code and at the ceiling entry.
+
+## The unread badge read the prototype chain
+
+`unreadFor` was `counts[channel] ?? NOTHING_UNREAD`. A channel named `constructor`, `toString` or
+`valueOf` returns a function and `__proto__` returns `Object.prototype` — none nullish, so the
+fallback never fired and the caller read `.messages` off a function as `undefined`, putting the
+literal text into the badge that function's own docblock exists to prevent. `withoutChannel` asked
+`channel in counts`, which walks the chain too, so opening such a channel allocated a copy identical
+to the original and reassigned a `$state.raw` field, re-rendering every tab to remove a key that was
+never there.
+
+**Not hypothetical names.** Channel names are the room owner's, and `parseChatTabsWithBadges` refuses
+only a built-in collision, a duplicate, a bad `badges` value, an over-long name and control
+characters. `constructor` passes all five.
+
+## A twelfth verifier enforced by nobody
+
+`verify-documented-test-counts.mjs` is the LAST step of the controller's `test`, and nothing invokes
+`test` — CI runs `test:gates && test:unit`, and the local `gate` ran the same two. So the four
+documented totals in `ENGINEERING-SSOT.md`, `PRODUCTION-CUTOVER-PLAN.md` and
+`SVELTE-CONFORMANCE-AUDIT.md` had drifted to **1077 tests against a suite of 1176, and 104 files
+against 116**, with nothing anywhere going red.
+
+This is the same shape as the eleven verifiers found unenforced on 2026-08-29, one round later, and
+it could not be fixed the same way: `test:gates` is asserted to be a literal PREFIX of `test`, and
+this step is at the end. So it gets its own script — `test:counts:report`, which reads the report
+`test:unit` has just written rather than running Vitest a second time — added to CI **and** to the
+gate, which `package-scripts-contract.test.ts` requires to be equal step for step.
+
+## A stale fork of the supply-chain evidence builder
+
+`apps/controller/scripts/build-api-release-evidence.sh`, 989 lines against the live script's 1,028,
+referenced by no workflow, no verifier and no package script. What made it a hazard rather than
+clutter is what a stale fork of THAT script contains: **its own pinned tool versions** — Syft 1.44.0
+against 1.51.1, Grype 0.112.0 against 0.118.0, and an older `rust:` builder digest. Running the copy
+sitting beside the other controller scripts would have produced release evidence from a scanner
+generations behind the policy it is measured against, and every check downstream would have passed.
+
+Deleted, and `verify-api-release-artifact.mjs --verify-contract` now asserts there is exactly ONE
+tracked copy at the pinned path. `git ls-files` rather than a directory walk, with status 1 (no
+match) branched apart from status ≥2 (git failed) — the distinction `naming-boundary.test.ts` learned
+the expensive way.
+
+## Three corrections and a deletion
+
+* **`gates.ts`** carried the only second-hand fact in the file: the `vo` mapping quoted from
+  `HANDOFF.md` because "the query-parameter block belongs to the app service" rather than to the 51
+  decoded components. True, and unnecessary — the pinned bundle ships here. The parser is quoted now
+  from byte **2,599,050**, with all four query parameters assigned out of one block. A caveat traded
+  for a citation.
+* **`arrivals.ts`** said the `alertQuestions` read was unbounded and "returns every question the room
+  has ever had". `loadQuestionsForAlerts` filters `inArray(alertQuestions.alertId, …)` against the
+  loaded alert page plus the captured fixtures. The conclusion did not move — scoped to fifty alerts
+  is not bounded by a row count, because one alert can carry an unbounded thread — but the next piece
+  of work changed address, from "bound the server read" to "bound the questions per alert".
+* **`gates.ts`'s "eighteen predicates"** was checked too and is CORRECT: eighteen getters. Refuted,
+  not fixed.
+* **`HERO_HEADLINE`** was exported and read by nothing — not the hero, not a `<title>`, not a meta
+  description, not a test. Deleted, with the reason a joined form should be derived at its consumer.
+
+## Verified
+
+Nine negative controls seen red, each with its anchor asserted present first: `stop()` restored to
+its unconditional form; `.trim()` removed; the announce guard removed; `unreadFor` restored to the
+`??` read; `withoutChannel` restored to `in`; the gate losing the counts step while CI keeps it; CI
+losing it while the gate keeps it; a documented total drifted by one; and a second build script
+re-added, which fails with the exact message naming both paths.
+
+Five new executed cases in `typing-indicator-contract.test.ts` count FRAMES rather than reading
+source, with the remote mocked — the defect was invisible to every source-text assertion in that
+file, to `svelte-check` and to the type system. Ten new cases in `chat.svelte.test.ts` cover the five
+prototype names on the real column, values and identity separately.
+
+`pnpm run gate` exit 0 in both apps. Nothing was opened in a browser.
+
+---
+
 ### 2026-09-02 19:12 UTC — XCP-09 closed: the second chat column has its stylesheet
 
 **Runtime impact: YES.** The extra chat column renders with its own component styles for the first
