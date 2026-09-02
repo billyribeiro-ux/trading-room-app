@@ -36,6 +36,7 @@
   import ModalHost from '#lib/components/ModalHost.svelte';
   import RemoteAudioSinks from '#lib/components/RemoteAudioSinks.svelte';
   import RecordingPreviewCard from '#lib/components/RecordingPreviewCard.svelte';
+  import SessionInfoModal from '#lib/components/SessionInfoModal.svelte';
   import ToastHost from '#lib/components/ToastHost.svelte';
   import type { RoomAlerts } from '#lib/room/alerts.svelte.js';
   import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
@@ -742,6 +743,22 @@
   Whether it is ever SEEN is decided inside it, by the capture's own gate.
 -->
 <RecordingPreviewCard {media} {prefs} {isPresenter} />
+<!--
+  "Session Information" — `getMyToken()`, byte 2,255,348.
+
+  MOUNTED HERE AND NOT IN `ModalHost`, which is where every other named modal lives, and the reason
+  is the size ratchet doing its job: `ModalHost.svelte` is at its ceiling and this repository has
+  spent the last week moving modals OUT of it (`ReplyModal`, `ConnectivityModal`). Mounting a
+  component that was born extracted back inside it would be the wrong direction by seven lines.
+
+  This file is the overlay mount point, it already holds `modals` and `data`, and one more overlay
+  is what it is for.
+-->
+<SessionInfoModal
+  open={modals.modal === 'session-info'}
+  shortCode={data.room.shortCode}
+  onclose={() => modals.closeActive()}
+/>
 <!--
   ── G03 — THE OVERLAY HAD ONLY ITS SUCCESS HALF ───────────────────────────────────────────────
 

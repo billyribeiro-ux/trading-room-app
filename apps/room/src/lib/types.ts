@@ -300,6 +300,15 @@ export type ModalName =
   | 'rich-text'
   | 'file-upload'
   | 'image-upload'
+  /**
+   * "Session Information" — `getMyToken()`, bundle byte 2,255,348.
+   *
+   * NOT one of the reference's `#…-modal` ids: upstream builds it as a `bootbox.dialog`, which has
+   * no id of its own. It is a modal here because this room has no bootbox, and the alternative — a
+   * dialog assembled from an interpolated HTML string, which is what upstream does — is the
+   * stored-XSS shape `CLAUDE.md` refuses.
+   */
+  | 'session-info'
   | null;
 
 /**

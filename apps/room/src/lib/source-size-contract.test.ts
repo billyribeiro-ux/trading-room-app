@@ -2284,7 +2284,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `defaultImagePreview` reaching `ModalHost` for USM-18. No prose — the argument is at the
       checkbox that reads them.
     */
-    max: 1243,
+    /*
+      1243 -> 1260, 2026-09-02. Seventeen lines: one import, a five-line mount, and eleven of
+      comment explaining why the mount is HERE rather than in `ModalHost.svelte`, where every other
+      named modal lives.
+
+      That is the size ratchet doing exactly what it is for. `ModalHost.svelte` is at its own
+      ceiling and this repository spent the previous week moving modals OUT of it — `ReplyModal`
+      and `ConnectivityModal` were both born that way. Putting a component that was born extracted
+      back inside it, to save seventeen lines here, would have been the wrong direction chosen by a
+      number. This file is the overlay mount point; it already holds `modals` and `data`.
+    */
+    max: 1260,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -5907,7 +5918,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The number follows the code rather than being left where it was: a ceiling parked above the
       real figure reads like a limit while licensing every line back.
     */
-    max: 892,
+    /*
+      892 -> 909, 2026-09-02. One handler branch and its reason: `get-my-token` stopped being inert.
+
+      The branch itself is two lines — `#openModal('session-info')` and a return. The other fifteen
+      record why upstream's `$("#user-settings-modal").modal("hide")` needs no equivalent here (a
+      single-slot modal host closes the other one by opening this one) and point at the component
+      that carries the refusal, so the next reader of this branch is not left wondering where the
+      other half of the reference's dialog went.
+    */
+    max: 909,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -8000,6 +8020,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 218,
     why: 'the public reply to one message - its composer, its picker and its image path'
+  },
+  {
+    file: 'lib/components/SessionInfoModal.svelte',
+    /*
+      Capped at the size it landed, 2026-09-02, the day it was written.
+
+      "Session Information" — `getMyToken()`, bundle byte 2,255,348. Two fields, two Copy buttons,
+      one Close, and the reference's whole dialog is one interpolated HTML string.
+
+      Most of this file is prose, and deliberately: HALF the dialog is refused, and a refusal with
+      no recorded reason is the thing somebody deletes as an oversight. The token field would mean
+      the server writing an httpOnly cookie into the DOM. Growth here should be argued, because the
+      only two directions it can grow are reproducing more of a dialog that is already complete, or
+      softening a refusal.
+    */
+    max: 168,
+    why: 'the Session Information dialog; half of it is a refusal, and the reason is the file'
   },
   {
     file: 'lib/components/RoomBranding.svelte',

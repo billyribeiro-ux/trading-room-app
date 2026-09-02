@@ -164,7 +164,7 @@ export const TOAST_ONLY_ACTIONS: readonly string[] = Object.keys(EXACT_ALERTS);
 /*
   ── THE DISPOSITION CENSUS, AND WHY IT LIVES HERE NOW ────────────────────────────────────────────
 
-  **Disposition census, measured 2026-08-31: 38 dispatched actions, 4 inert, 2 carrying a fixed
+  **Disposition census, measured 2026-09-02: 38 dispatched actions, 3 inert, 2 carrying a fixed
   alert.**
 
   This number was 39 for one commit's worth of minutes, and the gate below caught it — which is
@@ -193,11 +193,14 @@ export const TOAST_ONLY_ACTIONS: readonly string[] = Object.keys(EXACT_ALERTS);
   The contract recomputes all three from the buckets below and fails if this sentence disagrees, so
   a drift now fails on the commit that causes it rather than being found by hand a fortnight later.
 
-  **Four inert, and the number is 4 rather than 6 because two of the six were BUILT on 2026-08-29** —
-  `debug-log` and `upload-profile-picture` both have real commands and contract cover. Of the four
-  left, NONE is unbuilt work: two need a server-side recorder this deployment does not have, one is
-  a MATCH (the reference wires nothing to it), and one is a deliberate security divergence. Each
-  says which at its own entry.
+  **Three inert, and the number has fallen 6 -> 4 -> 3.** `debug-log` and `upload-profile-picture`
+  were BUILT on 2026-08-29; `get-my-token` on 2026-09-02, and that one left with a divergence rather
+  than a clean match — half of its dialog is refused on screen, for a reason its own entry records.
+
+  Of the three left, NONE is unbuilt work: `start-recording` and `stop-recording` need a server-side
+  recorder this deployment does not have, and `disable-private-chat` is a MATCH — the reference
+  renders that button with no click binding at all, so inert IS the reproduction. Each says which at
+  its own entry.
 */
 export const INERT_ACTIONS: Readonly<Record<string, string>> = {
   /*
@@ -371,38 +374,35 @@ export const INERT_ACTIONS: Readonly<Record<string, string>> = {
     exactly; wiring it would be a divergence, not a fix.
   */
   'disable-private-chat':
-    'ModalHost.svelte:2373 — MATCHES THE REFERENCE, which renders this button at bundle byte ~2067000 with an icon, a label and no x("click") binding at all while every neighbouring button has one',
+    'ModalHost.svelte:2373 — MATCHES THE REFERENCE, which renders this button at bundle byte ~2067000 with an icon, a label and no x("click") binding at all while every neighbouring button has one'
   /*
     `test-follow-sound` IS GONE FROM THIS TABLE — it was wired on 2026-08-23 and now has a real
     branch in `RoomUserActions.handle`, which is what removing an entry here demands. The sound is
     `pling`, from `testFollowChatSound()` at byte 2075886. See that handler for the full reasoning.
 
-    `get-my-token` is now EVIDENCED and stays inert only because nobody has built it yet. The row
-    said "what token it should show is not evidenced anywhere read so far"; it is, at byte 2255348,
-    and the answer is BOTH identifiers, not one:
+    `get-my-token` IS GONE FROM THIS TABLE — built 2026-09-02 as `SessionInfoModal.svelte`, and it
+    left carrying a divergence rather than a clean match, which is why the record stays here.
 
-      getMyToken(){
-        let e=globals.sessionID, i=globals.sesionToken;      // sesionToken: the reference's own typo
-        $("#user-settings-modal").modal("hide");
-        bootbox.dialog({ title:"Session Information", message:`…`,
-                         buttons:{ok:{label:"Close",className:"btn-primary"}} })
-      }
+    Its entry had said the whole control was refused, on two grounds. The first is UPHELD and is now
+    on screen instead of in this file: `globals.sesionToken` is the session credential, this room's
+    cookie is `httpOnly`, and reproducing that field would mean the server writing an httpOnly value
+    into the DOM — turning a cookie an XSS cannot read into a string it can. The token input renders
+    disabled with that reason beside it, which is the shape `stream-player-blocked-contract.test.ts`
+    already sets for a control that cannot honestly work.
 
-    The dialog is two `mb-3` blocks, each `<label class="form-label"><strong>…:</strong></label>`
-    over an `input-group` holding a readonly `<input class="form-control">` and a
-    `<button class="btn btn-outline-secondary">` with `<i class="fas fa-copy"></i> Copy`:
+    **The second ground did not survive re-measurement.** It read: *"`globals.sessionID` is the room
+    code, already visible in the address bar, so a dialog showing only that is a control whose only
+    effect is repeating what the URL says."* The first clause is right — `globals.sessionID = e` in
+    `loadGlobals(e)` at byte 1,148,131, called with `new URLSearchParams(location.search).get("id")`
+    at 2,600,589, one assignment in the bundle. The second is true of the REFERENCE and false of
+    THIS room: our address is `/`, the short code lives on the session row server-side, and
+    `routes/session/+page.svelte` strips even the handoff token from the bar. Nothing on screen tells
+    a member which room they are in, so the field that merely echoed the URL upstream is the only
+    answer here to "which room am I in" — which is what somebody reporting a problem needs.
 
-      Session ID     input id="sessionId"     copies, then alerts 'Session ID copied!'
-      Session Token  input id="sessionToken"  copies, then alerts 'Session Token copied!'
-
-    Two things to carry when it IS built. The reference copies with an INLINE `onclick` string
-    calling `navigator.clipboard.writeText(...)` and a bare `alert(...)`; this repository forbids
-    `window.alert` and would use the project's dialog primitive, which is a divergence to record
-    rather than hide. And the button label is `" Get my token "` — lower-case `my` and `token` —
-    sitting in the same menu as `" Mute Microphone for all non-admins "`.
+    A reason that is true of the reference and false of this room is the failure mode this whole file
+    is built to catch, and it caught itself only because the row was re-measured rather than read.
   */
-  'get-my-token':
-    'ModalHost.svelte:3230 — INERT ON PURPOSE, and the reason changed on 2026-08-29 from "merely unbuilt" to a SECURITY divergence. The reference dialog (byte 2255348) renders the session-token global into a readonly input. This room CANNOT reproduce that without a regression: its session cookie is set httpOnly (server/auth.ts:91), so no script can read it today, and every occurrence of that global name in this repository is a QUOTATION of the reference inside a comment — the client holds no token at all. Building it would mean handing the server the job of putting an httpOnly value into the DOM, turning a cookie an XSS cannot read into a string it can, in a multi-tenant fintech room. The other half is not worth building alone: globals.sessionID is the room code, already visible in the address bar, so a dialog showing only that is a control whose only effect is repeating what the URL says. Unblocking this needs a token that is SAFE to show — a short-lived, narrowly-scoped support identifier minted for the purpose — which is a feature, not a port.'
 };
 
 /**

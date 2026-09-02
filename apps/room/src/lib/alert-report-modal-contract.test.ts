@@ -656,13 +656,21 @@ describe('ASR-2 — the self-referential aria-labelledby, and the count that kee
       `titleId="scheduledAlertsModalLabel"`, which is const 4 — so `named` moves with `total` and
       the self-referential ten are untouched.
 
+      24 -> 25 on 2026-09-02, and a THIRD named one: `SessionInfoModal.svelte`, the "Session
+      Information" dialog behind "Get my token" (byte 2,255,348). `titleId="sessionInfoLabel"`
+      against `id="session-info-modal"`, so the two differ and the dialog's name is its heading
+      rather than itself. The self-referential ten are untouched for the third time running, which
+      is the number this case is actually about.
+
       **This count going red is the point of it.** It is what noticed that a dialog had been added
       at all, in a file nobody would have thought to open for a scheduling change, and it is the
-      reason the ratio is asserted as a triple rather than as three separate numbers.
+      reason the ratio is asserted as a triple rather than as three separate numbers. It did the
+      same on 2026-09-02 for a modal mounted from `RoomOverlays` rather than from `ModalHost` —
+      a placement nothing else in the suite would have flagged.
     */
     expect({ total, named, selfReferential }).toEqual({
-      total: 24,
-      named: 11,
+      total: 25,
+      named: 12,
       selfReferential: 10
     });
   });
