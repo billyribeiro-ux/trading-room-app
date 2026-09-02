@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ngbTooltip } from '#lib/ngb-tooltip.js';
   import { attachMenuPlacement } from '#lib/message-menu-position.js';
   import type { MessageAction } from '#lib/types.js';
   import { MESSAGE_MENU_TEXT, type MessageMenuAllows } from '#lib/message-behavior.js';
@@ -221,7 +222,17 @@
       }}
       aria-describedby={reactionPopoverId}
     >
-      <i class="far fa-smile"></i>&nbsp;&nbsp;Add Reaction
+      <!--
+        MSM-01 — const 40 at byte 1,359,726 and const 37 at 1,397,773, the same value in both:
+        `["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]`. The icon carries a
+        LEFT-placed tooltip repeating the entry's own label, which reads as redundant and is the
+        capture's; `ngbTooltipWith` is already how this room wears the four other captured tooltips.
+      -->
+      <i
+        class="far fa-smile"
+        {...{ placement: 'left', ngbtooltip: 'Add Reaction' } as Record<string, string>}
+        {@attach ngbTooltip}
+      ></i>&nbsp;&nbsp;Add Reaction
     </a>
   {/if}
   {#if allows.edit}

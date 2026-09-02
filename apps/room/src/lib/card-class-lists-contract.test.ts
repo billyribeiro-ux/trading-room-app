@@ -194,9 +194,15 @@ describe('RM-22 — the two reaction containers', () => {
       per host, and — the half a count cannot express — the strip's own markup appearing nowhere
       outside it. A second hand-written strip is the failure; a third CALL is not.
     */
-    expect(MESSAGE.match(/\{#snippet reactionStrip\(\)\}/g), 'one definition').toHaveLength(1);
+    /*
+      Matched with the parameter list left open. RMSG-06 (2026-09-02) gave the strip a `gated`
+      parameter, because the compact MEMBER host renders the pill ungated as `m_e` does — and a
+      pattern hard-coding `()` would fail on that for the wrong reason, which is the same lesson as
+      the paragraph above.
+    */
+    expect(MESSAGE.match(/\{#snippet reactionStrip\([^)]*\)\}/g), 'one definition').toHaveLength(1);
 
-    const renders = MESSAGE.match(/\{@render reactionStrip\(\)\}/g) ?? [];
+    const renders = MESSAGE.match(/\{@render reactionStrip\([^)]*\)\}/g) ?? [];
     expect(
       renders.length,
       'both hosts draw it, and the card draws it once per container'
@@ -207,7 +213,7 @@ describe('RM-22 — the two reaction containers', () => {
       `slice-anchor-contract` refuses the inline form, and a -1 here would slice one character and
       pass.
     */
-    const at = MESSAGE.indexOf('{#snippet reactionStrip()}');
+    const at = MESSAGE.indexOf('{#snippet reactionStrip(');
     expect(at, 'the snippet moved').toBeGreaterThan(-1);
     const end = MESSAGE.indexOf('{/snippet}', at);
     expect(end, 'the snippet is unterminated').toBeGreaterThan(at);

@@ -1,6 +1,7 @@
 <script lang="ts">
   import AvDevicePane from '#lib/components/AvDevicePane.svelte';
   import ViewerAlertPrefsPane from '#lib/components/ViewerAlertPrefsPane.svelte';
+  import { isGravatar } from '#lib/avatar-source.js';
   import type { ViewerAlertPrefs } from '#lib/viewer-alert-prefs.js';
   import type { RoomPeerHistory } from '#lib/room/peer-history.svelte.js';
   import CompactMessageRow from '#lib/components/CompactMessageRow.svelte';
@@ -1857,41 +1858,12 @@
     youtubeAlert = 'Youtube video url is saved successfully.';
   }
 
-  /**
-   * Whether an avatar is the gravatar fallback rather than something the member uploaded.
-   *
-   * Extracted from `gravatarAtSize`, which already asked exactly this question to decide whether it
-   * could resize. It is now asked in two places — that, and whether the avatar dropdown offers
-   * "Remove profile picture" — and one concept in two spellings is how they stop agreeing.
-   *
-   * IT IS THE ONLY SIGNAL AVAILABLE, and that is worth stating rather than leaving to be discovered.
-   * The reference asks `preferences.profilePic`, a field whose emptiness means "never set". This
-   * room has no such field: `removeProfilePicture` writes `gravatarUrl(email)` into `users.avatar_url`,
-   * so a member who has removed their picture has a URL rather than a null. "Is it a gravatar" is
-   * therefore the same question, asked of the value this room actually stores.
-   */
-  function isGravatar(url: string) {
-    try {
-      return new URL(url).hostname === 'secure.gravatar.com';
-    } catch {
-      return false;
-    }
-  }
-
-  function gravatarAtSize(url: string, size: number) {
-    if (!isGravatar(url)) return url;
-    const avatarUrl = new URL(url);
-    avatarUrl.searchParams.set('s', String(size));
-    return avatarUrl.toString();
-  }
-
-  const targetUserModalAvatar = $derived(gravatarAtSize(targetUser.pic, 80));
+  const targetUserModalAvatar = $derived(
+    targetUser.pic || `https://secure.gravatar.com/avatar/${targetUser.emailHash}?d=mm&s=80`
+  );
   /* `isPresenter` was declared here and is now hoisted above — see its docblock; the position is the fix. */
   const isTargetCurrentUser = $derived(targetUser.emailHash === currentUser.emailHash);
-  /*
-    `O(4, e.appService.globals.preferences.profilePic ? 5 : 4)` — the avatar menu's two states. See
-    `isGravatar` for why this room asks a different question to get the same answer.
-  */
+  /* `O(4, e.appService.globals.preferences.profilePic ? 5 : 4)` — see `#lib/avatar-source.js`. */
   const hasOwnProfilePicture = $derived(!isGravatar(targetUser.pic));
   const isTargetFollowed = $derived(Boolean(followedUsers[targetUser.emailHash]));
   const isTargetMuted = $derived(Boolean(mutedUsers[targetUser.emailHash]));

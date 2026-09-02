@@ -153,6 +153,14 @@ const AT_BYTE: ReadonlyArray<readonly [number, string]> = [
   [1_493_686, 'function Y0e'],
   [1_493_972, 'z("ngClass",ct(2,$0e,!e.isDetached&&(!e.isConnected'],
   [1_502_001, 'z("controls",o.showControls)("ngClass",Kn(18,H0e,!o.isConnected'],
+  /*
+    SP2-05's other half — the click that writes `showControls`, bound to node 9, the `<video>`. Its
+    partner above is the READ; this is the WRITE, and the two together are what make the attribute
+    provably false for the life of the component: nothing else assigns it, and
+    `.webcamScreen { pointer-events: none }` means the click never fires.
+  */
+  [1_501_400, '(9,"video",8),x("click",function(){return o.showControls=!o.showControls})'],
+  [1_494_556, 'this.showControls=!1,this.localpreview=!1'],
   /* SP2-02 — the clip, and the rule that lifts it in the popout. */
   [1_500_330, 'consts:[[1,"h-inherit"]'],
   [1_500_337, '[[1,"h-inherit"],[1,"mt-4","text-center"]'],

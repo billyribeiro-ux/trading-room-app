@@ -9,10 +9,28 @@ import { codeOf } from './source-comments';
  * ## What the audit found, and it was not a missing feature
  *
  * All 24 of the component's consts were decoded by value and compared against `RoomSidebar.svelte`.
- * Twenty are present. The four that are not — `new-badge`, `stars-container`, `stars-icon` and
- * `stars-num` — are `RS-03` and `RS-04` in the register, both BLOCKED on a server-side supply that
- * does not exist (`e.data.years` and `e.isNew` are populated by nothing, anywhere), and both
- * correctly reported as such. So the behaviour is complete to the limit of the evidence.
+ * Twenty were present. The four that were not — `new-badge`, `stars-container`, `stars-icon` and
+ * `stars-num` — were `RS-03` and `RS-04`, recorded BLOCKED on a server-side supply that does not
+ * exist (`e.data.years` and `e.isNew` are populated by nothing, anywhere).
+ *
+ * ## All 24 are present as of 2026-09-02, and THIS FILE IS WHAT FOUND THE CONTRADICTION
+ *
+ * The assertion below used to demand those four be ABSENT, so that building them over an absent
+ * supply would fail here. It went red the moment they were built — which is the gate working, and
+ * what it exposed is that **this repository already held two answers to the same question.**
+ *
+ * `ModalHost.svelte` and `RoomMessage.svelte` both render all four, over the same absent supply,
+ * with the reason argued at length at `ModalHost.svelte`: *"a gate written after the supply arrives
+ * is a gate written while somebody is watching a wrong star."* Two surfaces rendered by argument
+ * and the third forbade by test, so the same moderation fact appeared on a member's info card and
+ * in the message log and vanished in the roster between them.
+ *
+ * Resolved toward the majority and toward the capture. But the assertion is NOT simply deleted —
+ * deleting it would leave the real risk unguarded, and that risk was never "markup with no supply".
+ * It is markup with no GATE: an unconditional star discloses tenure the owner switched off, and an
+ * unconditional `New` tells a member something about another member. So it now asserts the three
+ * gates by their exact text and refuses the ungated spellings by name, which is the shape
+ * `moderation-badge-contract.test.ts` already uses for the modal twin.
  *
  * **What was wrong was the EVIDENCE POINTERS, in three ways, and all three are the shape that
  * survives a review**: the sentence is true, the quoted code is right, and only the label beside it
@@ -148,19 +166,54 @@ describe('the twenty consts that ARE built, and the four that are blocked', () =
     }
   });
 
-  it('and the four that are NOT are the two blocked register rows, not a new gap', () => {
+  it('and the last four are rendered too, so all 24 consts are present', () => {
     /*
-      `stars-container`/`stars-icon`/`stars-num` are `RS-03` and `new-badge` is `RS-04`. Both need a
-      value no server here produces — `e.data.years` and `e.isNew` — and both are recorded BLOCKED
-      with that reason. Asserted as ABSENT rather than left unmentioned, so that building them
-      without the supply (markup gated on a value that is always undefined, which is what the
-      register calls "a second node that can never render") fails here.
+      RS-03 and RS-04, built 2026-09-02. Values read from the consts table at bundle byte 2,038,387:
+      const 10 `[1,"badge","bg-warning","new-badge"]`, 11 `[1,"stars-container"]`,
+      20 `[1,"fas","fa-star","stars-icon"]`, 21 `[1,"stars-num"]`.
     */
     for (const value of ['stars-container', 'stars-icon', 'stars-num', 'new-badge']) {
-      expect(
-        SIDEBAR,
-        `${value} needs a server-side supply that does not exist — see RS-03/RS-04`
-      ).not.toContain(value);
+      expect(SIDEBAR, `const value ${value} is not rendered`).toContain(value);
+    }
+  });
+
+  it('renders neither of them UNGATED, which is the risk the old absence assertion held', () => {
+    /*
+      THE ASSERTION THAT REPLACED "these must not exist", and it guards the thing that actually
+      hurts. `years` having no producer is a reason nothing renders; it is not a reason anything
+      renders WRONGLY. What renders wrongly is an ungated node:
+
+        the star with no `disableStarYears`  — tenure shown in a room whose owner switched it off
+        the star with no `!user.isP`         — a presenter's standing is their role, not their years
+        `New` with no `isPresenter`          — a member reads a moderation fact about another member
+
+      Gates read at bundle byte 2,034,694, inverted because the reference names the reasons to HIDE:
+
+        O(8, sessData.isNewIndicatorOn && isPresenter && e.isNew ? 8 : -1)
+        O(9, sessData.disableStarYears || e.isP || !e.data.years ? -1 : 9)
+
+      `isNewIndicatorOn` is the one term deliberately left off — `isNew` has no producer and a gate
+      with nothing to gate is not a consumer, which is `moderation-badge-contract.test.ts`'s
+      argument and the form `ModalHost.svelte` already renders.
+
+      Source text here, VALUES in `RoomSidebar.svelte.test.ts`, which mounts the rail and gives each
+      of the three terms its own negative control. This half is what catches a term deleted during a
+      refactor that keeps every existing test green.
+    */
+    const code = codeOf('src/lib/components/RoomSidebar.svelte', SIDEBAR);
+    expect(code, 'the New badge lost its presenter gate').toContain(
+      '{#if isPresenter && user.isNew}'
+    );
+    expect(code, 'the membership star lost a gate term').toContain(
+      '{#if !session?.disableStarYears && !user.isP && user.years}'
+    );
+    for (const ungated of [
+      '{#if user.isNew}',
+      '{#if user.years}',
+      '{#if !user.isP && user.years}',
+      '{#if !session?.disableStarYears && user.years}'
+    ]) {
+      expect(code, `${ungated} — a badge rendered without its gate`).not.toContain(ungated);
     }
   });
 });

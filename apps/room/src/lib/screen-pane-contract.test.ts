@@ -330,10 +330,67 @@ describe('SV-SP-10 — the screenshare element is silent, three ways as upstream
   });
 
   it('makes it a static attribute and passes no volume at all', () => {
-    expect(pane).toContain('muted\n          {@attach attachStream}');
+    /*
+      `muted` STATIC — a bare attribute, never `muted={…}` — and no volume anywhere.
+
+      This used to assert the adjacency `muted\n          {@attach attachStream}`, which broke on
+      2026-09-02 when SP2-05 put `onclick` between them. That was the assertion being wrong about
+      what it cared about rather than the markup being wrong: nothing in the reference makes those
+      two lines neighbours, and a test that pins the ORDER of unrelated attributes fails on every
+      future addition and teaches the next author to loosen it rather than read it.
+
+      What SV-SP-10 is actually about is that the element is silent three ways, so that is what is
+      asserted now: the attribute is there, it is bare, and no code path writes `volume` or `muted`
+      at runtime in either component.
+    */
+    expect(pane, 'the video lost its static `muted`').toMatch(/\n\s+muted\n/);
+    expect(pane, '`muted` became a binding, which the const table refuses').not.toContain(
+      'muted={'
+    );
     expect(pane).not.toContain('node.volume =');
     expect(pane).not.toContain('node.muted =');
     expect(area).not.toContain('muted={volume === 0}');
+  });
+});
+
+describe('SP2-05 — the controls binding, transcribed with the CSS that keeps it dead', () => {
+  it('is the reference behaviour, read at both offsets', () => {
+    /*
+      The WRITE and the READ, which only mean something together. `grep -bo` gave both, and
+      `emoji-screen-citation-contract.test.ts` re-reads them — it rejected the first draft of the
+      note at the code, whose offsets were each a few dozen bytes past their own quoted text.
+    */
+    expect(BUNDLE.slice(1_501_400, 1_501_400 + 74)).toBe(
+      '(9,"video",8),x("click",function(){return o.showControls=!o.showControls})'
+    );
+    expect(BUNDLE.slice(1_494_556, 1_494_556 + 41)).toBe(
+      'this.showControls=!1,this.localpreview=!1'
+    );
+  });
+
+  it('binds `controls` to the flag and toggles it on click, as the capture does', () => {
+    expect(pane).toContain('controls={showControls}');
+    expect(pane).toContain('onclick={() => (showControls = !showControls)}');
+  });
+
+  it('and keeps the rule that makes the pair inert, which is the whole reason it is safe', () => {
+    /*
+      THE ASSERTION WORTH HAVING HERE.
+
+      Transcribing a click handler and a `controls` attribute is only a match while
+      `.webcamScreen { pointer-events: none }` stands: it is the reference's own rule, it is why
+      `showControls` is false for the life of the component upstream, and it is why copying the
+      handler changes nothing a viewer sees. Delete it — for any reason, including "the video should
+      be clickable" — and this room grows a control bar the capture never shows.
+
+      So the rule is pinned HERE, next to the thing that depends on it, rather than only in the
+      geometry test that pins it for panning.
+    */
+    const at = pane.indexOf('.webcamScreen {');
+    expect(at, 'the .webcamScreen rule is gone').toBeGreaterThan(-1);
+    const closes = pane.indexOf('}', at);
+    expect(closes).toBeGreaterThan(at);
+    expect(pane.slice(at, closes)).toContain('pointer-events: none');
   });
 });
 

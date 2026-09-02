@@ -645,12 +645,33 @@
               evidence rather than formatting.
             -->
             <label class="emoji-mart-sr-only" for={searchInputId}>{' Search '}</label>
+            <!--
+              EMOJI2-07 — the reference binds `clear()` TWICE on this button. Const at byte 737,990
+              is `["type","button",1,"emoji-mart-search-icon",3,"click","keyup.enter","disabled"]`
+              and the template at 738,430 is
+
+                d(5,"button",4), x("click", () => o.clear())("keyup.enter", () => o.clear())
+
+              on a real `<button type="button">`, whose own activation already fires `click` for a
+              focused Enter — so one Enter press runs `clear()` twice upstream.
+
+              Transcribed rather than tidied. `clear()` is idempotent, so the whole cost of matching
+              is one extra search pass over an already-empty query, and "it would reproduce an
+              upstream defect" is not one of the four things that excuse a divergence.
+
+              `keyup` and not `keydown`: Angular's `keyup.enter` is a keyup listener filtered on the
+              key, which is what makes the pair a DOUBLE rather than a race — the native click has
+              already fired on keydown by the time this runs.
+            -->
             <button
               class="emoji-mart-search-icon"
               type="button"
               disabled={!query}
               aria-label="Clear"
               onclick={clearQuery}
+              onkeyup={(event) => {
+                if (event.key === 'Enter') clearQuery();
+              }}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

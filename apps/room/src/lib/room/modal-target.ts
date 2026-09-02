@@ -80,6 +80,25 @@ export interface RosterRowForTarget {
     boundary, once, rather than either name leaking across it.
   */
   isFT?: boolean;
+  /**
+   * `locStr` — the member's city line, e.g. `Waterbury, CT, US`. THE MODAL'S `location` CELL.
+   *
+   * ## The refusal that kept it empty was wrong about the one fact that decides it
+   *
+   * Both `server/room-events.ts:711` and `server/user-detail.ts:70` recorded that `location`
+   * *"needs a geo-IP service this repository does not have"*. It does not, and this repository
+   * already runs the lookup: the reference's own geo call is CLIENT-side (bundle 1,145,213,
+   * `processData(){ … globals.locStr = i }`) and ships to the server on the login frame at 993,662.
+   * This room does the same at `events.svelte.ts:1051`, POSTing to `api/roster/location`, which
+   * calls `setRosterLocation` — and `RoomSidebar.svelte:870` has been RENDERING the result.
+   *
+   * So the value was sitting on the very object this mapping reads, and this interface omitted the
+   * field, which is why the modal showed `undefined`. Re-measured 2026-09-01.
+   *
+   * `| null` because `patchRosterUser` can clear it. No new disclosure: `locStr` is redacted to a
+   * member at the hub with `email`, so a member's copy of any row is already empty here.
+   */
+  locStr?: string | null;
 }
 
 /**
@@ -121,6 +140,15 @@ export function modalTargetFromRosterRow(user: RosterRowForTarget): ModalTargetU
       different problem and must not be made to look like this one by a default.
     */
     isTrial: user.isFT ?? false,
+    /*
+      UIM-09's `location`, and it needed no new producer — see `locStr` on the interface above for
+      why the recorded "needs a geo-IP service" refusal did not survive re-measurement.
+
+      `|| undefined` rather than `?? undefined`: `patchRosterUser` clears this to the EMPTY STRING
+      and the modal's cell renders `n/a` for an absent value, so an empty string must reach it as
+      absent. `??` would pass `''` through and draw a blank cell where "we do not know" belongs.
+    */
+    location: user.locStr || undefined,
     /*
       THE FIVE CHECKBOXES, carried through — and note they land on FLAT fields while arriving in a
       nested one. `ModalTargetUser.permissions` is already taken, by an unrelated `'r' | 'a'` string

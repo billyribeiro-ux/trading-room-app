@@ -49,6 +49,9 @@ interface Entry {
   locStr: string;
   isP: boolean;
   isFT: boolean;
+  /** RS-04 / RS-03 — both optional on the component's generic, so both are optional here. */
+  isNew?: boolean;
+  years?: number | null;
   hasAdminChat: boolean;
   userXrefID: string;
 }
@@ -89,6 +92,8 @@ const render = (options: {
     showOnlyUsernames?: boolean;
     /** RS-05 — the roster avatar's own gate, which is not the message log's. */
     hideAvatars?: boolean;
+    /** RS-03's first term — the owner's switch for the membership star. */
+    disableStarYears?: boolean;
   };
   /*
     The two handlers a REDUCED roster row must keep. Optional, and defaulted to no-ops, so every
@@ -591,5 +596,90 @@ describe('RS-10 and RS-11 — the info block s order and its four connection nod
       (b.textContent ?? '').trim()
     );
     expect(buttons).toEqual(['Mobile App Info', 'Tip Me']);
+  });
+});
+
+describe('RS-04 and RS-03 — the two roster badges this rail was the only surface not drawing', () => {
+  /*
+    THE SAME MODERATION FACT APPEARED AND VANISHED BETWEEN THREE SURFACES.
+
+    `ModalHost.svelte` draws Trial, New and the membership star; `RoomMessage.svelte` draws all
+    three; this rail drew Trial and stopped. So a presenter saw "New" on a member's info card and in
+    the message log, and not in the list between them.
+
+    Gates read at bundle byte 2,034,694, slot bodies at 2,033,362, consts at 2,038,387:
+
+      O(8, sessData.isNewIndicatorOn && globals.isPresenter && e.isNew ? 8 : -1)
+      O(9, sessData.disableStarYears || e.isP || !e.data.years ? -1 : 9)
+
+    These MOUNT rather than reading source text, so the assertions are about what a presenter
+    actually sees. Every one counts rows first — the positive control this file's own header
+    demands, because an empty roster satisfies any absence assertion.
+  */
+  it('draws the New badge to a PRESENTER only', () => {
+    const people = [entry({ id: 1, displayName: 'Newcomer', isNew: true })];
+    const seen = render({ isPresenter: true, people });
+    expect(seen.querySelectorAll('.room-roster-container'), 'positive control').toHaveLength(1);
+    expect(seen.querySelector('.new-badge')?.textContent?.trim()).toBe('New');
+    expect(seen.querySelector('.new-badge')?.className).toBe('badge bg-warning new-badge');
+  });
+
+  it('and NOT to a member, because who is new is a moderation fact about somebody else', () => {
+    /*
+      The term the Trial badge above took as a correction, applied to its sibling. Without it a
+      member reads another member's standing off the rail.
+    */
+    const people = [entry({ id: 1, displayName: 'Newcomer', isNew: true })];
+    const seen = render({
+      isPresenter: false,
+      people,
+      session: { rosterVisibleToViewers: true }
+    });
+    expect(seen.querySelectorAll('.room-roster-container'), 'positive control').toHaveLength(1);
+    expect(seen.querySelector('.new-badge')).toBeNull();
+  });
+
+  it('draws the membership star with all three terms satisfied', () => {
+    const people = [entry({ id: 1, displayName: 'Veteran', isP: false, years: 7 })];
+    const seen = render({ isPresenter: true, people });
+    expect(seen.querySelector('.stars-num')?.textContent).toBe('7');
+    expect(seen.querySelector('.stars-container .stars-icon')?.className).toBe(
+      'fas fa-star stars-icon'
+    );
+  });
+
+  it('hides the star when the OWNER switched it off', () => {
+    /*
+      `disableStarYears` is a supplied setting that `RoomMessage.svelte` and `ModalHost.svelte`
+      already obey. This rail was the third star in the room and the only one ignoring it.
+    */
+    const people = [entry({ id: 1, displayName: 'Veteran', isP: false, years: 7 })];
+    const seen = render({
+      isPresenter: true,
+      people,
+      session: { rosterVisibleToViewers: true, disableStarYears: true }
+    });
+    expect(seen.querySelectorAll('.room-roster-container'), 'positive control').toHaveLength(1);
+    expect(seen.querySelector('.stars-container')).toBeNull();
+  });
+
+  it('hides the star from a PRESENTER row — standing is their role, not their tenure', () => {
+    const people = [entry({ id: 1, displayName: 'Host', isP: true, years: 7 })];
+    const seen = render({ isPresenter: true, people });
+    expect(seen.querySelectorAll('.room-roster-container'), 'positive control').toHaveLength(1);
+    expect(seen.querySelector('.stars-container')).toBeNull();
+  });
+
+  it('draws no star for a row with no `years`, which is every row today', () => {
+    /*
+      Stated rather than papered over: `years` has no producer, so this renders for nobody in
+      production. The gate is written now because `ModalHost.svelte` and `RoomMessage.svelte`
+      already carry this exact shape over the same absent supply — a gate written after the supply
+      arrives is a gate written while somebody is watching a wrong star.
+    */
+    const people = [entry({ id: 1, displayName: 'Unknown', isP: false })];
+    const seen = render({ isPresenter: true, people });
+    expect(seen.querySelectorAll('.room-roster-container'), 'positive control').toHaveLength(1);
+    expect(seen.querySelector('.stars-container')).toBeNull();
   });
 });

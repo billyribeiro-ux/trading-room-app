@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { pollNavAnchorClasses, WEBINAR_MODE_TRAILING_ICON_REFUSED } from './alert-chat-nav.js';
+import { pollNavAnchorClasses, WEBINAR_MODE_TRAILING_ICON_BUILT } from './alert-chat-nav.js';
 import { codeOf } from './source-comments';
 
 /**
@@ -138,18 +138,30 @@ describe('ACA-04 — the webinar block s fourth node is refused, with the measur
     expect(reference.length).toBeGreaterThan(400_000);
   });
 
-  it('does not emit it, and says so where the omission is', () => {
+  it('emits it, as the last thing in the block and carrying nothing', () => {
     /*
-      The webinar block ends with the tooltip span. Nothing follows it inside the div, which is the
-      refusal — asserted on the rendered SHAPE rather than on the absence of a string, because "no
-      empty `<i>`" is unsearchable and "the block ends here" is not.
+      BUILT 2026-09-02, and this assertion is the inverse of the one it replaces.
+
+      It was refused because no stylesheet here or in the reference selects a bare `<i>`, so the
+      element is invisible. True, and true UPSTREAM for the same reason — which makes it an
+      upstream defect reproduced rather than an escape. An element the reference emits is
+      reference-facing output whether or not anything paints it.
+
+      Asserted on the rendered SHAPE, as the refusal was: the tail of the block after its last
+      `</span>` must carry an `<i>` and that `<i>` must be BARE. The second half is what stops the
+      obvious wrong fix — somebody giving it a class to make it "do something" would satisfy a
+      naive `toContain('<i')` and diverge from the const-less element in the capture.
     */
     const at = PANE.indexOf('<div class="px-1 webinarMode">');
     expect(at, 'the webinar block must exist for this to test anything').toBeGreaterThan(-1);
     const block = PANE.slice(at, PANE.indexOf('</div>', at) + 6);
     expect(block).toContain('fa-question-circle');
-    expect(block.slice(block.lastIndexOf('</span>'))).not.toContain('<i');
-    expect(WEBINAR_MODE_TRAILING_ICON_REFUSED).toContain('1,424,607');
-    expect(WEBINAR_MODE_TRAILING_ICON_REFUSED).toContain('2,371,066');
+    const tail = block.slice(block.lastIndexOf('</span>'));
+    expect(tail, 'the trailing bare <i> is missing').toContain('<i></i>');
+    expect(tail, 'the trailing <i> gained an attribute the capture does not have').not.toMatch(
+      /<i\s+[^>]/
+    );
+    expect(WEBINAR_MODE_TRAILING_ICON_BUILT).toContain('1,424,607');
+    expect(WEBINAR_MODE_TRAILING_ICON_BUILT).toContain('2,371,066');
   });
 });

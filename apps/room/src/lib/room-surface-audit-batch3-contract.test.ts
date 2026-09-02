@@ -484,18 +484,31 @@ describe('ROV-02 — the image lightbox gets the geometry the capture gives it',
  * anywhere. Neither is there markup wearing `.imgur-modal`: the class appears only inside component
  * stylesheets. So this bundle does not contain the viewer that handler opens.
  *
- * **That is not the same as saying it does not exist.** `deployed-index.html` names four scripts and
- * this checkout holds one of them; `runtime`, `polyfills` and `scripts` are not here, and a global
- * installed by `scripts.*.js` is exactly the shape `openImageModal` has. The passing control is
- * `showImagePreview`, whose five occurrences include its definition at byte 1,992,730 — so the
- * method finds a definition when the definition is in this file.
+ * **That is not the same as saying it does not exist**, and every sentence above is still true of
+ * the BUNDLE. What was wrong is the next step: the declaration was looked for in one file.
  *
- * The row is therefore BLOCKED and not "upstream is broken". What this room renders was built
- * against `showImagePreview`, the one image viewer the pinned bundle DOES contain, and ROV-02 and
- * ROV-04 are the two places that choice shows.
+ * ## UNBLOCKED 2026-09-02 — it is in `deployed-index.html`, which this file already reads
+ *
+ * `openImageModal` is defined at `deployed-index.html` line 70, inline, with the whole
+ * `bootbox.dialog({…})` at lines 106-123 and its `downloadImage(url, imageName)` at 125-145. The
+ * file is 159 lines, sits in the same pinned directory as the bundle, and is listed in that
+ * directory's `sha256sums.txt` as `d1f84087…6ae9a220`.
+ *
+ * **This test already had it in a constant.** `DEPLOYED_INDEX` was read only for the four
+ * `<script src>` tags in the assertion below — the file's `<script>` BODY was never looked at. That
+ * is the same failure as RTE-05's in the same pass, one level in: a sweep of one file reported as a
+ * sweep of the evidence, by a test whose own fixture held the answer.
+ *
+ * It was also already refuted by this room's own code: `RoomModals.openImage` is a transcription of
+ * this exact declaration, popped-out-window branch and all, and `routes/+page.svelte` assigns it to
+ * `window.openImageModal` — the global name the captured page defines for its inline handlers.
+ * Somebody built the function from this file while this row recorded the file as not holding it.
+ *
+ * So `ImageLightbox.svelte` is `openImageModal`'s dialog and was documented as
+ * `showImagePreview`'s. The visible consequence was its `alt`, corrected with this row.
  */
-describe('ROV-03 — the viewer the pinned chunk does not contain', () => {
-  it('finds the call and no declaration, and says which is which', () => {
+describe('ROV-03 — the viewer the pinned CHUNK does not contain, and the pinned INDEX does', () => {
+  it('finds the call and no declaration IN THE BUNDLE, and says which is which', () => {
     expect(BUNDLE.split('openImageModal').length - 1).toBe(1);
     expect(BUNDLE.indexOf('onclick="openImageModal(event,')).toBe(1_326_388);
     expect(BUNDLE.indexOf('function openImageModal')).toBe(-1);
@@ -512,6 +525,37 @@ describe('ROV-03 — the viewer the pinned chunk does not contain', () => {
     expect(DEPLOYED_INDEX).toContain('src="runtime.b70e5d3ff558bfdf.js"');
     expect(DEPLOYED_INDEX).toContain('src="polyfills.95db17d6d6f4b89d.js"');
     expect(DEPLOYED_INDEX).toContain('src="scripts.38973a242454fb27.js"');
+  });
+
+  it('AND FINDS THE DECLARATION in the index this file was already holding', () => {
+    /*
+      The assertion this describe block was missing for the whole of its life. It read
+      `DEPLOYED_INDEX` for four `<script src>` attributes and never for its inline body, which is
+      where the answer was.
+    */
+    expect(DEPLOYED_INDEX).toContain('function openImageModal(event, url) {');
+    expect(DEPLOYED_INDEX).toContain("var imageName = url.substring(url.lastIndexOf('/') + 1);");
+    expect(DEPLOYED_INDEX).toContain("className: 'imgur-modal',");
+  });
+
+  it('and the lightbox renders what that declaration writes, `alt` included', () => {
+    /*
+      `'<img src="' + url + '" alt="' + imageName + '" /><hr><button class="btn btn-primary btn-sm"…'`
+
+      The `alt` is the FILENAME. This component computed exactly that until 2026-08-31, when it was
+      changed to the whole URL as "a preference substituted for a captured value" — citing
+      `showImagePreview`, which is the OTHER viewer and does use the whole URL. Right rule, wrong
+      dialog.
+
+      The `<hr>` and the in-body button were recorded as this room's invention and "not evidence of
+      anything". They are the reference's, and its class list is `btn btn-primary btn-sm` — which is
+      what was already written here, so the guess was right and is now evidence.
+    */
+    expect(LIGHTBOX).toContain('alt={imageName}');
+    expect(LIGHTBOX).toContain("url.substring(url.lastIndexOf('/') + 1)");
+    expect(LIGHTBOX, 'the alt went back to the other viewer’s value').not.toContain('alt={url}');
+    expect(LIGHTBOX).toContain('<hr />');
+    expect(LIGHTBOX).toContain('class="btn btn-primary btn-sm"');
   });
 });
 

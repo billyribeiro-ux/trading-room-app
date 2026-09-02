@@ -41,8 +41,8 @@ function textContent(node: HtmlNode) {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-function renderModal(tab: 'text' | 'url' | 'media') {
-  const { body } = render(PostAlertModal, {
+function renderBody(tab: 'text' | 'url' | 'media') {
+  return render(PostAlertModal, {
     props: {
       open: true,
       tab,
@@ -53,8 +53,11 @@ function renderModal(tab: 'text' | 'url' | 'media') {
       onpost: async () => true,
       onpastepost: async () => true
     }
-  });
-  return elements(parseFragment(body) as unknown as HtmlNode);
+  }).body;
+}
+
+function renderModal(tab: 'text' | 'url' | 'media') {
+  return elements(parseFragment(renderBody(tab)) as unknown as HtmlNode);
 }
 
 describe('PAM-12 — `aria-selected` is DERIVED here, and the capture hardcodes TWO of them true', () => {
@@ -188,5 +191,50 @@ describe('Post Alert rendered evidence contract', () => {
       'aria-selected': 'true'
     });
     expect(attributes(byId(nodes, 'nav-img') ?? {}).class).toBe('tab-pane fade active show');
+  });
+});
+
+describe('PAM-14 — the six id/name pairs this room invented are gone', () => {
+  /*
+    The `app-post-alert-modal` consts table was read in full from byte 2,131,609. Consts 14, 20, 22,
+    25 and 58 — the five behind these controls — carry no `id` and no `name`; ours carried both on
+    all six fields and nothing in the repository read one. Asserted on the RENDERED markup, so a
+    re-introduction through any route fails here.
+  */
+  const invented = [
+    'alert-text-body',
+    'alertTextBody',
+    'alert-url"',
+    'alertUrl"',
+    'alert-url-text',
+    'alertUrlText',
+    'alert-media-url',
+    'alertMediaUrl',
+    'alert-media-text',
+    'alertMediaText',
+    'alert-legal-disclosure-text',
+    'legalDisclosureText"'
+  ];
+
+  it('renders none of them', () => {
+    const body = ['text', 'url', 'media'].map((tab) => renderBody(tab as never)).join('');
+    /* Positive control first: an unrendered modal satisfies every absence assertion below. */
+    expect(body, 'the modal did not render at all').toContain('Alert Text...');
+    for (const name of invented) {
+      expect(body, `${name} is back — the reference's consts carry no id or name`).not.toContain(
+        name
+      );
+    }
+  });
+
+  it('but keeps the checkbox ids a `<label for>` actually points at', () => {
+    /*
+      The distinction this test exists to hold. "Delete the ids" is the wrong lesson: three of them
+      are the targets of real labels, and removing those would take an accessible name off a control
+      that has one honestly.
+    */
+    const body = ['text', 'url', 'media'].map((tab) => renderBody(tab as never)).join('');
+    expect(body).toContain('id="alert-legal-disclosure-label"');
+    expect(body).toContain('for="alert-legal-disclosure-label"');
   });
 });

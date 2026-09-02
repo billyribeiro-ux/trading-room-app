@@ -67,8 +67,11 @@ import { liveConnectionFor, roomRoster } from './room-events';
     `streamServer`  the media plane. Blocked on a `STREAM_SERVER_MTX` host, the same blocker
     `serverId`      `TODO.md` rows X, AC and R name.
 
-  `location` (`privData.locStr`, byte 2,061,069) is the sixth and needs a geo-IP service this
-  repository does not have. That is an owner decision about an external dependency.
+  `location` (`privData.locStr`, byte 2,061,069) is the sixth and does NOT come from here at all —
+  it reaches the modal on the ROSTER row, through `RosterRowForTarget.locStr`, and has been supplied
+  since 2026-09-01. This paragraph used to claim it needed a geo-IP service this repository does not
+  have; that was wrong, and the correction is at `modal-target.ts`. It is named here only so the next
+  reader does not come looking for a producer in this file.
 
   **The reference decides visibility in the browser.** Its markup gates the whole block on
   `O(17, e.user.hidePrivateInfo ? -1 : 17)` (byte 2,068,096) — a flag the server puts on the payload

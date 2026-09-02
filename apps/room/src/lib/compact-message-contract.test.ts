@@ -230,8 +230,13 @@ describe('RM-04 — the compact add-reaction pill', () => {
       loosened, the inner gate stops being implied and has to come back.
     */
     expect(COMPACT).toContain('{#if menuAllows.reaction && reactions.length > 0}');
-    expect(COMPACT, 'and the pill is drawn from the one shared strip').toContain(
-      '{@render reactionStrip()}'
+    /*
+      The strip takes a parameter since RMSG-06 (2026-09-02) — the compact MEMBER host renders the
+      pill UNGATED, as `m_e` does at byte 1,379,950 — so this matches the call rather than a fixed
+      argument list. Which argument each host passes is `message-renderer-differences-contract`'s.
+    */
+    expect(COMPACT, 'and the pill is drawn from the one shared strip').toMatch(
+      /\{@render reactionStrip\([^)]*\)\}/
     );
     /*
       Asserted on the FILE, not on the compact slice: the pill lives in `reactionStrip`, which is

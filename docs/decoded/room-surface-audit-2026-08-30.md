@@ -2629,9 +2629,33 @@ postAlert(){let e={txt:this.alertTxt,n:this.appService.globals.user.name,sendTxt
 
 ### RPT-01 — Report modal never fetches a report — no getAlertReport call, no resp.queue, no error state
 
-**MEASURED REFUSAL 2026-08-30. One measurement decides this row and five others** — RPT-03 through
-RPT-07 — so it is written once, in full, at `AlertSendReportModal.svelte`, and each of those rows
-points here.
+**MEASURED REFUSAL 2026-08-30, RE-CHALLENGED AND STRENGTHENED 2026-09-02. One measurement decides
+this row and five others** — RPT-03 through RPT-07 — so it is written once, in full, at
+`AlertSendReportModal.svelte`, and each of those rows points here.
+
+**The re-challenge, and what it changed.** Put under "match the dump exactly", the proposal was to
+transcribe the client loader verbatim (which IS fully captured — `loadReports` at bundle bytes
+2,413,317-2,413,560, the branch, the strings) against a NEW per-recipient delivery table *"written
+when `alerts.dispatch` fans out"*, showing the reference's own `No Reports.` until rows appear. It
+accepted, correctly, that the schema half of this refusal still holds.
+
+It fails on one fact nobody had measured: **there is no fan-out.** `alerts.dispatch` is five
+booleans on the alert row — `sms`, `email`, `twitter`, `push`, `cross_post` — and *nothing in
+`services/api` reads one of them*. No Twilio, Resend, SendGrid, APNs or Firebase client exists
+anywhere in it. The flags are recorded INTENT with no actor.
+
+So the proposal is a table with no writer, feeding an endpoint that can only ever return empty,
+feeding a modal that would tell a presenter — in the reference's own words — that their alert
+reached nobody. That is RPT-02 exactly: the defect this room shipped once and fixed.
+
+`alert-report-modal-contract.test.ts` now asserts the SENDER half beside the schema half, and it is
+the better premise-expiry signal of the two because it fails in the right order — a sender has to
+exist before there is an outcome worth recording. Both negative controls were run: appending a
+sender's name, and appending a read of one flag, each turn it red.
+
+**The client transcription is not what is refused here.** It is buildable and was never in doubt.
+What is refused is shipping a UI whose empty state is a factual claim about delivery this product
+cannot make.
 
 Every field the reference's report holds (`status`, `name`, `email`, `sentTime`, `latency`,
 `failReason`, `token`) is a fact about one attempt to deliver one alert to one person. **This product
@@ -2990,7 +3014,13 @@ showUserAvatar(e){return!this.appService.globals.sessData.hideAvatars||!!e}
 
 ### RS-06 — Archives ▸ "Recording" renders with no handler at all
 
-**BLOCKED 2026-08-30 13:32 UTC — the same blocker as G01, and the same item.** `launchRecordings()` opens `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` in a new tab, which is a SERVER page. There is no archive service here and no recordings or archive table in either database. Wiring it would open a tab onto a 404 carrying a session token in the URL, which is worse than an inert item.
+**BLOCKED — and the recorded REASON was the weaker of the two. Re-measured 2026-09-02.** `launchRecordings()` opens `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` in a new tab, which is a SERVER page.
+
+The reason this row carried was *"there is no archive service here"*. True, and CONTINGENT: it evaporates the day one exists, and it says nothing about whether the client half is separable — which is the question this repository has now been wrong about three times.
+
+The escape that actually holds is **SECURITY, and the repository already names it by hand.** The URL's last segment is `sesionToken`. This room's session lives in an httpOnly cookie (`lib/server/auth.ts` sets `httpOnly: true`), and `lib/session-cookie-httponly-contract.test.ts` sweeps every client `.ts` and `.svelte` for `/\bses?sionToken\b/` outside a comment, failing with *"a session token is named in CLIENT code … the httpOnly cookie has been handed to the page"*. Transcribing this handler means the server handing that cookie's value to a script so it can put a credential in a URL. `lib/user-action-intent.ts` records the same refusal for the reference's own token dialog at byte 2,255,348, and `lib/room/alerts-pane.ts` already refuses the identical `tok=` clause on the detach-chat popout: *"this app authenticates from the session cookie, which the new window already has, so putting a credential in a URL here would add an exposure the original needed and this one does not."*
+
+So the item stays inert, and it stays inert for a reason an archive service would not change.
 
 **medium** · `missing-behaviour` · reference byte **2,467,757**
 
@@ -8715,13 +8745,25 @@ opening a two-tab colour palette. Ours is an `<input type="color">` in a Bootstr
 `oninput` applies `foreColor` on every frame of a drag while `run()` calls `editor?.focus()` each
 time.
 
-**The measurement that justifies refusing rather than matching.** The palette's markup is not in this
-repository to match: over `main.d1d09071be31f1ba.js`, `note-color` — the class summernote renders the
-palette with — has **zero** occurrences, `note-btn` has **two**, and `forecolor` has **two**, both of
-them inside the `rteConfig` literal itself. So the only captured evidence for this control is the
-five-character config entry, which the component already reproduces exactly. Building a palette would
-mean inventing every colour, every tab label and every class in it — a value picked because it looked
-right, which is the thing this repository's standard names outright.
+**The measurement that justifies refusing rather than matching — CORRECTED 2026-09-02, and the
+original was scoped to the wrong file.** It read: *"over `main.d1d09071be31f1ba.js`, `note-color` has
+zero occurrences"*. That count is right about the JS bundle and wrong about this repository. The
+SIBLING capture in the same pinned directory — `docs/source-v4-2026-08-15/styles.ee2a710065b60389.css`,
+444,793 bytes — holds **49** `note-color` occurrences and **22** `note-palette`, and gives the
+palette's whole class skeleton: `.note-palette-title{border-bottom:1px solid #eee;font-size:12px;
+margin:2px 7px;text-align:center}`, `.note-color-row{height:20px}`, `.note-color-select-btn
+{display:none}`, and the rest. A sweep of one capture file was reported as a sweep of the evidence.
+
+**The refusal SURVIVES, on the narrower and correct ground.** What decides this control is not its
+class names — those are now in hand — but its VALUES: the swatch colour array, the palette tab
+titles, and the reset / "More Color" labels. Those live in summernote's own JavaScript, which is in
+NEITHER capture: the bundle carries only jQuery plugin CALLS (`$(…).summernote(…)` at 1,225,015 and
+1,470,594), never the plugin, and the v3 bundle and `apps/controller/evidence-dumps` hold no
+`note-color` at all. Building the palette would still mean inventing every colour — a value picked
+because it looked right, which is the thing this repository's standard names outright.
+
+Recorded for whoever revisits: **only the colour table and three label strings are actually missing.**
+One capture run against a live original that renders the palette closes this row.
 
 The per-frame `oninput` is recorded, not fixed, for the same reason: changing it to `onchange` is a
 guess about which is closer to a palette pick, and neither can be checked against the capture or

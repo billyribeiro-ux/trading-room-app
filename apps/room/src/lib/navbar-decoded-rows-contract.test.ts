@@ -355,11 +355,21 @@ describe('NAV-03 — the hamburger is removed by alwaysShowRoster, not merely st
  * `RoomNavbar.svelte`'s own docblock said it was "a class MAP on the recording `ul`" and that was
  * wrong about the element; the room-wide `[ REC ]` badge (const 93) carries no class map at all.
  *
- * **NAV-05 is the refusal.** `recIndicatorStart` is not worn on that icon. Its only rule anywhere is
- * `app-room .recIndicatorStart a` — `captured-runtime-components.css:988`, a descendant selector —
- * and an `<i>` with no children has no descendant `a`, so the class paints nothing there. It is
- * inert in the reference for the same reason. Const 94 puts the same name on the STARTING badge's
- * `li`, which does have the `a` the rule needs, and that is where this room already wears it.
+ * **NAV-05 was a refusal until 2026-09-02, and its own last sentence is what overturned it.**
+ *
+ * `recIndicatorStart`'s only rule anywhere is `app-room .recIndicatorStart a` —
+ * `captured-runtime-components.css:988`, a descendant selector — and an `<i>` with no children has
+ * no descendant `a`, so the class paints nothing there. The refusal read that as "a class with no
+ * CSS, which this repository refuses by name", and recorded in the same breath: *"It is inert in
+ * the reference for the same reason."*
+ *
+ * That second sentence is not a supporting detail, it is the answer. A class that is dead upstream
+ * and dead here is an upstream defect reproduced, which is matching rather than an escape from it —
+ * and the rendered `class` attribute is reference-facing output, so it differed. Worn now.
+ *
+ * The assertion below flipped with it, and it keeps the half that was always worth having: const 94
+ * puts the same name on the STARTING badge's `li`, which does have the `a` the rule needs, so both
+ * elements must carry it and the badge is not quietly traded for the icon.
  */
 describe('NAV-04 — the presenter’s recording icon breathes where the reference breathes it', () => {
   const recording = { roomRecording: true };
@@ -414,11 +424,22 @@ describe('NAV-04 — the presenter’s recording icon breathes where the referen
     );
   });
 
-  it('NAV-05 — does NOT put recIndicatorStart on the icon, where its rule cannot match', () => {
+  it('NAV-05 — puts recIndicatorStart on the icon while the recording is STARTING', () => {
     const body = html({ isPresenter: true, media: { roomRecordingStarting: true } });
-    expect(iconClass(body)).not.toContain('recIndicatorStart');
-    /* …and the badge that CAN carry it still does, so the refusal is not "nothing renders it". */
+    expect(iconClass(body)).toContain('recIndicatorStart');
+    /* …and the badge that CAN paint it still does, so the icon is not traded for the badge. */
     expect(body).toContain('nav-item recIndicatorStart');
+  });
+
+  it('and takes it off again once the recording is no longer starting', () => {
+    /*
+      The second half of the binding, which the old absence assertion could never distinguish from a
+      class that is simply never written. `Kn(6, iPe, …, isRecordingStarting)` is a BINDING: dropping
+      the term entirely would satisfy the assertion above's negative twin and diverge from the
+      capture in the other direction.
+    */
+    const body = html({ isPresenter: true, media: { roomRecordingStarting: false } });
+    expect(iconClass(body)).not.toContain('recIndicatorStart');
   });
 });
 
@@ -431,6 +452,55 @@ describe('NAV-04 — the presenter’s recording icon breathes where the referen
  * were bare, so the spinner rendered without the padding and line-height every other item in the bar
  * takes from `.nav-link`, and the row shifted the moment the device finished opening.
  */
+/**
+ * NAV-11 — `audioVolSlider`, the first entry of const 200 at byte 2,545,086:
+ *
+ * ```js
+ * ["audioVolSlider","","type","range","min","0","max","100","title","Background Volume",
+ *  1,"px-0","py-2",3,"ngModelChange","input","ngModel"]
+ * ```
+ *
+ * An attribute with an EMPTY value, and nothing anywhere reads it — no CSS selector, no script, in
+ * either codebase. It was a refusal on exactly that ground until 2026-09-02, and it is inert
+ * upstream for the same reason, which makes it a defect reproduced rather than an escape.
+ *
+ * Rendered rather than read from source, because the thing that differed is the DOM: HTML attribute
+ * names are case-insensitive and Svelte lowercases them, so both sides carry `audiovolslider`.
+ */
+describe('NAV-11 — the background-music slider carries the capture’s inert attribute', () => {
+  const sliderTag = (body: string) => {
+    const at = body.indexOf('id="background-volume"');
+    expect(at, 'the background-music slider is not rendered at all').toBeGreaterThan(-1);
+    /*
+      BOTH bounds bound to locals and asserted, which `slice-anchor-contract.test.ts` requires and
+      is not ceremony here: an inlined `lastIndexOf` that finds nothing returns -1, and
+      `slice(-1, …)` silently yields a one-character window that every `toContain` below would fail
+      on for the wrong reason.
+    */
+    const opens = body.lastIndexOf('<input', at);
+    const closes = body.indexOf('>', at);
+    expect(opens, 'the slider tag has no opening').toBeGreaterThan(-1);
+    expect(closes, 'the slider tag is unterminated').toBeGreaterThan(at);
+    return body.slice(opens, closes + 1);
+  };
+
+  it('emits audiovolslider, and emits it EMPTY', () => {
+    const tag = sliderTag(html({ isPresenter: true, media: { soundCloudPlaying: true } }));
+    expect(tag).toContain('audiovolslider=""');
+  });
+
+  it('and still carries the three captured values it always had', () => {
+    /*
+      The positive control. An assertion that only checks the new attribute passes just as well on a
+      slider that has lost `title`, `class` or its range bounds — the rest of const 200.
+    */
+    const tag = sliderTag(html({ isPresenter: true, media: { soundCloudPlaying: true } }));
+    expect(tag).toContain('title="Background Volume"');
+    expect(tag).toContain('class="px-0 py-2"');
+    expect(tag).toContain('type="range"');
+  });
+});
+
 describe('NAV-07 — the launching spinners are nav-links', () => {
   const spinner = 'class="nav-link"><i class="fas fa-2x fa-spinner fa-spin">';
 

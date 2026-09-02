@@ -378,6 +378,33 @@ describe('QAM-10 and QAM-11 — the body is piped and the avatar knows its sende
   });
 });
 
+describe('QAM-12 — the root class carries the alert id, as the reference interpolates it', () => {
+  it('is the reference behaviour, read at the offset', () => {
+    /*
+      `Rh` is Angular's `classMapInterpolate1`, so the produced attribute is literally
+      `"modal fade " + qaMsg._id + ""` — trailing space included when the id is empty.
+    */
+    const call = 'Rh("modal fade ",o.qaMsg._id,"")';
+    expect(at(2_344_038, call)).toBe(call);
+  });
+
+  it('interpolates the id rather than writing a fixed class list', () => {
+    expect(MODAL).toContain("rootClass={`modal fade ${targetMessage?.id ?? ''}`}");
+  });
+
+  it('and the ORDER is the capture’s, which the old fixed value also had backwards', () => {
+    /*
+      The half the refusal this replaced waved away in its own last line — *"`fade modal` against
+      the reference's `modal fade ` is order alone, which CSS does not read"*. CSS does not, and the
+      rendered `class` ATTRIBUTE is still what the capture holds and what a byte-for-byte comparison
+      reads. Asserted separately from the interpolation because the two are separable: a future
+      author could keep the id and reorder the literals.
+    */
+    expect(MODAL).not.toContain('rootClass="fade modal"');
+    expect(MODAL).toContain('`modal fade ');
+  });
+});
+
 describe('QAM-13 — the compact renderer is already built one level down', () => {
   it('is a display-mode branch in the reference', () => {
     const branch = 'O(0,"r"==g().displayMode?0:1)';

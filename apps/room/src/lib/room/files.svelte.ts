@@ -256,12 +256,35 @@ export class RoomFiles {
     silently returned nothing for all of those.
   */
   searchedFiles() {
-    const query = this.#fileSearch.trim().toLowerCase();
-    const matching = this.#files().filter((item) =>
-      Object.values(item).some(
-        (field) => typeof field === 'string' && field.toLowerCase().includes(query)
-      )
-    );
+    /*
+      FP-09 — the pipe read whole at byte 1,914,488:
+
+        transform(e, i) { return e ? i ? (i = i.toLowerCase(), e.filter(o => { … })) : e : [] }
+
+      TWO things this had wrong, both fixed 2026-09-02, and neither is cosmetic.
+
+      **No `.trim()`.** It stood here and the reference has none, so a member typing a trailing space
+      got a different list from the one the capture gives — and the difference is not academic: with
+      the space kept, ` png` matches nothing, and this pipe is how the Files pane is searched at all.
+
+      **An empty term returns the array UNCHANGED**, where this ran the whole `Object.values` walk
+      with `''`. Stated precisely, because the obvious dramatic version of this is not true here:
+      `''.includes('')` is true, so the walk agrees for every row holding at least one string field,
+      and `RoomFileRow` types four of its fields as `string` — so no row this type can express is
+      actually dropped. **The visible effect was the wait, not the result.** The short-circuit is the
+      reference's own and it is the cheaper path on the render that happens most: the pane opens with
+      an empty box, and this ran an allocation plus an `Object.values` walk per row to arrive at the
+      list it started with. That is the shape question `CLAUDE.md` asks of every read path, and the
+      answer scales with the room's file count.
+    */
+    const query = this.#fileSearch.toLowerCase();
+    const matching = query
+      ? this.#files().filter((item) =>
+          Object.values(item).some(
+            (field) => typeof field === 'string' && field.toLowerCase().includes(query)
+          )
+        )
+      : this.#files();
     /*
       SEARCH FIRST, THEN SORT, which is the order the reference composes its two pipes in - read at
       byte 1,951,076:

@@ -1,6 +1,6 @@
 <script
   lang="ts"
-  generics="Entry extends { id: number; displayName: string; avatarUrl: string; locStr?: string | null; isP?: boolean; isFT?: boolean }"
+  generics="Entry extends { id: number; displayName: string; avatarUrl: string; locStr?: string | null; isP?: boolean; isFT?: boolean; isNew?: boolean; years?: number | null }"
 >
   import type { TipButton } from '#lib/tip-button.js';
   import type { RoomMenus } from '#lib/room/menus.svelte.js';
@@ -79,6 +79,15 @@
        * avatars off still published every member's picture in the sidebar.
        */
       hideAvatars?: boolean;
+      /**
+       * RS-03's first term — `O(9, sessData.disableStarYears || e.isP || !e.data.years ? -1 : 9)`,
+       * byte 2,034,694. Named here for the reason the four above are: the rail says what it reads.
+       *
+       * It is a real supplied setting, already on `ROOM_VISIBLE_SETTINGS`
+       * (`server/room-config-client.ts:85`) and already obeyed by `RoomMessage.svelte` and
+       * `ModalHost.svelte`. This rail was the third star in the room and the only one ignoring it.
+       */
+      disableStarYears?: boolean;
     };
     /**
      * RS-02 — the badges a roster row wears, resolved by the page.
@@ -803,6 +812,48 @@
                                     {/each}
                                     {#if isPresenter && user.isFT === true}
                                       <span class="badge bg-danger trial-badge">Trial</span>
+                                    {/if}
+                                    <!--
+                                      RS-04 — `O(8, sessData.isNewIndicatorOn && isPresenter &&
+                                      e.isNew ? 8 : -1)`, byte 2,034,694; body `y2e` at 2,033,362,
+                                      const 10 `[1,"badge","bg-warning","new-badge"]` at 2,038,387.
+
+                                      TWO of the three terms, the same form `ModalHost.svelte:2271`
+                                      renders. `isNewIndicatorOn` is left off deliberately —
+                                      `isNew` has no producer, and a gate with nothing to gate is
+                                      not a consumer; that argument is
+                                      `moderation-badge-contract.test.ts`, not repeated here.
+
+                                      What was wrong was not the missing term: this rail drew
+                                      NEITHER badge while both sibling surfaces drew both, so the
+                                      same moderation fact showed on a member's card and in the
+                                      message log and vanished in the list between them.
+                                    -->
+                                    {#if isPresenter && user.isNew}
+                                      <span class="badge bg-warning new-badge">New</span>
+                                    {/if}
+                                    <!--
+                                      RS-03 — the membership star. Gate at 2,034,694; body `F2e` at
+                                      2,033,362 is `span.11 > i.20 + span.21` over `e.data.years`;
+                                      consts 11/20/21 at 2,038,387 are `stars-container`,
+                                      `fas fa-star stars-icon`, `stars-num`. Inverted, because the
+                                      reference names the reasons to HIDE.
+
+                                      `user.isP` read DIRECTLY, where `ModalHost.svelte:2313` needs
+                                      the `permissions !== 'a'` spelling — a roster row carries the
+                                      flag itself.
+
+                                      `years` STILL HAS NO SUPPLY, so this renders for nobody
+                                      today. Written now because both sibling surfaces already
+                                      carry this shape over the same absence and the roster-scoped
+                                      CSS already ships: a gate written after the supply arrives is
+                                      a gate written while somebody watches a wrong star.
+                                    -->
+                                    {#if !session?.disableStarYears && !user.isP && user.years}
+                                      <span class="stars-container">
+                                        <i class="fas fa-star stars-icon"></i>
+                                        <span class="stars-num">{user.years}</span>
+                                      </span>
                                     {/if}
                                     <!-- svelte-ignore a11y_interactive_supports_focus -->
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->

@@ -97,6 +97,8 @@ const CITED: ReadonlyArray<readonly [number, string]> = [
   [1_902_616, 'cleanup(){this.retryTime'],
   [1_902_786, 'getHlsConfig(){const e=t'],
   [1_903_977, 'setupStream(){let e=`roo'],
+  /* STV-04 — the PAIR `setupStream()` ends with; the second half is the row. */
+  [1_904_326, 'this.loadStream(),this.startPerformanceMonitoring()}'],
   [1_904_378, 'loadStream(){const e=thi'],
   [1_904_725, 'startPerformanceMonitoring(){!'],
   [1_904_918, 'checkAndAdaptPerformance(){if('],
@@ -555,24 +557,91 @@ describe('DTP-02 and SWP-01 — the Ze/Ne split, which is what makes the five no
       back into the first effect is what would silently re-open the row, so that effect is asserted
       to read `videoSrc` and NOT `bufferSizeLevel`.
     */
-    const LOAD_EFFECT = `$effect(() => {
-    void videoSrc;
-    if (!videoPlayer) return;
-    void loadStream();
-    return cleanup;
-  });`;
+    /*
+      THE COUPLING, NOT THE BODY TEXT — repaired 2026-09-02.
+
+      This pinned the load effect's whole body as a literal, and STV-04 broke it by adding the
+      second statement `setupStream()` actually ends with. That was the assertion being wrong about
+      its own subject: its comment three lines up says *"the negative control that matters here is
+      the coupling, not the guard"*, and a literal body asserts every character instead — so it
+      fails on any future addition and teaches the next author to paste the new text in rather than
+      read what the test is for.
+
+      Bounded by the effect's own opening and closing so a second effect cannot satisfy it.
+    */
+    const loadEffectOpens = playerCode.indexOf('$effect(() => {\n    void videoSrc;');
+    expect(
+      loadEffectOpens,
+      'the load effect is gone or no longer reads videoSrc first'
+    ).toBeGreaterThan(-1);
+    const loadEffectCloses = playerCode.indexOf('\n  });', loadEffectOpens);
+    expect(loadEffectCloses, 'the load effect is unterminated').toBeGreaterThan(loadEffectOpens);
+    const loadEffect = playerCode.slice(loadEffectOpens, loadEffectCloses);
     const BUFFER_EFFECT = `$effect(() => {
     void bufferSizeLevel;
     if (!hls) return;
     void loadStream();
   });`;
 
-    expect(playerCode).toContain(LOAD_EFFECT);
+    /*
+      THE COUPLING. The load effect must guard on the ELEMENT and reload; it must not read
+      `bufferSizeLevel`, which is the whole of STV-03 — putting that back here is what would
+      silently re-open the row.
+    */
+    expect(loadEffect).toContain('if (!videoPlayer) return;');
+    expect(loadEffect).toContain('void loadStream();');
+    /*
+      STV-04 — `setupStream()` ends with TWO statements (byte 1,904,326) and this effect had one.
+      The call is provably inert in both codebases: `startPerformanceMonitoring` opens
+      `!this.hls || !this.hasStartedPlaying || (…)` at 1,904,725 and this room's copy carries the
+      identical guard, so it returns immediately on this pass.
+
+      That is exactly why it needs an assertion: a line that provably does nothing is the first one
+      a later reader removes, and the reason it belongs here — the reference is equally pointless —
+      lives in a comment nothing enforces. Its negative control came back GREEN before this line
+      existed, which is how the gap was found.
+    */
+    expect(loadEffect, 'STV-04: the second half of setupStream is gone again').toContain(
+      'startPerformanceMonitoring();'
+    );
+    expect(
+      loadEffect,
+      'STV-03 re-opened: the load effect tracks the buffer level again'
+    ).not.toContain('bufferSizeLevel');
     expect(playerCode).toContain(BUFFER_EFFECT);
 
-    /* The coupling, stated as its own assertion: exactly two effects, and the load one is first. */
+    /* Exactly two effects, and the load one is first. */
     expect(playerCode.split('$effect(').length - 1).toBe(2);
-    expect(playerCode.indexOf(LOAD_EFFECT)).toBeLessThan(playerCode.indexOf(BUFFER_EFFECT));
+    expect(loadEffectOpens).toBeLessThan(playerCode.indexOf(BUFFER_EFFECT));
+  });
+});
+
+describe('STV-09 — the video carries the capture’s attribute VALUE, not the bare boolean', () => {
+  it('is the reference behaviour, read at the offset', () => {
+    /* Const 3, whose first pair is the attribute's own name as its value. */
+    expect(BUNDLE.slice(1_909_111, 1_909_111 + 42)).toBe(
+      '["autoplay","autoplay",1,"video-streaming"'
+    );
+  });
+
+  it('emits autoplay="autoplay" rather than the bare form', () => {
+    /*
+      The recorded reason for leaving this was that Svelte emits the bare boolean and there is no
+      way to ask for the other one. Measured on this repository's own svelte 5.57.0, both spellings
+      compile to different attributes — `autoplay="autoplay"` and `autoplay=""` — in the client and
+      server outputs alike, so that reason was a property of what was written.
+
+      Asserted on the SOURCE rather than a render, because the real obstacle is a typing rather than
+      an output: `autoplay` is declared boolean in Svelte's HTML types, so the literal fails
+      `svelte-check` and the attribute goes through the spread this repository already uses for its
+      captured `ngbtooltip` pairs. Pinning the spread is pinning the thing that would be "tidied"
+      back to a bare `autoplay` by somebody who does not know why it is written that way.
+    */
+    expect(
+      playerCode,
+      'the autoplay VALUE is gone — a bare `autoplay` emits autoplay=""'
+    ).toContain("{...{ autoplay: 'autoplay' } as Record<string, string>}");
+    expect(playerCode, 'a bare autoplay attribute was added back').not.toMatch(/\n\s+autoplay\n/);
   });
 });
 

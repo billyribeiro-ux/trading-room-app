@@ -2337,7 +2337,19 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `chat-display-mode-contract.test.ts` requires `TRIGGER_CLASS`'s three strings to stay in this
       file's own code.
     */
-    max: 252,
+    /*
+      252 -> 263, 2026-09-02. MSM-01 — the Add Reaction icon's captured tooltip.
+
+      Const 40 at byte 1,359,726 and const 37 at 1,397,773 are the same value:
+      `["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]`. STATIC attribute pairs,
+      not a binding — which is what decides the spelling: `ngbTooltipWith` is for the five hosts
+      whose text the reference binds and which therefore carry no `ngbtooltip` attribute at all, and
+      using it here would have shown the right bubble on an element the reference marks differently.
+
+      Six lines of note, four of markup and one import. The tooltip repeats the entry's own label,
+      which reads as redundant and is the capture's.
+    */
+    max: 263,
     why: 'the kebab on a message - trigger, twelve entries, and the placement that positions them'
   },
   {
@@ -2519,7 +2531,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       from the page — reading them from the object every other body in this room already reads is
       what stops the Q&A header disagreeing with the log beneath it about the same two preferences.
     */
-    max: 409,
+    /*
+      409 -> 422, 2026-09-02. QAM-12 — the root class is INTERPOLATED with the alert's id, as
+      `Rh("modal fade ", o.qaMsg._id, "")` at byte 2,344,038 interpolates it.
+
+      Thirteen lines, twelve of them the record of a refusal that did not survive and one the
+      expression. Everything that refusal measured is still true — no CSS rule names the class, and
+      the jQuery `hidden.bs.modal` listener that reads it is correctly absent here because
+      `RoomModals.closeActive` already does its work. What changed is the reading: the LISTENER is
+      the thing with no consumer here; the class is a value the reference renders, and the rendered
+      `class` attribute is reference-facing output.
+
+      It closes a second divergence the old note waved away in its last line — `"fade modal"` against
+      `"modal fade "` — which is why the assertions pin the order separately from the id.
+    */
+    max: 422,
     why: 'app-alert-qa-modal - the Q&A thread on one alert, its own open menu row and its wiring'
   },
   {
@@ -2849,7 +2875,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       upstream and the presence here — so a future capture that adds the guard makes this re-read
       rather than leaving the comment describing a difference that stopped existing.
     */
-    max: 358,
+    /*
+      358 -> 375, 2026-09-02. PCC-07 — `onkeydown` became `onkeyup`, which is the only event const
+      55 binds (byte 2,217,289).
+
+      Seventeen lines and one word of code. The note is the whole raise because the change looks
+      like a preference and is not: this composer SWALLOWED a line break the reference keeps. The
+      divergence recorded here was *"`preventDefault()` on `keyup` runs after the browser has
+      already inserted the newline, so the branch below could not swallow anything"* — every word
+      true, and it is the reason the reference leaves the newline rather than a reason to bind
+      `keydown`.
+
+      It also records the measurement that stopped this being a bigger change than it is: plain
+      Enter's newline is `.trim()`ed away by `sendMessage` at byte 2,208,062, so the send arm is
+      indistinguishable either way and only the Shift arm actually moved.
+    */
+    max: 375,
     why: "app-privchat's composer: the textarea, its three buttons, both popovers and autoExpand"
   },
   {
@@ -2975,7 +3016,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       recreated where upstream reuses it. Nothing else here would notice, so
       `roster-identity-contract.test.ts` pins both ends and this says why.
     */
-    max: 888,
+    /*
+      888 -> 939, 2026-09-02, for RS-04 and RS-03 — the `New` badge and the membership star.
+
+      THIS RAIL WAS THE ONLY ONE OF THREE SURFACES NOT DRAWING THEM. `ModalHost.svelte` draws Trial,
+      New and the star; `RoomMessage.svelte` draws all three; this drew Trial and stopped. So a
+      presenter saw "New" on a member's info card and in the message log and not in the list
+      between them, and a room that switched the membership star OFF still showed it here — this
+      rail was the third star in the room and the only one ignoring the owner's setting.
+
+      Fifty-one lines, of which eleven are markup and the rest are the two gates' byte citations,
+      read at 2,034,694 (both gates), 2,033,362 (both slot bodies) and 2,038,387 (consts 10, 11, 20,
+      21). Two arguments that already live elsewhere are POINTED AT rather than repeated: why the
+      third term of the `New` gate is deliberately absent (`moderation-badge-contract.test.ts`) and
+      why a star gate is written over an absent `years` supply (`ModalHost.svelte:2313`). That is
+      what kept this to fifty-one instead of a hundred.
+
+      Six mount tests, and each of the three gate TERMS has its own negative control: dropping
+      `isPresenter` fails only the member test, dropping `disableStarYears` only the owner test,
+      dropping `isP` only the presenter-row test.
+
+      It goes DOWN when the roster row's badge cluster and the per-row menu find components of their
+      own, which is the next real extraction here.
+    */
+    max: 939,
     why: 'the sidebar - roster, app info, connectivity and the two external-link blocks'
   },
   {
@@ -3308,7 +3372,33 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The row this closes had recorded itself blocked behind extracting this very component out of
       `RoomOverlays.svelte`. The extraction had already happened, for `dta-02`, on the same day.
     */
-    max: 117,
+    /*
+      117 -> 169, 2026-09-02, for ROV-03 / OVL-06 — and the fifty-two lines are the record of this
+      component having been attributed to the WRONG upstream function for its whole life.
+
+      There are two image viewers upstream. `showImagePreview(e, i = "")` at bundle byte 1,992,730
+      is the alert panes' preview; `openImageModal(event, url)` at `deployed-index.html:70` is the
+      chat image, and it is the one this dialog is. This room's whole image path is the second —
+      `RoomModals.openImage` transcribes it, popped-out window and all, and `routes/+page.svelte`
+      assigns that method to `window.openImageModal`, the global name the captured page defines for
+      its own inline handlers.
+
+      One line of code changed: `alt` is the FILENAME, which this component computed until
+      2026-08-31 when it was changed to the whole URL as "a preference substituted for a captured
+      value". It was a captured value, of the right dialog, read from the wrong one.
+
+      The rest is a paragraph deleted and replaced. It said the `<hr />` and the in-body button
+      "are this room's… and are not evidence of anything", because "the capture roots that would
+      hold one are absent here". They were not absent: the file is 159 lines, in the same pinned
+      directory, listed in its own `sha256sums.txt`, and its inline `<script>` writes that markup out
+      by hand — `<hr>` included, and `btn` prepended exactly as this room had guessed.
+
+      Both halves of that are worth their lines: the correction, and the reason the old claim was
+      believable. A sweep of one capture FILE reported as a sweep of the evidence is the same failure
+      RTE-05 paid for in this pass, and `room-surface-audit-batch3-contract.test.ts` had the answer
+      in a constant it only ever read four attributes out of.
+    */
+    max: 169,
     why: 'the imgur lightbox - one image, a download that does not dismiss, and one alt rule'
   },
   {
@@ -3925,7 +4015,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       every time. `RecordingPreviewCard` left for `RoomOverlays`: it is not a modal, and this host
       has neither `media` nor `prefs`, so it could not have fed the card the state its gate reads.
     */
-    max: 6066,
+    /*
+      6,066 -> 6,038, 2026-09-01, and it is a LOWERING that came out of a one-line divergence fix.
+
+      The reference emits a user's `pic` verbatim (byte 2,095,604, a plain `||`); this file rewrote
+      the stored URL's `s` parameter through a local `gravatarAtSize`. Deleting that rewrite left its
+      helper `isGravatar` with a single caller and a fifteen-line argument — why "is it a gravatar"
+      is the only "did they set one" signal this room has — sitting inside six thousand lines where
+      no test could reach it without a mount.
+
+      It is now `#lib/avatar-source.ts` with four cases, every input a value `users.avatar_url`
+      genuinely holds. A pure predicate, the whole of one concept, and testable directly: the
+      extraction this entry asks for rather than the raise the citation would otherwise have needed.
+    */
+    max: 6038,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -4779,7 +4882,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       copy-on-write Set convention into a guarantee — raw state cannot be mutated, so the pattern is
       enforced by the rune instead of by everyone remembering it.
     */
-    max: 401,
+    /*
+      401 -> 421, 2026-09-02. FP-09, and the twenty lines bought a real behaviour fix, not a
+      transcription.
+
+      The reference's filter pipe, read whole at byte 1,914,488, has NO `.trim()` and returns the
+      array UNCHANGED for an empty term. Ours trimmed, and ran the `Object.values` walk with `''`.
+
+      The empty-term half is the one that mattered. `''.includes('')` is true for any string, so the
+      walk agreed for every row holding at least one string field and DROPPED any row holding none —
+      in the state the pane opens in. The short-circuit is also the cheaper path: no allocation and
+      no walk on the render that happens most, which is the shape question `CLAUDE.md` asks of every
+      read path.
+
+      Seventeen of the twenty-three lines are that explanation, and it is the half a reader cannot
+      recover: "removed a trim" looks cosmetic until somebody works out what an empty query did.
+
+      Three of those seventeen are a CORRECTION to my own first draft of the note, kept rather than
+      quietly rewritten: it claimed the empty-term walk DROPPED rows holding no string field. True
+      of the expression and unreachable through the type — `RoomFileRow` declares four fields as
+      `string`. The visible effect was the wait, not the result, and the note now says so.
+    */
+    max: 424,
     why: 'the file drive; the first slice to collapse a prop list at TWO call sites rather than one'
   },
   {
@@ -5039,7 +5163,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       If this climbs again, the question is whether a field arrived or whether an argument is being
       written twice.
     */
-    max: 204,
+    /*
+      204 -> 232, 2026-09-01, for UIM-09's `location` — and every one of the twenty-eight lines is
+      the record of a REFUSAL THAT WAS FALSE, which is what makes it worth the ceiling.
+
+      Two files stated that `location` *"needs a geo-IP service this repository does not have"* and
+      called it an owner decision about an external dependency. The reference's geo lookup is
+      CLIENT-side (bundle 1,145,213), this room has run the same lookup since it was built —
+      `events.svelte.ts` POSTs to `api/roster/location`, which calls `setRosterLocation` — and
+      `RoomSidebar.svelte:870` has been rendering the answer on screen the whole time. The value was
+      on the very object this mapping reads; the interface omitted the field.
+
+      The mapping itself is one line. The other twenty-seven are the corrected reason and the
+      `||`-not-`??` argument, and both are load-bearing: a reader who trusts the old refusal never
+      looks, and `??` would push the roster's own empty string into a cell that renders `n/a` for
+      absent, drawing a blank where "we do not know" belongs.
+
+      It goes DOWN when the five permission checkboxes and their history find a module of their own,
+      which is the next real extraction here. It does not go up again for prose.
+    */
+    max: 232,
     why: 'how a roster row, a message and a managed-chat row each become the modal’s target'
   },
   {
@@ -5731,7 +5874,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It was never modal state — no field, no lifecycle, nothing rendered. A method whose class it
       never touches is a function that has not been extracted yet.
     */
-    max: 55,
+    /*
+      55 -> 62, 2026-09-02. Seven lines: the SOURCE, located at last — `downloadImage(url, imageName)`
+      at `deployed-index.html:125-145`, in the same pinned directory as the bundle.
+
+      This file's rules were transcribed "character for character" from a reference it could not
+      name. Both differences from it are now stated rather than left for the next comparison to
+      find: upstream takes the filename as a second argument and re-splits it, so the one-argument
+      form here is internal structure rather than output; and this adds `revokeObjectURL`, which
+      upstream omits and which leaks the blob for the life of the document.
+    */
+    max: 62,
     why: 'save a shown image, with the reference two filename rules that are not cosmetic'
   },
   {
@@ -6731,7 +6884,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       gate there. A reader adding a gate here for consistency would remove a control from every
       member.
     */
-    max: 1543,
+    /*
+      1,543 -> 1,559, 2026-09-02. ACA-04 — `T(4,"i")` at byte 1,424,607, a BARE `<i>` closing the
+      Webinar Mode block: no const index, so no class and no attribute, and no text.
+
+      Refused on the ground that nothing in either stylesheet selects a bare `<i>`, so it is
+      invisible. True, and true UPSTREAM for the same reason — which makes it an upstream defect
+      reproduced rather than an escape. Fifteen of the sixteen lines say exactly that, because an
+      empty element with no note over it is the first thing a later reader deletes.
+    */
+    max: 1559,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -7076,7 +7238,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       78 capped never shipped, and shortening the version that did would mean deleting the six-offset
       table that is the reason it is right. From here it ratchets down like everything else.
     */
-    max: 86,
+    /*
+      86 -> 171, 2026-09-02, and it is the largest single raise in this file for a module of twenty
+      lines of code — because what grew is the record of a rule this repository has now got wrong
+      FOUR times, and the fourth time it was already executable.
+
+      PCC-07. The previous decoding read all six `onKey` handlers in the bundle by value, found five
+      identical, wrote the table, and made it a function so nobody could guess again. It was one
+      input short: **a handler that prevents a default says nothing until you know which event it is
+      bound to.** The const tables say — and this entry is why the table of six offsets is in the
+      docblock rather than a sentence — that only TWO of the six also bind `keydown.enter`, whose
+      handler is the whole of `onKeydown(e){e.preventDefault()}`.
+
+      For those two the newline dies on the way down and Shift+Enter does nothing, exactly as the
+      old table said. For the other four the browser has already inserted it and `preventDefault()`
+      on a keyup is inert, so Shift+Enter LEAVES a newline and Alt+Enter leaves two.
+
+      The lines are the six-row const table, the two-row outcome table, and the paragraph saying
+      that executable is not the same as complete. Every one of them is the thing a fifth reader
+      would otherwise re-derive — and three of the four previous readers wrote their conclusion down
+      confidently before being wrong.
+
+      It goes DOWN if the two bindings ever collapse to one, which they will not: the reference's
+      own two shapes are what this module exists to keep apart.
+    */
+    max: 171,
     why: 'the captured three-way Enter branch, defined once for both composers'
   },
   {
@@ -7320,7 +7506,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       is most of the addition. Five more lines for PAM-11's `onconfirm`, threaded through to the
       scheduler pane, which does not own the room's dialog stack.
     */
-    max: 657,
+    /*
+      657 -> 672, 2026-09-02, and the DIFF IS A NET DELETION — thirteen attributes removed, and
+      twenty-eight comment lines added over them.
+
+      PAM-14. The `app-post-alert-modal` consts table was read in full from byte 2,131,609: not one
+      of the five consts behind these controls carries an `id` or a `name`, and this room put both on
+      all six fields. Nothing read one of them — no `<label for>`, no selector, no submission.
+
+      Most of the note is one paragraph that has to be there: const 58's field carried
+      `aria-labelledby` pointing at the CHECKBOX above it, so its accessible name was the name of the
+      control that reveals it. Const 58 has no aria attribute at all, so the field is unnamed
+      upstream and is unnamed here now. That is a real accessibility cost of a match, and it is
+      written down rather than discovered — a deletion with no reason over it reads as an oversight,
+      and the next author's instinct would be to "fix" it back.
+    */
+    max: 672,
     why: 'the alert composer and its per-open resets'
   },
   {
@@ -7620,7 +7821,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       out when `MessageActionEvent` gained a fourth member and this file could not describe it. The
       prop and `runAction` both take the shared union now.
     */
-    max: 1255,
+    /*
+      1,255 -> 1,272, 2026-09-02. RMSG-06 — the compact MEMBER reaction repeater has no
+      `clickedBy` gate upstream, and this room gated all four hosts.
+
+      `m_e` at byte 1,379,950 opens the pill directly where `Oge`, `u1e` and `V1e` each wrap it in
+      `O(1, e.value.clickedBy.length > 0 ? 1 : -1)`. `addRemoveReaction` empties `clickedBy` rather
+      than deleting the key, so a reaction whose last holder removes it draws upstream as `😀 0` —
+      on a compact member row and on no other row in the product.
+
+      It was refused as a defect, and it is one. That is an argument about whether the reference's
+      behaviour is good, which is not one of the four escapes; the pill is rendered output.
+
+      The strip stays ONE snippet and takes the gate as a PARAMETER, which is what its existing
+      assertion has always been protecting — two strips is how the compact one drifted before. The
+      term passed is `reverseMessage`, the same one that already chooses between the two compact
+      containers `$1e` (admin, holding the gated `V1e`) and `__e` (member, holding `m_e`), so one
+      question keeps one answer.
+    */
+    max: 1272,
     why: 'one message, thirty-five props, and the file the chrome type exists to serve'
   },
   {
@@ -7867,7 +8086,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       an HTML comment, which CLAUDE.md forbids by name — prose to a human, an unclosed block to any
       parser reading the file. The branch is named rather than quoted now, and the reason is at it.
     */
-    max: 1134,
+    /*
+      1,134 -> 1,156, 2026-09-02. NAV-05 and NAV-11, two dead-on-arrival values the reference ships
+      and this room did not.
+
+      NAV-05 — `recIndicatorStart`, the second key of `iPe` (byte 2,465,900). Its only rule is
+      `app-room .recIndicatorStart a`, a DESCENDANT selector, and the `<i>` it is bound to has no
+      children — so it paints nothing. The refusal said so and recorded, in its own last sentence,
+      that it paints nothing upstream either. That sentence is the answer: dead there and dead here
+      is a defect reproduced, and the rendered `class` attribute is reference-facing output.
+
+      NAV-11 — `audiovolslider=""`, the first entry of const 200 (byte 2,545,086). An attribute with
+      an empty value that nothing anywhere reads.
+
+      Both notes state that the value is EXPECTED to do nothing, which is the only thing that stops
+      the next reader removing them as dead code — and is why they are notes rather than one line
+      each.
+    */
+    max: 1156,
     why: 'the top bar; its render cover is RoomNavbar.svelte.test.ts and room-navbar-render.test.ts'
   },
   {
@@ -7932,7 +8168,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and points at the file that proves it. That is this entry's own rule — *moving an explanation to
       the code it explains is the extraction itself* — applied to a decode rather than to markup.
     */
-    max: 727,
+    /*
+      727 -> 757, 2026-09-02. SP2-05 — `z("controls", o.showControls)` and the click that writes it.
+
+      The refusal here was unusual and worth keeping visible: it measured that the attribute is FALSE
+      for the life of the component upstream, because the only writer is a click on the `<video>` and
+      the component's own `.webcamScreen { pointer-events: none }` makes that click unreachable. It
+      concluded: do not build it.
+
+      That measurement is the reason it is SAFE to build. Element, handler, binding and the CSS that
+      kills them are all the reference's, and all four already ship here — so transcribed, the pair
+      is exactly as dead here as there. Refusing it was refusing to reproduce an upstream defect.
+
+      Twenty-two of the thirty lines are that argument plus the statement that
+      `pointer-events: none` is now LOAD-BEARING for a second reason: delete it and this room grows a
+      control bar the capture never shows. `screen-pane-contract.test.ts` pins the rule beside the
+      binding for exactly that, with its own negative control.
+
+      Two offsets in the note were corrected before it shipped —
+      `emoji-screen-citation-contract.test.ts` re-reads every byte a file cites and rejected both.
+    */
+    max: 757,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {
@@ -8347,7 +8603,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       refused to diverge from. A decline with its reason at the code is what stops that being
       "tidied up" by the next reader holding the same suggestion.
     */
-    max: 689,
+    /*
+      689 -> 732, 2026-09-02. STV-04 and STV-09 — two members of the reference this file was one
+      short of, and one attribute it emitted differently.
+
+      STV-04 — `setupStream()` ends `this.loadStream(),this.startPerformanceMonitoring()` (byte
+      1,904,326) and this effect called the first only. The row recorded that we reproduce it
+      "exactly, member for member"; we did not. **It is inert in both codebases**, and twenty of its
+      lines say so, because a call that provably returns immediately is the first thing a later
+      reader deletes — and it is equally pointless upstream, which is what makes transcribing it the
+      match.
+
+      STV-09 — const 3 at 1,909,111 is `["autoplay","autoplay",…]`, so the rendered element carries
+      `autoplay="autoplay"`; a bare `autoplay` in Svelte emits `autoplay=""`. The recorded reason
+      was that Svelte only emits the bare form. That was MEASURED and is false — compiling both
+      spellings on this repository's own svelte 5.57.0 gives the two different attributes in the
+      client and server outputs alike. The real obstacle is one step further on and is recorded too:
+      Svelte's HTML typings declare `autoplay` as boolean, so the literal fails `svelte-check`, and
+      the attribute is written as the spread this repository already uses for its captured
+      `ngbtooltip` pairs.
+    */
+    max: 732,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {
@@ -8471,12 +8747,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
   },
   {
     file: 'lib/alert-chat-nav.ts',
-    max: 83,
+    /*
+      83 -> 85, 2026-09-02. `WEBINAR_MODE_TRAILING_ICON_REFUSED` became
+      `WEBINAR_MODE_TRAILING_ICON_BUILT` and grew two lines saying why the refusal did not survive.
+      The constant is kept rather than deleted for the reason it was exported in the first place: the
+      contract test reads it, so the history cannot be lost by deleting a comment.
+    */
+    max: 85,
     why: 'ACA-03/ACA-04: the poll indicator class map, on the anchor the update block actually selects, and the refused trailing icon'
   },
   {
     file: 'lib/message-renderer-differences.ts',
-    max: 183,
+    /*
+      183 -> 192, 2026-09-02. `COMPACT_MEMBER_REACTION_GATE_DIVERGENCE` became
+      `…_BUILT` and grew nine lines: why the refusal did not survive, and where the gate now comes
+      from. The constant is kept rather than deleted for the reason it was exported — the contract
+      test reads it, so the history cannot be lost by deleting a comment.
+    */
+    max: 192,
     why: 'RMSG-01..06: where app-st-message and app-st-compactmessage disagree, with the consumers beside the measurements'
   }
 ];

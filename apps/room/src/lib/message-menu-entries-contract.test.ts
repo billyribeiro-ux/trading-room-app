@@ -54,7 +54,7 @@ const html = (allows: Partial<MessageMenuAllows> = {}, extra: Record<string, unk
 const MENU = readFileSync(new URL('./components/MessageMenu.svelte', import.meta.url), 'utf8');
 
 /**
- * MSM-01 — the smile icon's captured tooltip, and why it is NOT worn.
+ * MSM-01 — the smile icon's captured tooltip. WORN as of 2026-09-02; a refusal before that.
  *
  * ```
  * app-st-message        const 40 @1,359,726  ["placement","left","ngbTooltip","Add Reaction",1,"far","fa-smile"]
@@ -66,44 +66,66 @@ const MENU = readFileSync(new URL('./components/MessageMenu.svelte', import.meta
  * `v(3,"\xa0\xa0Add Reaction")`. **The tooltip text is byte-identical to the label four
  * characters to its right.**
  *
- * That is the measurement, and it is what makes this a refusal rather than a gap. This repository
- * builds captured `ngbTooltip`s — `#lib/ngb-tooltip` exists for exactly that, and
- * `PrivateChatComposer.svelte` wears const 58's `["placement","left","ngbTooltip","Add Emojis",…]`
- * on an icon with NO adjacent text, where the tooltip is the only label the control has. Here the
- * bubble would repeat a label the reader is already looking at, and our attachment's only a11y
- * effect is an `aria-describedby` pointing at that same word.
+ * That measurement is right and it was the wrong conclusion. The refusal read: the bubble would
+ * repeat a label the reader is already looking at, where `PrivateChatComposer.svelte` wears the same
+ * const SHAPE on an icon with no adjacent text and needs it. A good UX argument — and an argument
+ * about whether the reference's choice is a good one, which is not one of the four things that
+ * excuse a divergence. The rendered `ngbtooltip` and `placement` attributes are reference-facing
+ * output, and they were absent.
  *
- * The reason lives HERE and not at the element, and that is a second measurement rather than a
- * preference: `source-size-contract.test.ts` caps this component at 253 lines and it arrived at 252,
- * so there was one line of headroom and no seam to make more — `chat-display-mode-contract.test.ts`
- * requires `TRIGGER_CLASS`'s three strings to stay in this file's own code, which is the only block
- * large enough to move. A refusal that cannot carry its reason at the code carries it at the gate.
+ * **The spelling is the part worth reading.** These consts are STATIC attribute pairs — both sit
+ * before the `1,` class marker — so the reference writes `ngbtooltip="Add Reaction"` into the DOM,
+ * and the right transcription is the attribute plus `{@attach ngbTooltip}`. `ngbTooltipWith` would
+ * have been wrong here: `#lib/ngb-tooltip`'s own docblock records that it exists for the five hosts
+ * whose text the reference BINDS, which therefore carry no `ngbtooltip` attribute at all. Using it
+ * would have shown the right bubble on an element marked differently from the capture.
+ *
+ * The refusal's second half — that the reason had to live here because the component was one line
+ * under its ceiling — is gone with the ceiling, raised at the entry with this change's argument.
  */
-describe('MSM-01 — the Add Reaction tooltip is a measured refusal', () => {
+describe('MSM-01 — the Add Reaction tooltip, worn as the capture writes it', () => {
   it('renders the entry and its captured label — the positive control', () => {
     const body = html();
     expect(body).toContain('far fa-smile');
     expect(body).toContain('Add Reaction');
   });
 
-  it('the label is what carries the words, so the icon needs no second copy of them', () => {
+  it('the icon carries both halves of the const, as ATTRIBUTES', () => {
     /*
-      The whole refusal in one assertion: the text the reference's tooltip would show is already in
-      the document, inside the same anchor. If the label ever stops being rendered this goes red and
-      the refusal has to be re-argued rather than inherited.
+      Both, and in the rendered DOM rather than in source, because the two are separable and getting
+      it half right is the likely mistake: the text without `placement` gives a bubble in the wrong
+      direction, and `#lib/ngb-tooltip`'s `bind` reads `placement` off the host to choose the
+      direction class, so a missing one resolves to nothing at all.
+
+      Scoped to the ICON's tag rather than the anchor: `placement="left"` appears elsewhere in this
+      menu, and an unscoped `toContain` would pass on somebody else's attribute.
+    */
+    const body = html();
+    const at = body.indexOf('far fa-smile');
+    expect(at, 'the reaction entry is not rendered').toBeGreaterThan(-1);
+    const opens = body.lastIndexOf('<i', at);
+    const closes = body.indexOf('>', at);
+    expect(opens, 'the icon tag has no opening').toBeGreaterThan(-1);
+    expect(closes, 'the icon tag is unterminated').toBeGreaterThan(at);
+    const tag = body.slice(opens, closes + 1);
+    expect(tag).toContain('ngbtooltip="Add Reaction"');
+    expect(tag).toContain('placement="left"');
+  });
+
+  it('the label still carries the words too, which is the capture and reads as redundant', () => {
+    /*
+      Kept from the refusal this replaced, because it is the one assertion that was always worth
+      having: the tooltip text is byte-identical to the label four characters to its right, and that
+      duplication is the reference's. If the label ever stops rendering, the tooltip is suddenly the
+      control's only name and this goes red so somebody looks.
     */
     const at = html().indexOf('far fa-smile');
-    expect(at, 'the reaction entry is not rendered').toBeGreaterThan(-1);
     const end = html().indexOf('</a>', at);
     expect(end, 'the reaction anchor is unterminated').toBeGreaterThan(at);
     expect(html().slice(at, end)).toContain('Add Reaction');
   });
 
-  it('and the precedent it is measured against is real, not remembered', () => {
-    /*
-      `PrivateChatComposer` wears the same const SHAPE on an icon with no adjacent text. Asserted
-      rather than cited, because "the repository does X elsewhere" is the kind of claim that rots.
-    */
+  it('and matches the shape the composer already wears, which is measured not remembered', () => {
     const composer = readFileSync(
       new URL('./components/PrivateChatComposer.svelte', import.meta.url),
       'utf8'

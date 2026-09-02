@@ -457,29 +457,57 @@ describe('the gear toolbar, which is this component’s own state', () => {
 describe('the composer', () => {
   const composer = (root: HTMLElement) => root.querySelector<HTMLTextAreaElement>('#textAreaTxtPM');
 
-  const key = (init: KeyboardEventInit) =>
-    new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+  /*
+    `keyup`, and it is the SUBJECT of these three tests rather than a detail of the harness — PCC-07,
+    2026-09-02.
 
-  it('Enter sends', () => {
+    Const 55 at bundle byte 2,217,289 binds `3,"keyup","paste","focus"` and NOTHING else. Two of the
+    reference's six composers additionally bind `keydown.enter`, whose handler is the whole of
+    `onKeydown(e){e.preventDefault()}` (bytes 1,440,246 and 2,386,566); this is not one of them.
+
+    That is what decides every assertion below, and `chat-composer-enter.ts` carries the table.
+  */
+  const key = (init: KeyboardEventInit) =>
+    new KeyboardEvent('keyup', { bubbles: true, cancelable: true, ...init });
+
+  it('Enter sends, and does NOT claim to have swallowed anything', () => {
     const { root, calls } = render({ tabs: [tab({ uid: 1 })], currentUserId: 1 });
     const event = key({ key: 'Enter' });
     composer(root)?.dispatchEvent(event);
     flushSync();
 
     expect(calls.send).toBe(1);
-    expect(event.defaultPrevented, 'or the newline lands as well as the send').toBe(true);
+    /*
+      This asserted `defaultPrevented === true` while the handler was on `keydown`, with the reason
+      "or the newline lands as well as the send". The newline DOES land upstream, on all four
+      keyup-only composers — and `sendMessage` `.trim()`s it away (byte 2,208,062), which is why the
+      two readings are indistinguishable at the send.
+
+      False now, and deliberately: `preventDefault()` on a keyup is inert, so calling it would be a
+      line telling the next reader something is being swallowed when nothing is.
+    */
+    expect(event.defaultPrevented, 'nothing can be prevented on a keyup').toBe(false);
   });
 
-  it('Shift+Enter and Alt+Enter insert a newline instead', () => {
+  it('Shift+Enter does not send, and leaves the browser’s newline alone', () => {
     /*
-      `onKey(e)` in the capture calls `preventDefault()` on 13 EITHER WAY, which is why the newline
-      is inserted by hand rather than left to the browser.
+      THE ROW ITSELF. This composer swallowed a line break the reference keeps: `onKey`'s shift arm
+      is `i.val(i.val())` — a no-op — and on a keyup the character is already in the box, so the
+      no-op preserves it. Binding `keydown` here made `preventDefault()` effective and took it away.
+
+      Alt+Enter is the other arm and is upstream's own defect, reproduced: the browser's newline
+      plus the handler's explicit `+ "\n"` is TWO.
     */
     for (const modifier of [{ shiftKey: true }, { altKey: true }]) {
       const { root, calls } = render({ tabs: [tab({ uid: 1 })], currentUserId: 1 });
-      composer(root)?.dispatchEvent(key({ key: 'Enter', ...modifier }));
+      const event = key({ key: 'Enter', ...modifier });
+      composer(root)?.dispatchEvent(event);
       flushSync();
       expect(calls.send, JSON.stringify(modifier)).toBe(0);
+      expect(
+        event.defaultPrevented,
+        `${JSON.stringify(modifier)} — the reference's newline must survive`
+      ).toBe(false);
       if (component) unmount(component);
       component = undefined;
     }
@@ -492,5 +520,19 @@ describe('the composer', () => {
     flushSync();
     expect(calls.send).toBe(0);
     expect(event.defaultPrevented, 'typing must not be swallowed').toBe(false);
+  });
+
+  it('ignores a keyDOWN entirely, because the capture binds none here', () => {
+    /*
+      The assertion that makes the change above falsifiable in the other direction. Without it,
+      re-adding an `onkeydown` alongside the `onkeyup` would double every send and every test here
+      would stay green.
+    */
+    const { root, calls } = render({ tabs: [tab({ uid: 1 })], currentUserId: 1 });
+    composer(root)?.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' })
+    );
+    flushSync();
+    expect(calls.send, 'a keydown listener was added back').toBe(0);
   });
 });

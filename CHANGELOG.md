@@ -45,6 +45,493 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 02:41 UTC — the compact member reaction pill, and three assertions that hard-coded an empty parameter list
+
+RMSG-06. Four templates repeat the reaction loop; three wrap the pill in
+`O(1, e.value.clickedBy.length > 0 ? 1 : -1)` and one does not:
+
+```js
+Oge  1,333,312   card admin       gated
+u1e  1,341,960   card member      gated
+V1e  1,371,615   compact admin    gated
+m_e  1,379,950   compact MEMBER   d(0,"span")(1,"span",51), x("click",…), v(2)   ← no gate
+```
+
+`addRemoveReaction` empties `clickedBy` rather than deleting the key, so once a reaction's last
+holder removes it, upstream draws `😀 0` — on a compact member row and on no other row in the
+product. This room gated all four, on the recorded ground that reproducing it *"would ship a pill
+claiming a reaction nobody has made"*.
+
+That is an argument about whether the reference's behaviour is good, which is not one of the four
+things that excuse a divergence. Reproduced.
+
+**The strip stays ONE snippet and takes the gate as a parameter**, which is what its existing
+assertion had always been protecting — two strips is how the compact one drifted the first time. The
+term passed is `reverseMessage`, which already chooses between the two compact containers `$1e`
+(admin, holding the gated `V1e`) and `__e` (member, holding `m_e`), so one question keeps one answer.
+
+## Three assertions broke, and all three for the same reason
+
+`card-class-lists-contract`, `compact-message-contract` and `message-renderer-differences-contract`
+each matched `reactionStrip()` with the empty parameter list written into the pattern. None of them
+cares about the arguments — one counts definitions, one checks a host draws the strip at all, one
+counts call sites — and all three would have failed on any future parameter.
+
+The irony is on the record: `card-class-lists-contract`'s own comment two lines above says a test
+that pins a NUMBER *"fails the next time a container is added for a measured reason, and the repair
+is to bump the number, which teaches nobody anything"*. It then hard-coded the parameter list. All
+three now match with the list left open, and the one test that does care about the arguments asserts
+them by name.
+
+**Runtime impact.** A reaction whose last holder removes it stays on screen as `👍 0` on a compact
+member row, and on no other row — which is what the reference does.
+
+**Verified:** room gate exit 0 at `b986dbb` — 341 files, 6,170 passed, 1 skipped. Both negative controls seen red: gating all four fails the
+compact-member case, and ungating all four fails the other three.
+
+### 2026-09-02 02:19 UTC — a whole capture file nobody had read, in the directory everything else is read from
+
+ROV-03 recorded the chat-image viewer as BLOCKED, and its measurement was exact: `openImageModal`
+occurs once in 2,891,205 bytes — the call — with no declaration, no `.imgur-modal` markup, and the
+three sibling chunks named so the absence was bounded. Every word true of `main.d1d09071be31f1ba.js`.
+
+**The declaration is at `deployed-index.html:70`, and this repository was already building from it.**
+159 lines, same pinned directory, listed in that directory's own `sha256sums.txt`. Its inline
+`<script>` holds `openImageModal` in full — the popped-out-window branch, the `bootbox.dialog`, and
+`downloadImage(url, imageName)` after it.
+
+Three things make this worth the entry rather than a one-line fix:
+
+1. **The test that recorded the blocker had the file in a constant.** `DEPLOYED_INDEX` was read for
+   four `<script src>` attributes and never for the body those tags sit beside.
+2. **`RoomModals.openImage` is a transcription of that declaration**, popped-out window and all, and
+   `routes/+page.svelte` assigns it to `window.openImageModal` — the global name the captured page
+   defines for its inline handlers. Somebody built the function from this file while the row
+   recorded the file as not holding it.
+3. It is the same failure RTE-05 paid for earlier in this pass, one level in: **a sweep of one
+   capture FILE reported as a sweep of the evidence.** `main.*.js` is not the capture; the directory
+   is.
+
+## What it changed, and it reverses a change from 2026-08-31
+
+There are two image viewers upstream and `ImageLightbox.svelte` was documented as the other one:
+
+| | `showImagePreview(e, i="")` | `openImageModal(event, url)` |
+| --- | --- | --- |
+| where | bundle byte 1,992,730 | `deployed-index.html:70` |
+| used by | the alert panes | **the chat image — this dialog** |
+| `alt` | the whole url | **the basename** |
+
+`OVL-05` had changed `alt` from the basename to the url on 2026-08-31, calling the basename *"a
+preference substituted for a captured value"*. It was a captured value — of the right dialog, read
+from the wrong one.
+
+Its supporting argument was that the basename *"disagreed with this room's own other renderer of the
+same image"*, the popped-out window, which uses the url. **That disagreement is upstream's own**: the
+popped-out window is `openImageModal`'s shift/alt/ctrl branch, ten lines above the dialog in the same
+function, and it really does write `alt="${url}"` there. The reference describes one image two ways
+depending on the gesture that opened it. Both halves are transcribed now.
+
+## And a paragraph of "this cannot be known" that was answerable
+
+`ImageLightbox.svelte` said the download button's container and class list *"are this room's, are
+recorded as this room's, and are not evidence of anything"*, because only bootbox decides where a
+`buttons` entry lands and *"the capture roots that would hold one are absent here"*. The index does
+not use `buttons` at all — it writes the markup by hand:
+
+```html
+<img src="URL" alt="FILENAME" /><hr>
+<button class="btn btn-primary btn-sm" onclick="downloadImage('URL','FILENAME')">…
+```
+
+So the `<hr>`, the in-body placement and the prepended `btn` are all settled, and **the room's guess
+was right character for character**. `download-image.ts` also has its source named at last, with both
+of its differences from it stated: upstream passes the filename as a second argument and re-splits
+it, and this adds the `revokeObjectURL` upstream omits.
+
+**Runtime impact.** A chat image's lightbox describes it by filename again instead of by its full
+URL — which is what a screen reader reads out.
+
+**Verified:** room gate exit 0 at `9431f1b` — 341 files, 6,167 passed, 1 skipped. Negative controls
+seen red for the `alt` and for the `<hr>`. Controller untouched.
+
+### 2026-09-02 02:04 UTC — a rule this repository has now got wrong four times, and the fourth time it was executable
+
+PCC-07 arrived as a one-line row: the private composer binds `keydown` and const 55 binds `keyup`.
+Following it found something much larger.
+
+## The handlers are identical and the BINDINGS are not
+
+`chat-composer-enter.ts` exists because three readers had each guessed Shift+Enter differently. Its
+fix was to read all six `onKey` implementations in the bundle by value, find five identical, and make
+the rule executable so nobody could guess again. That reading was one input short.
+
+Measured 2026-09-02 from the CONST TABLES rather than the handlers:
+
+| textarea | const at | binding section |
+| --- | ---: | --- |
+| `textAreaTxt` | 1,451,244 | `3,"keyup","paste","keydown.enter","focus"` |
+| `textAreaTxtExtra` | 2,397,231 | `3,"keyup","paste","keydown.enter","focus"` |
+| `textAreaAlertTxt` | 2,055,692 | `3,"keyup","paste"` |
+| `textAreaTxtPM` | 2,217,289 | `3,"keyup","paste","focus"` |
+| `textAreaReplyTxt` | 2,324,702 | `3,"keyup","paste"` |
+| `textAreaQATxt` | 2,342,122 | `3,"keyup","paste","placeholder"` |
+
+Only two carry `keydown.enter`, and what it calls is a whole method: `onKeydown(e){e.preventDefault()}`,
+at bytes 1,440,246 and 2,386,566 — the only two in the bundle.
+
+So for those two the newline dies on the way down and `onKey`'s shift arm — `i.val(i.val())`, a
+no-op — genuinely leaves the box unchanged. **Shift+Enter does nothing, exactly as the table said.**
+
+For the other four there is no keydown handler. The browser inserts the newline, `onKey` runs on
+keyup, and `e.preventDefault()` there is INERT. **Shift+Enter leaves a newline, and Alt+Enter leaves
+two.**
+
+**A handler that prevents a default says nothing until you know which event it is bound to.** That is
+the reusable half, and it is why the module now carries the six-row const table rather than a
+sentence: executable is not the same as complete.
+
+## What it actually cost
+
+One composer. `PrivateChatComposer.svelte` was the only one whose handler reached `'swallow'` — the
+others merely return without preventing, which happens to reproduce keyup behaviour — so Shift+Enter
+there **swallowed a line break the reference keeps**. It binds `keyup` now, and
+`composerEnterAction`/`composerEnterPrevents` take the binding as an argument.
+
+Two things were measured rather than assumed before touching it: `sendMessage` `.trim()`s (byte
+2,208,062), so plain Enter is indistinguishable between the two readings; and Alt+Enter's explicit
+`+ "\n"` landing on top of the browser's is upstream's own double, now reproduced.
+
+## STV-04 and STV-09, on the way
+
+`setupStream()` ends with TWO statements — `this.loadStream(),this.startPerformanceMonitoring()` at
+byte 1,904,326 — and this room's effect called the first. The row recorded that we reproduce it
+"exactly, member for member". **It is inert in both codebases**, which is the reason to transcribe it
+rather than the reason not to, and the reason it now has an assertion: its first negative control
+came back GREEN.
+
+`STV-09` — const 3 at 1,909,111 is `["autoplay","autoplay",…]`, so the reference's element carries
+`autoplay="autoplay"` where a bare `autoplay` in Svelte emits `autoplay=""`. The recorded reason was
+that Svelte only emits the bare form; compiling both spellings on this repository's own svelte 5.57.0
+gives two different attributes in the client and server outputs alike. The real obstacle is one step
+further on: `autoplay` is typed boolean, so the literal fails `svelte-check` and the attribute goes
+through the spread this repository already uses for its captured `ngbtooltip` pairs.
+
+## Two more over-tight assertions of my own repaired
+
+`streaming-view-and-alert-panes-citation-contract` pinned the load effect's whole body as a literal
+string while its own comment said *"the negative control that matters here is the coupling, not the
+guard"*. It asserts the coupling now — the effect reads `videoPlayer` and `loadStream` and NOT
+`bufferSizeLevel`, which is what STV-03 is about.
+
+`PrivateChatPanel.test.ts` dispatched `keydown` from a helper, so the event was a detail of the
+harness. It is the subject now, with a fourth case asserting a keydown listener has NOT been added
+back — without which re-adding one would double every send and leave all three green.
+
+**Runtime impact.** Shift+Enter in the private-chat composer inserts a line break instead of doing
+nothing. The stream `<video>` emits the capture's `autoplay="autoplay"`. Nothing else moves: the
+added `startPerformanceMonitoring()` returns immediately on that path in both codebases.
+
+**Verified:** room gate exit 0 at `fc736fb` — 341 files, 6,162 passed, 1 skipped. Negative controls seen red for all three, plus two more that
+were green first and are red now — the ones that found the missing assertions.
+
+### 2026-09-02 01:40 UTC — the report modal's refusal was re-challenged, and one unmeasured fact decided six rows
+
+RPT-01 through RPT-07 came back from the re-triage as MATCHABLE. They are the largest single block
+in it, and the challenge was a serious one rather than a rehash: the reference's CLIENT loader is
+fully captured — `loadReports` at bundle bytes 2,413,317-2,413,560, its branch, its error string —
+so "the client half is untranscribable" was never the reason, and the proposal was to build it
+against a new per-recipient delivery table *"written when `alerts.dispatch` fans out"*, showing the
+reference's own `No Reports.` until rows appear. It accepted, correctly, that the schema half of the
+refusal still holds.
+
+**It fails on one fact nobody in this repository had measured: there is no fan-out.**
+`alerts.dispatch` is five booleans on the alert row — `sms`, `email`, `twitter`, `push`,
+`cross_post` — and *nothing in `services/api` reads one of them*. No Twilio, Resend, SendGrid, APNs
+or Firebase client exists anywhere in it. The flags are recorded INTENT with no actor.
+
+So the proposal is a table with no writer, feeding an endpoint that can only ever return empty,
+feeding a modal that would tell a presenter — in the reference's own words — that their alert reached
+nobody. **That is RPT-02: the defect this room shipped once and fixed.** In a product where "no
+reports" is a factual claim about delivery, an always-empty list is a silent fallback of the kind
+`CLAUDE.md` forbids by name.
+
+## What actually changed, because a refusal that survives is not a no-op
+
+The premise-expiry check was one-sided. It swept the migrations for a delivery record — by COLUMNS
+rather than a table name, which is good — and stopped there. A table is the second thing to appear,
+not the first.
+
+`alert-report-modal-contract.test.ts` now reads every `.rs` under `services/api/src` and asserts
+both halves: that no sender's name appears, and that nothing reads a dispatch flag. **It is the
+better signal of the two** because it fails in the right order — a sender has to exist before there
+is an outcome worth recording — and it closes the gap where a delivery table could arrive for some
+unrelated reason and expire the refusal early, or a sender could arrive and not expire it at all.
+
+Both negative controls were run against the real tree and reverted: appending a sender's name to
+`services/api/src/http/v1/alerts.rs` turns it red, and so does appending a read of one flag.
+`services/` is untouched in the diff.
+
+**The client transcription is not what is refused here**, and the row now says so. It is buildable
+and was never in doubt. What is refused is shipping a UI whose empty state is a claim this product
+cannot make.
+
+**Runtime impact.** None. Six rows are disposed with a stronger reason than they carried, and the
+gate that holds them fails one step earlier than it used to.
+
+**Verified:** room gate exit 0 at `2d10a7e` — 341 files, 6,156 passed, 1 skipped. Two negative controls seen red, and `git status services/`
+clean afterwards. Controller untouched.
+
+### 2026-09-02 01:34 UTC — four more refusals, and a repository gate that caught a citation I had copied from an agent
+
+Batch three of the re-triage. All four were MEASURED REFUSALS, all four measurements were correct,
+and none of the four conclusions was.
+
+## SP2-05 — the measurement that refused it is the reason it is safe
+
+`z("controls", o.showControls)` on the screenshare `<video>`, with a click handler that toggles the
+flag. The refusal measured that `showControls` starts `!1` (byte 1,494,556), that its ONLY writer is
+that click (1,501,400), and that the component's own `.webcamScreen { pointer-events: none }` makes
+the click unreachable — so the attribute is false for the life of the component upstream and no
+control bar ever appears. It concluded: do not build it.
+
+Element, handler, binding and the CSS that kills all three are the reference's, and all of them
+already ship here. Transcribed, the pair is exactly as dead here as it is there. **That rule is now
+load-bearing for a second reason** — delete `pointer-events: none` and this room grows a control bar
+the capture never shows — so `screen-pane-contract.test.ts` pins it beside the binding, with its own
+negative control.
+
+## QAM-12 — the listener is the thing with no consumer, not the class
+
+`Rh("modal fade ", o.qaMsg._id, "")` at 2,344,038 puts the alert's id in the dialog's class list. The
+refusal was right that no CSS rule names it and that its one reader — a jQuery `hidden.bs.modal`
+listener — is correctly absent here, because `RoomModals.closeActive` already does that listener's
+work. But the class is a value the reference RENDERS, and the rendered `class` attribute is
+reference-facing output.
+
+It also closes a divergence the old note waved away in its own last line: `"fade modal"` against
+`"modal fade "`. CSS does not read order; a byte-for-byte comparison does.
+
+## EMOJI2-07 and PAM-14
+
+`EMOJI2-07` — the reference binds `clear()` twice on the search-clear button (`x("click", …)
+("keyup.enter", …)` at 738,430) on a real `<button>`, whose own activation already fires `click` for
+a focused Enter. So one Enter runs it twice upstream. Transcribed: `clear()` is idempotent, and the
+whole cost is one extra pass over an already-empty query.
+
+`PAM-14` — **a net deletion.** The `app-post-alert-modal` consts table was read in full from
+2,131,609: not one of the five consts behind these controls carries an `id` or a `name`, and this
+room put both on all six fields. Nothing read one of them.
+
+**The one accessibility cost of that match is written down rather than discovered.** Const 58's field
+carried `aria-labelledby` pointing at the CHECKBOX above it, so its accessible name was the name of
+the control that reveals it. Const 58 has no aria attribute at all, so the field is unnamed upstream
+and is unnamed here now. Removing a mis-aimed name is not removing a good one — but it is an unnamed
+input, and the owner should read that sentence rather than find it.
+
+## Three of this repository's own gates earned their keep
+
+`emoji-screen-citation-contract.test.ts` re-reads every byte offset a file cites. It rejected the
+SP2-05 note: **both offsets in it were wrong** — each a few dozen bytes past where its own quoted
+text begins — and I had copied them from the re-triage agent without re-measuring. `grep -bo` gave
+the real ones. This is exactly the "points at a real function that is not the one the sentence means"
+failure that file exists for, caught before it shipped instead of a year later.
+
+`screen-pane-contract.test.ts` broke on an assertion of its own that was wrong rather than a
+regression: it pinned the ADJACENCY `muted\n          {@attach attachStream}`, and SP2-05 put
+`onclick` between them. Nothing in the reference makes those two lines neighbours, and a test that
+pins the order of unrelated attributes fails on every future addition and teaches the next author to
+loosen it. It now asserts what SV-SP-10 is actually about: the attribute is present, it is bare, and
+nothing writes `volume` or `muted` at runtime.
+
+`eslint` refused two `svelte-ignore` comments I added defensively for warnings that do not fire.
+
+**Runtime impact.** None visible, and that is the point of three of the four: the controls binding
+and its handler are inert behind the reference's own `pointer-events: none`, the Q&A dialog's extra
+class is selected by nothing, and the emoji clear button now clears twice instead of once. `PAM-14`
+removes thirteen attributes from the rendered post-alert form, one of which was providing a wrong
+accessible name.
+
+**Verified:** room gate exit 0 at `801fb08` — 341 files, 6,155 passed, 1 skipped. Negative controls seen red for all four, plus two wrong-fix
+controls: restoring one deleted `id`, and deleting a checkbox `id` that a real `<label for>` points
+at. Controller untouched, so its gate was not run.
+
+### 2026-09-02 01:09 UTC — five values the reference ships and this room did not, four of them refused for being inert
+
+The re-triage's second batch. Every one of these was a MEASURED REFUSAL whose measurement was
+correct, and four of the five were refused on the same reasoning: *the value paints nothing / does
+nothing here.* True in every case — and true UPSTREAM for the same reason in every case, which makes
+each one an upstream defect reproduced rather than an escape from matching. The rendered attribute,
+class or element is reference-facing output, and it differed.
+
+Every byte below was read in this session from the pinned bundle, not quoted from a row.
+
+| row | value | why it was refused | why that did not survive |
+| --- | --- | --- | --- |
+| NAV-05 | `recIndicatorStart` on the recording icon (byte 2,465,900) | its only rule is `app-room .recIndicatorStart a`, a DESCENDANT selector, and the `<i>` has no children | the refusal's own last sentence read *"It is inert in the reference for the same reason"* |
+| NAV-11 | `audiovolslider=""` on the music slider (2,545,086) | an empty attribute nothing anywhere reads | nothing reads it upstream either |
+| ACA-04 | a bare `<i></i>` closing the Webinar Mode block (1,424,607) | no stylesheet here or there selects a bare `<i>` | invisible upstream for the same reason |
+| MSM-01 | `ngbtooltip="Add Reaction"` `placement="left"` (1,359,726 / 1,397,773) | the bubble repeats a label four characters to its right | that is an argument about whether the reference's choice is GOOD, which is not one of the four escapes |
+| FP-09 | the file-search pipe (1,914,488) | — | not a refusal; a real behaviour difference, below |
+
+Each note at the code now states that the value is EXPECTED to do nothing, because that is the only
+thing stopping the next reader deleting it as dead.
+
+## MSM-01's spelling was the part worth getting right
+
+Both consts are STATIC attribute pairs — they sit before the `1,` class marker — so the reference
+writes `ngbtooltip="Add Reaction"` into the DOM, and the transcription is the attribute plus
+`{@attach ngbTooltip}`. `ngbTooltipWith` would have been wrong: `#lib/ngb-tooltip`'s own docblock
+records that it exists for the five hosts whose text the reference BINDS, which therefore carry no
+`ngbtooltip` attribute at all. Using it would have shown the right bubble on an element marked
+differently from the capture. The first draft here used it; the docblock caught it.
+
+## FP-09 — the file search, and a claim of mine that was too strong
+
+The pipe read whole at 1,914,488 has NO `.trim()` and returns the input array UNCHANGED for a falsy
+term. Ours trimmed and ran the `Object.values` walk with `''`.
+
+The trim is user-visible and not academic: with the space kept, ` png` matches nothing, and this
+pipe is the only way the Files pane is searched.
+
+**My first note on the empty-term half was wrong and is corrected rather than rewritten.** It said
+the walk DROPPED rows holding no string field. True of the expression, unreachable through the type
+— `RoomFileRow` declares four fields as `string`. The visible effect was the WAIT, not the result:
+the pane opens with an empty box and this allocated and walked every row to arrive at the list it
+started with. The short-circuit is the reference's own and it is the cheaper path on the render that
+happens most.
+
+## Two of my own gates caught my own test code
+
+`slice-anchor-contract.test.ts` refused two slices I wrote that inlined their `indexOf`, and it was
+right: `lastIndexOf` returning -1 makes `slice(-1, …)` a one-character window, and every assertion
+downstream then fails for the wrong reason. Both bounds are bound and asserted now.
+
+`navbar-decoded-rows-contract.test.ts` had NO assertion for NAV-11 at all — the negative control came
+back GREEN, which is how that was found. It has one now, plus a positive control asserting the
+slider still carries `title`, `class` and `type`, because an assertion that only checks the new
+attribute passes just as well on a slider that has lost the rest of its const.
+
+**Runtime impact.** The presenter's recording icon carries the capture's starting class, the music
+slider carries its inert attribute, the Webinar Mode block emits its trailing element, and the Add
+Reaction icon shows the capture's left-placed tooltip. The Files search now behaves as the reference
+does for a term with spaces, and does no work at all for an empty one.
+
+**Verified:** room gate exit 0 at `532390a` — 341 files, 6,145 passed, 1 skipped. Negative controls seen red for all five: dropping the
+`recIndicatorStart` term, the `audiovolslider` attribute, the bare `<i>` (and giving it a class),
+the tooltip (and the tooltip without its placement), and restoring the `.trim()`. Controller
+untouched, so its gate was not run.
+
+### 2026-09-02 00:45 UTC — five re-measured refusals, three of which were wrong, and a gate that found this repository disagreeing with itself
+
+The re-triage pass over the audit's non-code dispositions, under the standing instruction to match
+the capture. Five rows were put back against the bundle. **Two were built, one escape reason was
+replaced with a stronger one, one measurement was corrected, and one refusal survived a challenge I
+was told it would lose.** Every reference byte below was read in this session, not quoted from a row.
+
+## UIM-16 — the avatar `src` was rewritten, and the reference emits it verbatim
+
+`z("src", o.user.pic || "…/avatar/" + o.user.emailHash + "?d=mm&s=80", Mt)` at byte 2,095,604: a
+plain `||`. This room ran `gravatarAtSize(targetUser.pic, 80)`, which parsed the stored URL and
+rewrote its `s` parameter — so for the gravatar it actually stores (`?d=mm&s=50`, `connection.ts`)
+the two emitted DIFFERENT `src` strings for one input.
+
+The refutation that had kept this open was right about its own premise and stopped one step short:
+`pic` is `text('avatar_url').notNull()`, so the fallback arm is indeed dead — but the divergence is
+in the arm that always runs. The same file already writes the `||` form twice, at s=30.
+
+**Not a raise but a LOWERING**, which is the ratchet's other half. Deleting the rewrite left
+`isGravatar` with one caller and a fifteen-line argument sitting inside six thousand lines where no
+test could reach it without a mount. It is now `#lib/avatar-source.ts` with four cases, every input
+a value `users.avatar_url` genuinely holds — including `/avatar.svg`, the column default, which is
+why the `try`/`catch` is the answer for a real value rather than padding. **ModalHost.svelte
+6,066 → 6,038.**
+
+## UIM-09 `location` — the refusal named a dependency this repository already has
+
+Two files recorded that `location` *"needs a geo-IP service this repository does not have"*. It does
+not. The reference's own geo lookup is CLIENT-side (byte 1,145,213) and ships on its login frame at
+993,662; this room does the same thing at `events.svelte.ts`, POSTing to `api/roster/location` →
+`setRosterLocation`, and `RoomSidebar.svelte` has been RENDERING the answer. The value was on the
+very object the mapping reads and `RosterRowForTarget` omitted the field.
+
+`|| undefined`, not `??`, and the negative control is the reason: `patchRosterUser` clears this to
+the EMPTY STRING, and the cell renders `{targetUser.location ?? 'n/a'}` — so `??` would push `''`
+through and draw a BLANK where "we do not know" belongs. Both corrected paragraphs are at their code.
+
+## RS-04 and RS-03 — this rail was the only one of three surfaces not drawing them
+
+`ModalHost.svelte` draws Trial, New and the membership star; `RoomMessage.svelte` draws all three;
+`RoomSidebar.svelte` drew Trial and stopped. So a presenter saw "New" on a member's info card and in
+the message log and not in the list between them, and a room that switched the membership star OFF
+still showed it here — this rail was the third star in the room and the only one ignoring the
+owner's setting. Gates at 2,034,694, slot bodies at 2,033,362, consts 10/11/20/21 at 2,038,387.
+
+`isNewIndicatorOn` is deliberately left off, on this repository's own recorded reasoning: `isNew` has
+no producer and a gate with nothing to gate is not a consumer.
+
+**The interesting part is what stopped it.** `roster-identity-contract.test.ts` asserted those four
+class names must be ABSENT, *"so that building them without the supply fails here"* — and it went
+red immediately. What it exposed is that **this repository held two answers to one question**: two
+surfaces rendered by an argued reason, the third forbade by test. Resolved toward the capture and
+the majority, and the assertion is NOT deleted — it now refuses the UNGATED spellings, because the
+real risk was never markup with no supply. It is markup with no gate: an unconditional star
+discloses tenure the owner switched off, and an unconditional `New` tells a member a moderation fact
+about another member. Six mount tests, and **each of the three gate terms has its own negative
+control** — dropping `isPresenter` fails only the member test, `disableStarYears` only the owner
+test, `isP` only the presenter-row test.
+
+## RS-06 — the refusal stands and its REASON was the weaker of two
+
+The row blocked "Recording" on *"there is no archive service here"*. True, and CONTINGENT — it
+expires the day one exists, and says nothing about whether the client half is separable, which is
+the question this repository has now been wrong about three times.
+
+The escape that actually holds is SECURITY, already named by hand here: the URL's last segment is
+`sesionToken`, this room's session is an httpOnly cookie, and
+`session-cookie-httponly-contract.test.ts` fails any client file naming one. `alerts-pane.ts`
+already refuses the identical `tok=` clause on the detach-chat popout. The item stays inert for a
+reason an archive service would not change.
+
+## RTE-05 — the row's own measurement was scoped to the wrong file
+
+It read *"over `main.d1d09071be31f1ba.js`, `note-color` has zero occurrences"*. Correct about the JS
+bundle and wrong about this repository: the SIBLING capture in the same pinned directory,
+`styles.ee2a710065b60389.css`, holds **49** `note-color` and **22** `note-palette`, and gives the
+palette's whole class skeleton. A sweep of one capture file was reported as a sweep of the evidence.
+
+The refusal survives on the narrower and correct ground: what decides the control is its VALUES —
+the swatch colours and three label strings — and those are in summernote's own JavaScript, which is
+in neither capture. Recorded so whoever revisits knows one capture run closes the row.
+
+## ASR-1 — challenged, and it SURVIVES
+
+Put to me as matchable on the ground that `captured-runtime-components.css` already ships orphan
+captured CSS. It is not a precedent: that file is GENERATED WHOLESALE from a pinned capture, so its
+orphans are a property of the generator, not a rule-by-rule choice — and these eleven are not in
+that capture at all. Porting them means hand-authoring eleven orphan rules into `app.css` for a
+report list refused on EVIDENCE ABSENT. The re-challenge and both counter-arguments are recorded at
+the test, because a refusal nobody re-tests is the shape this repository keeps finding wrong.
+
+## A CI flake, reproduced and fixed
+
+`trade-alerts-mirror-delete.test.ts` failed the whole file with `UNIQUE constraint failed:
+users.email` on roughly **one full-suite run in three**, and passed every time it ran alone. The
+test database is per-PROCESS, so unique emails stop a collision between files and not a second seed
+of the same row. Reproduced deterministically by seeding one email twice — red on the bare insert,
+green with the conflict clause — and fixed with the `onConflictDoUpdate` that `stream-names.test.ts`
+already carries for the same reason. **Four consecutive full-suite runs green afterwards.**
+
+**Runtime impact.** A presenter's user-info modal shows the member's city instead of `n/a`, and the
+modal avatar requests the URL the room stored rather than a rewritten one. The roster now shows the
+`New` badge and the membership star on the same terms as the other two surfaces, and obeys the
+owner's `disableStarYears` switch, which it previously ignored.
+
+**Verified:** room gate exit 0 at `67a6eca` — 341 files, 6,139 passed, 1 skipped. Negative controls seen red for the location mapping
+(`??` for `||`), all three roster gate terms, the ungated-spelling refusal, and the seed flake.
+`svelte-check` 0 errors 0 warnings across 1,635 files; `svelte-autofixer` clean on the badge markup.
+Nothing in the controller was touched, so its gate was not run.
+
 ### 2026-09-01 23:51 UTC — the gate could not see a whole file, and the defect it exists for was in there
 
 `session-reload-config` raised a confirm, ran a LOCAL `deps.reload()` — a refetch of the calling

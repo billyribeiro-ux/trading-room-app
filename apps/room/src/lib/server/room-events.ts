@@ -708,8 +708,13 @@ export function roomRoster(room: string): RosterUser[] {
  *   `streamServer`      the media plane. Blocked on a `STREAM_SERVER_MTX` host, the same blocker
  *   `serverId`          `TODO.md` rows X, AC and R carry.
  *
- * `location` (upstream's `privData.locStr`) is the sixth and needs a geo-IP service this repository
- * does not have; that is an owner decision about an external dependency, not a reading.
+ * `location` (upstream's `privData.locStr`) is the sixth and **is supplied, since 2026-09-01**.
+ * This paragraph used to say it *"needs a geo-IP service this repository does not have"*, which was
+ * wrong: the reference's geo lookup is CLIENT-side (bundle 1,145,213) and reaches its server on the
+ * login frame, and this room does the same thing — `events.svelte.ts` POSTs to `api/roster/location`,
+ * which calls `setRosterLocation` sixty lines below this docblock. The value has been on the roster,
+ * and rendered in the sidebar, the whole time; what was missing was the field on
+ * `RosterRowForTarget`, so the modal read `undefined` off the object that already held it.
  *
  * ## Returns null for somebody who is not here
  *
