@@ -45,6 +45,71 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 23:01 UTC — "Get my token", and a reason that was true of the reference and false of this room
+
+`d76b1a7`. `INERT_ACTIONS` is down to **three**, and none of the three is unbuilt work: two need a
+server-side recorder this deployment does not have, and `disable-private-chat` is a MATCH — the
+reference renders that button with no click binding at all.
+
+`get-my-token` carried TWO recorded reasons for being refused, and only one survived re-measurement.
+
+**UPHELD, and now on screen instead of in a comment.** `globals.sesionToken` is the session
+credential. This room's cookie is `httpOnly`, so reproducing that field means the SERVER writing an
+`httpOnly` value into the DOM — turning a cookie an XSS cannot read into a string it can. The token
+input renders **disabled and empty with the reason beside it**, which is the shape
+`stream-player-blocked-contract.test.ts` already sets for a control that cannot honestly work.
+Deleting the field instead would leave a member looking for their session token with no answer at all.
+
+**WITHDRAWN.** The entry also said *"`globals.sessionID` is the room code, already visible in the
+address bar, so a dialog showing only that is a control whose only effect is repeating what the URL
+says."* The first clause is right and was confirmed — `globals.sessionID = e` in `loadGlobals(e)` at
+byte **1,148,131**, called with `new URLSearchParams(location.search).get("id")` at **2,600,589**,
+one assignment in the whole bundle. The second is true of the REFERENCE and **false of this room**:
+our address is `/`, the short code lives on the session row server-side, and
+`routes/session/+page.svelte` strips even the handoff token from the bar. Nothing on screen tells a
+member which room they are in, so the field that merely echoed the URL upstream is the only answer
+here to "which room am I in" — which is what somebody reporting a problem needs.
+
+A reason that is true of the reference and false of this room is precisely the failure
+`user-action-intent.ts` exists to catch, and it caught itself only because the row was re-measured
+rather than read.
+
+**Runtime impact.** The user-settings modal's "Get my token" button did nothing at all — no command,
+no toast, no console line. It opens a dialog.
+
+**Two more divergences, both forced.** Upstream copies with an inline
+`onclick="navigator.clipboard.writeText('${e}')"` INSIDE its interpolated `message` — a value
+crossing into executable attribute text, which is a stored-XSS primitive the moment either value can
+contain a quote — and ends in `alert(…)`, forbidden here by name. Both are ordinary Svelte, and a
+clipboard refusal (an insecure origin, a permissions policy) is **said out loud** rather than silently
+doing nothing, which upstream's handler has no branch for.
+
+**Mounted from `RoomOverlays` and not `ModalHost`, and the size ratchet is why.** `ModalHost.svelte`
+is at its ceiling and this repository spent the previous week moving modals OUT of it (`ReplyModal`,
+`ConnectivityModal`). Putting a component that was born extracted back inside it, to save seventeen
+lines, would have been the wrong direction chosen by a number.
+
+**Four negative controls seen red, and one caught a vacuous assertion of my own.** The `disabled`
+check sliced a fixed 200 characters from `id="sessionToken"` and was being satisfied by the **Copy
+button** rather than the input it named — the same shape as the archives-gate defect found this
+morning, twice in one day. Both are now pinned to the element they name.
+
+**Five gates caught the change and each was answered rather than silenced.** The one worth naming is
+`session-cookie-httponly-contract`, which flagged `id="sessionToken"` in the new component — correct
+by its letter and wrong by its purpose, since an `id` attribute cannot carry a value. Fixed by
+stripping `id=` / `for=` attribute values before the sweep, which is a **general rule rather than a
+per-file exemption**: a variable, a property read or an interpolated `value={sessionToken}` still
+trips it, and the control for that lives in the new contract. The others were the modal-naming census
+(24 → 25, and the self-referential ten untouched for the third time running), the two surface-audit
+scopes, `slice-anchor-contract` (two unasserted `indexOf` bounds in my own test) and the size ratchet.
+
+**Verified:** both gates exit 0. `svelte-check` 1646 files, 0 errors. `svelte-autofixer` clean. Nine
+assertions in `session-info-modal-contract.test.ts`, rendered through SSR rather than read as text —
+a source search would pass on a field inside an `{#if}` that never opens.
+
+**Not verified, and named: no browser was opened on this dialog.**
+
+
 ### 2026-09-02 22:33 UTC — the transcript window, and the second reason it was blocked
 
 `22e71e9`. **The commit that closed the tracker row for this work, `8347c13`, cites the hash
