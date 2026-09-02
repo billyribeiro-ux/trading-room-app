@@ -103,8 +103,13 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
  * as well as the display.
  *
- * `hasAlertScheduler` left last, and it is the LAST buildable row of this enumeration — what remains
- * is `enableDiscord`, which needs an application registration that does not exist. Its blocker named
+ * `hasAlertScheduler` left last on 2026-08-28, and `smallerImagePreview` (USM-18) left on 2026-09-02
+ * — which is why "the LAST buildable row" is a claim this file no longer makes about a date. What
+ * remains is `enableDiscord`, and its blocker is TWO things rather than one, re-read 2026-09-02: a
+ * Discord application registration (nothing to link accounts to until one exists) AND the
+ * `/discord/v2/status` and `/discord/v2/auth/start` endpoints it would be reached through, at bundle
+ * bytes 1,160,297 and 1,160,186. The client half alone is a presenter-only control whose single
+ * action is a request that 404s. `hasAlertScheduler`'s own blocker named
  * the wrong process: *"a scheduler process in `services/api`, and the crate's TEST targets cannot
  * build here."* Both halves are true of that crate and neither is a reason to put the scheduler in
  * it. The reference's scheduler is its own Node server; this stack's long-lived Node process is the

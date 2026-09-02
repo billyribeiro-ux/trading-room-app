@@ -611,3 +611,96 @@ test.describe('the private-chat log', () => {
     expect(scroller.height, 'and an inline box has no height to give its child').toBeGreaterThan(0);
   });
 });
+
+/*
+  XCP-09 and USM-18, in the one place that can settle either: a browser's CSSOM.
+
+  Both changes landed on 2026-09-02 and both are about CSS that no unit test can check. The
+  generated sheet is asserted as TEXT by `extra-chat-styles-contract.test.ts` — that the generator
+  produced it and that a hand-edit fails — and text is exactly what a stylesheet is not. What text
+  cannot tell you is whether the browser PARSED it, and these selectors are the kind that get
+  dropped silently:
+
+      app-extra-chat .roomLog:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *)
+
+  A `:not()` containing a compound `:is()` with a descendant combinator is legal in Selectors 4 and
+  was legal in nothing before it. A parser that refuses it discards the WHOLE rule, without an error,
+  and the second chat column would go on rendering unstyled exactly as it did before the generator
+  existed — with a green suite, because every assertion about that file is about its bytes.
+
+  The other half is the one that has to STAY absent. `chat-uploaded-img-sm` is transcribed from the
+  capture and styles nothing there; inventing a rule for it here would be a worse divergence than
+  binding a dead name, and this is the assertion that would catch somebody doing it.
+*/
+test.describe('the two 2026-09-02 stylesheet changes, in the CSSOM', () => {
+  test('the extra column has its component rules and the dead class still has none', async ({
+    page
+  }) => {
+    await page.route('**/*', (route) => {
+      const url = new URL(route.request().url());
+      if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return route.continue();
+      return route.abort();
+    });
+    await page.goto(handoffUrl(ROOM));
+    await page
+      .getByRole('button', { name: /log ?in|enter/i })
+      .first()
+      .click();
+    await page.waitForTimeout(1_000);
+    const entered = await page.goto(`/?room=${ROOM}`, { waitUntil: 'domcontentloaded' });
+    expect(entered?.status(), 'the room must answer 200 before anything below means anything').toBe(
+      200
+    );
+
+    /*
+      Every rule the browser actually holds, flattened. Cross-origin sheets throw on `cssRules` and
+      are skipped; the room's own styles are same-origin, which is the only reason this works.
+    */
+    const rules = await page.evaluate(() =>
+      [...document.styleSheets].flatMap((sheet) => {
+        try {
+          return [...sheet.cssRules].map((rule) => rule.cssText);
+        } catch {
+          return [];
+        }
+      })
+    );
+
+    expect(
+      rules.length,
+      'no stylesheet was readable, so nothing below means anything'
+    ).toBeGreaterThan(100);
+
+    /*
+      PARSED, not merely shipped. `cssText` is the browser's own re-serialisation of a rule it
+      accepted — a rule it rejected is not in this list at all.
+    */
+    const extraChatRules = rules.filter((text) => /(^|[\s,>])app-extra-chat[\s.:]/.test(text));
+    expect(
+      extraChatRules.length,
+      'the generated `captured-extra-chat.css` reached the browser and survived parsing'
+    ).toBeGreaterThan(20);
+
+    for (const [selector, declaration] of [
+      ['.roomLog', /overflow-y:\s*scroll/],
+      ['.txt-area', /./],
+      ['.chatTabs', /./],
+      ['.counterBadge', /./]
+    ] as const) {
+      expect(
+        extraChatRules.some((text) => text.includes(selector) && declaration.test(text)),
+        `app-extra-chat ${selector} is not a rule this browser holds`
+      ).toBe(true);
+    }
+
+    /*
+      And the class USM-18 binds is styled by NOTHING, here as in the capture. Asserted over every
+      rule rather than over one sheet, because the way this would break is somebody adding it to
+      `app.css` to "finish" the feature.
+    */
+    expect(
+      rules.some((text) => text.includes('chat-uploaded-img-sm')),
+      'a rule was invented for a class the reference leaves dead'
+    ).toBe(false);
+  });
+});

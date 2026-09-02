@@ -415,9 +415,28 @@ handoff, because the SvelteKit 3 migration to `goto(…, { shallow: true })` bro
 condition its own comment documented — that call does not update `page.url`, so the guard re-read the
 token forever.
 
-**THE SETTINGS ENUMERATION IS DOWN TO ONE UNBUILT FEATURE** — measured 2026-08-28, not inherited.
-`enableDiscord` needs a Discord application registration, which is the owner's call because there is
-nothing to link accounts to until one exists. `altChatRender` was the fifth and is BUILT.
+**THE SETTINGS ENUMERATION IS DOWN TO ONE UNBUILT FEATURE** — measured 2026-08-28, re-measured
+2026-09-02, not inherited. `altChatRender` was the fifth and is BUILT; `smallerImagePreview` was the
+sixth and is BUILT (USM-18, 2026-09-02, after three weeks recorded as NOT A GAP on a premise that did
+not survive re-reading).
+
+`enableDiscord` is the one that stands, and the re-read makes the blocker sharper rather than
+weaker. Three occurrences in the bundle, and all of the behaviour behind them is a round trip to a
+server this deployment does not have:
+
+* `sessData.enableDiscord && !globals.discordState.discordChecked && checkDiscordAuth()` on session
+  load (byte 2,241,709) — `GET ${apiROOT}/discord/v2/status?token=…` (byte 1,160,297);
+* `doDiscordAuth()` — `GET ${apiROOT}/discord/v2/auth/start?token=…` (byte 1,160,186);
+* two presenter-only slots in the settings modal, `O(19, …)` and `O(291, …)` at bytes 2,283,599 and
+  2,288,443, both gated `isPresenter && sessData && sessData.enableDiscord`;
+* `discordState` — six fields initialised at byte 981,233 (`discordChecked`, `discordLinking`,
+  `discordConnected`, `discordUserId`, `discordUsername`, `discordLinkedAt`).
+
+So it is not one blocker but two, and neither is markup: a Discord APPLICATION REGISTRATION (there is
+nothing to link accounts to until one exists — the owner's call) and the `/discord/v2/*` endpoints
+that registration would be reached through. Transcribing the client half alone would ship a
+presenter-only control whose single action is a request that 404s, which is the same shape `SC-05`
+is refused for.
 
 **`hasAlertScheduler` is BUILT, and its blocker named the wrong process.** "A scheduler process in
 `services/api`" is true of that crate and is not where this belongs: the reference's scheduler is its
@@ -708,7 +727,7 @@ orphaned action is deleted, and the actions export is nineteen to eighteen.
 
 | item | spec | note |
 | --- | --- | --- |
-| `presAreaTabs-recordings` — **NOT BUILT, blocker named** | `docs/decoded/missing-commands-triage.md` | NOT cheap after all. The reference's pane is one iframe onto a SERVER archive page; verified 2026-08-17 that there are **zero recordings/archive tables in either database** — `rooms.archived_at` is a per-room flag, not an archive — so the tab would front nothing. Needs an archive service first: a design decision, not a port |
+| `presAreaTabs-recordings` — **NOT BUILT, blocker named** | `docs/decoded/missing-commands-triage.md` | NOT cheap after all. The reference's pane is one iframe onto a SERVER archive page, `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` (byte 1,959,918), gated on `archivesAvailableTo() && sessData.recsInRoom` (bytes 2,016,835 and 2,017,632) — re-read 2026-09-02 and character for character what three other rows already carry. **The blocker holds and its wording is corrected in the same pass:** it said *"zero recordings/archive tables in either database"*, and `chat_archives` has existed since `861a462` on 2026-08-29. What is zero is a RECORDINGS table — a media archive — so the tab still fronts nothing, and a reader must not conclude from the old sentence that chat archiving has no storage either. Needs an archive service first: a design decision, not a port |
 | Alert Labels — **BUILT BOTH HALVES; this row's blocker was FALSE, found 2026-08-31 by trying to build it** | `docs/decoded/alert-scheduler-filter-labels.md` | The row said the picker was *"an evidence gap, not a port … that branch never rendered in any capture we hold and there is no markup to match"*, and named `hiddenCapabilityBranches` as the reason. The DOM-capture half is true and the CONCLUSION does not follow: **the compiled template is in the pinned bundle**. `zTe` at byte **2,119,145** is the per-label row (`div.form-check` > `input.form-check-input#alert-trade-label-{i}` + `label[for]` showing `e.name` with a trailing `?`), `GTe` at 2,119,525 repeats it over `globals.alertLabels`, the gate is `O(62, …length > 0 ? 62 : -1)` at 2,138,428, and `processAlertLabels` at 2,131,295 is the `" #"+hash` prefix rule. Decoding compiled templates is how this entire repository was built, so "no rendered capture" was never the same claim as "no markup to match". **It is built**: `PostAlertModal.svelte:518-553` carries the transcription with those offsets, `alertLabelPrefix` is in `alert-labels.ts`, and `alert-label-picker-contract.test.ts` holds it |
 | Alert Scheduler | same | **BUILT 2026-08-29 — removed from "ready to build".** This cell said *"The entitlement IS captured and IS in the schema — `hasAlertScheduler` … but it is `wired: false`, so nothing in the room reads it."* Measured: `hasAlertScheduler` is **`wired: true`**, and the feature ships as `scheduled-alert.ts`, `server/scheduled-alerts.ts`, `routes/scheduled-alerts.remote.ts`, `components/ScheduledAlerts.svelte` and the sweeper `startAlertScheduler`, under `scheduled-alert-contract.test.ts`. `NEW-TODO.md` §5.3 carried the same stale claim and was corrected the same day — two trackers describing one feature, and both wrong in the same direction |
 | Benzinga — **BUILT BOTH PLACES, 2026-08-29** | `NEW-TODO.md` §2.2 | This cell said the const-table pass *"found nothing to change"*. It found a whole surface: **Benzinga renders TWICE upstream.** Two of the three render functions are the sidebar component compiled twice (`mPe` 2,467,533, `_Re` 2,563,731); the third, **`PPe` at 2,473,150**, is a different element in a different container with different classes — the NAVBAR item — and only the sidebar one existed here. The indices were parsed with a string-aware walker rather than counted, because an index is per component and the sidebar's `li` is index 32 of a table where that means a generic `nav-item`. Both honest gaps stand and are recorded at the code: the default url is built from three values this room does not have, and `assets/images/benzinga-logo.png` is verified absent — which is why the navbar item, being image-ONLY upstream, renders only when the room supplies a logo rather than shipping a broken `<img>` |

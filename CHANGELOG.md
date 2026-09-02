@@ -45,6 +45,311 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 23:01 UTC — "Get my token", and a reason that was true of the reference and false of this room
+
+`d76b1a7`. `INERT_ACTIONS` is down to **three**, and none of the three is unbuilt work: two need a
+server-side recorder this deployment does not have, and `disable-private-chat` is a MATCH — the
+reference renders that button with no click binding at all.
+
+`get-my-token` carried TWO recorded reasons for being refused, and only one survived re-measurement.
+
+**UPHELD, and now on screen instead of in a comment.** `globals.sesionToken` is the session
+credential. This room's cookie is `httpOnly`, so reproducing that field means the SERVER writing an
+`httpOnly` value into the DOM — turning a cookie an XSS cannot read into a string it can. The token
+input renders **disabled and empty with the reason beside it**, which is the shape
+`stream-player-blocked-contract.test.ts` already sets for a control that cannot honestly work.
+Deleting the field instead would leave a member looking for their session token with no answer at all.
+
+**WITHDRAWN.** The entry also said *"`globals.sessionID` is the room code, already visible in the
+address bar, so a dialog showing only that is a control whose only effect is repeating what the URL
+says."* The first clause is right and was confirmed — `globals.sessionID = e` in `loadGlobals(e)` at
+byte **1,148,131**, called with `new URLSearchParams(location.search).get("id")` at **2,600,589**,
+one assignment in the whole bundle. The second is true of the REFERENCE and **false of this room**:
+our address is `/`, the short code lives on the session row server-side, and
+`routes/session/+page.svelte` strips even the handoff token from the bar. Nothing on screen tells a
+member which room they are in, so the field that merely echoed the URL upstream is the only answer
+here to "which room am I in" — which is what somebody reporting a problem needs.
+
+A reason that is true of the reference and false of this room is precisely the failure
+`user-action-intent.ts` exists to catch, and it caught itself only because the row was re-measured
+rather than read.
+
+**Runtime impact.** The user-settings modal's "Get my token" button did nothing at all — no command,
+no toast, no console line. It opens a dialog.
+
+**Two more divergences, both forced.** Upstream copies with an inline
+`onclick="navigator.clipboard.writeText('${e}')"` INSIDE its interpolated `message` — a value
+crossing into executable attribute text, which is a stored-XSS primitive the moment either value can
+contain a quote — and ends in `alert(…)`, forbidden here by name. Both are ordinary Svelte, and a
+clipboard refusal (an insecure origin, a permissions policy) is **said out loud** rather than silently
+doing nothing, which upstream's handler has no branch for.
+
+**Mounted from `RoomOverlays` and not `ModalHost`, and the size ratchet is why.** `ModalHost.svelte`
+is at its ceiling and this repository spent the previous week moving modals OUT of it (`ReplyModal`,
+`ConnectivityModal`). Putting a component that was born extracted back inside it, to save seventeen
+lines, would have been the wrong direction chosen by a number.
+
+**Four negative controls seen red, and one caught a vacuous assertion of my own.** The `disabled`
+check sliced a fixed 200 characters from `id="sessionToken"` and was being satisfied by the **Copy
+button** rather than the input it named — the same shape as the archives-gate defect found this
+morning, twice in one day. Both are now pinned to the element they name.
+
+**Five gates caught the change and each was answered rather than silenced.** The one worth naming is
+`session-cookie-httponly-contract`, which flagged `id="sessionToken"` in the new component — correct
+by its letter and wrong by its purpose, since an `id` attribute cannot carry a value. Fixed by
+stripping `id=` / `for=` attribute values before the sweep, which is a **general rule rather than a
+per-file exemption**: a variable, a property read or an interpolated `value={sessionToken}` still
+trips it, and the control for that lives in the new contract. The others were the modal-naming census
+(24 → 25, and the self-referential ten untouched for the third time running), the two surface-audit
+scopes, `slice-anchor-contract` (two unasserted `indexOf` bounds in my own test) and the size ratchet.
+
+**Verified:** both gates exit 0. `svelte-check` 1646 files, 0 errors. `svelte-autofixer` clean. Nine
+assertions in `session-info-modal-contract.test.ts`, rendered through SSR rather than read as text —
+a source search would pass on a field inside an `{#if}` that never opens.
+
+**Not verified, and named: no browser was opened on this dialog.**
+
+
+### 2026-09-02 22:33 UTC — the transcript window, and the second reason it was blocked
+
+`22e71e9`. **The commit that closed the tracker row for this work, `8347c13`, cites the hash
+`4d21b13` for it, and no such commit exists** — the TIMESTAMP in this heading was read with
+`git show -s --format=%cI` as the rule at the top of this file requires, and the hash beside it in
+that message was written from memory rather than read. Corrected here rather than by rewriting a
+pushed message, because the rule this file states is that a number is measured or it is wrong, and
+that applies to my own citations first.
+
+`TODO.md` gap 18 is CLOSED, five hours after its first reason was withdrawn as false. Both halves of
+that day are the record: the morning corrected what the row said, and the evening found that the
+OTHER document blocking it was resting on the same kind of mistake.
+
+**The reason in `reference-const-coverage-contract.test.ts`** listed all twenty-seven of
+`app-session-transcript`'s const values as unbuilt because building the viewer *"means first deciding
+to record every spoken word of every session to disk. In a multi-tenant fintech application that is a
+retention, consent and jurisdiction question and it belongs to the owner, not to a sweep closing a
+gap."* The observation is right and is **not** withdrawn. The conclusion was wrong on two counts:
+
+- **It is what the reference does.** Its own client proves its server holds a transcript —
+  `getSessionTranscripts(token, {startDate, page, limit})` posting to
+  `${apiROOT}/sessions/v2/getSessionTranscript`, byte **1,151,135**. Storing lines this room already
+  receives is matching, not a new product decision.
+- **Nothing is recorded that was not already being broadcast.** The write sits inside
+  `beginSpeechRecognition`'s own `onresult`, downstream of all three gates that decide whether a word
+  is captioned at all — the room's `hasSpeechRecognitionDisabled`, the presenter's `doSpeechReco`, and
+  `isPresenter()`. A room that never captions never gets a row. That is asserted **structurally**, by
+  the write's position relative to the guard, and the negative control moved it above and saw it red.
+
+What the owner's decision genuinely governs is **retention** — how long the rows live. Recorded as an
+open question at the table, not answered.
+
+| built | what it is |
+| --- | --- |
+| `session_transcripts` | one room's FINAL caption lines, indexed `(room_short_code, spoken_at)`. The read is one day, 300 rows to a page — upstream's own shape, and what keeps it from growing with the room's history |
+| `server/session-transcript.ts` | the store. `[dayStart, dayEnd)` half-open so a boundary row belongs to exactly one day; newest-first with an id tiebreak, so offset paging is a partition rather than a thing that repeats and drops rows |
+| `routes/session-transcript.remote.ts` | the write (presenter-only) and the read (archives-gated, failing closed on a config the controller could not answer) |
+| `routes/session-transcript/+page.svelte` | `SessionTranscriptComponent`, byte **2,607,394**, transcribed whole: the date picker and its `yyyy-MM-dd` round trip, `formatDate`'s 12-hour clock, the client-side search over `text` and `speaker`, the five navigation buttons rendered twice, and the three-way loading/error/list state machine |
+
+**Runtime impact.** The caption overlay's "Full Transcript History" button opened a dialog saying the
+page was unavailable; it opens the page. A presenter's speech in a room with captions enabled is now
+durable and readable a day at a time.
+
+**ONE DIVERGENCE, AND IT IS A REFUSAL.** Upstream opens
+`#/session-transcript?token=${globals.sesionToken}&name=…`. Ours opens `/session-transcript` with no
+query string: a session credential in an address bar is also in browser history and in every outbound
+`Referer` — the refusal already recorded for the Benzinga default URL. The window is same-origin, so
+the server re-derives the room, the caller **and the room's name** from the session cookie. Nothing
+about a transcript is asserted by the caller — not the room, not the speaker, not the session.
+
+**The write had to go on the SPEAKER's side.** Every browser in the room receives the relayed line, so
+writing where the caption ARRIVES would store one row per listener per sentence. Both shapes "work";
+only one of them stops filling a table.
+
+**Nine negative controls seen red across two contracts, and one found a defect in my own test.** The
+archives gate's assertion was being satisfied by the fail-closed branch's identical 403 message, so
+deleting the gate entirely left it green — the vacuous pass this repository has now met five times.
+Pinned to its own condition.
+
+**Six gates caught the new files, and each was answered rather than silenced.**
+`orphaned-comment-contract` (a docblock with no code under it); `error-page-contract` (124 → **126**
+`error(…)` doors, restated with which two and why); `todo-next-coverage-contract` (a new surface is
+unaudited scope until the table says so — and it found two OTHER rows that had drifted,
+`routes/+page.svelte` and `routes/+error.svelte`); `slice-anchor-contract` (four inlined `indexOf` in
+my own test, bound to asserted locals instead, because `slice(-1)` takes the last character rather
+than failing); `source-size-contract` (five ceilings, each argued at its entry); and
+`reference-const-coverage-contract` — **108 → 81 residuals, its largest single fall**, forty-one → 42
+components fully covered, and group one ("surfaces this room has not built at all") is now EMPTY with
+a gate that keeps it that way.
+
+Twenty-six of those twenty-seven values were on the UNEXAMINED side of that file's split. The largest
+unbuilt surface in the reference had never been named by anyone before a sweep found it.
+
+**Verified:** both gates exit 0, run once each immediately before the push. `svelte-check` 1644 files,
+0 errors, 0 warnings. `svelte-autofixer` clean — it flagged a mutated `Date` and the fix was to stop
+mutating rather than to import `SvelteDate` for a throwaway local, which would have been a reactive
+wrapper with no reactive reader. `session-transcript.test.ts` drives the store against the real
+database: 7 cases, four controls red.
+
+**Not verified, and named: no browser was opened on this page.** The e2e suite has no case for it, and
+what would exercise the read end to end is a room with real captions in it.
+
+
+### 2026-09-02 21:32 UTC — seven evidence-gap rows were stale, and two comments were the only evidence they stood on
+
+`apps/room/TODO.md`'s evidence-gap table had not been swept this session. Seven rows were
+re-measured against the pinned v4 bundle (`docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`,
+2,891,205 bytes) and against the current source. **All seven were stale in the safe direction —
+built, or answered — and none of them was closed by work done today.** They moved to
+`docs/RESOLVED-ARCHIVE.md` with the measurement that closes each; the rows are deleted from `TODO.md`
+rather than struck through.
+
+| gap        | recorded                                                       | measured 2026-09-02                                                                                                                                                                                                                             |
+| ---------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **4 / 12** | "`O(83, …)` is the only reference"; "Not built"                | the bundle holds **nine**, three decisive: the button template at **1,946,166**, the sender at **1,977,411**, the room-state seed at **1,966,551**. `FilesPane.svelte:299` renders it gated on `isPresenter && mp3Playing`. Filed twice, built once. |
+| **5**      | "`app-privchatscroller` is a stub … writes an empty file"      | `PrivateChatPanel.svelte:474-495` renders `{#each log as message (message._id)}` with both paging branches; `loadLog` pages, settles `#paging` and dedupes on `_id`. `downloadLog()` maps over populated rows.                                     |
+| **10**     | "those two entry points are not built"                         | the roster path ships end to end. The user-info modal's copy is dead **upstream** too: `O(18, o.canPM && o.checkIsMe() ? 18 : -1)`, and `checkIsMe()` is true only when the target is NOT me (**2,087,485**).                                     |
+| **11**     | "no image sharing inside a private thread"                     | `beginImageUpload` / `confirmImagePaste` (from byte **2,212,274**) over an injected uploader. What remains is the empty `PUBLIC_PTR_UPLOAD_SERVER`, which is gap 7 and not per-feature.                                                            |
+| **24**     | "WHICH element calls it has not been located"                  | **not work.** All eight occurrences read; **no `x("click", … giveMicScreen …)` exists** anywhere in the bundle. A button would be a control the reference does not render.                                                                        |
+| **29**     | "Five of seven membership fields are dropped"                  | all six are consumed, and the three media ones are decided on the **server** (`/api/media/grant` reads the controller's membership), which is the divergence that matters.                                                                        |
+
+**Gap 18's reason was false and is withdrawn rather than closed.** It read *"nothing in this repo
+produces a transcript: `currentCaption` is never assigned … neither half is wired"*. All three halves
+are wired and were read end to end: `room/recording.ts:457` sends, `services/media/src/server.rs:1412`
+relays as `speechReco`, `room/media-transport.svelte.ts:734` receives, and `+page.svelte:648` commits
+every FINAL line to a 500-entry `captionHistory` the caption overlay already renders. What is missing
+is a transcript the **server** holds: the control opens a NEW WINDOW, which can read none of this
+tab's memory. The reference's own URL cannot be matched either — `#/session-transcript?token=${sesionToken}`
+puts the controller's session credential into an address bar, browser history and every outbound
+`Referer`, the refusal already recorded for the Benzinga default URL. The row stays open with the two
+pieces that would close it.
+
+**Runtime impact: one user-facing sentence changed.** `TRANSCRIPT_UNAVAILABLE` said *"speech
+recognition results are not being captured, so there is nothing to open"* — untrue, and it pointed a
+presenter away from the history that exists. It now names the window boundary and sends them to the
+overlay's history button. Nothing else here reaches a running room.
+
+**Two comments in shipped source were the origin of two of those rows.** `private-chat.svelte.ts`'s
+`downloadLog` docblock claimed the log "is still a stub here"; `alerts-pane.ts` claimed the caption
+relay was unbuilt. A comment asserting a feature is MISSING is the one kind that never fails a build,
+so both outlived their gap by weeks and seeded the same false claim into the tracker, where it stood
+as a blocker. That is why both size-ceiling raises here — `alerts-pane.ts` 332 → 344 and
+`private-chat.svelte.ts` 1148 → 1154 — are **entirely prose**, and each is argued at its own entry.
+
+**Verified:** `svelte-check` 1640 files, 0 errors, 0 warnings. `source-size-contract.test.ts` 683
+passed, and the `alerts-pane.ts` raise's **negative control was seen RED** at 343 before the ceiling
+was restored. The four private-chat suites pass (133 assertions). `prettier --check` clean on both
+documents, which were clean before the edit and were reformatted after it.
+
+**Not verified, and named:** `files-pane-contract.test.ts` and `roster-private-chat.test.ts` — the
+guards cited for gaps 4 and 10 — are two of the forty-two evidence-bound files
+`gate/evidence-bound-tests.mjs` excludes in this checkout. `discoverEvidenceBoundTests()` was called
+and both came back in its list. Those two closures rest on the SOURCE having been read and on the byte
+offsets, not on a green tick, and the archive entry says so at the top.
+
+
+### 2026-09-02 21:17 UTC — the room was opened in a browser, and the CSS changes were verified there
+
+**Runtime impact: NO.** One new end-to-end case and one config docblock. What changed is what this
+file is allowed to claim: every verification note today said *"nothing was opened in a browser"*, and
+that was an inherited belief rather than a measurement.
+
+## The e2e suite runs in this container, and did not because of one symlink
+
+`pnpm run test:e2e` failed on every spec with
+
+> `browserType.launch: Executable doesn't exist at
+> /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell`
+
+Not a harness problem and not an application problem: **Playwright 1.62.1 asks for Chromium build
+1234 and the image ships 1194**, with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, so nothing fetches the
+missing one. One symlink from the expected path to the installed `headless_shell` and the suite runs
+green. **15 passed** on the first real run — the room shell, the login handoff, a refused handoff,
+the dropdowns, the private-chat scroll rules, the room-config seam and the note-carousel CSSOM.
+
+The fix belongs in the environment and not in `playwright.config.ts` — pinning an `executablePath`
+there would make CI launch a binary the runner does not have — so it is written into that file's
+docblock as the recipe. It is recorded because the failure names a PATH and not a CAUSE, and reads
+exactly like *"the browser cannot run here"*, which is how a session decides browser verification is
+unavailable and writes it off for the rest of the day. That is the third blocker today that was an
+inference wearing a measurement's clothes.
+
+## And it verified the two stylesheet changes, which nothing else could
+
+A 16th case, in `room-renders.spec.ts`, reads the browser's own CSSOM:
+
+* **XCP-09** — the generated `captured-extra-chat.css` is asserted as TEXT by
+  `extra-chat-styles-contract.test.ts`, and text is exactly what a stylesheet is not. The selectors
+  it ships are the kind a parser drops SILENTLY —
+  `app-extra-chat .roomLog:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *)`, a `:not()`
+  containing a compound `:is()` with a descendant combinator, legal in Selectors 4 and in nothing
+  before it. A browser that refused it would discard the whole rule with no error, the second chat
+  column would render unstyled exactly as before the generator existed, and every assertion about
+  that file would stay green because they are all about its bytes. **Measured: 20+ rules addressing
+  `app-extra-chat` are live in the CSSOM**, `.roomLog` among them with `overflow-y: scroll`, plus
+  `.txt-area`, `.chatTabs` and `.counterBadge`. `cssText` is the browser's re-serialisation of a rule
+  it ACCEPTED; a rejected rule is not in that list at all.
+* **USM-18** — `chat-uploaded-img-sm` resolves to no rule in any stylesheet the page holds, which is
+  what the capture does and what must stay true. The way this breaks is somebody adding the rule to
+  `app.css` to "finish" the feature, and that is now caught in the only place it can be seen.
+
+Two negative controls seen red: the extra-chat import removed from `app.css` (the rule count
+collapses), and a `.chat-uploaded-img-sm` rule added to it (the absence assertion fires by name).
+Full suite re-run after restoring: **16 passed**.
+
+`pnpm run gate` exit 0.
+
+---
+
+### 2026-09-02 20:56 UTC — the last two blocked rows re-measured; both hold, both were imprecise
+
+**Runtime impact: NO.** Documentation and one contract docblock. The two rows this closes out are
+`presAreaTabs-recordings` and `enableDiscord` — the last two the trackers name that are not an owner
+decision, an environment or hardware — and neither turned out to be buildable. What was wrong in both
+was the WORDING of the blocker, which is the thing a future reader acts on.
+
+## `presAreaTabs-recordings` — the blocker holds, the sentence was false
+
+Re-read against the pinned bundle and every recorded detail matches: the tab click at byte 1,917,052,
+the pane's `<iframe [src]="getRecordingsUrl() | noSanitize">` at 1,930,515, the URL
+`${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` at 1,959,918, and the two-term gate
+`archivesAvailableTo() && sessData.recsInRoom` at 2,016,835 and 2,017,632. Building it is still a
+transcription and it still fronts nothing.
+
+**What was wrong is the phrase four documents repeated: *"zero recordings or archive tables in either
+database"*.** `chat_archives` has existed since `861a462`, 2026-08-29 — three months of chat archiving
+with its own table, its own index and its own contract. What is absent is a MEDIA archive. The old
+wording would have told the next reader that archiving has no storage at all, which is exactly the
+kind of sentence that gets acted on. Corrected in `TODO.md`, `NEW-TODO.md`,
+`missing-commands-triage.md`, `room-surface-audit-2026-08-30.md` and `IMPLEMENTATION-LIST.md` — all
+five, in one pass, because correcting the one that was noticed is how the other four go stale.
+
+## `enableDiscord` — one blocker was really two
+
+The row read *"needs a Discord application registration"*. True and incomplete. All three occurrences
+in the bundle lead to a server this deployment does not have:
+
+* `sessData.enableDiscord && !discordState.discordChecked && checkDiscordAuth()` on session load
+  (byte 2,241,709) → `GET ${apiROOT}/discord/v2/status?token=…` (1,160,297);
+* `doDiscordAuth()` → `GET ${apiROOT}/discord/v2/auth/start?token=…` (1,160,186);
+* two presenter-only settings slots, `O(19, …)` and `O(291, …)` at 2,283,599 and 2,288,443, both gated
+  `isPresenter && sessData && sessData.enableDiscord`;
+* `discordState`, six fields at 981,233.
+
+So it needs the registration AND the `/discord/v2/*` endpoints that registration is reached through.
+Transcribing the client half alone ships a presenter-only control whose single action is a request
+that 404s — the same shape `SC-05` is refused for, and worth saying because "needs a registration"
+reads like one procurement step away from buildable.
+
+## One claim this file will no longer make
+
+`setting-coverage-contract.test.ts` said `hasAlertScheduler` was *"the LAST buildable row of this
+enumeration"*. It was not: `smallerImagePreview` left the same list on 2026-09-02. The docblock now
+records both departures and stops making a claim about which is last, because that claim has been
+wrong twice and costs nothing to omit.
+
+`pnpm run gate` exit 0 in both apps.
+
+---
+
 ### 2026-09-02 20:44 UTC — a blocker written three times as an inference, and row 8 closed on a number
 
 **Runtime impact: NO.** No shipped behaviour changed. What changed is that a question recorded as

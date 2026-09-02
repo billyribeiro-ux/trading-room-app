@@ -308,9 +308,15 @@
    * `showSpeechRecoOverlay` preference. These are the overlay's own state: the line being spoken,
    * the transcript, and `speechRecoHistoryMode`.
    *
-   * `currentCaption` stays null until a recognition source exists. The capture drives it from the
-   * Web Speech API on the presenter's machine and relays results to viewers; neither half is wired
-   * here, and inventing captions would put words in a presenter's mouth.
+   * `currentCaption` is null until the first line arrives, and lines DO arrive: this comment used to
+   * say the relay was unbuilt — *"neither half is wired here"* — and all of it was wired.
+   * `room/recording.ts` runs the Web Speech API on the speaking presenter's machine and sends each
+   * result, `services/media/src/server.rs` relays it as `speechReco`, and
+   * `room/media-transport.svelte.ts` hands it back through `setCurrentCaption` below.
+   *
+   * An INTERIM result replaces the line being spoken; a FINAL one is also pushed to
+   * `captionHistory`, which is what the overlay's history mode reads. Recognition revises the same
+   * sentence repeatedly as it hears more of it, so appending interims would show every draft.
    */
   let currentCaption = $state<{ timestamp: number; sender: string; text: string; live?: boolean } | null>(
     null

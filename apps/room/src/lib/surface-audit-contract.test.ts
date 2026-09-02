@@ -879,7 +879,13 @@ describe('app-room — audited 2026-09-01, the whole page', () => {
     expect(report.region.consts).toBe(229);
     expect(report.views.resolved).toBe(108);
     expect(report.views.unresolved).toEqual([]);
-    expect(files.length, 'a component was added or removed from lib/components').toBe(84);
+    /*
+      84 -> 85, 2026-09-02: `SessionInfoModal.svelte`. The scope of this audit is the page and every
+      component under `lib/components`, so a new component widens it — which is why the count is
+      asserted rather than the glob simply being trusted. The three numbers above did NOT move,
+      which is the check that the new file adds no unresolved reference const to `app-room`.
+    */
+    expect(files.length, 'a component was added or removed from lib/components').toBe(85);
   });
 
   it('has five const values left, and every one is on record', () => {
@@ -952,7 +958,8 @@ describe('app-presentationarea — audited 2026-09-01, the page s other giant', 
     expect(report.region.consts).toBe(292);
     expect(report.views.resolved).toBe(125);
     expect(report.views.unresolved).toEqual([]);
-    expect(files.length, 'a component was added or removed under lib/components').toBe(94);
+    /* 94 -> 95, 2026-09-02: `SessionInfoModal.svelte`, for the reason recorded on `app-room`'s. */
+    expect(files.length, 'a component was added or removed under lib/components').toBe(95);
   });
 
   it('is missing the RECORDINGS tab and NOTHING else', () => {

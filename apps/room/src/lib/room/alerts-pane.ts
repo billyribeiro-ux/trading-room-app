@@ -42,15 +42,38 @@ const DETACHED_ALERTS_MESSAGE =
  * ```
  *
  * Both controls were dead links - no handler at all on the menu item, no button on the overlay.
- * They now report the same thing, honestly: there is no transcript page to open, because nothing
- * in this repo produces a transcript. `currentCaption` is never assigned (the Web Speech API runs
- * on the presenter's machine in the capture and the results are relayed over the socket; neither
- * half is wired here), so `lastSpeechReco` has no source and the page would render an empty
- * document. Recorded in TODO.md rather than papered over with a route that always says "empty".
+ * They reported the gap honestly for three weeks, and on 2026-09-02 the gap was closed rather than
+ * re-worded - twice, because the FIRST rewrite that day was also wrong.
+ *
+ * ## What the refusal used to say, and why both versions of it were false
+ *
+ * It began as *"`currentCaption` is never assigned … neither half is wired here"*. Every half was
+ * wired and was read end to end before this was touched: `room/recording.ts:457` sends,
+ * `services/media/src/server.rs:1412` relays it as `speechReco`, `room/media-transport.svelte.ts`
+ * receives it, and `+page.svelte` keeps the last 500 FINAL lines for the caption overlay.
+ *
+ * It was then rewritten to say the captions were held in this window only - true that morning, and
+ * true only because nothing stored them. `session_transcripts` and `session-transcript.remote.ts`
+ * store them now, so the window HAS something to read and this opens it.
+ *
+ * ## The URL is ours, and the difference is a refusal rather than a shortcut
+ *
+ * Upstream opens `#/session-transcript?token=${globals.sesionToken}&name=…`. Ours opens
+ * `/session-transcript` with nothing in the query string. A session credential in an address bar is
+ * also in browser history, in every outbound `Referer` and in any screenshot of the window - the
+ * same refusal `TODO.md` records for the Benzinga default URL. The window is same-origin, so it
+ * arrives with the room's own session cookie, and the server re-derives both the room and the
+ * caller from it rather than believing a parameter.
+ *
+ * The reference's own guard - *"No session token available for transcript"* - therefore has nothing
+ * to guard here and is deliberately not reproduced: there is no token to be missing.
+ *
+ * `_blank`, as upstream. `noopener` is added and upstream has no equivalent: without it the opened
+ * page gets a live `window.opener` handle back into the room, which is a navigation primitive over
+ * the tab holding the session. Upstream in fact USES `window.opener` (it posts
+ * `transcriptWindowClosing` back), and that is the one piece of its behaviour not transcribed -
+ * nothing here listens for that message, so the handle would be a capability with no consumer.
  */
-const TRANSCRIPT_UNAVAILABLE =
-  'The transcript page is not available in this room: speech recognition results are not being captured, so there is nothing to open.';
-
 const alertExportFormatter = new Intl.DateTimeFormat('en-US', {
   year: '2-digit',
   month: 'numeric',
@@ -237,7 +260,7 @@ export class RoomAlertsPane<Row extends ExportableRow> {
   }
 
   openTranscript() {
-    this.#dialogs.alert = TRANSCRIPT_UNAVAILABLE;
+    window.open('/session-transcript', '_blank', 'noopener');
   }
 
   /**

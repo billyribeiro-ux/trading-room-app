@@ -788,7 +788,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       next reader will see the same warning and the alternative it proposes cannot write to a
       server.
     */
-    max: 1918,
+    /*
+      1918 -> 1925, 2026-09-02, and every line is prose. `currentCaption`'s docblock asserted the
+      caption relay was unbuilt — *"neither half is wired here, and inventing captions would put
+      words in a presenter's mouth"* — while `setCurrentCaption` sat eleven lines below it, fed by
+      `media-transport.svelte.ts`, fed by `services/media`. It is the third comment corrected today
+      that claimed a feature was missing and was the only evidence a tracker row stood on.
+    */
+    max: 1925,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   /*
@@ -833,7 +840,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       one string; a second status rule, or anything that reads room state, is the signal that a page
       whose whole job is to work when everything else failed has started depending on things.
     */
-    max: 159,
+    /*
+      159 -> 164, 2026-09-02. Five lines, all in the docblock that states this page's own premise:
+      the count of `error(<status>, …)` doors it exists for went 124 -> 126 when the transcript's
+      two 403s landed, and `error-page-contract.test.ts` re-derives that number on every run rather
+      than trusting the paragraph. The added sentence says which two and why, because a number
+      restated with no reason is the next one somebody assumes was always that.
+    */
+    max: 164,
     why: 'the page every refusal in this app lands on, including a closed room'
   },
   {
@@ -903,6 +917,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 732,
     why: 'the entry door: handoff, token strip and the login form'
+  },
+  {
+    file: 'routes/session-transcript/+page.svelte',
+    /*
+      Capped at the size it landed, 2026-09-02, the day it was written.
+
+      THE TRANSCRIPT WINDOW — `SessionTranscriptComponent`, bundle byte 2,607,394. A date picker, a
+      client-side search, 300-row server paging, five navigation buttons rendered twice, and the
+      three-way loading/error/list state machine, all transcribed rather than designed.
+
+      What makes a ceiling worth having here is that almost none of it is logic: the reference's own
+      component is small, and this one is larger only because every transcribed number carries the
+      byte it came from. If this file grows it will be because behaviour was added, and behaviour
+      added to a transcribed surface is a divergence that should have to argue for itself at this
+      line.
+    */
+    max: 472,
+    why: 'the transcript window; a transcription, so growth here means a divergence'
   },
   {
     file: 'lib/room/chat-log-save.ts',
@@ -1225,7 +1257,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       scroller's height. HERE and not in `RoomAlerts` for the reason that one gives — the scroller is
       this file's element.
     */
-    max: 332,
+    /*
+      332 -> 344, 2026-09-02, and every one of the twelve is prose. `TRANSCRIPT_UNAVAILABLE`'s
+      docblock asserted the caption relay was unbuilt — *"neither half is wired here"* — and all
+      three halves were wired: the send at `room/recording.ts:457`, the relay at
+      `services/media/src/server.rs:1412`, the receive at `room/media-transport.svelte.ts:734`.
+
+      The raise buys the correction AND the reason the correction was needed, which is the part
+      worth twelve lines: a comment claiming a feature is MISSING is the one kind that never fails
+      a build, so it outlived the gap and seeded the same false claim into `TODO.md`'s evidence-gap
+      table, where it sat as a blocker for three weeks. The rewritten block names what is actually
+      missing (a server-held transcript) and why the reference's URL cannot be matched.
+    */
+    /*
+      344 -> 356, 2026-09-02, LATER THE SAME DAY as the raise above it, and the second raise is the
+      more interesting one: the first bought a corrected refusal, and this one deletes the refusal
+      entirely. `TRANSCRIPT_UNAVAILABLE` is gone and `openTranscript` opens
+      `routes/session-transcript/+page.svelte`. The prose that replaces it records both wrong
+      versions of the reason, because a control that refused for three weeks on a blocker that did
+      not exist is the failure mode this file's comments are for.
+    */
+    max: 356,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
@@ -1263,7 +1315,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `arm()` and none had the release beside it, so each one-line `if` became a block carrying both
       calls and the citation for why they belong together. Three feeds, one mechanism, again.
     */
-    max: 343,
+    max: 344,
     why: 'the scroll and paging mechanism - three feeds, one set of moving parts'
   },
   {
@@ -1444,7 +1496,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       different flags and different lifetimes, and the entry that recorded them as one is what let
       the card stay inert for as long as it did.
     */
-    max: 472,
+    /*
+      472 -> 511, 2026-09-02, for the transcript's DURABLE half.
+
+      Six lines of code — an `isFinal` branch, the injected collaborator and its field — and the
+      rest is the reason, which is the part worth keeping: the write must sit on the SPEAKER's
+      recognition callback, because every browser in the room receives the relayed line and writing
+      from the receiver would store one row per listener per sentence. That is a bug nothing here
+      would have caught, since both shapes "work" and only one of them stops filling a table.
+    */
+    max: 511,
     why: 'MediaRecorder, the preview window, the room-wide broadcast, the two speech calls and auto-record'
   },
   {
@@ -2223,7 +2284,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `defaultImagePreview` reaching `ModalHost` for USM-18. No prose — the argument is at the
       checkbox that reads them.
     */
-    max: 1243,
+    /*
+      1243 -> 1260, 2026-09-02. Seventeen lines: one import, a five-line mount, and eleven of
+      comment explaining why the mount is HERE rather than in `ModalHost.svelte`, where every other
+      named modal lives.
+
+      That is the size ratchet doing exactly what it is for. `ModalHost.svelte` is at its own
+      ceiling and this repository spent the previous week moving modals OUT of it — `ReplyModal`
+      and `ConnectivityModal` were both born that way. Putting a component that was born extracted
+      back inside it, to save seventeen lines here, would have been the wrong direction chosen by a
+      number. This file is the overlay mount point; it already holds `modals` and `data`.
+    */
+    max: 1260,
     /*
       821 -> 823, 2026-08-29. Two lines: `canManageNotes={userActions.canManageNotes}` and the
       one-line note saying only the class that asked the controller can know it.
@@ -5846,7 +5918,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The number follows the code rather than being left where it was: a ceiling parked above the
       real figure reads like a limit while licensing every line back.
     */
-    max: 892,
+    /*
+      892 -> 909, 2026-09-02. One handler branch and its reason: `get-my-token` stopped being inert.
+
+      The branch itself is two lines — `#openModal('session-info')` and a return. The other fifteen
+      record why upstream's `$("#user-settings-modal").modal("hide")` needs no equivalent here (a
+      single-slot modal host closes the other one by opening this one) and point at the component
+      that carries the refusal, so the next reader of this branch is not left wondering where the
+      other half of the reference's dialog went.
+    */
+    max: 909,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -5996,7 +6077,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       senders each holding their own copy of `canPost` is the shape this repository refuses one
       level up — the class's own comment already argues it for the client-versus-server split.
     */
-    max: 1148,
+    /*
+      1148 -> 1154, 2026-09-02. Six lines, all prose, in `downloadLog`'s docblock — which claimed
+      "the private-chat message log itself is still a stub here, so this currently writes an empty
+      file". It stopped being true when `.pc-messages` got its `{#each}` and `loadLog` got its
+      paging; nothing failed, because a comment cannot. The replacement records that it writes
+      `this.log`, and records the failure mode, because this file is now the second place today
+      where a stale "not built" comment was the only evidence a tracker row was standing on.
+    */
+    max: 1154,
     why: 'the private-chat panel; generic over the roster row so the full row reaches selectRosterUser'
   },
   /*
@@ -7931,6 +8020,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 218,
     why: 'the public reply to one message - its composer, its picker and its image path'
+  },
+  {
+    file: 'lib/components/SessionInfoModal.svelte',
+    /*
+      Capped at the size it landed, 2026-09-02, the day it was written.
+
+      "Session Information" — `getMyToken()`, bundle byte 2,255,348. Two fields, two Copy buttons,
+      one Close, and the reference's whole dialog is one interpolated HTML string.
+
+      Most of this file is prose, and deliberately: HALF the dialog is refused, and a refusal with
+      no recorded reason is the thing somebody deletes as an oversight. The token field would mean
+      the server writing an httpOnly cookie into the DOM. Growth here should be argued, because the
+      only two directions it can grow are reproducing more of a dialog that is already complete, or
+      softening a refusal.
+    */
+    max: 168,
+    why: 'the Session Information dialog; half of it is a refusal, and the reason is the file'
   },
   {
     file: 'lib/components/RoomBranding.svelte',

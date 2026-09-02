@@ -1349,3 +1349,65 @@ export const presenterColors = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.roomShortCode, table.senderEmailHash] })]
 );
+
+/**
+ * `getSessionTranscript` — one room's closed-caption lines, kept so a SEPARATE WINDOW can read them.
+ *
+ * ## Why a table exists at all, and why the row that asked for it was wrong
+ *
+ * `TODO.md` gap 18 recorded this as blocked because *"nothing in this repo produces a transcript:
+ * `currentCaption` is never assigned … neither half is wired"*. Every part of that was false by
+ * 2026-09-02 and was re-measured then: `room/recording.ts` sends each result, `services/media`
+ * relays it as `speechReco`, `room/media-transport.svelte.ts` receives it, and the page keeps the
+ * last 500 FINAL lines in `captionHistory` for the caption overlay.
+ *
+ * What was actually missing is this table. `captionHistory` is one browser tab's memory, and the
+ * reference's "Full Transcript History" control opens a NEW WINDOW — which can read none of it. The
+ * reference's own server holds the transcript, which its client proves at bundle byte **1,151,135**:
+ *
+ *   getSessionTranscripts(token, {startDate, page, limit}) ->
+ *     POST `${apiROOT}/sessions/v2/getSessionTranscript`
+ *
+ * So a server-held transcript is what MATCHES, not a divergence.
+ *
+ * ## Only FINAL lines land here
+ *
+ * The Web Speech API revises the same sentence repeatedly as it hears more of it, which is why
+ * `media-transport.svelte.ts` distinguishes an interim result from a final one and why
+ * `+page.svelte` commits only finals to its history. Writing interims would store every draft of
+ * every sentence — many rows per utterance, all but the last of them wrong.
+ *
+ * ## What bounds the read, which is the question `CLAUDE.md` asks of every new read path
+ *
+ * The index is `(room_short_code, spoken_at)` and the reference's own page asks for ONE DAY at a
+ * time, 300 rows to a page, with the day sent as `startDate`. That is an index range scan whose
+ * size is one room's speech on one date — not a scan that grows with the room's whole history. The
+ * page's date picker and its `Load Previous Day` / `Load Next Day` controls exist precisely because
+ * upstream reads it this way.
+ *
+ * The TABLE does grow with usage, and nothing here truncates it. That is deliberate and it is
+ * recorded rather than solved: a transcript is a record of what a presenter said to paying members,
+ * so dropping old rows on a timer is a retention policy, and a retention policy is the owner's to
+ * set. `TODO.md` carries it as an open question rather than this file inventing an answer.
+ *
+ * ## The speaker is a NAME, captured at the time, not a join
+ *
+ * `session_history` records the same decision for the same reason: joining `users` would rewrite
+ * history on a rename, and a transcript that changes what it says somebody said is not a transcript.
+ * The name comes from the SERVER's session, never from the caller — see `session-transcript.ts`.
+ */
+export const sessionTranscripts = sqliteTable(
+  'session_transcripts',
+  {
+    /** The reference's row key: its template tracks by `_id` (`NRe = (t, n) => n._id`). */
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    roomShortCode: text('room_short_code').notNull(),
+    /** The reference's `speaker`, rendered in `.entry-speaker` before the colon. */
+    speaker: text('speaker').notNull(),
+    /** The reference's `text`, rendered after it. */
+    text: text('text').notNull(),
+    /** The reference's `ts`, which its `formatDate(e.ts)` reads. */
+    spokenAt: integer('spoken_at', { mode: 'timestamp' }).notNull()
+  },
+  (table) => [index('session_transcripts_room_spoken_idx').on(table.roomShortCode, table.spokenAt)]
+);

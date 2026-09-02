@@ -76,6 +76,18 @@ export class RoomRecording {
      * on the next mute, not on the next reload.
      */
     autoRecordSettings: () => { autoRecord: boolean; dontStopRecOnMicMute: boolean };
+    /**
+     * Write one FINAL caption line to the room's transcript — `session-transcript.remote.ts`.
+     *
+     * Injected rather than imported, for the reason every other collaborator here is: this class
+     * knows WHEN a line is final and nothing about how it reaches a database, and a unit test for
+     * captions must not need a server. It is also what lets `speech-reco-entitlement.test.ts` see
+     * the call without one.
+     *
+     * The command takes no speaker and no room — both are the SERVER's, read from the session. See
+     * that file's docblock for why a client-named speaker is refused in a transcript specifically.
+     */
+    recordTranscript: (line: { text: string; spokenAt: number }) => Promise<unknown>;
   }) {
     this.#dialogs = options.dialogs;
     this.#media = options.media;
@@ -85,6 +97,7 @@ export class RoomRecording {
     this.#isPresenter = options.isPresenter;
     this.#speechRecognitionAvailable = options.speechRecognitionAvailable;
     this.#autoRecordSettings = options.autoRecordSettings;
+    this.#recordTranscript = options.recordTranscript;
 
     this.#screenRecorder = null;
 
@@ -105,6 +118,7 @@ export class RoomRecording {
   readonly #isPresenter: () => boolean;
   readonly #speechRecognitionAvailable: () => boolean;
   readonly #autoRecordSettings: () => { autoRecord: boolean; dontStopRecOnMicMute: boolean };
+  readonly #recordTranscript: (line: { text: string; spokenAt: number }) => Promise<unknown>;
 
   /**
    * Records the shared screen to a file on this machine.
@@ -456,6 +470,30 @@ export class RoomRecording {
         void this.#mediaTransport.signalling
           ?.request('sendSpeechReco', result)
           .catch((error: unknown) => console.warn('[captions] a line was not relayed', error));
+
+        /*
+          ── The DURABLE half, and why it is here and not where the caption arrives ──────────────
+
+          Every browser in the room receives the relayed line, so writing from the RECEIVER would
+          store one row per listener for every sentence spoken. This runs on the SPEAKER's machine
+          only — it is the callback of that machine's own `SpeechRecognition` — so exactly one row
+          is written however many people are listening.
+
+          FINALS ONLY. An interim result is a revision of the sentence still being spoken; the
+          overlay shows it and then replaces it, and storing them would put every draft of every
+          sentence in the transcript with all but the last of them wrong. This is the same test
+          `+page.svelte` applies before committing a line to `captionHistory`.
+
+          FIRE AND FORGET, but never SILENT. A failed write must not interrupt the relay — the live
+          caption is what the room is watching and it has already been sent — but `.catch(() => {})`
+          is the swallow this repository refuses, so the reason is logged with the same shape the
+          relay's own failure takes one line above.
+        */
+        if (result.isFinal) {
+          void this.#recordTranscript({ text: result.text, spokenAt: result.timestamp }).catch(
+            (error: unknown) => console.warn('[captions] a line was not recorded', error)
+          );
+        }
       },
       onfatal: (reason) => {
         console.warn('[captions] recognition stopped:', reason);

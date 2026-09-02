@@ -16,6 +16,29 @@ import { defineConfig, devices } from '@playwright/test';
  * That is the gap this closes. It is not a replacement for the 3,085 unit assertions; it is the one
  * kind of failure they structurally cannot see — markup that type-checks, mounts, and renders wrong.
  *
+ * ## RUNNING IT IN A CLAUDE-CODE CONTAINER, recorded 2026-09-02 because it looked impossible
+ *
+ * `pnpm run test:e2e` failed here on every spec with
+ * `browserType.launch: Executable doesn't exist at
+ * /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell`.
+ * That is not a harness problem and not an application problem: Playwright 1.62.1 asks for Chromium
+ * build **1234** and the image ships **1194**, under `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`
+ * with `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, so nothing fetches the missing one.
+ *
+ * The fix is one symlink and it belongs in the ENVIRONMENT rather than in this file — pinning an
+ * `executablePath` here would make CI launch a binary the runner does not have:
+ *
+ * ```sh
+ * mkdir -p /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64
+ * ln -sfn /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell \
+ *   /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell
+ * ```
+ *
+ * With that in place the suite runs green in this container. It is written down because the failure
+ * names a path and not a cause, and reads exactly like "the browser cannot run here" — which is how
+ * a session concludes that browser verification is unavailable and writes "nothing was opened in a
+ * browser" for the rest of the day.
+ *
  * ## Two servers, and the stub is the interesting one
  *
  * The room fails CLOSED without its configuration, so nothing renders until something answers

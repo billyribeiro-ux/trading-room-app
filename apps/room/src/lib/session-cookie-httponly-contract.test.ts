@@ -96,10 +96,29 @@ describe('no session token reaches the client', () => {
     expect(clientFiles.length).toBeGreaterThan(50);
   });
 
+  /**
+   * A DOM identifier is not a value, and this is what tells the two apart.
+   *
+   * `SessionInfoModal.svelte` renders the reference's own `id="sessionToken"` on an input that is
+   * empty and disabled — the transcribed shell of a field this room refuses to fill. That tripped
+   * the sweep below on 2026-09-02, correctly by its letter and wrongly by its purpose: what this
+   * file exists to catch is a session token reaching the PAGE, and an `id` attribute cannot carry
+   * one.
+   *
+   * Stripping `id=` and `for=` attribute values is the narrow fix, and it is narrow on purpose. It
+   * is a general rule rather than a per-file exemption, because an exemption list is a thing
+   * somebody appends to; and it removes only the two attributes whose entire content is the NAME of
+   * an element. Everything else still trips: a variable called `sessionToken`, a property read, an
+   * interpolated `value={sessionToken}`, a `data-token={…}`. The negative control for that is in
+   * `session-info-modal-contract.test.ts`, which puts a token-shaped value in that very field and
+   * watches its own assertion go red.
+   */
+  const withoutElementNames = (code: string): string => code.replace(/\b(?:id|for)="[^"]*"/g, '');
+
   it('names no session token outside a comment', () => {
     const leaks: string[] = [];
     for (const file of clientFiles) {
-      const code = codeOf(readFileSync(`${ROOT}/${file}`, 'utf8'));
+      const code = withoutElementNames(codeOf(readFileSync(`${ROOT}/${file}`, 'utf8')));
       // The reference's own spelling AND the correct one: `sesionToken` is upstream's typo, and both
       // must stay out of client code.
       if (/\bses?sionToken\b/.test(code)) leaks.push(file);

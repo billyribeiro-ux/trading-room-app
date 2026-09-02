@@ -164,20 +164,35 @@ describe('the document title', () => {
         (line) =>
           line.startsWith('| ') && !line.startsWith('| ---') && !line.startsWith('| consumer')
       );
+    /*
+      ONE row, and it is the table's PLACEHOLDER — the section is empty as of 2026-09-02.
+
+      It held the transcript window title until that day. A markdown table with no body rows reads
+      as a broken table rather than an empty set, so the row is an explicit `| — | — | none. |`;
+      asserting on its length keeps this case measuring something, and asserting on its content is
+      what tells a reader which state the table is in.
+    */
     expect(
       rows,
       'the triage must list exactly the consumers that are still unbuilt — a row for something ' +
-        'that now exists is the drift this case was added to stop'
+        'that now exists is the drift this case was added to stop, and an empty section still ' +
+        'carries its placeholder row'
     ).toHaveLength(1);
-    expect(rows[0]).toContain('transcript window title');
+    expect(rows[0]).toContain('none');
 
     /*
-      And it IS still unbuilt: the room raises an unavailable dialog rather than opening a transcript
-      window, so there is no `&name=` to pass. Read at the code, because "still a gap" asserted from
-      the document alone would be the document checking itself.
+      And the last one IS built: `openTranscript` opens the window rather than refusing. Read at the
+      CODE, because "no longer a gap" asserted from the document alone would be the document
+      checking itself — which is the same reason the assertion it replaces read the code.
+
+      The window's URL is asserted too, and it is the half that matters. Upstream's carries
+      `globals.sesionToken`; a token in this string would put a session credential in an address
+      bar, in browser history and in every outbound `Referer`. The negative control for this line is
+      to append one and watch it go red.
     */
     const alertsPane = readFileSync(new URL('./room/alerts-pane.ts', import.meta.url), 'utf8');
-    expect(alertsPane).toContain('this.#dialogs.alert = TRANSCRIPT_UNAVAILABLE;');
+    expect(alertsPane).toContain("window.open('/session-transcript', '_blank', 'noopener');");
+    expect(alertsPane).not.toContain('TRANSCRIPT_UNAVAILABLE');
 
     /*
       The flasher must not be listed as missing — asserted on the ROWS, not on the section body.

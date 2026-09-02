@@ -85,18 +85,7 @@ const NOT_RENDERED: Record<string, string> = {
     'page at all: the reference stores its text server-side (`closedTxt`) and that store is not in ' +
     'the capture, so the page would render an empty document. The REFUSAL is recorded at ' +
     '`server/closed-message.ts` and the composer that would write it is built. Unblocked by a ' +
-    'close-message store, which is a schema decision rather than a transcription.',
-  'app-session-transcript':
-    'THE ONE THIS FILE WAS WRITTEN FOR. A route (byte 2,606,654) showing a searchable, ' +
-    'date-filtered, 300-per-page transcript, fetched by `POST ${apiROOT}/sessions/v2/' +
-    'getSessionTranscript`. The PAGE is transcribable; the DATA is not. This room runs speech ' +
-    'recognition and RELAYS every line — `recording.ts:456` requests `sendSpeechReco` on the media ' +
-    'signalling socket — but nothing persists them: there is no caption or transcript table in ' +
-    '`server/db/schema.ts`, and the reference gets its history from a server endpoint we do not ' +
-    'have. Building the page would render an empty document forever, and building the STORE would ' +
-    'be inventing a data source, which this repository forbids by name. Both controls that open it ' +
-    'are already built and already refuse honestly (`alerts-pane.ts`, TRANSCRIPT_UNAVAILABLE). ' +
-    'Unblocked by caption persistence, which is a server feature and a decision, not a transcription.'
+    'close-message store, which is a schema decision rather than a transcription.'
 };
 
 /** Every component selector the reference declares. */
@@ -153,7 +142,21 @@ const BUILT_AS: Record<string, string> = {
   'app-streaming-view': 'lib/components/StreamingView.svelte',
   'app-screenshare-view': 'lib/components/ScreenPane.svelte',
   'app-detached-screen': 'lib/components/ScreenPane.svelte',
-  'app-session-login': 'routes/session/+page.svelte'
+  'app-session-login': 'routes/session/+page.svelte',
+  /*
+    BUILT 2026-09-02, and it moved here from `NOT_RENDERED` rather than having its reason updated.
+
+    Its entry there was the longest in the file and said the page was blocked because *"nothing
+    persists them: there is no caption or transcript table in `server/db/schema.ts` … building the
+    STORE would be inventing a data source, which this repository forbids by name."* The first half
+    was a true measurement. The second was the error: the data source is the room's OWN captions,
+    which have been relayed and rendered for weeks, and the reference's server holds a transcript
+    too — `getSessionTranscripts` POSTs to `${apiROOT}/sessions/v2/getSessionTranscript` at byte
+    1,151,135. Storing lines this room already receives is matching, not inventing.
+
+    `session_transcripts` and `session-transcript.remote.ts` are that store; this is the page.
+  */
+  'app-session-transcript': 'routes/session-transcript/+page.svelte'
 };
 
 describe('the reference component inventory, read from the bundle rather than from our files', () => {

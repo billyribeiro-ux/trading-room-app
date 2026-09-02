@@ -618,6 +618,23 @@ export class RoomUserActions<User extends RosterRowForTarget> {
       return;
     }
 
+    if (action === 'get-my-token') {
+      /*
+        `getMyToken()`, byte 2,255,348 — "Session Information".
+
+        Upstream hides the user-settings modal first (`$("#user-settings-modal").modal("hide")`) and
+        then opens a bootbox on top. `#openModal` is a single-slot host, so opening this one closes
+        that one: the same visible outcome by the mechanism this room already has, rather than two
+        modals racing for the backdrop.
+
+        The dialog is half refused, and the refusal is on screen rather than here — see
+        `SessionInfoModal.svelte`, which carries the whole argument: the token field would mean the
+        server writing an httpOnly cookie into the DOM.
+      */
+      this.#openModal('session-info');
+      return;
+    }
+
     if (action === 'edit-username') {
       // `editUsername(e)` - a presenter renaming somebody else. No pre-filled value, no length or
       // character rules: the capture accepts whatever a presenter types.

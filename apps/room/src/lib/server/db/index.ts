@@ -351,6 +351,15 @@ export function ensureDatabase() {
       updated_by_user_id INTEGER NOT NULL REFERENCES users(id),
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS session_transcripts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      speaker TEXT NOT NULL,
+      text TEXT NOT NULL,
+      spoken_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS session_transcripts_room_spoken_idx
+      ON session_transcripts(room_short_code, spoken_at);
   `);
 
   /*

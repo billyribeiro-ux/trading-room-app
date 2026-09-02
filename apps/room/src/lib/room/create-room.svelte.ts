@@ -98,6 +98,7 @@ import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
 import { sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
 import { postAlert as postAlertCommand } from '../../routes/post-alert.remote';
+import { recordTranscript } from '../../routes/session-transcript.remote';
 /* The message menu's SEVEN wires, in one frozen object — see `message-actions-port.ts` for why. */
 import { messageActionsPort } from './message-actions-port';
 
@@ -932,7 +933,13 @@ export function createRoom(deps: RoomDeps) {
     autoRecordSettings: () => ({
       autoRecord: data.sessData?.autoRecord === true,
       dontStopRecOnMicMute: data.sessData?.dontStopRecOnMicMute === true
-    })
+    }),
+    /*
+      The transcript's durable half. Passed straight through: the command already takes the room and
+      the speaker from the session on the server, so there is nothing for this factory to add and
+      nothing it could get wrong.
+    */
+    recordTranscript: (line) => recordTranscript(line)
   });
 
   /*
