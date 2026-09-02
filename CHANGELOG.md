@@ -45,6 +45,56 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 12:14 UTC — six more audit rows re-read; five were stale, one refusal overturned by measurement
+
+Fourteen of the twenty-nine `DELIBERATE DIVERGENCE` rows are now re-read against the four escapes.
+
+## Five more stale — matched during this session, with nothing updating the row
+
+| row | what is actually true |
+| --- | --- |
+| **MSB-06** (`rel` half) | `rel="noreferrer"` is gone from `MessageBody.svelte`; the only occurrence left in the file is the argument in a comment. The concern behind the old refusal — a `window.opener` handle back into a logged-in room — is answered by `Referrer-Policy: same-origin` in `hooks.server.ts`, which covers this link, every other link and every subresource, and needs no attribute the reference does not have. And `rel` is a **choice** upstream: `"rel",` occurs **8 times** in the bundle, seven `noopener noreferrer` and one `required`. |
+| **PAM-14** | All six invented `id`/`name` pairs are gone, asserted on the RENDERED markup of all three tabs. The row's own argument is why the deletion is narrow: it said the ids are what make `<label for>` work, and for these six that was false — no label pointed at any of them and nothing read one. The three CHECKBOX ids a real label does point at were **kept**. *"Delete the ids"* would have been the wrong lesson. |
+| **SZC-03** | `swallowDoubleClick` and all six `ondblclick` bindings are gone, and the component's ceiling went **down** (237 → 222). Its premise was removed rather than argued with: the old note said the nesting was ours and on purpose, so the guard was *"the price of a placement this repository chose"* — circular, because the guard existed because of the nesting, and the nesting was the divergence. |
+| **SP2-07** | See below — the one worth reading. |
+| *(and NTC-3, OVL-07, STB-06, MSM-03 in the 06:11 entry)* | |
+
+## SP2-07 — a refusal overturned by a measurement, not an argument
+
+It refused on the ground that moving the detached cluster out means *"inventing the ancestor"* its
+`position: absolute` resolves against. That was a gap in the reading, not in the evidence, and two
+lookups closed it:
+
+- `app-screenshare-view`'s const 0 is `[1,"h-inherit"]` — **no `position`**;
+- the popout wrapper's only two rules are `.detach-screen .webcamScreen{max-height:100vh!important}`
+  and `.detach-screen .overflow-hidden{overflow:initial!important}` — neither positions anything.
+
+So **upstream has no positioned ancestor inside the component either**, and `right: 5px; top: 5px`
+resolves against the popout window at both ends. Nothing was invented. The cluster is now a sibling
+immediately before `#video-screen-container-{id}`, which is the create block's own order — slot 5
+closes before `d(6,…)` opens on the `appDoubleClick` box.
+
+Its last worry — that the cluster now sits outside the element `toggleFullscreen` fullscreens, so
+the popout's magnifier would vanish when maximised — is answered by the same fact that made the move
+correct: **it is outside that element upstream too.**
+
+## Two that HOLD, each on an escape the row already contained
+
+- **MSB-06's `Sw.sanitize` — escape 4.** Upstream the return value is a STRING that becomes markup,
+  so the sanitiser is what stops a crafted URL closing the anchor. Here the link is a Svelte element
+  and the url goes into a TEXT position, where the compiler escapes it: no markup boundary for a
+  payload to cross, and the same rendered output either way.
+- **SP2-06's watermark — escape 2**, and this row had already shown the search before the rule
+  asking for it was written. Its own *"what the bundle proves and what it does not, kept apart"*
+  paragraph **is** the escape: that the watermark sits inside the transform is **inferred**, and
+  `<pan-zoom>` is third-party with its templates in no capture we hold. The anti-leak function
+  decides which reading to build on rather than excusing the divergence — if the bundle *did* prove
+  it pans, the row would be escape 1 and still not built.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
 ### 2026-09-02 06:21 UTC — one Svelte, one SvelteKit, and a gate that keeps it that way
 
 ## Measured first, against npm rather than recalled

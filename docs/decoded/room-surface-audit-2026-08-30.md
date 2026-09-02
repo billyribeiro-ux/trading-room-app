@@ -2632,7 +2632,11 @@ if("img"===this.selectedTab){if(this.imageAlertTxt&&(e.txt=this.imageAlertTxt+"\
 
 ### PAM-14 — Element ids and name attributes added on the six text inputs/textareas that the reference leaves unnamed
 
-**DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC, and the reference is not consistent about this either.** The ids and `name` attributes are OURS and they are what make `<label for>` and `aria-labelledby` work: a text input with no accessible name is unreachable by a screen reader, and this repository adds them for the same reason it gives the captured trade span a `role` and a keydown. **The reference names some of its own** — const 62 is `["type","datetime-local","id","alert-send-later-time","name","alert-send-later-time",…]`, so the send-later input carries both — which makes this a difference in consistency rather than in kind. Nothing about them is visible to a member, and none is read by any selector in the captured stylesheets.
+**BUILT — MATCHED; re-labelled 2026-09-02 from `DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC`.** All six invented `id`/`name` pairs are gone from `PostAlertModal.svelte`, and `post-alert-render.test.ts` asserts their absence on the RENDERED markup of all three tabs, so a re-introduction through any route fails there rather than in review.
+
+**The row's own argument is why the deletion is narrow rather than total, and that distinction is the deliverable.** It said the attributes are what make `<label for>` work, and for these six that was not true: consts 14, 20, 22, 25 and 58 carry no `id` and no `name`, no `<label for>` in this room pointed at any of the six, and nothing in the repository read one — so they gave no control an accessible name it did not already have from the `aria-label` the const does carry. The three CHECKBOX ids that a real `<label for>` does point at were kept, and are asserted present in the same file. "Delete the ids" would have been the wrong lesson.
+
+The row's second observation stands and is worth keeping: **the reference names some of its own** — const 62 is `["type","datetime-local","id","alert-send-later-time","name","alert-send-later-time",…]` — so upstream is inconsistent about this, and matching means following it control by control rather than applying a rule.
 
 **low** · `divergence` · reference byte **2,131,663**
 
@@ -6947,12 +6951,21 @@ cluster is **node 5** and the `appDoubleClick` box (const 5,
 **node 6**. They are SIBLINGS under const 0, so upstream no double-click on the cluster can reach a
 fullscreen handler and the reference carries no guard.
 
-**Ours is nested, and on purpose.** `ScreenPane.svelte:565-578` puts the cluster inside
-`#video-screen-container-…`, which is what makes it fullscreen with the picture — the same nesting
-`SV-SP-01` relies on for the user-ID watermark, which is clipped away if it sits outside. So the
-guard is the price of a placement this repository chose, not a transcription of anything, and
-un-nesting it to match the reference would undo a row already built. Recorded at the code rather
-than removed, because a guard whose stated reason is false is a guard the next reader deletes.
+**RE-READ 2026-09-02 — MATCHED, and the row's premise was removed rather than argued with.** The
+2026-08-31 note said the nesting was ours and on purpose, so the guard was *"the price of a placement
+this repository chose"*. That reasoning was circular: the guard existed because of the nesting, and
+the nesting was the divergence.
+
+`SP2-07` un-nested it. `ScreenPane.svelte:546-563` now renders the `{#if detached}` cluster as a
+SIBLING immediately before `#video-screen-container-{id}`, which is the reference's own node 5 /
+node 6 arrangement. With the cluster outside the `appDoubleClick` box, no double-click on it can
+reach a fullscreen handler — exactly as upstream — so the guard has nothing left to guard.
+`swallowDoubleClick` and all six `ondblclick` bindings are deleted; the only occurrence of the word
+left in the component is this argument in a comment, and the component's size ceiling went DOWN
+(237 → 222) rather than up, which is the measurement that the code shrank rather than moved.
+
+`SV-SP-01`'s watermark is untouched and was the row's other worry: it is opened AFTER the `<video>`
+container closes, so it is a child of a different node and the move does not reach it.
 
 This row was ADDED after this document was committed, in the 2026-08-31 pass.
 
@@ -8683,18 +8696,37 @@ onclick=showChatGif('${c}')>gif muted, click to show</div>
 
 ### MSB-06 — `rel="noreferrer"` is ours, and `Sw.sanitize` is deliberately not reproduced
 
-**DELIBERATE DIVERGENCE — recorded 2026-08-31, not matched.**
+**BUILT 2026-09-02 — the `rel` half MATCHED and replaced by a header; the `Sw.sanitize` half holds under escape 4. Recorded as `DELIBERATE DIVERGENCE 2026-08-31` until then.**
 This row was ADDED after this document was committed, by the seventh batch.
 The reference's anchor is `'<a href="'+e+'" target="_blank" class="linkColor"
 onclick="event.stopPropagation()">'+Sw.sanitize(e)+"</a>"` — no `rel`, and the SANITISED url as the
 link TEXT beside the RAW one in `href`. Ours carries `rel="noreferrer"` and puts `segment.text` in
 the text position.
 
-Both differences are the same decision. `target="_blank"` with no `rel` hands the opened page a
-`window.opener` handle back into a room a member is logged into; reproducing that would reproduce a
-defect, which is what this disposition is for. And `Sw.sanitize` exists upstream because the string
-becomes markup — here it becomes a text node, so sanitising it would only mangle a URL a member can
-read, without removing any capability.
+**RE-READ 2026-09-02 — the two halves went OPPOSITE ways, and the `rel` half is now MATCHED.**
+
+*The `rel` half — matched.* The original reason was *"reproducing that would reproduce a defect"*,
+which is retired, and the concern behind it turned out to be answerable without the divergence.
+`rel="noreferrer"` is gone from `MessageBody.svelte`; the only occurrence left in that file is this
+argument in a comment. What replaced it is a header — `hooks.server.ts` sets `Referrer-Policy:
+same-origin` on every response — which covers this link, every other link in the room, and every
+subresource, and needs no attribute the reference does not have.
+
+Worth recording that `rel` is a CHOICE upstream rather than an oversight, which is what makes it
+worth matching: `"rel",` occurs **8 times** in the 2,891,205-byte bundle — seven
+`"rel","noopener noreferrer"` (the avatar menu's outbound links among them) and one
+`"rel","required"`. So the reference puts `rel` on the links it wants it on and not on this one.
+`shell-body-rte-reference-contract.test.ts` holds the pair, the markup and the header together,
+because deleting the attribute WITHOUT the header is the change that leaks and a test asserting only
+the markup would pass on exactly that.
+
+*The `Sw.sanitize` half — held, escape 4, NOT A DIVERGENCE.* Upstream the return value is a STRING
+that becomes markup, so `Sw.sanitize` is what stops a crafted URL closing the anchor and opening a
+tag of its own. Here the link is a Svelte element and the url goes into a TEXT position, where the
+compiler escapes it — there is no markup boundary for a payload to cross. So the sanitiser's
+function is already discharged by the surrounding construction, and calling it would only mangle a
+URL a member can read. The reference-facing OUTPUT is the same rendered text either way, which is
+the escape on its own terms.
 
 **low** · `divergence` · reference byte **1,326,527**
 
@@ -9641,9 +9673,22 @@ identifies can move off the recording is not a watermark. It is kept inside
 `#video-screen-container-{id}` so it still goes fullscreen with the picture, which is the state a
 recording would be made in.
 
+**RE-READ 2026-09-02 — escape 2, EVIDENCE ABSENT, and this row had already shown the search before
+the rule asking for it was written.** Its own *"What the bundle proves and what it does not, kept
+apart"* paragraph is the escape: that the watermark sits INSIDE the transform is **inferred**, from
+where `<pan-zoom>` projects its content, and the library is third-party — its templates are in no
+capture this repository holds. There is no byte to match. Matching an inference would mean choosing
+one of two readings and calling it transcription.
+
+The anti-leak function is what decides which reading to build on rather than what excuses the
+divergence, and the distinction matters: if the bundle DID prove the watermark pans, this row would
+be `SECURITY` (escape 1) instead, and it would still not be built — a control the person it
+identifies can drag off the frame is not a control. Either way the row holds; it is escape 2
+because the evidence stops first.
+
 ### SP2-07 — the detached cluster is a sibling of the pan container upstream, in an unpositioned parent
 
-**DELIBERATE DIVERGENCE** — `apps/room/src/lib/components/ScreenPane.svelte`. This
+**BUILT 2026-09-02 — MATCHED. Recorded as `DELIBERATE DIVERGENCE` until then** — `apps/room/src/lib/components/ScreenPane.svelte`. This
 row was ADDED after this document was committed and is deliberately outside the tables above.
 
 Node 5 of the create block — `Y0e`, gated `O(5, o.isDetachedCtrl ? 5 : -1)` at byte 1,501,767 —
@@ -9660,6 +9705,34 @@ This component nests the cluster inside `#video-screen-container-{id}`, whose ca
 (reference sheet byte 441,996). So it anchors five pixels from that box's top-right corner —
 deterministically, from a rule this repository can point at.
 
+**RE-READ 2026-09-02 — MATCHED. The refusal was overturned by a measurement, not by an argument.**
+
+The paragraph below refused it on the ground that moving the cluster out means *"inventing the
+ancestor"* its `position: absolute` resolves against. That was a gap in the reading rather than a
+gap in the evidence, and closing it took two lookups:
+
+* `app-screenshare-view`'s const 0 is `[1,"h-inherit"]` — **no `position`**;
+* the popout wrapper's only two rules are `.detach-screen .webcamScreen{max-height:100vh!important}`
+  and `.detach-screen .overflow-hidden{overflow:initial!important}` — neither positions anything.
+
+So **upstream has no positioned ancestor inside the component either**, and `right: 5px; top: 5px`
+resolves against the popout window at both ends. Nothing is invented; the ancestor chain is the one
+the capture already has.
+
+`ScreenPane.svelte:546-563` now renders the cluster as a sibling immediately BEFORE
+`#video-screen-container-{id}`, which is the create block's own order — slot 5 (const 4, the
+cluster) closes before `d(6,…)` opens on const 5, the `appDoubleClick` box. Two things followed:
+`SZC-03`'s `swallowDoubleClick` and its six bindings are deleted, a workaround removed by matching
+rather than by being argued away; and the component's size ceiling went DOWN.
+
+The row's last worry — that the cluster now sits outside the element `toggleFullscreen` fullscreens,
+so the popout's magnifier would vanish when maximised — is answered by the same fact that made the
+move correct: **it is outside that element upstream too.** Whatever the reference does on fullscreen,
+this now does, which is the whole of what matching asks. `SV-SP-01`'s watermark is untouched, and was
+the row's other worry: it is opened after the `<video>` container closes, so it is a child of a
+different node and the move does not reach it.
+
+*The 2026-08-31 reasoning, for the record:*
 Kept, and the argument is that the reference's placement is not a specification. "Whichever ancestor
 happens to be positioned" is a value this bundle does not contain, so matching it would mean
 inventing the ancestor rather than transcribing it; and the one thing it definitely produces —
