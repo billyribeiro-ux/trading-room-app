@@ -45,6 +45,79 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 19:12 UTC — XCP-09 closed: the second chat column has its stylesheet
+
+**Runtime impact: YES.** The extra chat column renders with its own component styles for the first
+time — `.chatTabs` and its five `.nav-link` states, `.counterBadge`, `.roomLog`, `.txt-area` and its
+focus ring, `.textAreaBtns` and its hover, `.textAreaBtnsCol`, `#textAreaHolder`, `.chatDisabled`,
+`.webinarMode`, `.typing-indicator-container`, `.users-typing` and the whole Giphy popover. It had
+none of them.
+
+## One measurement closed it, and it made the generator small
+
+`app-chat` and `app-extra-chat` ship **byte-identical** style arrays: 5,807 bytes each, at bundle
+offsets 1,454,430 and 2,400,462. So does the scroller pair — 49 bytes each, at 1,419,485 and
+2,367,140. The reference builds the second column by re-declaring the same component under a second
+selector and does not vary one declaration.
+
+So the translation of the FIRST of each pair was already in this repository, in
+`captured-runtime-components.css` sections 34 and 35, performed from a live document's CSSOM with the
+value normalisation only a CSSOM can do — `border: none` expanded to five longhands, `#fff` to
+`rgb(255, 255, 255)`. **Re-deriving that from the bundle's text would have produced a different
+stylesheet for identical input, and the difference would have been the new generator's opinion rather
+than the reference's.** `gate/sync-extra-chat-styles.mjs` therefore renames those two sections and
+re-proves the identity on every run. That check is not a sanity assertion, it is the entire licence
+for the substitution: if a future bundle makes the two differ by one byte it fails loudly and the
+answer becomes a real `[_ngcontent-%COMP%]` translator.
+
+Output is `src/lib/styles/captured-extra-chat.css` — its own artifact with both inputs hashed in its
+header, not a section appended to a sheet whose header pins a different input. Imported by `app.css`
+immediately after its twin, so the two columns land in the same place in the cascade; an import
+between them would silently give the second column a different answer to any override written for the
+first, and that ordering is asserted.
+
+## The blocker named the wrong missing thing
+
+Filed 2026-08-31 as needing a re-capture of `css/complete-app-styles.css` from a room with the second
+column enabled. The capture we hold was taken with `extraChatColumn` off, so Angular never mounted the
+component and never injected its styles into the captured DOCUMENT — true, and the wrong conclusion.
+The compiled COMPONENT carries its own rules, ships here, is SHA-256 pinned, and was already being
+read by this very surface's contract test. **A captured document is not the only place a component's
+rules exist.** Both the wrong blocker and the correction are kept side by side.
+
+With it and `XCP-07` closed the same day, `EXTRA_CHAT_MEASURED_GAPS` is EMPTY — all nine `XCP-` rows
+answered. The list stays, empty, because an empty list asserted against every row is the statement
+that each is answered; a deleted one would make the next gap look like the first.
+
+## RNB-04 / NAV-10 / RNB-05: the "separable receiver half" was already built
+
+Those three rows carried an identical paragraph, written earlier today, naming `setRecPreview` and
+its navbar gate as real unbuilt work. All three pieces ship and have for some time:
+`lib/room/recording-frames.ts:67-93` quotes byte 1,023,704 verbatim and assigns
+`media.recPreviewLocation`; `RoomMedia.recPreviewLocation` documents all three consumers the frame
+arms; `RoomNavbar.svelte:679` is `media.roomRecording && media.recPreviewLocation`, byte 2,476,206
+term for term, with `RecordingPreviewCard.svelte` behind it. The capability question that paragraph
+deferred to the owner was already answered in the code too — the room's own post-stop preview is kept
+beside the reference's pair and relabelled "Local Recording", and the two can never both draw.
+
+**The sixth stale claim found this week, and the same cause every time: prose about what is missing,
+written without re-reading what is there.** All three paragraphs are corrected in place.
+
+## Verified
+
+`extra-chat-styles-contract.test.ts` (new, 9 cases) regenerates the artifact in memory from the two
+pinned inputs and compares byte for byte, so a hand-edit fails; it asserts the byte-identity with its
+offsets, the 57 rule blocks, the import order, and that `renameHost` leaves `app-chat-logs-modal`
+alone — the prefix collision a `\b` boundary does NOT catch, because `t` followed by `-` is a word
+boundary. **Four negative controls seen red**: a hand-edit of the CSS, a half-applied rename, the
+import removed, and the regex swapped for the `\b` form. A fifth is executed in the suite itself — a
+tampered bundle must make the generator throw, and the assertion names the pair.
+
+`pnpm run gate` exit 0 in both apps. Nothing was opened in a browser: the CSS is asserted as text and
+by the build, not rendered.
+
+---
+
 ### 2026-09-02 18:37 UTC — three blockers re-measured; one of them named the wrong missing thing
 
 **Runtime impact: NO.** Documentation, comments and one ceiling. No shipped behaviour changed.

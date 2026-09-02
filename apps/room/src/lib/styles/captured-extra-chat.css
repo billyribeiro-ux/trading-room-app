@@ -1,0 +1,339 @@
+/*
+ * GENERATED — do not edit by hand; run: pnpm css:sync-extra-chat
+ *
+ * The second chat column's component styles, XCP-09.
+ *
+ * Sources, both pinned:
+ *   docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js
+ *     SHA-256: 40796ca83dba809bb966dad0d020ee5170b33aa4556c691957cb65f0bab87524
+ *   src/lib/styles/captured-runtime-components.css
+ *     SHA-256: 938d1354aa306582b6584c49d93c8a29ea299a5e62383ff55821e776c7b6d4a4
+ *
+ * The reference declares the second column as a byte-identical copy of the first under a second
+ * selector, and this file is the already-translated first copy with the hosts renamed. The identity
+ * is re-proved on every run and is the whole licence for that substitution — see
+ * gate/sync-extra-chat-styles.mjs for why re-translating from the bundle would produce a different
+ * sheet for identical input.
+ *
+ *   app-chat (byte 1,454,430) = app-extra-chat (byte 2,400,462), 5,807 bytes
+ *   app-roomscroller (byte 1,419,485) = app-extra-roomscroller (byte 2,367,140), 49 bytes
+ */
+
+/* app-extra-chat, renamed from app-chat */
+app-extra-chat .navbar:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  font-size: 12px;
+  padding: 2px;
+}
+app-extra-chat .chatToolbar:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *),
+app-extra-chat .chatHeader:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: var(--msgs-header-bg);
+  color: var(--msgs-header-color);
+}
+app-extra-chat
+  .chatHeader:not(:root)
+  .dropdown-menu:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: var(--msgs-header-bg);
+  border-width: medium;
+  border-style: none;
+  border-color: currentcolor;
+  border-image: none;
+  border-radius: 0px 0px 0px 5px;
+}
+app-extra-chat .roomLog:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  height: 100%;
+  overflow-y: scroll;
+}
+app-extra-chat .chatDisabled:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  height: 40px;
+  min-height: 40px;
+  width: 100%;
+  background-color: rgb(255, 255, 255);
+  color: rgb(0, 0, 0);
+}
+app-extra-chat .webinarMode:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: rgb(255, 255, 255);
+  color: rgb(0, 0, 0);
+  width: 100%;
+}
+app-extra-chat .chat-header-nav:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  font-size: 12px;
+  min-height: 30px;
+}
+app-extra-chat
+  .chatHeader:not(:root)
+  .fas:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *),
+app-extra-chat
+  .chat-header-nav:not(:root)
+  .navbar-brand:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  font-size: 16px;
+}
+app-extra-chat .menu-p-label:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  padding: 5px;
+  font-weight: 100;
+  font-size: 12px;
+}
+app-extra-chat
+  .chat-header-menu-settings:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  padding: 0px;
+  margin: 0px;
+  border-width: medium;
+  border-style: none;
+  border-color: currentcolor;
+  border-image: none;
+  border-radius: 0%;
+  background-color: transparent;
+}
+app-extra-chat .chat-header:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: var(--chat-header-bg) !important;
+  color: var(--chat-header-color) !important;
+}
+app-extra-chat .chat:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: var(--chat-bg);
+}
+app-extra-chat
+  .chat:not(:root)
+  li:not(:root)
+  a:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *),
+app-extra-chat
+  .chat:not(:root)
+  .clear-chat-input:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  cursor: pointer;
+}
+app-extra-chat .list-of-msgs:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  height: calc(100% - 41px);
+  overflow-y: scroll;
+  background-color: var(--msgs-bg);
+}
+app-extra-chat .textAreaBtns:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  padding: 5px;
+  color: var(--dark-gray);
+}
+app-extra-chat .custom-file:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  display: none;
+}
+app-extra-chat .input-group-text:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  padding: 0px;
+  margin: 0px;
+}
+app-extra-chat .textAreaBtnsCol:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: var(--textarea-bg) !important;
+  color: var(--dark-gray) !important;
+}
+app-extra-chat .textAreaBtns:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  color: var(--textarea-holder-btns-color) !important;
+}
+app-extra-chat .textAreaBtns:not(:root):hover:not(app-extra-chat :is(app-extra-roomscroller) *) {
+  color: var(--textarea-holder-btns-hover-color) !important;
+  cursor: pointer;
+}
+app-extra-chat .txt-area:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  border-radius: 0px;
+  border: 1px solid rgb(255, 255, 255);
+  font-size: 14px;
+  resize: none;
+  outline: none;
+  overflow-y: auto;
+  margin-left: 0px;
+  margin-right: 0px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: var(--textarea-color) !important;
+  background-color: var(--textarea-bg) !important;
+}
+app-extra-chat .txt-area:not(:root):focus:not(app-extra-chat :is(app-extra-roomscroller) *) {
+  border-color: var(--darker-gray);
+  box-shadow: 1px 1px 1px var(--darker-gray);
+}
+app-extra-chat
+  #form-upload-img:not(:root)
+  .input-group-text:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *),
+app-extra-chat
+  #form-upload-img:not(:root)
+  .form-control:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  border-radius: 0px;
+}
+app-extra-chat .unreadIndicator:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  text-align: center;
+  position: relative;
+  top: 30px;
+  z-index: 10;
+  background-color: rgb(154, 205, 50);
+}
+app-extra-chat .white:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  color: rgb(255, 255, 255);
+}
+app-extra-chat .chat-nav:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  align-items: center;
+  flex-wrap: nowrap;
+  min-height: 40px;
+}
+app-extra-chat
+  .chatTabs:not(:root)
+  li:not(:root)
+  a:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  font-weight: 700;
+  font-size: 12px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin-right: 5px;
+  margin-bottom: 0px;
+  padding-bottom: 5px;
+}
+app-extra-chat ul.chatTabs:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  margin-bottom: 0px;
+}
+app-extra-chat .chatTabs:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  border-color: var(--modal-active-tab-border-color) !important;
+}
+app-extra-chat
+  .chatTabs:not(:root)
+  .nav-link.active:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  border: 1px solid var(--modal-active-tab-border-color) !important;
+}
+app-extra-chat
+  .chatTabs:not(:root)
+  .nav-link:not(:root):hover:not(app-extra-chat :is(app-extra-roomscroller) *) {
+  cursor: pointer;
+  border-color: var(--modal-active-tab-border-color) !important;
+}
+app-extra-chat
+  .chatTabs:not(:root)
+  .nav-link.active:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *),
+app-extra-chat
+  .chatTabs:not(:root)
+  .nav-item.show:not(:root)
+  .nav-link:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  cursor: default;
+  background-color: var(--modal-active-tab-bg-color) !important;
+  color: var(--modal-active-tab-color) !important;
+}
+app-extra-chat
+  .chatTabs:not(:root)
+  .nav-link.active:not(:root):hover:not(app-extra-chat :is(app-extra-roomscroller) *) {
+  cursor: default;
+}
+app-extra-chat .counterBadge:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  top: -5px;
+  position: relative;
+}
+app-extra-chat .textAreaBtnSelected:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: rgb(241, 242, 243);
+}
+app-extra-chat
+  .bs-popover-top:not(:root)
+  > .arrow:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *)::after,
+app-extra-chat
+  .bs-popover-auto[x-placement^="top"]:not(:root)
+  > .arrow:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *)::after {
+  border-top-color: var(--modal-content-bg-color);
+}
+app-extra-chat .giphy-search:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  width: 400px;
+  height: 700px;
+  border: 2px solid var(--modal-content-bg-color);
+  background-color: rgb(255, 255, 255);
+  overflow: hidden;
+}
+app-extra-chat
+  .giphy-search:not(:root)
+  .input-group-text:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  border-width: medium;
+  border-style: none;
+  border-color: currentcolor;
+  border-image: none;
+  background-color: var(--modal-input-group-bg);
+}
+app-extra-chat
+  .giphy-search:not(:root)
+  .fa-times:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  font-size: 16.5px;
+  padding: 10px;
+}
+app-extra-chat
+  .giphy-search:not(:root)
+  .fa-times:not(:root):hover:not(app-extra-chat :is(app-extra-roomscroller) *) {
+  cursor: pointer;
+  opacity: 0.85;
+}
+app-extra-chat .giphy-header:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  padding: 10px;
+  background-color: var(--modal-content-bg-color);
+}
+app-extra-chat .search-results:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  overflow-y: auto;
+  height: 100%;
+  padding: 5px;
+}
+app-extra-chat .gif-result:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  text-align: center;
+}
+app-extra-chat
+  .gif-result:not(:root)
+  img:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  cursor: pointer;
+}
+app-extra-chat
+  .giphy-search:not(:root)
+  li:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  padding: 10px;
+}
+app-extra-chat
+  .giphy-search:not(:root)
+  li:not(:root):hover:not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: var(--modal-upload-files-color);
+}
+app-extra-chat
+  .giphy-search:not(:root)
+  h4:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *),
+app-extra-chat
+  .giphy-search:not(:root)
+  h6:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  color: var(--modal-content-color);
+}
+app-extra-chat .giphy-hr:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  color: rgb(255, 255, 255);
+  padding: 0px;
+  margin: 0px 0px 10px;
+}
+app-extra-chat #textAreaHolder:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: var(--textarea-bg);
+  border-radius: 8px;
+  padding: 5px;
+  margin: 5px;
+}
+app-extra-chat
+  .typing-indicator-container:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  margin: 0px 8px;
+  border-top: 1px solid rgb(204, 204, 204);
+}
+app-extra-chat .users-count:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *),
+app-extra-chat .users-typing:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  color: rgb(144, 148, 156);
+  font-size: 12px;
+}
+app-extra-chat .users-typing:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+app-extra-chat
+  .users-typing:not(:root)
+  em:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  font-weight: 700;
+}
+app-extra-chat #textAreaTxt:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  max-height: 300px;
+  width: 100%;
+}
+app-extra-chat #textAreaTxt:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *),
+app-extra-chat .textAreaBtnsCol:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  background-color: var(--textarea-bg);
+}
+app-extra-chat img:not(:root):not(app-extra-chat :is(app-extra-roomscroller) *) {
+  max-width: 100%;
+}
+
+/* app-extra-roomscroller, renamed from app-roomscroller */
+app-extra-roomscroller:not(:root) {
+  background-color: var(--msgs-bg);
+}

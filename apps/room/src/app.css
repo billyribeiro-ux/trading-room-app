@@ -4,6 +4,21 @@
 @import './lib/styles/tokens.css';
 @import './lib/styles/captured-runtime-components.css';
 /*
+  XCP-09 — the SECOND chat column's component styles, in their own generated file.
+
+  `app-extra-chat` ships 5,807 bytes of component styles in the reference and the generated sheet
+  above contained the string zero times, so the column rendered with none of `.chatTabs`, `.roomLog`,
+  `.txt-area`, `.counterBadge`, `#textAreaHolder` or the Giphy popover. It is a separate import
+  rather than a section of the file above because that file is generated from
+  `css/complete-app-styles.css` and pins that input's hash in its own header; this one is derived
+  from the pinned BUNDLE and pins two inputs. One provenance line per artifact.
+
+  Immediately after its twin, so the two columns land in the same place in the cascade — they are
+  the same declarations under a different host, and an intervening import would silently give the
+  second column a different answer to any `app.css` override written for the first.
+*/
+@import './lib/styles/captured-extra-chat.css';
+/*
   `app-st-compactmessage`'s own block. LAST, so it wins over the card's rules for anything the
   compact host encloses — which is the cascade Angular's per-component attributes gave upstream, and
   the reason it is imported here rather than folded into the generated file it cannot come from.

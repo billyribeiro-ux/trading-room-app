@@ -7433,7 +7433,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       inside the component is now the paragraph explaining how its gate works.
     */
     /*
-      309 -> 322, 2026-09-02, and it is two corrections in one day rather than growth.
+      309 -> 341, 2026-09-02, and it is two corrections and one close rather than growth.
 
       Four lines for `XCP-07`, re-dispositioned from refused to built, so the entry carries the
       measurement that stood, the conclusion that did not, and the precedent that replaced it. The
@@ -7445,8 +7445,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       superseded claim is kept beside the correction, because a blocker that names the wrong missing
       thing is the failure worth being able to recognise again — and it is the second one found on
       this file in a day.
+
+      Nineteen more when `XCP-09` CLOSED later the same day, which is the rest of that correction
+      rather than a separate one: the measurement that closed it — `app-chat` and `app-extra-chat`
+      shipping byte-identical style arrays, which is what licenses renaming an already-translated
+      section instead of writing a second translator — is the thing a reader has to be able to check
+      before trusting `captured-extra-chat.css` at all, and it belongs beside the surface it is about.
+      The gap list below went from two rows to none, and the empty list is now the assertion.
     */
-    max: 322,
+    max: 341,
     why: 'the second chat column`s decoded const tables and the decisions taken against them'
   },
   {

@@ -155,9 +155,9 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
  * attributes — `data-bs-toggle` and `data-bs-target` — are kept, exactly as the main column keeps
  * them: they are what the capture serves, and `onclick` is the substitution.
  *
- * ### `XCP-09` — this column has NO transcribed stylesheet at all
+ * ### `XCP-09` LEFT THIS LIST on 2026-09-02, and its blocker had named the wrong missing thing
  *
- * `app-extra-chat` ships **5,818 bytes** of component styles at bundle byte **2,400,462**:
+ * `app-extra-chat` ships **5,807 bytes** of component styles at bundle byte **2,400,462**:
  * `.chatTabs` and its five `.nav-link` states, `.counterBadge`, `.typing-indicator-container`,
  * `.users-count`, `.users-typing`, `.txt-area` and its focus ring, `.textAreaBtns` and its hover,
  * `.textAreaBtnsCol`, `#textAreaHolder`, `.chatDisabled`, `.webinarMode`, `.roomLog`, and the whole
@@ -169,20 +169,32 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
  * too. That capture was taken from a room with `preferences.extraChatColumn` off, so Angular never
  * mounted this component and never injected its styles into the document being captured.
  *
- * THE UNBLOCK WAS NAMED WRONG UNTIL 2026-09-02, and this is the corrected version. It was recorded as
- * needing a re-capture of `complete-app-styles.css` from a room with the second column on, and it does
- * not: those 5,818 bytes are in the `styles:` array of the pinned bundle at byte 2,400,462, in a file
- * that ships here, is SHA-256 pinned in its own `sha256sums.txt`, and is already read by
- * `extra-chat-surface-contract.test.ts`. The DOCUMENT capture never saw the component; the compiled
- * component carries its own rules and is held here.
+ * **THE BLOCKER NAMED THE WRONG MISSING THING, and that is the part worth keeping.** It was filed as
+ * needing a re-capture of `complete-app-styles.css` from a room with the second column on. It did
+ * not: those 5,807 bytes are in the `styles:` array of the pinned BUNDLE, in a file that ships here,
+ * is SHA-256 pinned in its own `sha256sums.txt`, and that this very contract test already reads. A
+ * captured DOCUMENT is not the only place a component's rules exist — the compiled COMPONENT carries
+ * them.
  *
- * What it is actually blocked on is the GENERATOR. `AGENTS.md` forbids hand-editing a generated
- * artifact, and `captured-runtime-components.css`'s header names the command that wrote it —
- * `pnpm css:sync-captured` — which is no longer in `apps/room/package.json` and is among the evicted
- * `apps/room/scripts/` files. The work is a published generator that reads the bundle's `styles:`
- * array and performs the `[_ngcontent-%COMP%]` to captured-host translation that sheet describes. It is also why `XCP-01` above
- * matters far more than an id normally would — with the component sheet missing, `app.css`'s
- * `#textAreaHolder` family is the only thing left that styles this composer.
+ * **What closed it is one measurement.** `app-chat` and `app-extra-chat` ship BYTE-IDENTICAL style
+ * arrays: 5,807 bytes each, at bundle offsets 1,454,430 and 2,400,462, and the scroller pair is 49
+ * bytes each at 1,419,485 and 2,367,140. The reference builds the second column by re-declaring the
+ * same component under a second selector without varying one declaration. So the translation of the
+ * FIRST of each pair — performed from a live document's CSSOM, with the value normalisation only a
+ * CSSOM can do — was already here, in `captured-runtime-components.css` sections 34 and 35.
+ *
+ * `gate/sync-extra-chat-styles.mjs` renames those two sections and **re-proves the identity on every
+ * run**, which is the entire licence for the substitution rather than a sanity check: if a future
+ * bundle makes the two differ by one byte it fails loudly and the answer becomes a real
+ * `[_ngcontent-%COMP%]` translator. The output is `src/lib/styles/captured-extra-chat.css`, its own
+ * artifact with its own two pinned inputs, imported by `app.css` immediately after its twin so the
+ * two columns land in the same place in the cascade. `extra-chat-styles-contract.test.ts`
+ * regenerates in memory and compares, so a hand-edit fails.
+ *
+ * It is also why `XCP-01` above mattered more than an id normally would: while the component sheet
+ * was missing, `app.css`'s `#textAreaHolder` family was the only thing styling this composer. Those
+ * global rules stay — they are this sheet's stand-in for the encapsulation attribute and they apply
+ * to both columns — and the two columns are now symmetric rather than one carrying the other's work.
  *
  * ### `XCP-07` LEFT THIS LIST on 2026-09-02, and it left for the reason `XCP-08` did
  *
@@ -207,10 +219,17 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
  * and the button is gated on the HANDLER rather than on a flag, which is this column's own design
  * (see the `isPresenter` note below) rather than a shortcut.
  *
- * The ONE that remains is not of that kind. It is not a scope problem, and no amount of owning more
- * files closes it: `XCP-09` needs a re-capture of a component this room has never dumped.
+ * **NOTHING REMAINS.** Both rows that were "not of that kind" turned out to be exactly of that kind
+ * once their premises were re-read: `XCP-07` was refused on a rule that governs invented classes
+ * rather than transcribed ones, and `XCP-09` was blocked on a file that was never the only source.
+ * Two blockers, two wrong names for what was missing, closed within a day of each other.
+ *
+ * The list stays, empty, rather than being deleted with its last entry. It is asserted by
+ * `extra-chat-surface-contract.test.ts` against every `XCP-` row this file documents, so an empty
+ * list is the statement that every one of them is answered — and adding a row without adding it here
+ * fails. A deleted list would make the next gap look like the first one.
  */
-export const EXTRA_CHAT_MEASURED_GAPS = ['XCP-09'] as const;
+export const EXTRA_CHAT_MEASURED_GAPS = [] as const;
 
 /**
  * ## Decisions RELOCATED from `ExtraChatPane.svelte`, verbatim, on 2026-08-31
