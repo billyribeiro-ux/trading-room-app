@@ -45,6 +45,86 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 02:04 UTC — a rule this repository has now got wrong four times, and the fourth time it was executable
+
+PCC-07 arrived as a one-line row: the private composer binds `keydown` and const 55 binds `keyup`.
+Following it found something much larger.
+
+## The handlers are identical and the BINDINGS are not
+
+`chat-composer-enter.ts` exists because three readers had each guessed Shift+Enter differently. Its
+fix was to read all six `onKey` implementations in the bundle by value, find five identical, and make
+the rule executable so nobody could guess again. That reading was one input short.
+
+Measured 2026-09-02 from the CONST TABLES rather than the handlers:
+
+| textarea | const at | binding section |
+| --- | ---: | --- |
+| `textAreaTxt` | 1,451,244 | `3,"keyup","paste","keydown.enter","focus"` |
+| `textAreaTxtExtra` | 2,397,231 | `3,"keyup","paste","keydown.enter","focus"` |
+| `textAreaAlertTxt` | 2,055,692 | `3,"keyup","paste"` |
+| `textAreaTxtPM` | 2,217,289 | `3,"keyup","paste","focus"` |
+| `textAreaReplyTxt` | 2,324,702 | `3,"keyup","paste"` |
+| `textAreaQATxt` | 2,342,122 | `3,"keyup","paste","placeholder"` |
+
+Only two carry `keydown.enter`, and what it calls is a whole method: `onKeydown(e){e.preventDefault()}`,
+at bytes 1,440,246 and 2,386,566 — the only two in the bundle.
+
+So for those two the newline dies on the way down and `onKey`'s shift arm — `i.val(i.val())`, a
+no-op — genuinely leaves the box unchanged. **Shift+Enter does nothing, exactly as the table said.**
+
+For the other four there is no keydown handler. The browser inserts the newline, `onKey` runs on
+keyup, and `e.preventDefault()` there is INERT. **Shift+Enter leaves a newline, and Alt+Enter leaves
+two.**
+
+**A handler that prevents a default says nothing until you know which event it is bound to.** That is
+the reusable half, and it is why the module now carries the six-row const table rather than a
+sentence: executable is not the same as complete.
+
+## What it actually cost
+
+One composer. `PrivateChatComposer.svelte` was the only one whose handler reached `'swallow'` — the
+others merely return without preventing, which happens to reproduce keyup behaviour — so Shift+Enter
+there **swallowed a line break the reference keeps**. It binds `keyup` now, and
+`composerEnterAction`/`composerEnterPrevents` take the binding as an argument.
+
+Two things were measured rather than assumed before touching it: `sendMessage` `.trim()`s (byte
+2,208,062), so plain Enter is indistinguishable between the two readings; and Alt+Enter's explicit
+`+ "\n"` landing on top of the browser's is upstream's own double, now reproduced.
+
+## STV-04 and STV-09, on the way
+
+`setupStream()` ends with TWO statements — `this.loadStream(),this.startPerformanceMonitoring()` at
+byte 1,904,326 — and this room's effect called the first. The row recorded that we reproduce it
+"exactly, member for member". **It is inert in both codebases**, which is the reason to transcribe it
+rather than the reason not to, and the reason it now has an assertion: its first negative control
+came back GREEN.
+
+`STV-09` — const 3 at 1,909,111 is `["autoplay","autoplay",…]`, so the reference's element carries
+`autoplay="autoplay"` where a bare `autoplay` in Svelte emits `autoplay=""`. The recorded reason was
+that Svelte only emits the bare form; compiling both spellings on this repository's own svelte 5.57.0
+gives two different attributes in the client and server outputs alike. The real obstacle is one step
+further on: `autoplay` is typed boolean, so the literal fails `svelte-check` and the attribute goes
+through the spread this repository already uses for its captured `ngbtooltip` pairs.
+
+## Two more over-tight assertions of my own repaired
+
+`streaming-view-and-alert-panes-citation-contract` pinned the load effect's whole body as a literal
+string while its own comment said *"the negative control that matters here is the coupling, not the
+guard"*. It asserts the coupling now — the effect reads `videoPlayer` and `loadStream` and NOT
+`bufferSizeLevel`, which is what STV-03 is about.
+
+`PrivateChatPanel.test.ts` dispatched `keydown` from a helper, so the event was a detail of the
+harness. It is the subject now, with a fourth case asserting a keydown listener has NOT been added
+back — without which re-adding one would double every send and leave all three green.
+
+**Runtime impact.** Shift+Enter in the private-chat composer inserts a line break instead of doing
+nothing. The stream `<video>` emits the capture's `autoplay="autoplay"`. Nothing else moves: the
+added `startPerformanceMonitoring()` returns immediately on that path in both codebases.
+
+**Verified:** room gate exit 0 at `fc736fb` — 341 files, 6,162 passed, 1 skipped. Negative controls seen red for all three, plus two more that
+were green first and are red now — the ones that found the missing assertions.
+
 ### 2026-09-02 01:40 UTC — the report modal's refusal was re-challenged, and one unmeasured fact decided six rows
 
 RPT-01 through RPT-07 came back from the re-triage as MATCHABLE. They are the largest single block

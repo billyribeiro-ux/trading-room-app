@@ -346,6 +346,26 @@
     void videoSrc;
     if (!videoPlayer) return;
     void loadStream();
+    /*
+      STV-04 — `setupStream()` ends with TWO statements, and this had one of them:
+
+        …,console.log("Streaming view comp videoSrc:"+this.videoSrc),
+          this.loadStream(),this.startPerformanceMonitoring()}
+
+      read at the tail of `setupStream`, byte 1,904,326. The row recorded
+      that this effect "reproduces it exactly, member for member"; it did not.
+
+      **It is inert in both codebases and is transcribed anyway**, which is the whole of the row.
+      `startPerformanceMonitoring()` opens `!this.hls || !this.hasStartedPlaying || (…)` (1,904,725)
+      and this room's copy has the identical guard — and on this pass `hls` has only just been asked
+      for by `loadStream()` and `hasStartedPlaying` is false until playback actually begins. So the
+      call returns immediately, here and there.
+
+      Written down because it is exactly the kind of line a later reader deletes as pointless: it is
+      pointless in the reference too, and the monitor that matters is started from the `playing`
+      handler. Its cost is one comparison per stream change.
+    */
+    startPerformanceMonitoring();
     return cleanup;
   });
 
@@ -451,12 +471,35 @@
   <!--
     `autoplay` is an attribute upstream; `muted` and `volume` are property bindings. The id is
     `video-${muser._id}` (`ei('id','video-', o.muser._id, '')`).
+
+    STV-09 — const 3, read whole at byte 1,909,111:
+
+      ["autoplay","autoplay",1,"video-streaming",3,"dblclick","id","muted","volume"]
+
+    The VALUE is the attribute's own name, so the rendered element carries `autoplay="autoplay"`.
+    This wrote a bare `autoplay`, which Svelte emits as `autoplay=""` — a different rendered
+    attribute — and the recorded reason was that Svelte emits the bare boolean form and there is no
+    way to ask for the other one.
+
+    That is a property of what was written, not a limit of the language, and it was MEASURED rather
+    than argued: compiling both spellings on this repository's own svelte 5.57.0 gives
+    `autoplay="autoplay"` for the explicit form and `autoplay=""` for the bare one, in the client
+    and server outputs alike.
+
+    It is written as a SPREAD rather than `autoplay="autoplay"`, and the reason is the one real
+    obstacle in the row's neighbourhood: Svelte's HTML typings declare `autoplay` as
+    `boolean | null | undefined`, so the literal string fails `svelte-check`. The spread is this
+    repository's existing idiom for exactly this — `MessageMenu.svelte` and `ExtraChatPane.svelte`
+    carry the captured `ngbtooltip` pairs the same way — and it emits the attribute verbatim.
+
+    The two STATIC attributes are also written first here, in the const's own order — everything
+    after the `3` marker is a binding, and `id` is one of them (an interpolation) in both codebases.
   -->
   <video
     bind:this={videoPlayer}
-    id="video-{muser._id}"
-    autoplay
+    {...{ autoplay: 'autoplay' } as Record<string, string>}
     class="video-streaming"
+    id="video-{muser._id}"
     muted={isMuted}
     {volume}
     ondblclick={toggleFullscreen}

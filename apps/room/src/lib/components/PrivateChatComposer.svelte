@@ -142,10 +142,17 @@
 
   The FLEX ROW was on the wrong element too: the capture's holder carries no flex classes at all.
 
-  **`keyup` is the capture's event and `onkeydown` is ours** — the divergence `CarouselDialog.svelte`
-  already argued and recorded, and the one `AlertChatArea.svelte:985` makes for the same textarea
-  shape: `preventDefault()` on `keyup` runs after the browser has already inserted the newline, so
-  the branch below could not swallow anything. Every composer in this room binds `keydown`.
+  **`keyup` is the capture's event and it is now ours too — PCC-07, 2026-09-02.**
+
+  The divergence recorded here was: *"`preventDefault()` on `keyup` runs after the browser has
+  already inserted the newline, so the branch below could not swallow anything."* Every word of that
+  is true. It was read as a reason to bind `keydown` instead; it is the reason the reference's
+  Shift+Enter LEAVES a newline in this box, and binding `keydown` is what made ours swallow one.
+
+  The rest of the branch is unaffected, and that was worth measuring rather than assuming: plain
+  Enter's newline is `.trim()`ed away by `sendMessage` (byte 2,208,062), so the send arm is
+  indistinguishable either way. See `chat-composer-enter.ts` for the const-table measurement that
+  settles all six composers — the handlers are identical and the BINDINGS are not.
 
   **`paste` is the capture's third binding and this composer has none** — see PCC-06 in
   `docs/decoded/room-surface-audit-2026-08-30.md`, which is BLOCKED on one line in the panel.
@@ -205,14 +212,24 @@
         oninput={autoExpand}
         onpaste={handlePaste}
         onfocus={() => onfocus()}
-        onkeydown={(event) => {
+        onkeyup={(event) => {
           /*
-            The three-way branch lives in `chat-composer-enter.ts`, decoded from all six `onKey`
-            implementations in the bundle. Shift+Enter SWALLOWS — it does not insert a newline, which
-            is what this composer used to do and what no composer in the capture does.
+            PCC-07 — `keyup`, which is the ONLY event const 55 binds (byte 2,217,289,
+            `3,"keyup","paste","focus"`). This was `keydown`, and the difference is not the timing.
+
+            The three-way branch lives in `chat-composer-enter.ts`, and `'keyup-only'` is the input
+            it was missing: on a keyup the browser has already inserted the newline and
+            `preventDefault()` cannot take it back. So Shift+Enter LEAVES a newline here, where two
+            of the six composers — the only two the reference also binds `keydown.enter` on — kill
+            it on the way down. That module's table now carries both readings and the bytes for each.
+
+            What this fixes: Shift+Enter in the private composer swallowed a line break the reference
+            keeps. The other two arms are unchanged in effect — plain Enter's newline is `.trim()`ed
+            away by the send (byte 2,208,062), and Alt+Enter's `+ "\n"` lands on top of the
+            browser's, which is upstream's own double and is now reproduced.
           */
-          const action = composerEnterAction(event);
-          if (composerEnterPrevents(action)) event.preventDefault();
+          const action = composerEnterAction(event, 'keyup-only');
+          if (composerEnterPrevents(action, 'keyup-only')) event.preventDefault();
           if (action === 'newline') {
             draft += '\n';
             return;

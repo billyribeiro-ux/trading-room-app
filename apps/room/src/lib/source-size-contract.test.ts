@@ -2875,7 +2875,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       upstream and the presence here — so a future capture that adds the guard makes this re-read
       rather than leaving the comment describing a difference that stopped existing.
     */
-    max: 358,
+    /*
+      358 -> 375, 2026-09-02. PCC-07 — `onkeydown` became `onkeyup`, which is the only event const
+      55 binds (byte 2,217,289).
+
+      Seventeen lines and one word of code. The note is the whole raise because the change looks
+      like a preference and is not: this composer SWALLOWED a line break the reference keeps. The
+      divergence recorded here was *"`preventDefault()` on `keyup` runs after the browser has
+      already inserted the newline, so the branch below could not swallow anything"* — every word
+      true, and it is the reason the reference leaves the newline rather than a reason to bind
+      `keydown`.
+
+      It also records the measurement that stopped this being a bigger change than it is: plain
+      Enter's newline is `.trim()`ed away by `sendMessage` at byte 2,208,062, so the send arm is
+      indistinguishable either way and only the Shift arm actually moved.
+    */
+    max: 375,
     why: "app-privchat's composer: the textarea, its three buttons, both popovers and autoExpand"
   },
   {
@@ -7187,7 +7202,31 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       78 capped never shipped, and shortening the version that did would mean deleting the six-offset
       table that is the reason it is right. From here it ratchets down like everything else.
     */
-    max: 86,
+    /*
+      86 -> 171, 2026-09-02, and it is the largest single raise in this file for a module of twenty
+      lines of code — because what grew is the record of a rule this repository has now got wrong
+      FOUR times, and the fourth time it was already executable.
+
+      PCC-07. The previous decoding read all six `onKey` handlers in the bundle by value, found five
+      identical, wrote the table, and made it a function so nobody could guess again. It was one
+      input short: **a handler that prevents a default says nothing until you know which event it is
+      bound to.** The const tables say — and this entry is why the table of six offsets is in the
+      docblock rather than a sentence — that only TWO of the six also bind `keydown.enter`, whose
+      handler is the whole of `onKeydown(e){e.preventDefault()}`.
+
+      For those two the newline dies on the way down and Shift+Enter does nothing, exactly as the
+      old table said. For the other four the browser has already inserted it and `preventDefault()`
+      on a keyup is inert, so Shift+Enter LEAVES a newline and Alt+Enter leaves two.
+
+      The lines are the six-row const table, the two-row outcome table, and the paragraph saying
+      that executable is not the same as complete. Every one of them is the thing a fifth reader
+      would otherwise re-derive — and three of the four previous readers wrote their conclusion down
+      confidently before being wrong.
+
+      It goes DOWN if the two bindings ever collapse to one, which they will not: the reference's
+      own two shapes are what this module exists to keep apart.
+    */
+    max: 171,
     why: 'the captured three-way Enter branch, defined once for both composers'
   },
   {
@@ -8510,7 +8549,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       refused to diverge from. A decline with its reason at the code is what stops that being
       "tidied up" by the next reader holding the same suggestion.
     */
-    max: 689,
+    /*
+      689 -> 732, 2026-09-02. STV-04 and STV-09 — two members of the reference this file was one
+      short of, and one attribute it emitted differently.
+
+      STV-04 — `setupStream()` ends `this.loadStream(),this.startPerformanceMonitoring()` (byte
+      1,904,326) and this effect called the first only. The row recorded that we reproduce it
+      "exactly, member for member"; we did not. **It is inert in both codebases**, and twenty of its
+      lines say so, because a call that provably returns immediately is the first thing a later
+      reader deletes — and it is equally pointless upstream, which is what makes transcribing it the
+      match.
+
+      STV-09 — const 3 at 1,909,111 is `["autoplay","autoplay",…]`, so the rendered element carries
+      `autoplay="autoplay"`; a bare `autoplay` in Svelte emits `autoplay=""`. The recorded reason
+      was that Svelte only emits the bare form. That was MEASURED and is false — compiling both
+      spellings on this repository's own svelte 5.57.0 gives the two different attributes in the
+      client and server outputs alike. The real obstacle is one step further on and is recorded too:
+      Svelte's HTML typings declare `autoplay` as boolean, so the literal fails `svelte-check`, and
+      the attribute is written as the spread this repository already uses for its captured
+      `ngbtooltip` pairs.
+    */
+    max: 732,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {
