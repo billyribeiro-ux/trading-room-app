@@ -229,7 +229,7 @@ browser.
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **163** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **158** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 

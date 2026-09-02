@@ -19,7 +19,7 @@ import {
   ── EXTRA CHAT CHANNELS, BEHIND BADGES ─────────────────────────────────────────────────────────────
 
   `chatTabsWithBadges` is the first setting to change a TYPE. This room had two chat channels, named
-  in three places and held in a closed `ChatTab` union, and the argument for the union was written
+  in three places and held in a closed `ChatChannelName` union, and the argument for the union was written
   down: a typo in a comparison becomes a compile error. An owner can configure more channels now, so
   the set is per room and per member and cannot be a type at all.
 
@@ -266,15 +266,33 @@ describe('visibleBadgeTabs', () => {
   });
 });
 
+/**
+ * `chatTabsForMember` as NAMES, which is what every case below asserted before 2026-09-02.
+ *
+ * The function returns full tabs now — `{name, displayName, type}`, which is the shape the reference
+ * itself pushes — and the cases that predate that are about ORDER and MEMBERSHIP, not about labels.
+ * Projecting keeps them asserting the thing they were written for; the label and type cases are
+ * their own, below.
+ */
+const namesFor = (options: Parameters<typeof chatTabsForMember>[0]): string[] =>
+  chatTabsForMember(options).map((tab) => tab.name);
+
 describe('chatTabsForMember', () => {
   it('puts the built-ins first, in the order the owner wrote the rest', () => {
     const raw = '[{"name":"b","badges":[]},{"name":"a","badges":[]}]';
-    expect(chatTabsForMember(raw, [], false)).toEqual(['main', 'off-topic', 'b', 'a']);
+    expect(namesFor({ badgeTabsRaw: raw, isPresenter: false })).toEqual([
+      'main',
+      'off-topic',
+      'b',
+      'a'
+    ]);
   });
 
   it('and a room that configured nothing has exactly the two it always had', () => {
-    expect(chatTabsForMember(undefined, [], false)).toEqual([...BUILT_IN_CHAT_TABS]);
-    expect(chatTabsForMember('nonsense', ['1'], true)).toEqual([...BUILT_IN_CHAT_TABS]);
+    expect(namesFor({ isPresenter: false })).toEqual([...BUILT_IN_CHAT_TABS]);
+    expect(namesFor({ badgeTabsRaw: 'nonsense', memberBadges: ['1'], isPresenter: true })).toEqual([
+      ...BUILT_IN_CHAT_TABS
+    ]);
   });
 });
 
@@ -479,12 +497,24 @@ describe('the page load reads only this member’s channels', () => {
   });
 
   it('and the page resolves it on the server before selecting a row', () => {
-    const at = pageServer.indexOf('const chatChannels = await memberChatChannels(');
+    /*
+      `memberChatTabs` since 2026-09-02, and the projection to names sits between the two.
+
+      The property this asserts is unchanged and is the one that matters: the entitlement is
+      resolved on the SERVER before any row is selected against it, so a message page can never be
+      read for a channel the member does not hold. What moved is that the resolution now yields full
+      tabs and `chatChannelNames` narrows them, which is why there are three positions here and not
+      two — and asserting all three keeps the projection from drifting above the resolution, where
+      it would be naming a list that does not exist yet.
+    */
+    const at = pageServer.indexOf('const chatTabs = await memberChatTabs(');
+    const projected = pageServer.indexOf('const chatChannels = chatChannelNames(chatTabs);');
     const read = pageServer.indexOf(
       'loadNewestChatPages(requireRoomShortCode(locals), chatChannels)'
     );
     expect(at, 'the resolution is missing').toBeGreaterThan(-1);
-    expect(read).toBeGreaterThan(at);
+    expect(projected, 'the projection to names is missing').toBeGreaterThan(at);
+    expect(read).toBeGreaterThan(projected);
   });
 });
 
@@ -507,12 +537,12 @@ describe('Off Topic is a room SETTING, not a constant', () => {
    * were unrecorded, and six of the seven were this one function.
    */
   it('shows Off Topic when the room says so', () => {
-    expect(chatTabsForMember(null, [], false, true)).toEqual(['main', 'off-topic']);
+    expect(namesFor({ isPresenter: false, hasChannelTabs: true })).toEqual(['main', 'off-topic']);
   });
 
   it('HIDES it when the owner turned it off', () => {
     /* The behaviour that did not exist before 2026-08-31: the setting was ignored entirely. */
-    expect(chatTabsForMember(null, [], false, false)).toEqual(['main']);
+    expect(namesFor({ isPresenter: false, hasChannelTabs: false })).toEqual(['main']);
   });
 
   it('treats ABSENT as true, which is the captured default', () => {
@@ -522,8 +552,11 @@ describe('Off Topic is a room SETTING, not a constant', () => {
       cannot mean "off" without silently removing a tab from every room that never stored the
       setting. A regression dressed as a fix is exactly what this asserts against.
     */
-    expect(chatTabsForMember(null, [], false, undefined)).toEqual(['main', 'off-topic']);
-    expect(chatTabsForMember(null, [], false)).toEqual(['main', 'off-topic']);
+    expect(namesFor({ isPresenter: false, hasChannelTabs: undefined })).toEqual([
+      'main',
+      'off-topic'
+    ]);
+    expect(namesFor({ isPresenter: false })).toEqual(['main', 'off-topic']);
   });
 
   it('never hides `main`, whatever the setting says', () => {
@@ -533,7 +566,7 @@ describe('Off Topic is a room SETTING, not a constant', () => {
       is a room with no chat.
     */
     for (const setting of [true, false, undefined]) {
-      expect(chatTabsForMember(null, [], false, setting)).toContain('main');
+      expect(namesFor({ isPresenter: false, hasChannelTabs: setting })).toContain('main');
     }
   });
 
@@ -543,7 +576,242 @@ describe('Off Topic is a room SETTING, not a constant', () => {
       would take the badge tabs with it. That is the shape of mistake this catches.
     */
     const raw = JSON.stringify([{ name: 'vip', badges: [] }]);
-    expect(chatTabsForMember(raw, [], false, false)).toEqual(['main', 'vip']);
-    expect(chatTabsForMember(raw, [], false, true)).toEqual(['main', 'off-topic', 'vip']);
+    expect(namesFor({ badgeTabsRaw: raw, isPresenter: false, hasChannelTabs: false })).toEqual([
+      'main',
+      'vip'
+    ]);
+    expect(namesFor({ badgeTabsRaw: raw, isPresenter: false, hasChannelTabs: true })).toEqual([
+      'main',
+      'off-topic',
+      'vip'
+    ]);
+  });
+});
+
+describe('the other five settings of the same expression, built 2026-09-02', () => {
+  /**
+   * ── THE CHANNEL MODEL — five settings, one expression, three types ────────────────────────────
+   *
+   * `hasChannelTabs` above was one of SIX settings feeding `processSessData`'s tab expression
+   * (pinned bundle, bytes 1,146,625-1,147,200). It crossed alone on 2026-08-31 because it was the
+   * one that was a live defect. These are the other five, and they arrived together because a
+   * subset of the six describes a room the reference cannot be in.
+   *
+   * They were a MODEL change rather than five more pushes: the reference gives every tab a `type`
+   * and has three of them (`r`, `p`, `po`) where this room had one.
+   *
+   * ## `po` was recorded as undecoded, and it is not
+   *
+   * `docs/decoded/missing-settings-triage.md` said *"`po` versus `p` is undecoded: both are private,
+   * and nothing in the capture says what the `o` distinguishes"*. Three sites in the bundle say what
+   * `po` is, and they agree:
+   *
+   *   byte 1,008,074   `registerForExtraChannels`, the SUBSCRIPTION
+   *   bytes 1,437,340 and 2,383,602   both chat columns, the RENDER
+   *
+   * both gating on `isPresenter || user.hasAdminChat`.
+   *
+   * ## `p` is decoded too, and the answer is that NOTHING reads it
+   *
+   * `type:"p"` occurs exactly once in the whole 2,891,205-byte bundle — the `extraAdminChannels`
+   * push at 1,147,139 — and no comparison against it exists anywhere. So a `p` channel behaves as
+   * an `r` one in the reference's own client, and `extraAdminChannels` is a name describing an
+   * intent that client does not enforce. Carried as a value, treated as `r` for visibility, and
+   * asserted below so the finding cannot be quietly "fixed" into a gate the reference does not have.
+   */
+
+  it('renames the built-in TABS and never the channels behind them', () => {
+    /*
+      Upstream keeps `name:"main"` on BOTH branches of its ternary and changes only `displayName`.
+      Getting that backwards would move every message in the room into a channel named after a
+      label — `messages.room` is the channel name.
+    */
+    const tabs = chatTabsForMember({
+      isPresenter: false,
+      altGenChannelName: 'Trading Floor',
+      altOffTopicChannelName: 'Anything Goes'
+    });
+
+    expect(tabs.map((tab) => tab.name)).toEqual(['main', 'off-topic']);
+    expect(tabs.map((tab) => tab.displayName)).toEqual(['Trading Floor', 'Anything Goes']);
+  });
+
+  it('falls back to the captured labels when the owner typed nothing usable', () => {
+    /* `dump-contract.ts` pins `['Main Chat', 'Off Topic']` as the strip the capture rendered. */
+    for (const raw of [undefined, null, '', '   ']) {
+      const tabs = chatTabsForMember({
+        isPresenter: false,
+        altGenChannelName: raw,
+        altOffTopicChannelName: raw
+      });
+      expect(tabs.map((tab) => tab.displayName)).toEqual(['Main Chat', 'Off Topic']);
+    }
+  });
+
+  describe('the admin channel, and the gate that is the whole point of it', () => {
+    const adminTab = (options: Parameters<typeof chatTabsForMember>[0]) =>
+      chatTabsForMember(options).find((tab) => tab.name === 'adminChat');
+
+    it('gives it to a presenter', () => {
+      expect(adminTab({ isPresenter: true, hasAdminOnlyChannel: true })).toEqual({
+        name: 'adminChat',
+        displayName: 'Admins',
+        type: 'po'
+      });
+    });
+
+    it('gives it to a member the CONTROLLER marks with hasAdminChat', () => {
+      expect(
+        adminTab({ isPresenter: false, hasAdminChat: true, hasAdminOnlyChannel: true })?.name
+      ).toBe('adminChat');
+    });
+
+    it('REFUSES it to an ordinary member, so the tab does not exist for them at all', () => {
+      /*
+        THE ASSERTION THIS SECTION EXISTS FOR.
+
+        Upstream pushes the tab for everybody and filters at subscribe and at render, in the
+        browser. Both are gates a member steps past with a console, and the subscribe one decides
+        whether the SERVER sends them the channel's messages. Here the tab is never in the list, so
+        `memberChatChannels` never names the channel, so `isMemberChatChannel` refuses a post to it
+        and the SSE hub never subscribes them — one decision instead of two, on the server.
+      */
+      expect(adminTab({ isPresenter: false, hasAdminOnlyChannel: true })).toBeUndefined();
+      expect(
+        adminTab({ isPresenter: false, hasAdminChat: false, hasAdminOnlyChannel: true })
+      ).toBeUndefined();
+    });
+
+    it('is ABSENT unless the room asked for it, which is the opposite default to Off Topic', () => {
+      /*
+        `hasChannelTabs` reads absent as TRUE and this reads absent as FALSE, and the asymmetry is
+        deliberate: defaulting a PRIVATE channel into existence is the direction a member cannot
+        undo. A room that has stored nothing gets no extra private channel rather than one nobody
+        configured.
+      */
+      expect(adminTab({ isPresenter: true })).toBeUndefined();
+      expect(adminTab({ isPresenter: true, hasAdminOnlyChannel: false })).toBeUndefined();
+    });
+  });
+
+  describe('the two comma lists', () => {
+    it('splits, trims, and carries the reference’s two types', () => {
+      const tabs = chatTabsForMember({
+        isPresenter: false,
+        extraAdminChannels: 'desks, options',
+        extraRegChannels: 'lounge'
+      });
+
+      expect(tabs.filter((tab) => tab.type === 'p').map((tab) => tab.name)).toEqual([
+        'desks',
+        'options'
+      ]);
+      /* `main`, `off-topic` and `lounge` — the two built-ins are type `r` too. */
+      expect(tabs.filter((tab) => tab.type === 'r').map((tab) => tab.name)).toEqual([
+        'main',
+        'off-topic',
+        'lounge'
+      ]);
+
+      /*
+        TRIMMED, which upstream does not do: `"a, b"` there yields a channel literally named `" b"`,
+        and that string is then a `messages.room` value, a realtime channel key and a tab label.
+      */
+      expect(tabs.map((tab) => tab.name)).not.toContain(' options');
+    });
+
+    it('pushes the typed name as BOTH the channel and the label, as upstream does', () => {
+      const [tab] = chatTabsForMember({ isPresenter: false, extraRegChannels: 'lounge' }).filter(
+        (entry) => entry.name === 'lounge'
+      );
+      expect(tab.displayName).toBe('lounge');
+    });
+
+    it('REFUSES a name that collides with a reserved channel', () => {
+      /*
+        THE ONE PLACE IN THIS FUNCTION WHERE MATCHING WOULD REPRODUCE A PRIVILEGE ESCALATION.
+
+        Upstream has no collision check at all. An `extraRegChannels` entry named `adminChat` would
+        be a type-`r` channel — ungated, in everyone's list — sharing a name with the type-`po` one,
+        and the name IS the channel: `messages.room`, the realtime key, the allow-list entry. Every
+        member would read the admin channel.
+
+        `main` is the same defect one step milder: a second tab whose messages land in every
+        member's main log. Both are refused, and the reserved set is the one `parseChatTabsWithBadges`
+        already applies to a badge channel.
+      */
+      const tabs = chatTabsForMember({
+        isPresenter: true,
+        hasAdminOnlyChannel: true,
+        extraRegChannels: 'adminChat,main,off-topic,lounge'
+      });
+
+      expect(tabs.map((tab) => tab.name)).toEqual(['main', 'off-topic', 'adminChat', 'lounge']);
+      expect(tabs.filter((tab) => tab.name === 'adminChat')).toHaveLength(1);
+      expect(tabs.find((tab) => tab.name === 'adminChat')?.type).toBe('po');
+    });
+
+    it('refuses a duplicate across the two lists, keeping the FIRST', () => {
+      /*
+        Upstream pushes both. Two entries with one name are two gates on one channel, and which one
+        wins depends on which the reader reaches last. The first wins here for the reason the
+        collision rule has: the order it loses in is upstream's own order, so nobody loses a channel
+        they already had.
+      */
+      const tabs = chatTabsForMember({
+        isPresenter: false,
+        extraAdminChannels: 'shared',
+        extraRegChannels: 'shared'
+      });
+      expect(tabs.filter((tab) => tab.name === 'shared')).toEqual([
+        { name: 'shared', displayName: 'shared', type: 'p' }
+      ]);
+    });
+
+    it('applies the same bound and control-character rule as a badge channel', () => {
+      /* The name lands in the same three places, so it takes the same rules. */
+      const tabs = chatTabsForMember({
+        isPresenter: false,
+        extraRegChannels: `${'x'.repeat(MAX_CHAT_TAB_NAME + 1)},ok,bad\nname`
+      });
+      expect(tabs.map((tab) => tab.name)).toEqual(['main', 'off-topic', 'ok']);
+    });
+  });
+
+  it('keeps the reference’s own ORDER, which is what a member lands on', () => {
+    /*
+      main, Off Topic, adminChat, extraAdmin*, extraReg*, then the badge channels — upstream's own
+      order, because `registerForExtraChannels` appends the badge ones to a `globals.chatTabs` that
+      already holds all of the above. Not cosmetic: the first entry is the tab a member opens on.
+    */
+    const tabs = chatTabsForMember({
+      badgeTabsRaw: JSON.stringify([{ name: 'vip', badges: [] }]),
+      isPresenter: true,
+      hasAdminOnlyChannel: true,
+      extraAdminChannels: 'desks',
+      extraRegChannels: 'lounge'
+    });
+
+    expect(tabs.map((tab) => tab.name)).toEqual([
+      'main',
+      'off-topic',
+      'adminChat',
+      'desks',
+      'lounge',
+      'vip'
+    ]);
+  });
+
+  it('gives a badge channel type `r`, as upstream does', () => {
+    /* `{displayName: i.name, name: i.name, type: "r"}` at byte 1,007,911. Its gate is the badge. */
+    const tabs = chatTabsForMember({
+      badgeTabsRaw: JSON.stringify([{ name: 'vip', badges: [] }]),
+      isPresenter: false
+    });
+    expect(tabs.find((tab) => tab.name === 'vip')).toEqual({
+      name: 'vip',
+      displayName: 'vip',
+      type: 'r'
+    });
   });
 });

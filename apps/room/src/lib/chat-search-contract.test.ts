@@ -72,7 +72,7 @@ describe('results are filtered exactly as the log is', () => {
   const pipeline = bodyOf(
     FEEDS,
     `chatMessagesFor(
-    tab: ChatTab,
+    tab: ChatChannelName,
     searchResults: readonly Message[] | null,
     column: 'main' | 'extra'
   ) {`

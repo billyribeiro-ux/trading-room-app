@@ -1,4 +1,4 @@
-import { chatTabsForMember } from '#lib/chat-tabs.js';
+import { type ChatTab, chatChannelNames, chatTabsForMember } from '#lib/chat-tabs.js';
 import { isPresenterRole } from './auth';
 import { hashEmail } from './connection';
 import { readRoomConfig } from './room-config-client';
@@ -33,21 +33,52 @@ import { readRoomConfig } from './room-config-client';
  * `parseChatTabsWithBadges` returns an empty list for an absent, empty or malformed setting, so the
  * absent case needs no branch here.
  */
+export async function memberChatTabs(
+  request: Request,
+  roomShortCode: string,
+  user: { email: string; role: string }
+): Promise<ChatTab[]> {
+  const config = await readRoomConfig(request, roomShortCode, user.email);
+  const badges = config.badges?.byEmailHash?.[hashEmail(user.email)] ?? [];
+
+  return chatTabsForMember({
+    badgeTabsRaw: config.settings?.chatTabsWithBadges,
+    memberBadges: badges.map((badge) => String(badge)),
+    isPresenter: isPresenterRole(user.role),
+    /*
+      THE OTHER HALF OF THE `po` GATE, and it comes from the CONTROLLER's membership.
+
+      Upstream reads `globals.user.hasAdminChat` in the browser at all three of its `po` sites. Here
+      it is the per-room membership the server just read — the rule the 2026-08-07 privilege
+      escalation was written under, applied to the one flag that decides who sees the admin channel.
+
+      `=== true` and not truthiness: a membership the controller could not answer must not open a
+      private channel by being undefined.
+    */
+    hasAdminChat: config.member?.permissions.hasAdminChat === true,
+    // Passed through RAW. What `undefined` means is decided once, in `chatTabsForMember`.
+    hasChannelTabs: config.settings?.hasChannelTabs,
+    hasAdminOnlyChannel: config.settings?.hasAdminOnlyChannel,
+    altGenChannelName: config.settings?.altGenChannelName,
+    altOffTopicChannelName: config.settings?.altOffTopicChannelName,
+    extraAdminChannels: config.settings?.extraAdminChannels,
+    extraRegChannels: config.settings?.extraRegChannels
+  });
+}
+
+/**
+ * The same answer as NAMES, which is what an allow-list and a keyed map need.
+ *
+ * Deliberately derived from `memberChatTabs` rather than computed a second way — the docblock above
+ * says why a second implementation of this rule is the failure mode, and that applies to a
+ * projection of it just as much as to a re-derivation.
+ */
 export async function memberChatChannels(
   request: Request,
   roomShortCode: string,
   user: { email: string; role: string }
 ): Promise<string[]> {
-  const config = await readRoomConfig(request, roomShortCode, user.email);
-  const badges = config.badges?.byEmailHash?.[hashEmail(user.email)] ?? [];
-
-  return chatTabsForMember(
-    config.settings?.chatTabsWithBadges,
-    badges.map((badge) => String(badge)),
-    isPresenterRole(user.role),
-    // Passed through RAW. What `undefined` means is decided once, in `chatTabsForMember`.
-    config.settings?.hasChannelTabs
-  );
+  return chatChannelNames(await memberChatTabs(request, roomShortCode, user));
 }
 
 /**

@@ -427,7 +427,28 @@ const ROOM_CONSUMED = [
 
      ABSENT MEANS TRUE, decided once in chat-tabs.ts: the captured default is on, and reading
      absence as false would remove the tab from every room that has never stored the setting. */
-  'hasChannelTabs'
+  'hasChannelTabs',
+  /* THE OTHER FIVE OF THAT SAME EXPRESSION - 106 through 110, added 2026-09-02.
+
+     `hasChannelTabs` was one of SIX settings that feed one function, and it crossed alone because it
+     was the one that was a live defect. These five are the rest, and they cross together: a subset
+     describes a room the reference cannot be in.
+
+     They were invisible to `audit-setting-coverage.mjs` for the same reason it was - all six are
+     read inside `processSessData`, off the minifier's own local, before the object is `sessData`.
+
+     altGenChannelName and altOffTopicChannelName rename a TAB and never the channel behind it.
+     hasAdminOnlyChannel adds the `adminChat` tab, whose type `po` is the only one the reference
+     gates: presenter or the controller's own hasAdminChat flag. extraAdminChannels and
+     extraRegChannels are comma-separated owner-typed lists, pushed as types `p` and `r`.
+
+     The room refuses a typed name that collides with a reserved channel, which upstream does not: an
+     extraRegChannels entry named `adminChat` would be an UNGATED channel aliasing the private one. */
+  'altGenChannelName',
+  'altOffTopicChannelName',
+  'hasAdminOnlyChannel',
+  'extraAdminChannels',
+  'extraRegChannels'
 ];
 
 /**
@@ -1012,6 +1033,20 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // `sessData.<name>` rule misses every read the reference takes inside `processSessData` while the
 // object is still a local. Six settings were invisible that way; this was the one already half-built.
 //
+// 106-110 since 2026-09-02: `altGenChannelName`, `altOffTopicChannelName`, `hasAdminOnlyChannel`,
+// `extraAdminChannels`, `extraRegChannels`. Thirty-seventh through forty-first finds, and they are
+// ONE find rather than five — the remaining five of the six that feed `processSessData`'s tab
+// expression, invisible to the enumeration for exactly the reason 105 was.
+//
+// They arrive together because a subset describes a room the reference cannot be in, and because
+// they are a MODEL change: the reference gives every tab a `type` and has three of them where this
+// room had one. `po` is the only type it gates, and it gates it twice in the browser — at subscribe
+// and at render. The room decides it once, on the server, from the controller's membership.
+//
+// `p` turned out to be decoded too, and the answer is that nothing reads it: `type:"p"` occurs once
+// in the whole bundle and no comparison against it exists anywhere. So `extraAdminChannels` is a
+// name describing an intent the reference's own client does not enforce.
+//
 // 106 since 2026-09-02: `smallerImagePreview`. Thirty-seventh find, and the first that crosses on a
 // PRECEDENT rather than on a new measurement. It has been on the enumeration since the enumeration
 // existed, answered NOT A GAP on a premise re-read this session and found wrong: `defaultImagePreview`
@@ -1022,7 +1057,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 106 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 111 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

@@ -9,7 +9,7 @@ import {
   postOnXIntent
 } from '#lib/post-alert-behavior.js';
 import { stripHtmlToText } from '#lib/chat-plain-text.js';
-import type { AlertTab, ChatTab, MessageActionItem, ModalName } from '#lib/types.js';
+import type { AlertTab, ChatChannelName, MessageActionItem, ModalName } from '#lib/types.js';
 
 import type { MenuName } from './menus.svelte';
 
@@ -18,7 +18,7 @@ import type { RoomDialogs } from './dialogs.svelte';
 
 /** The three wire commands this class sends, injected so it needs no route import. */
 export interface ComposerCommands {
-  send: (payload: { body: string; bodyHtml?: string; room: ChatTab }) => Promise<unknown>;
+  send: (payload: { body: string; bodyHtml?: string; room: ChatChannelName }) => Promise<unknown>;
   uploadImage: (payload: { file: File; originalName: string }) => Promise<string>;
   postAlert: (payload: {
     kind: AlertTab;
@@ -503,7 +503,7 @@ export class RoomComposer {
    * it and derives its own `body` from the result, so what arrives here as plain text is the
    * optimistic copy and never the stored one.
    */
-  async sendBody(body: string, bodyHtml?: string, room: ChatTab = this.#chat.tab) {
+  async sendBody(body: string, bodyHtml?: string, room: ChatChannelName = this.#chat.tab) {
     const trimmedBody = body.trim();
     if (!trimmedBody) return false;
 

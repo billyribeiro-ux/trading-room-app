@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 106 of 269 are wired today.
+// nothing in the room reads it yet. 111 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -227,11 +227,11 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "privMessageHugePopup", section: "settings", type: "checkbox", label: "Huge Priv Msg Alert?", help: "Some user can't see the private messages, this makes a HUGE popup", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "hasChannelTabs", section: "settings", type: "checkbox", label: "OffTopic Channels/Tabs", help: "This setting adds an OffTopic, channel tabs next to general chat", helpShape: "plain", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "autoSwitchToOfftopics", section: "settings", type: "checkbox", label: "Auto switch to OffTopic Channels/Tabs?", help: "Auto Switch to OffTopic tab", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "hasAdminOnlyChannel", section: "settings", type: "checkbox", label: "Admin Channels/Tabs", help: "This setting adds an admin/presenter dedicated chat tab", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "extraAdminChannels", section: "settings", type: "textarea", label: "Extra Admin Channels", help: "Comma separated list of extra admin channels", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "extraRegChannels", section: "settings", type: "textarea", label: "Extra Regular Channels", help: "Comma separated list of extra regular (anyone can post) channels", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "altGenChannelName", section: "settings", type: "textarea", label: "Rename \"Main Chat\"", help: "Rename the Main Chat channel to...", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
-  { name: "altOffTopicChannelName", section: "settings", type: "textarea", label: "Rename \"Off-Topic\"", help: "Rename the Off-Topic channel to...", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "hasAdminOnlyChannel", section: "settings", type: "checkbox", label: "Admin Channels/Tabs", help: "This setting adds an admin/presenter dedicated chat tab", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
+  { name: "extraAdminChannels", section: "settings", type: "textarea", label: "Extra Admin Channels", help: "Comma separated list of extra admin channels", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
+  { name: "extraRegChannels", section: "settings", type: "textarea", label: "Extra Regular Channels", help: "Comma separated list of extra regular (anyone can post) channels", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
+  { name: "altGenChannelName", section: "settings", type: "textarea", label: "Rename \"Main Chat\"", help: "Rename the Main Chat channel to...", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
+  { name: "altOffTopicChannelName", section: "settings", type: "textarea", label: "Rename \"Off-Topic\"", help: "Rename the Off-Topic channel to...", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "chatTabsWithBadges", section: "settings", type: "textarea", label: null, help: "List of chat tabs with badges: [ { \"name\": \"easy channel\", \"badges\": [ \"61eafd612fcdee7bc8e979bc\", \"6489f1f98993a677b83cdd70\" ] }, { \"name\": \"harder channel\", \"badges\": [ \"61eafd612fcdee7bc8e979bc\" ] } ]", helpShape: "plain", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hasProfanityFilter", section: "settings", type: "checkbox", label: "Chat Profanity filter?", help: "Profanity filter will try to filter (put xxxx) on bad words", helpShape: "plain", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "ingnoreBadWordsList", section: "settings", type: "text", label: "Ignore List", help: "Comma separated list OK words to remove from the filter", helpShape: "bare", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },

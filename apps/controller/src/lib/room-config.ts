@@ -985,6 +985,34 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'hasChannelTabs',
   /*
+    THE OTHER FIVE SETTINGS OF THE SAME EXPRESSION, crossed 2026-09-02.
+
+    hasChannelTabs above crossed alone on 2026-08-31 and it is one of SIX that feed one function in
+    the reference's own room client. These are the rest, and they cross together because a subset
+    describes a room the reference cannot be: a renamed Main Chat tab with no admin channel, or an
+    admin channel with no way to name the extra ones beside it.
+
+    Each is read as sessData dotted onto its name in the room bundle, which is the test this list
+    applies: per-room policy the room must READ and can never decide.
+
+    None is credential-shaped. The two comma lists are owner-typed text and are the only ones that
+    could carry anything surprising; the room trims, bounds and refuses them against its reserved
+    channel names before any of them becomes a channel, which upstream does not do at all.
+
+    Alt Gen Channel Name and Alt OffTopic Channel Name rename a TAB and never the channel behind it.
+    Getting that backwards would move every message in a room into a channel named after a label.
+
+    Admin Only Channel adds the adminChat tab, and its type is the one the reference gates: only a
+    presenter or a member the controller marks with hasAdminChat may see it or subscribe to it. The
+    room decides that on the SERVER from the membership, where upstream decides it twice in a
+    browser.
+  */
+  'altGenChannelName',
+  'altOffTopicChannelName',
+  'hasAdminOnlyChannel',
+  'extraAdminChannels',
+  'extraRegChannels',
+  /*
     "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with it.
 
     THREE behaviours behind one checkbox, read from six sites. It forces the display mode to compact
@@ -1139,8 +1167,11 @@ const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);
  * `ROOM_VISIBLE_SETTINGS` is delivered to every member. `apps/room`'s `+page.server.ts` returns it
  * as `sessData` from the page load, and SvelteKit serialises a load's return into the SSR payload —
  * so a name added there is a name in the HTML of every viewer's page, participants and muted
- * members included. That is correct for the ninety settings on it, every one of which decides
- * something the viewer's own browser has to draw.
+ * members included. That is correct for the ninety-odd settings on it, every one of which decides
+ * something the viewer's own browser has to draw. (A COUNT IN PROSE, deliberately approximate: the
+ * exact one is `verify-room-settings-schema.mjs`'s, re-derived on every run, and a second exact
+ * number here would be a second thing to keep in step. It read "ninety" until 2026-09-02, when five
+ * channel settings crossed at once.)
  *
  * `restreamToURL` is not one of those. It decides where the ROOM republishes its stream, only a
  * presenter can set it, and only a presenter's pane displays it.

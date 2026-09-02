@@ -52,6 +52,7 @@
   import { formatChatMutedTill, sameCalendarDay } from '#lib/message-formatters.js';
   import ChatSearchBar from './ChatSearchBar.svelte';
   import ChatTabStrip from './ChatTabStrip.svelte';
+  import type { ChatTab } from '#lib/chat-tabs.js';
   import type { ChatTabUnreadCounts } from '#lib/room/chat-tab-unread.js';
   import EmojiPicker from './EmojiPicker.svelte';
   import GiphyPicker from './GiphyPicker.svelte';
@@ -60,7 +61,7 @@
   import type { RoomMessageChrome } from '#lib/room-message-chrome.js';
   import type { ChatDisplayMode } from '#lib/chat-display-mode.js';
   import type {
-    ChatTab,
+    ChatChannelName,
     FollowChatStyle,
     MessageAction,
     MessageActionEvent,
@@ -74,14 +75,21 @@
      * Bindable, because the column has its own tab strip and its own idea of where it is; the page
      * owns the value so that paging and unread counts can be keyed by channel across both columns.
      */
-    tab: ChatTab;
+    tab: ChatChannelName;
     /**
      * The channel strip this column draws, decided on the SERVER.
      *
      * Both columns get the SAME list — a member's entitlement does not depend on which column they
      * are looking at — and it arrives with the page as `data.chatTabs`. See `#lib/chat-tabs.ts`.
      */
-    chatTabs: readonly string[];
+    /*
+      FULL TABS since 2026-09-02, not names. A tab carries the label it is drawn with, because
+      `altGenChannelName` / `altOffTopicChannelName` let an owner rename the two built-ins — so the
+      label stopped being derivable from the name. It carries its TYPE too, unread here and passed
+      through, because the strip is not where a channel's audience is decided: `chat-channels.ts`
+      already refused a member the tab they may not have.
+    */
+    chatTabs: readonly ChatTab[];
     /**
      * `acA-06` — THIS column's unread counts. `app-extra-chat` keeps its own `unreadMsgs` map (byte
      * 2,375,500) and clears its own on a switch, so the two columns badge independently.
@@ -196,7 +204,7 @@
      * for its own reasons. `follow` is the page's INSTANCE rather than a fresh one: constructing it
      * here would silently give this column the `alwaysScrollToBottom` the alerts one is forbidden.
      */
-    follow: RoomScrollFollow<ChatTab>;
+    follow: RoomScrollFollow<ChatChannelName>;
     viewerId: number;
     /** THIS column's flag — see the note on the effect. */
     readingHistory: boolean;

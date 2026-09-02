@@ -881,8 +881,8 @@ for reference behaviour.
 
 ### E.5 — The honest gap that is not a diff: `wired`
 
-Our schema carries a `wired` flag meaning "something actually consumes this value". **106 of 269 are
-wired. 163 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
+Our schema carries a `wired` flag meaning "something actually consumes this value". **111 of 269 are
+wired. 158 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
 
 **This section said "58 wired, 211 not" until 2026-08-29**, and listed those 58 by name. The count
 had nearly doubled underneath it. Both the number and the roster below are now regenerated from
@@ -895,7 +895,8 @@ Wired (106), alphabetically:
 
 `alertLabels`, `alertSoundOff`, `alertsChatOnBottom`, `alertsOverlayOnScreenshare`,
 `allowUsersToChangeUsername`, `allowedMemberships`, `allowedPerms`, `allowedProducts`,
-`altBenzingaLinkURL`, `altBenzingaLogoURL`, `altChatRender`, `alwaysShowRoster`, `autoRecord`,
+`altBenzingaLinkURL`, `altBenzingaLogoURL`, `altChatRender`, `altGenChannelName`,
+`altOffTopicChannelName`, `alwaysShowRoster`, `autoRecord`,
 `autoSwitchToOfftopics`, `beepOnUserJoin`, `blinkingRec`, `chatDisabledForTrials`,
 `chatTabsWithBadges`, `claimNickName`, `copyTrades`, `customCSS`, `customEnterDisclosure`,
 `customFaviconURL`, `customMobileAppAndroidUrl`, `customMobileAppEnabled`,
@@ -903,7 +904,8 @@ Wired (106), alphabetically:
 `disableCopy`, `disableEditingUsername`, `disablePMForTrials`, `disableStarYears`,
 `dontShowRecInfoToUsers`, `dontStopRecOnMicMute`, `enableBadges`, `enableEditAlerts`,
 `enableEditMessage`, `enablePrivateMessageHistory`, `enableQAReactions`, `enableRTE`,
-`enableReactions`, `freeTrialsGetApp`, `hasAlertScheduler`, `hasBenzingaNews`,
+`enableReactions`, `extraAdminChannels`, `extraRegChannels`, `freeTrialsGetApp`,
+`hasAdminOnlyChannel`, `hasAlertScheduler`, `hasBenzingaNews`,
 `hasChannelTabs`, `hasDayTradeAlerts`, `hasQAOnAlerts`, `hasRequiredPhoneInLogin`, `hasSpeechRecognitionDisabled`,
 `hasSwingTradeAlerts`, `hasTypingIndicator`, `hideAppInfo`, `hideAvatars`, `hideChatAlerts`,
 `hideChatLog`, `hideFiles`, `hideMobileCredentials`, `hideNotes`, `hidePoweredBy`, `hideRecs`,
@@ -919,17 +921,23 @@ Wired (106), alphabetically:
 `tokenExpiresIn`, `useMediaMTX`, `userJoinAndLeavePopup`, `userPM`, `userToPresenterPM`,
 `userUploads`, `usernameInstructions`, `usersCanDeleteOwnMsgs`, `usersPublicReply`, `webinarPW`.
 
-The 163 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
+The 158 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
 `saveRecsToVimeo` and the four Vimeo fields), most of the streaming fields (`obsBroadcastRoom`,
 `obsStreamKey`, `restreamToURLKey`, `hasYTStreaming` — `restreamToURL` beside them was wired on
 2026-08-30 and is the one exception), every SMS field
 (`twillioApiSID`, `twillioApiToken`, `twilioPhone`, `protextingSecretTok`, `protextingGroupIDs`),
-most of the channels group (`hasChannelTabs`, `hasAdminOnlyChannel`, `extraAdminChannels`,
-`extraRegChannels`, `altGenChannelName`, `altOffTopicChannelName`), the profanity filter
+the profanity filter
 (`hasProfanityFilter`, `ingnoreBadWordsList`, `additionalBadWordsList`), every linked-room push
 (`linkedRoomAlerts`, `linkedRoomSwingAlerts`, `linkedRoomSwingAlertsOther`,
 `linkedRoomDayTradeAlerts`, `linkedRoomDayTradeAlertsOther`, `linkedRoomRecordings`,
 `linkedStreamsAPIKey`), all 49 DON'T TOUCH fields, and `apiSecret`.
+
+**The channels group left this list entirely on 2026-09-02.** It read *"most of the channels group
+(`hasChannelTabs`, `hasAdminOnlyChannel`, `extraAdminChannels`, `extraRegChannels`,
+`altGenChannelName`, `altOffTopicChannelName`)"*, and all six are wired now — `hasChannelTabs` on
+2026-08-31 and the other five with the channel-model change. They are one expression in the
+reference (`processSessData`, bundle bytes 1,146,625-1,147,200), so a subset of them describes a
+room the reference cannot be in, and the five arrived together for that reason.
 
 > **Superseded 2026-08-29.** This paragraph read *"The 211 unwired …"* and listed
 > `chatTabsWithBadges` inside the channels group. It has been wired since — `chat-tabs.ts`,

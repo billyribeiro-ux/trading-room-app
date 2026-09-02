@@ -1,7 +1,7 @@
 import { appendMention } from '#lib/mention-insert.js';
 import { RoomChatSearch, type ChatColumn } from './chat-search.svelte.js';
 import { withArrival, withoutChannel, type ChatTabUnreadCounts } from './chat-tab-unread.js';
-import type { ChatTab } from '#lib/types.js';
+import type { ChatChannelName } from '#lib/types.js';
 
 /*
   The room's two chat columns — which channel each shows, what is typed in each, which one the
@@ -69,9 +69,9 @@ export class RoomChat {
    * "offTopic", …)` in `ngOnInit`, byte 1,407,102. A SEED and not a lock — the channel tabs still
    * switch back, and writing it as a derivation would re-switch the column on every invalidate.
    */
-  #tab = $state<ChatTab>('main');
+  #tab = $state<ChatChannelName>('main');
   /** `this.channel = 'offTopic'` in `app-extra-chat` — the extra column has its own channel. */
-  #extraTab = $state<ChatTab>('off-topic');
+  #extraTab = $state<ChatChannelName>('off-topic');
   #composer = $state('');
   #extraComposer = $state('');
   /** `globals.chatInputFocus` — which composer the viewer last typed in. */
@@ -164,7 +164,7 @@ export class RoomChat {
     if (sources.autoSwitchToOffTopic) this.#tab = 'off-topic';
   }
 
-  get tab(): ChatTab {
+  get tab(): ChatChannelName {
     return this.#tab;
   }
 
@@ -257,7 +257,7 @@ export class RoomChat {
   typingUpdated(chatChannel: string, names: readonly string[]): void {
     /*
       NO MAPPING. `CHAT_CHANNELS` in `#lib/server/chat-log.ts` is `['main', 'off-topic']` — this
-      room's wire names ARE its `ChatTab` values, so a translation function here would be a second
+      room's wire names ARE its `ChatChannelName` values, so a translation function here would be a second
       spelling of a fact that is already one. (The reference's own names differ — `offTopic` — and
       that difference is the boundary's, not this class's.)
     */
@@ -282,7 +282,7 @@ export class RoomChat {
     this.#announced[composer] = false;
   }
 
-  set tab(next: ChatTab) {
+  set tab(next: ChatChannelName) {
     this.#tab = next;
     // `switchChatChannel` clears the channel it opened. See `withoutChannel`.
     this.#unread = withoutChannel(this.#unread, next);
@@ -294,11 +294,11 @@ export class RoomChat {
     this.search.endedByChannelSwitch('main');
   }
 
-  get extraTab(): ChatTab {
+  get extraTab(): ChatChannelName {
     return this.#extraTab;
   }
 
-  set extraTab(next: ChatTab) {
+  set extraTab(next: ChatChannelName) {
     this.#extraTab = next;
     // See `tab` above. `app-extra-chat` clears its own map and never the main column's.
     this.#extraUnread = withoutChannel(this.#extraUnread, next);

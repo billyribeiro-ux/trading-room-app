@@ -2625,7 +2625,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and the note recording that `app-chat` and `app-extra-chat` differ by ONE leading space — which
       is the reason this is still one component and not two.
     */
-    max: 105,
+    /*
+      105 -> 111, 2026-09-02. The strip takes full `ChatTab` objects rather than names.
+
+      `altGenChannelName` and `altOffTopicChannelName` let an owner rename the two built-ins, so a
+      label stopped being derivable from a name and `chatTabLabel`'s two-entry lookup could not have
+      known about it. The reference puts `displayName` on the tab for exactly that reason.
+    */
+    max: 111,
     why: 'the chat channel strip - the captured markup, once, over a list the server decided'
   },
   {
@@ -4322,7 +4329,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       whole defect. This file is the connect, so this is where the read belongs; everything else about
       it, including the gate that decides whether to SHOW it, is elsewhere.
     */
-    max: 1018,
+    /*
+      1018 -> 1034, 2026-09-02. The load resolves full TABS and projects the names beside them.
+
+      Sixteen lines, thirteen of them prose. The projection is a separate statement rather than an
+      inline `.map` because `chat-channels.ts` argues that a second computation of this rule is the
+      failure mode, and a caller that narrowed inline would be one — the reason has to sit where the
+      narrowing happens.
+    */
+    max: 1034,
     why: 'the loader, plus `logout`; 3,233 before the remote-function conversions began'
   },
   /*
@@ -5541,7 +5556,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       here rather than in a commit message. The paragraph beside it records the divergence: this
       applies to search results too, which upstream cannot do because its toggle re-requests the log.
     */
-    max: 490,
+    /*
+      490 -> 495, 2026-09-02, and it is the `ChatTab` -> `ChatChannelName` rename reflowing one
+      import. The alias in `types.ts` described itself as "a chat channel's name, which is also its
+      tab label", and the middle clause stopped being true when the two built-in tabs became
+      renameable. `ChatTab` is the OBJECT now; the string took the name it always meant, and a
+      longer identifier pushes a four-name import list past the print width.
+    */
+    max: 495,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {
@@ -7261,7 +7283,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       precedent. It also has to establish that the binding is on the SCROLLER and not on a message,
       which the component's input list settles and nothing else does.
     */
-    max: 1587,
+    /*
+      1587 -> 1595, 2026-09-02. The `chatTabs` prop takes `ChatTab[]` and the reason for it.
+
+      Eight lines, seven of them the comment: a label is no longer derivable from a channel name,
+      because an owner can rename the two built-in tabs. The type travels with the tab and is unread
+      here deliberately — the strip is not where a channel's audience is decided, and saying so at
+      the prop is what stops somebody adding a gate beside a gate.
+    */
+    max: 1595,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -7570,7 +7600,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       file must match. A pointer to the other component would be a comment that goes stale the day
       the two columns diverge, which is the thing this pane's own header spends its first page on.
     */
-    max: 802,
+    /*
+      802 -> 810, 2026-09-02. The same eight lines as `AlertChatArea` above, and they are the same
+      eight on purpose: both columns take the identical `chatTabs` prop, and the note explaining why
+      a label is no longer derivable from a channel name has to be at both props or at neither. The
+      strip is one component precisely so the two cannot drift; the PROP is where each column states
+      what it takes.
+    */
+    max: 810,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

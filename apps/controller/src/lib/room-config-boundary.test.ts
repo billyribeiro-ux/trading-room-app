@@ -261,6 +261,25 @@ describe('the allow-list itself', () => {
         stored the setting.
       */
       hasChannelTabs: 'chat-tabs.ts `chatTabsForMember` — whether the room has an Off Topic channel',
+      /*
+        THE OTHER FIVE OF THAT SAME EXPRESSION, added 2026-09-02, and they all reach one function.
+
+        `chatTabsForMember` is the reference's `processSessData` tab builder reproduced, so every one
+        of these has its consumer in the same place — which is the point of the list being one
+        function rather than six pushes. The reference gives every tab a TYPE and has three of them
+        where this room had one, and `hasAdminOnlyChannel`'s `po` is the only type it gates.
+
+        The two comma lists are the only owner-TYPED text among them, and they are the reason the
+        room refuses a name colliding with a reserved channel where upstream does not: an
+        `extraRegChannels` entry named `adminChat` would alias the private channel with an ungated
+        one.
+      */
+      altGenChannelName: 'chat-tabs.ts `chatTabsForMember` — renames the Main Chat TAB',
+      altOffTopicChannelName: 'chat-tabs.ts `chatTabsForMember` — renames the Off Topic TAB',
+      hasAdminOnlyChannel:
+        'chat-tabs.ts `chatTabsForMember` — adds the `adminChat` tab, gated on presenter or hasAdminChat',
+      extraAdminChannels: 'chat-tabs.ts `chatTabsForMember` — comma-split, type `p`',
+      extraRegChannels: 'chat-tabs.ts `chatTabsForMember` — comma-split, type `r`',
       enableBadges: 'RoomMessage `visibleBadges` — the owner master switch on chat badges',
       showBadgesToPresentersOnly: 'RoomMessage `visibleBadges` — narrows badges to presenters',
       disableStarYears: 'RoomMessage — the membership-star gate',

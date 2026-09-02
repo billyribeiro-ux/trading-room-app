@@ -3,7 +3,7 @@ import {
   CHAT_PAGE_REQUEST_NUDGE,
   shouldLoadOlderMessages
 } from '#lib/chat-paging.js';
-import type { ChatTab } from '#lib/types.js';
+import type { ChatChannelName } from '#lib/types.js';
 
 import {
   loadOlderAlerts as loadOlderAlertsPage,
@@ -283,7 +283,7 @@ export class RoomFeedScroll {
    * (`0 == o.length && (this.hasMoreData = !1)`): the server does not say how much history is left
    * and does not need to, because running out is something you discover by asking once too often.
    */
-  async loadOlderChatMessages(channel: ChatTab, scroller: HTMLElement) {
+  async loadOlderChatMessages(channel: ChatChannelName, scroller: HTMLElement) {
     const page = this.#chatPages.requesting(channel);
 
     let incoming: Awaited<ReturnType<typeof loadOlderChatPage>>;

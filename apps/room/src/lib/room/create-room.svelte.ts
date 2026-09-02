@@ -161,7 +161,7 @@ import { dayTradeAlertsTabVisible } from '#lib/day-trade-alerts.js';
 import type { DayTradeAlertRow } from '#lib/types.js';
 
 import { playSoundEffect } from '#lib/sound-effects.js';
-import type { ChatTab, FollowChatStyle, MainTab, Theme } from '#lib/types.js';
+import type { ChatChannelName, FollowChatStyle, MainTab, Theme } from '#lib/types.js';
 
 /** Everything the constructions reach for that this file does not own. */
 export interface RoomDeps {
@@ -1145,11 +1145,11 @@ export function createRoom(deps: RoomDeps) {
   */
   const alertsFollow = new RoomScrollFollow();
 
-  const chatFollow = new RoomScrollFollow<ChatTab>({
+  const chatFollow = new RoomScrollFollow<ChatChannelName>({
     alwaysScrollToBottom: () => prefs.alwaysScrollToBottom
   });
 
-  const extraChatFollow = new RoomScrollFollow<ChatTab>({
+  const extraChatFollow = new RoomScrollFollow<ChatChannelName>({
     alwaysScrollToBottom: () => prefs.alwaysScrollToBottom
   });
 
