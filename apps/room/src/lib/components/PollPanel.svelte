@@ -590,6 +590,31 @@
     const frame = requestAnimationFrame(drawPieChart);
     return () => cancelAnimationFrame(frame);
   });
+
+  /*
+    `poll-11` — the reference's TWO post-transition re-plots, and why this effect is them.
+
+    `grep -bo "calcPieData(),100)"` returns exactly two offsets, 2,109,087 and 2,109,678: the tail of
+    the restore path and the tail of the maximize branch, both
+    `"results" == this.mode && this.total > 0 && setTimeout(() => this.calcPieData(), 100)`.
+
+    The row asks for both to be transcribed at those two sites. They are already there, as one
+    dependency instead of two timers — measured on all three paths 2026-09-02:
+
+      restore FROM MAXIMIZED   `restorePanel` assigns `panelWidth`/`panelHeight` → this re-runs
+      maximize               `toggleMaximize` assigns both → this re-runs
+      restore from NORMAL     assigns neither — and needs no re-plot, because minimizing sets
+                              `display: none` on the panel (`panelStyle`) rather than unmounting it,
+                              so the canvas keeps the bitmap it was painted with and shows it again
+
+    Upstream needs the 100ms because it writes geometry through jQuery `.css()` and has to wait for
+    the layout it caused; this room writes reactive state that is read synchronously, so the frame
+    after the assignment already has the final size.
+
+    NOT A DIVERGENCE — internal structure, not reference-facing output — and the alternative is
+    worse than equal: two `setTimeout`s would paint the same chart a second time 100ms after every
+    minimize and every maximize, which is the shape question `CLAUDE.md` asks of every render path.
+  */
 </script>
 
 <svelte:window onpointermove={movePointer} onpointerup={endPointer} onpointercancel={endPointer} />

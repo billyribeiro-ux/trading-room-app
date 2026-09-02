@@ -45,6 +45,55 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 03:13 UTC — two rows measured and NOT built, with the cost of matching written down
+
+Not every row the re-triage confirms is work, and these two are the honest cases. Both are recorded
+at the code with the measurement, so the next comparison finds the reason rather than the hole.
+
+## `poll-11` — already satisfied, by one dependency instead of two timers
+
+`grep -bo "calcPieData(),100)"` returns exactly two offsets, 2,109,087 and 2,109,678: the tail of
+the restore path and the tail of the maximize branch, each
+`"results" == this.mode && this.total > 0 && setTimeout(() => this.calcPieData(), 100)`.
+
+All three paths measured:
+
+| path | upstream | here |
+| --- | --- | --- |
+| restore FROM MAXIMIZED | the timer | `restorePanel` assigns `panelWidth`/`panelHeight`, so the plot effect re-runs |
+| maximize | the timer | `toggleMaximize` assigns both — same |
+| restore from NORMAL | the timer | assigns neither, **and needs no re-plot**: minimizing sets `display: none` rather than unmounting, so the canvas keeps the bitmap it was painted with |
+
+Upstream needs the 100ms because it writes geometry through jQuery `.css()` and must wait for the
+layout it caused. This room writes reactive state read synchronously, so the frame after the
+assignment already has the final size. **NOT A DIVERGENCE — internal structure**, and the
+alternative is worse than equal: two `setTimeout`s would repaint the same chart 100ms after every
+minimize and every maximize.
+
+## `SSM-2` — a real divergence, held, with the cost stated on both sides
+
+The reference splits its six screenshare-menu rows: three carry the click on the `<li>` (consts
+185/186/187), three on the `<a>` (const 163, `d(2,"li")(3,"a",163)`). Both halves were already read
+into the contract test. Ours puts it on the `<li>` for all six, so **ours is a superset on three
+rows** — a click in the padding beside the text activates here and does nothing upstream.
+
+Closing it would cost the keyboard path on those three. This component's structure already diverges
+by a decision `SSM-1` records and tests: the `<li>` is the `role="menuitem"` carrying the accessible
+name, and the `<a>` keeps the capture's `aria-hidden="true"`. Moving `run` onto that anchor puts
+activation on the node marked hidden from assistive technology, while `activateOnKey` stays on the
+`<li>` — which is exactly the mouse-only defect `NTC-2` was opened for.
+
+**This is not claimed as one of the four escapes.** It is a divergence with a cost on each side, and
+the side with the cost to a member using a keyboard is the one this room does not take. Recorded for
+the owner, because "three menu rows respond to a click in their padding" is a product judgement
+rather than a measurement — and the measurement is unchanged and asserted.
+
+**Runtime impact.** None. No code changed in either row; what changed is that both now carry the
+reason a future comparison will need.
+
+**Verified:** room gate exit 0 at `f401c60` — 341 files, 6,179 passed, 1 skipped. No negative control for a no-op change; the existing
+assertions on both rows were re-run and are unchanged.
+
 ### 2026-09-02 03:06 UTC — three rows asked for the same frozen attribute, and the const table cannot settle any of them
 
 MTS-06, MSM-02 and NTC-3 each asked this room to replace a BOUND `aria-selected` / `aria-expanded`
