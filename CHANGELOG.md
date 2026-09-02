@@ -45,6 +45,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 02:19 UTC — a whole capture file nobody had read, in the directory everything else is read from
+
+ROV-03 recorded the chat-image viewer as BLOCKED, and its measurement was exact: `openImageModal`
+occurs once in 2,891,205 bytes — the call — with no declaration, no `.imgur-modal` markup, and the
+three sibling chunks named so the absence was bounded. Every word true of `main.d1d09071be31f1ba.js`.
+
+**The declaration is at `deployed-index.html:70`, and this repository was already building from it.**
+159 lines, same pinned directory, listed in that directory's own `sha256sums.txt`. Its inline
+`<script>` holds `openImageModal` in full — the popped-out-window branch, the `bootbox.dialog`, and
+`downloadImage(url, imageName)` after it.
+
+Three things make this worth the entry rather than a one-line fix:
+
+1. **The test that recorded the blocker had the file in a constant.** `DEPLOYED_INDEX` was read for
+   four `<script src>` attributes and never for the body those tags sit beside.
+2. **`RoomModals.openImage` is a transcription of that declaration**, popped-out window and all, and
+   `routes/+page.svelte` assigns it to `window.openImageModal` — the global name the captured page
+   defines for its inline handlers. Somebody built the function from this file while the row
+   recorded the file as not holding it.
+3. It is the same failure RTE-05 paid for earlier in this pass, one level in: **a sweep of one
+   capture FILE reported as a sweep of the evidence.** `main.*.js` is not the capture; the directory
+   is.
+
+## What it changed, and it reverses a change from 2026-08-31
+
+There are two image viewers upstream and `ImageLightbox.svelte` was documented as the other one:
+
+| | `showImagePreview(e, i="")` | `openImageModal(event, url)` |
+| --- | --- | --- |
+| where | bundle byte 1,992,730 | `deployed-index.html:70` |
+| used by | the alert panes | **the chat image — this dialog** |
+| `alt` | the whole url | **the basename** |
+
+`OVL-05` had changed `alt` from the basename to the url on 2026-08-31, calling the basename *"a
+preference substituted for a captured value"*. It was a captured value — of the right dialog, read
+from the wrong one.
+
+Its supporting argument was that the basename *"disagreed with this room's own other renderer of the
+same image"*, the popped-out window, which uses the url. **That disagreement is upstream's own**: the
+popped-out window is `openImageModal`'s shift/alt/ctrl branch, ten lines above the dialog in the same
+function, and it really does write `alt="${url}"` there. The reference describes one image two ways
+depending on the gesture that opened it. Both halves are transcribed now.
+
+## And a paragraph of "this cannot be known" that was answerable
+
+`ImageLightbox.svelte` said the download button's container and class list *"are this room's, are
+recorded as this room's, and are not evidence of anything"*, because only bootbox decides where a
+`buttons` entry lands and *"the capture roots that would hold one are absent here"*. The index does
+not use `buttons` at all — it writes the markup by hand:
+
+```html
+<img src="URL" alt="FILENAME" /><hr>
+<button class="btn btn-primary btn-sm" onclick="downloadImage('URL','FILENAME')">…
+```
+
+So the `<hr>`, the in-body placement and the prepended `btn` are all settled, and **the room's guess
+was right character for character**. `download-image.ts` also has its source named at last, with both
+of its differences from it stated: upstream passes the filename as a second argument and re-splits
+it, and this adds the `revokeObjectURL` upstream omits.
+
+**Runtime impact.** A chat image's lightbox describes it by filename again instead of by its full
+URL — which is what a screen reader reads out.
+
+**Verified:** room gate exit 0 at `9431f1b` — 341 files, 6,167 passed, 1 skipped. Negative controls
+seen red for the `alt` and for the `<hr>`. Controller untouched.
+
 ### 2026-09-02 02:04 UTC — a rule this repository has now got wrong four times, and the fourth time it was executable
 
 PCC-07 arrived as a one-line row: the private composer binds `keydown` and const 55 binds `keyup`.

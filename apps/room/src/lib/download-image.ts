@@ -22,6 +22,13 @@
  *
  * ## The filename rules are the reference's and they are not cosmetic
  *
+Source, located 2026-09-02: `downloadImage(url, imageName)` at `docs/source-v4-2026-08-15/deployed-index.html`
+ * lines 125-145 — the same pinned directory as the bundle, listed in its `sha256sums.txt`. Two
+ * differences, both stated: upstream takes the filename as a SECOND argument and then re-splits it
+ * (`imageName.split('/').pop()`), so passing the basename or the whole url gives the same answer and
+ * the one-argument form here is internal structure rather than output; and this adds
+ * `revokeObjectURL`, which upstream omits and which leaks the blob for the life of the document.
+ *
  * `replace(/^[^_]+_/, '')` drops the upload id this room's storage prefixes, and
  * `replace(/_[^_]+(\.[^.]+)$/, '$1')` drops the size suffix before the extension. Without them a
  * presenter saving a screenshot gets `a3f9c1_chart_1024.png` instead of `chart.png`. Transcribed

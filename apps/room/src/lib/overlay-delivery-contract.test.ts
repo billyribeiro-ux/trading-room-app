@@ -234,24 +234,52 @@ describe('OVL-04 — a mention rings, and the popup preference does not silence 
 
 describe('OVL-05 — the lightbox describes the image the way the capture does', () => {
   /*
+    ## THIS ROW WAS BUILT FROM THE WRONG UPSTREAM FUNCTION, and reversed on 2026-09-02
+
+    It cited `showImagePreview` at byte 1,992,730:
+
     ```js
-    message: `… <img src="${e}" class="img-fluid" alt="${e}" /> …`         // byte 1,992,730
+    message: `… <img src="${e}" class="img-fluid" alt="${e}" /> …`
     ```
 
-    `alt` IS the url. This room computed a basename instead — a preference substituted for a
-    captured value — and disagreed with its own other renderer of the same image, `RoomModals.showImage`,
-    which writes `alt="${url}"` into the popped-out window.
+    That IS a real viewer and its `alt` IS the url — but it is the ALERT PANES' preview. The dialog
+    this component renders is `openImageModal`, declared at `deployed-index.html:70`, and its `alt`
+    is the basename:
+
+    ```js
+    var imageName = url.substring(url.lastIndexOf('/') + 1);
+    message: '<img src="' + url + '" alt="' + imageName + '" /><hr>…'      // index lines 106-116
+    ```
+
+    The room had it right and it was changed to the wrong one — "a preference substituted for a
+    captured value" was the reason given, and the basename was the captured value.
+
+    ## The supporting argument was upstream's own disagreement
+
+    The other half of the reason was that the basename *"disagreed with its own other renderer of
+    the same image, `RoomModals.showImage`, which writes `alt="${url}"` into the popped-out window"*.
+    True — and the popped-out window is `openImageModal`'s OWN shift/alt/ctrl branch, ten lines above
+    the dialog in the same function, and it really does use the whole url there:
+
+    ```js
+    <img src="${url}" alt="${url}" />                                       // index line 104
+    ```
+
+    So the reference describes one image two ways depending on which gesture opened it. The
+    inconsistency is upstream's, both halves are transcribed, and the third assertion below — which
+    was written to prove the room disagreed with itself — is kept, because it now pins the half that
+    was always right.
   */
-  it('passes the whole url as the alt text', () => {
-    expect(lightbox).toContain('alt={url}');
+  it('passes the FILENAME as the alt text, which is what the dialog does', () => {
+    expect(lightbox).toContain('alt={imageName}');
+    expect(lightbox).toContain("url.substring(url.lastIndexOf('/') + 1)");
   });
 
-  it('no longer trims it to a filename', () => {
-    expect(lightbox).not.toContain('lastIndexOf');
-    expect(overlays, 'and the caller does not do it either').not.toContain('lastIndexOf');
+  it('and the caller does not compute one, because the component does', () => {
+    expect(overlays, 'a second basename rule appeared in the caller').not.toContain('lastIndexOf');
   });
 
-  it('agrees with the popped-out window, which was the second answer', () => {
+  it('while the POPPED-OUT window keeps the whole url, which is the same function’s other arm', () => {
     const modals = read('./room/modals.svelte.ts');
     expect(modals).toContain('<img src="${url}" alt="${url}" />');
   });

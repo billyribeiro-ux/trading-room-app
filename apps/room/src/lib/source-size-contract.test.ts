@@ -3372,7 +3372,33 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       The row this closes had recorded itself blocked behind extracting this very component out of
       `RoomOverlays.svelte`. The extraction had already happened, for `dta-02`, on the same day.
     */
-    max: 117,
+    /*
+      117 -> 169, 2026-09-02, for ROV-03 / OVL-06 — and the fifty-two lines are the record of this
+      component having been attributed to the WRONG upstream function for its whole life.
+
+      There are two image viewers upstream. `showImagePreview(e, i = "")` at bundle byte 1,992,730
+      is the alert panes' preview; `openImageModal(event, url)` at `deployed-index.html:70` is the
+      chat image, and it is the one this dialog is. This room's whole image path is the second —
+      `RoomModals.openImage` transcribes it, popped-out window and all, and `routes/+page.svelte`
+      assigns that method to `window.openImageModal`, the global name the captured page defines for
+      its own inline handlers.
+
+      One line of code changed: `alt` is the FILENAME, which this component computed until
+      2026-08-31 when it was changed to the whole URL as "a preference substituted for a captured
+      value". It was a captured value, of the right dialog, read from the wrong one.
+
+      The rest is a paragraph deleted and replaced. It said the `<hr />` and the in-body button
+      "are this room's… and are not evidence of anything", because "the capture roots that would
+      hold one are absent here". They were not absent: the file is 159 lines, in the same pinned
+      directory, listed in its own `sha256sums.txt`, and its inline `<script>` writes that markup out
+      by hand — `<hr>` included, and `btn` prepended exactly as this room had guessed.
+
+      Both halves of that are worth their lines: the correction, and the reason the old claim was
+      believable. A sweep of one capture FILE reported as a sweep of the evidence is the same failure
+      RTE-05 paid for in this pass, and `room-surface-audit-batch3-contract.test.ts` had the answer
+      in a constant it only ever read four attributes out of.
+    */
+    max: 169,
     why: 'the imgur lightbox - one image, a download that does not dismiss, and one alt rule'
   },
   {
@@ -5848,7 +5874,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       It was never modal state — no field, no lifecycle, nothing rendered. A method whose class it
       never touches is a function that has not been extracted yet.
     */
-    max: 55,
+    /*
+      55 -> 62, 2026-09-02. Seven lines: the SOURCE, located at last — `downloadImage(url, imageName)`
+      at `deployed-index.html:125-145`, in the same pinned directory as the bundle.
+
+      This file's rules were transcribed "character for character" from a reference it could not
+      name. Both differences from it are now stated rather than left for the next comparison to
+      find: upstream takes the filename as a second argument and re-splits it, so the one-argument
+      form here is internal structure rather than output; and this adds `revokeObjectURL`, which
+      upstream omits and which leaks the blob for the life of the document.
+    */
+    max: 62,
     why: 'save a shown image, with the reference two filename rules that are not cosmetic'
   },
   {
