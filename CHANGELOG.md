@@ -45,6 +45,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 01:40 UTC — the report modal's refusal was re-challenged, and one unmeasured fact decided six rows
+
+RPT-01 through RPT-07 came back from the re-triage as MATCHABLE. They are the largest single block
+in it, and the challenge was a serious one rather than a rehash: the reference's CLIENT loader is
+fully captured — `loadReports` at bundle bytes 2,413,317-2,413,560, its branch, its error string —
+so "the client half is untranscribable" was never the reason, and the proposal was to build it
+against a new per-recipient delivery table *"written when `alerts.dispatch` fans out"*, showing the
+reference's own `No Reports.` until rows appear. It accepted, correctly, that the schema half of the
+refusal still holds.
+
+**It fails on one fact nobody in this repository had measured: there is no fan-out.**
+`alerts.dispatch` is five booleans on the alert row — `sms`, `email`, `twitter`, `push`,
+`cross_post` — and *nothing in `services/api` reads one of them*. No Twilio, Resend, SendGrid, APNs
+or Firebase client exists anywhere in it. The flags are recorded INTENT with no actor.
+
+So the proposal is a table with no writer, feeding an endpoint that can only ever return empty,
+feeding a modal that would tell a presenter — in the reference's own words — that their alert reached
+nobody. **That is RPT-02: the defect this room shipped once and fixed.** In a product where "no
+reports" is a factual claim about delivery, an always-empty list is a silent fallback of the kind
+`CLAUDE.md` forbids by name.
+
+## What actually changed, because a refusal that survives is not a no-op
+
+The premise-expiry check was one-sided. It swept the migrations for a delivery record — by COLUMNS
+rather than a table name, which is good — and stopped there. A table is the second thing to appear,
+not the first.
+
+`alert-report-modal-contract.test.ts` now reads every `.rs` under `services/api/src` and asserts
+both halves: that no sender's name appears, and that nothing reads a dispatch flag. **It is the
+better signal of the two** because it fails in the right order — a sender has to exist before there
+is an outcome worth recording — and it closes the gap where a delivery table could arrive for some
+unrelated reason and expire the refusal early, or a sender could arrive and not expire it at all.
+
+Both negative controls were run against the real tree and reverted: appending a sender's name to
+`services/api/src/http/v1/alerts.rs` turns it red, and so does appending a read of one flag.
+`services/` is untouched in the diff.
+
+**The client transcription is not what is refused here**, and the row now says so. It is buildable
+and was never in doubt. What is refused is shipping a UI whose empty state is a claim this product
+cannot make.
+
+**Runtime impact.** None. Six rows are disposed with a stronger reason than they carried, and the
+gate that holds them fails one step earlier than it used to.
+
+**Verified:** room gate exit 0 at `2d10a7e` — 341 files, 6,156 passed, 1 skipped. Two negative controls seen red, and `git status services/`
+clean afterwards. Controller untouched.
+
 ### 2026-09-02 01:34 UTC — four more refusals, and a repository gate that caught a citation I had copied from an agent
 
 Batch three of the re-triage. All four were MEASURED REFUSALS, all four measurements were correct,

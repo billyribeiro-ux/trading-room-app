@@ -101,6 +101,20 @@ const MIGRATIONS = readdirSync(MIGRATIONS_DIR)
  */
 const MIGRATION_SQL = MIGRATIONS.replace(/--[^\n]*/g, '');
 
+/**
+ * Every `.rs` file under `services/api/src`, joined — the SENDER half of the premise.
+ *
+ * Added 2026-09-02, when the refusal was re-challenged under "match the dump exactly" and the
+ * challenge proposed building the report against a NEW delivery-attempt table *"written when
+ * `alerts.dispatch` fans out"*. There is no such fan-out, and that is the fact this constant makes
+ * falsifiable rather than remembered. See the assertion below.
+ */
+const API_SRC_DIR = fileURLToPath(new URL('../../../../services/api/src/', import.meta.url));
+const API_SOURCES = readdirSync(API_SRC_DIR, { recursive: true, encoding: 'utf8' })
+  .filter((name) => name.endsWith('.rs'))
+  .map((name) => readFileSync(`${API_SRC_DIR}${name}`, 'utf8'))
+  .join('\n');
+
 describe('the sources this file measures are actually loaded', () => {
   it('reads both modals, the bundle and every migration', () => {
     expect(modal.length).toBeGreaterThan(500);
@@ -170,6 +184,40 @@ describe('RPT-01 / RPT-03 / RPT-04 / RPT-05 / RPT-06 / RPT-07 — the refusal, a
       `dispatch jsonb DEFAULT '{"sms": false, "push": false, "email": false, "twitter": false, "crossPost": false}'::jsonb NOT NULL`
     );
     expect(MIGRATIONS).toContain('alerts_dispatch_shape_check');
+  });
+
+  it('finds no DISPATCHER either — nothing reads the flags, so there is nothing to report on', () => {
+    /*
+      THE STRONGER HALF OF THE PREMISE, measured 2026-09-02 when the refusal was re-challenged.
+
+      The challenge accepted that the schema has no delivery record and proposed building one
+      *"written when `alerts.dispatch` fans out"*, with the modal showing the reference's own
+      `No Reports.` until rows appear. Both halves of that fail on one measurement: **there is no
+      fan-out.** `Dispatch` is five booleans on the alert row (pinned above), nothing in
+      `services/api` reads one of them, and no SMS, email or push client exists anywhere in it.
+
+      So the proposal is a table with no writer feeding an endpoint that can only ever return empty
+      — and the modal would then tell a presenter, in the reference's own words, that their alert
+      reached nobody. That is RPT-02 exactly: the defect this room already shipped once and fixed,
+      and it is a silent fallback in a product where the fallback is a factual claim about delivery.
+
+      This is a better premise-expiry signal than the schema sweep beside it, because it fails in
+      the right ORDER: a sender has to exist before there is an outcome worth recording. The day one
+      of these names appears, this goes red and all six rows come back.
+    */
+    for (const marker of ['twilio', 'sendgrid', 'resend', 'firebase', 'apns']) {
+      expect(
+        API_SOURCES.toLowerCase(),
+        `"${marker}" appeared in services/api — a sender exists now, so RPT-01..07 are buildable`
+      ).not.toContain(marker);
+    }
+    /*
+      And nothing READS the flags. Written as the field accesses rather than the word `dispatch`,
+      which appears in the request struct, the column and this file's own prose.
+    */
+    for (const read of ['dispatch.sms', 'dispatch.email', 'dispatch.push', 'dispatch.twitter']) {
+      expect(API_SOURCES, `${read} is read now — something acts on the flags`).not.toContain(read);
+    }
   });
 
   it('has no client half either — getAlertReport is asked for nowhere in the room', () => {

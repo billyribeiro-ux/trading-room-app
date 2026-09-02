@@ -2629,9 +2629,33 @@ postAlert(){let e={txt:this.alertTxt,n:this.appService.globals.user.name,sendTxt
 
 ### RPT-01 — Report modal never fetches a report — no getAlertReport call, no resp.queue, no error state
 
-**MEASURED REFUSAL 2026-08-30. One measurement decides this row and five others** — RPT-03 through
-RPT-07 — so it is written once, in full, at `AlertSendReportModal.svelte`, and each of those rows
-points here.
+**MEASURED REFUSAL 2026-08-30, RE-CHALLENGED AND STRENGTHENED 2026-09-02. One measurement decides
+this row and five others** — RPT-03 through RPT-07 — so it is written once, in full, at
+`AlertSendReportModal.svelte`, and each of those rows points here.
+
+**The re-challenge, and what it changed.** Put under "match the dump exactly", the proposal was to
+transcribe the client loader verbatim (which IS fully captured — `loadReports` at bundle bytes
+2,413,317-2,413,560, the branch, the strings) against a NEW per-recipient delivery table *"written
+when `alerts.dispatch` fans out"*, showing the reference's own `No Reports.` until rows appear. It
+accepted, correctly, that the schema half of this refusal still holds.
+
+It fails on one fact nobody had measured: **there is no fan-out.** `alerts.dispatch` is five
+booleans on the alert row — `sms`, `email`, `twitter`, `push`, `cross_post` — and *nothing in
+`services/api` reads one of them*. No Twilio, Resend, SendGrid, APNs or Firebase client exists
+anywhere in it. The flags are recorded INTENT with no actor.
+
+So the proposal is a table with no writer, feeding an endpoint that can only ever return empty,
+feeding a modal that would tell a presenter — in the reference's own words — that their alert
+reached nobody. That is RPT-02 exactly: the defect this room shipped once and fixed.
+
+`alert-report-modal-contract.test.ts` now asserts the SENDER half beside the schema half, and it is
+the better premise-expiry signal of the two because it fails in the right order — a sender has to
+exist before there is an outcome worth recording. Both negative controls were run: appending a
+sender's name, and appending a read of one flag, each turn it red.
+
+**The client transcription is not what is refused here.** It is buildable and was never in doubt.
+What is refused is shipping a UI whose empty state is a factual claim about delivery this product
+cannot make.
 
 Every field the reference's report holds (`status`, `name`, `email`, `sentTime`, `latency`,
 `failReason`, `token`) is a fact about one attempt to deliver one alert to one person. **This product
