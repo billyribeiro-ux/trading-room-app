@@ -45,6 +45,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 05:35 UTC — the September Svelte post, item by item, with the measurement for each
+
+`apps/controller/docs/SVELTE-CONFORMANCE-AUDIT.md` §18, following §9's precedent for the August
+post. Every item in
+[What's new in Svelte: September 2026](https://svelte.dev/blog/whats-new-in-svelte-september-2026)
+was put against this repository, and the section records the result of each: what landed, what was
+already here, and what does not apply **with the count that says so** rather than a recollection.
+
+## Three items applied, each with its own commit
+
+- **next.24, `filename` on the preload filter's font branch** — 04:59 UTC above.
+- **`sv migrate sveltekit-3`** — 05:24 UTC above; it could not read the repository until four
+  comments stopped carrying a script-closing tag.
+- **next.17, `use:enhance` on a cross-page form action** — this entry.
+
+## The one cross-page form in either app, and why it stays unenhanced
+
+The impersonation banner posts to `action="/admin?/stopImpersonating"` from the root layout. It is
+the only cross-page action in the repository, so it is the only place next.17 could land, and it
+deliberately does not take it: `use:enhance` **calls `goto` on a redirect** — the official
+`kit/form-actions` doc's own word — and a client-side navigation keeps the document, and with it
+every module-level and component-level value the impersonated identity was already written into.
+The operator would arrive at `/admin` as themselves with parts of the screen still holding the
+person they were viewing as. A full document load throws all of it away, which is the correct
+behaviour for an identity change specifically.
+
+**Nothing covered that banner before now.** So `impersonation-banner-contract.test.ts` also asserts
+the two requirements its own comment states and nothing enforced — that it sits ABOVE the chrome
+branches, so it reaches every page an impersonated session can, and that it offers no way to
+dismiss it — plus both halves of the cross-page post: the action exists, and it redirects, which is
+what makes the unenhanced POST land somewhere.
+
+## Two corrections to my own earlier measurements
+
+Both from globs that reached build sourcemaps rather than source, which is the same class of error
+this session has already recorded four times:
+
+- `createContext` appears **4** times, not 20 — and all four are prose explaining why it is NOT
+  used; the eight state classes are passed as props.
+- `$lib` appears **24** times, not zero — and all 24 are prose. **Zero import specifiers**, which is
+  what the migration claim actually needs, and what `lib-subpath-imports.test.ts` guards.
+
+## Not applicable, with the count in each row
+
+`getOrInsert`/`getOrInsertComputed` (53 `SvelteMap`/`SvelteSet` usages, searched two ways for the
+shape they replace, **zero** sites); `<select defaultValue>` (17 selects, **zero**
+`<option selected>`); `svelte/server`'s new `RenderOutput`/`SyncRenderOutput` (zero non-test
+importers) and `Csp`/`Sha256Source` (no CSP configured in either app); next.19's `+`-file naming
+and `defineParams`; `applyReroute`; the adapter `pre`/`post` groups; the Vite logger;
+`dynamicCompileOptions`; the `mcp` → `ai-tools` rename; and `sv-utils`.
+
+## The one refused on a REASON rather than on absence
+
+**The `+server.js` `QUERY` handler.** Every read in both apps is already a `GET` —
+`internal/room-config` included. The `POST`s that are semantically queries are the credential
+checks (`room-entry`, `room-notes-auth`, `room-alert-delete-auth`, `mobile-pin`, `stream-read`), and
+they must stay `POST`: **`QUERY` is defined as safe and cacheable**, and making a password check
+cacheable by an intermediary is the fail-open this repository refuses. Written down so a later sweep
+does not reconsider it as an oversight.
+
+**Verification.** Three negative controls seen RED on the new contract: `use:enhance` added to the
+form, a dismiss button added to the banner, and the action returning data instead of redirecting.
+`pnpm run gate` exit 0 in **both** apps. Nothing was opened in a browser.
+
+---
+
 ### 2026-09-02 05:24 UTC — the official Svelte CLI could not read this repository, and four characters were why
 
 ## Found by running the September blog's `sv migrate sveltekit-3` as a check
