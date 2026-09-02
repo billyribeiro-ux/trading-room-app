@@ -54,7 +54,11 @@ function recordingWith(speechRecognitionAvailable: boolean) {
     isPresenter: () => true,
     speechRecognitionAvailable: () => speechRecognitionAvailable,
     // Off, so nothing in this file's subject can be reached through the auto-record path.
-    autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false })
+    autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false }),
+    // No recognition source exists in this environment, so no line is ever final and this is never
+    // called. It is a rejecting stub rather than a no-op so that a change which DID call it here
+    // would be visible as an unhandled rejection instead of passing silently.
+    recordTranscript: () => Promise.reject(new Error('no line should be recorded in this file'))
   });
 }
 
@@ -97,7 +101,8 @@ describe('beginSpeechRecognition asks the room, not only the viewer', () => {
       } as never,
       isPresenter: () => true,
       speechRecognitionAvailable: () => true,
-      autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false })
+      autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false }),
+      recordTranscript: () => Promise.reject(new Error('no line should be recorded in this file'))
     });
     recording.beginSpeechRecognition();
     expect(warn).not.toHaveBeenCalled();
@@ -120,7 +125,8 @@ describe('beginSpeechRecognition asks the room, not only the viewer', () => {
       } as never,
       isPresenter: () => false,
       speechRecognitionAvailable: () => true,
-      autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false })
+      autoRecordSettings: () => ({ autoRecord: false, dontStopRecOnMicMute: false }),
+      recordTranscript: () => Promise.reject(new Error('no line should be recorded in this file'))
     });
     recording.beginSpeechRecognition();
     expect(warn).not.toHaveBeenCalled();

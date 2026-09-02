@@ -7,8 +7,13 @@
     `src/routes` held no `+error.svelte` and `src` held no error shell, so every `error(...)` this
     app raises rendered SvelteKit's built-in fallback: an unstyled white page with the status and the
     message and no font, no colour and no name on it. Measured rather than assumed —
-    `find src/routes -name '+error.svelte'` returned nothing, against **124** `error(<status>, …)`
-    call sites (42 × 403, 41 × 404, 31 × 400, 4 × 502, 3 × 409, 2 × 429, 1 × 500).
+    `find src/routes -name '+error.svelte'` returned nothing, against **126** `error(<status>, …)`
+    call sites (44 × 403, 41 × 404, 31 × 400, 4 × 502, 3 × 409, 2 × 429, 1 × 500).
+
+    124 → 126 on 2026-09-02: the transcript's two new doors, both 403 and both in
+    `session-transcript.remote.ts` — a config the controller could not answer, and a caller the
+    archives gate refuses. Restated rather than left, because the sentence beside it argues that
+    this number is measured and not recalled.
 
     That count EXCLUDES comments, and the first draft of this sentence said 162 because it did not.
     This repository quotes its own code in its docblocks more than most, so a raw grep over `.ts`

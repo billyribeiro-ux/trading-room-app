@@ -788,7 +788,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       next reader will see the same warning and the alternative it proposes cannot write to a
       server.
     */
-    max: 1918,
+    /*
+      1918 -> 1925, 2026-09-02, and every line is prose. `currentCaption`'s docblock asserted the
+      caption relay was unbuilt — *"neither half is wired here, and inventing captions would put
+      words in a presenter's mouth"* — while `setCurrentCaption` sat eleven lines below it, fed by
+      `media-transport.svelte.ts`, fed by `services/media`. It is the third comment corrected today
+      that claimed a feature was missing and was the only evidence a tracker row stood on.
+    */
+    max: 1925,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   /*
@@ -833,7 +840,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       one string; a second status rule, or anything that reads room state, is the signal that a page
       whose whole job is to work when everything else failed has started depending on things.
     */
-    max: 159,
+    /*
+      159 -> 164, 2026-09-02. Five lines, all in the docblock that states this page's own premise:
+      the count of `error(<status>, …)` doors it exists for went 124 -> 126 when the transcript's
+      two 403s landed, and `error-page-contract.test.ts` re-derives that number on every run rather
+      than trusting the paragraph. The added sentence says which two and why, because a number
+      restated with no reason is the next one somebody assumes was always that.
+    */
+    max: 164,
     why: 'the page every refusal in this app lands on, including a closed room'
   },
   {
@@ -903,6 +917,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 732,
     why: 'the entry door: handoff, token strip and the login form'
+  },
+  {
+    file: 'routes/session-transcript/+page.svelte',
+    /*
+      Capped at the size it landed, 2026-09-02, the day it was written.
+
+      THE TRANSCRIPT WINDOW — `SessionTranscriptComponent`, bundle byte 2,607,394. A date picker, a
+      client-side search, 300-row server paging, five navigation buttons rendered twice, and the
+      three-way loading/error/list state machine, all transcribed rather than designed.
+
+      What makes a ceiling worth having here is that almost none of it is logic: the reference's own
+      component is small, and this one is larger only because every transcribed number carries the
+      byte it came from. If this file grows it will be because behaviour was added, and behaviour
+      added to a transcribed surface is a divergence that should have to argue for itself at this
+      line.
+    */
+    max: 472,
+    why: 'the transcript window; a transcription, so growth here means a divergence'
   },
   {
     file: 'lib/room/chat-log-save.ts',
@@ -1237,7 +1269,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       table, where it sat as a blocker for three weeks. The rewritten block names what is actually
       missing (a server-held transcript) and why the reference's URL cannot be matched.
     */
-    max: 344,
+    /*
+      344 -> 356, 2026-09-02, LATER THE SAME DAY as the raise above it, and the second raise is the
+      more interesting one: the first bought a corrected refusal, and this one deletes the refusal
+      entirely. `TRANSCRIPT_UNAVAILABLE` is gone and `openTranscript` opens
+      `routes/session-transcript/+page.svelte`. The prose that replaces it records both wrong
+      versions of the reason, because a control that refused for three weeks on a blocker that did
+      not exist is the failure mode this file's comments are for.
+    */
+    max: 356,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
@@ -1456,7 +1496,16 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       different flags and different lifetimes, and the entry that recorded them as one is what let
       the card stay inert for as long as it did.
     */
-    max: 472,
+    /*
+      472 -> 511, 2026-09-02, for the transcript's DURABLE half.
+
+      Six lines of code — an `isFinal` branch, the injected collaborator and its field — and the
+      rest is the reason, which is the part worth keeping: the write must sit on the SPEAKER's
+      recognition callback, because every browser in the room receives the relayed line and writing
+      from the receiver would store one row per listener per sentence. That is a bug nothing here
+      would have caught, since both shapes "work" and only one of them stops filling a table.
+    */
+    max: 511,
     why: 'MediaRecorder, the preview window, the room-wide broadcast, the two speech calls and auto-record'
   },
   {

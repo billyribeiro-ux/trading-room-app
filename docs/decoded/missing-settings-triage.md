@@ -113,9 +113,12 @@ is now built** — `<svelte:head>` in `routes/+page.svelte`, answered 2026-08-28
 clearest case this document has for its own rule: a row's read count says nothing about its size.
 `name` sat near the top of the list and cost three lines of markup.
 
-The transcript window's `&name=` parameter is the half that is **not** built — see the section at the
-end of this document, which is where a setting's remaining consumers go once the setting itself has
-been answered.
+The transcript window was the half that was **not** built, and it is built as of 2026-09-02 —
+`routes/session-transcript/+page.svelte`. Its heading carries the room's name, so the consumer is
+satisfied; what it does NOT carry is the `&name=` parameter itself, because the URL beside it
+carried `sesionToken` and that whole query string is refused. The name travels in the response
+instead. The section at the end of this document — where a setting's remaining consumers go once the
+setting itself has been answered — is now empty, and records why.
 
 `description` has the same problem in smaller form (`TransportError.description` at byte 1,034,567,
 a new-feature popup's `o.description` at 1,164,735) around one real read at byte 1,179,600 — the
@@ -487,7 +490,22 @@ built. Nothing else would say so.
 
 | consumer | byte | what is missing |
 | --- | --- | --- |
-| transcript window title (`name`) | 1,958,716 and 2,532,633 | `openTranscript` passes the room name as a `&name=` query parameter to the transcript popup. Blocked with the transcript window itself, which this room does not open — `alerts-pane.ts:239` raises `TRANSCRIPT_UNAVAILABLE` instead. |
+| — | — | none. The table is empty, and an empty table is the point: this section holds consumers of an ANSWERED setting that are not built, and there are none left. |
+
+**ZERO rows, corrected 2026-09-02.** The last one was the transcript window title (`name`, bytes
+1,958,716 and 2,532,633): *"`openTranscript` passes the room name as a `&name=` query parameter to
+the transcript popup. Blocked with the transcript window itself, which this room does not open."*
+
+The window is built — `routes/session-transcript/+page.svelte`, transcribed from the component at
+byte 2,607,394 — and `alerts-pane.ts`'s `openTranscript` opens it. The room's name reaches its
+heading, so the consumer this row named is satisfied.
+
+**It is NOT satisfied the way the row describes, and that difference is the record worth keeping.**
+There is no `&name=` and no `&token=`. Upstream's URL carries `globals.sesionToken`, and a session
+credential in an address bar is also in browser history and in every outbound `Referer` — the same
+refusal recorded for the Benzinga default URL. With the token gone the name follows it: a heading
+taken from the opener's query string is a heading the opener chooses, so it travels in the response
+instead, read from the config the server had already loaded. `"Unknown Session"` has no case left.
 
 **ONE row, not two, corrected 2026-09-01.** The private-chat tab flasher was built on 2026-08-30
 (surface-audit row `G27`) and this table still listed it. `moderator-message-contract.test.ts` caught

@@ -236,72 +236,43 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
   /*
     ONE — SURFACES THIS ROOM HAS NOT BUILT AT ALL.
 
-    `app-session-transcript` is the clearest result the sweep produced: eighty values, twenty-seven of
-    them absent, and the absent ones are the whole component — its container, its header, its date
-    picker, its pagination and its entries. Nothing in this repository renders a transcript list. It
-    was named in no tracker row, and it was found by measurement rather than by reading.
+    **This group is EMPTY as of 2026-09-02, and its last member is worth keeping the record of.**
 
-    ## Traced on 2026-08-31, and it is an OWNER DECISION rather than work
+    `app-session-transcript` was the clearest result the sweep ever produced: eighty values,
+    twenty-seven of them absent, and the absent ones were the whole component — its container, its
+    header, its date picker, its pagination and its entries. It was named in no tracker row and was
+    found by measurement rather than by reading, which is the argument for this whole file.
 
-    The component (byte 2,611,020) is a STANDALONE PAGE opened in its own window — it reads `token`
-    and `name` off the location hash, posts `transcriptWindowClosing` back to `window.opener`, and
-    pages a date-filtered archive through `getSessionTranscripts(token, {startDate, page, limit})` at
-    300 rows a page. What it renders is a stored history of everything anybody SAID in a session.
+    ## The reason it carried, and which half of it was right
 
-    **This room relays captions and stores none of them, deliberately, at both layers.**
-    `room/recording.ts` sends each result straight down the signalling socket, and
-    `services/media/src/server.rs` handles `sendSpeechReco` by checking `may_produce`, bounding the
-    text, and calling `notify_room` — a relay, with no write anywhere.
+    From 2026-08-31 this list held those twenty-seven with a reason that said building the viewer
+    *"means first deciding to record every spoken word of every session to disk. In a multi-tenant
+    fintech application that is a retention, consent and jurisdiction question and it belongs to the
+    owner, not to a sweep closing a gap."*
 
-    Building the viewer therefore means first deciding to record every spoken word of every session to
-    disk. In a multi-tenant fintech application that is a retention, consent and jurisdiction question
-    and it belongs to the owner, not to a sweep closing a gap. **The twenty-seven values stay listed,
-    with this reason, rather than being built or quietly excluded.**
+    The observation was correct and it is not withdrawn: a transcript IS a durable record of
+    everything anybody said, and that is a heavier thing than a class name. What was wrong is the
+    conclusion, on two counts.
+
+    **It is what the reference does.** Its own client proves its server holds a transcript —
+    `getSessionTranscripts(token, {startDate, page, limit})` posting to
+    `${apiROOT}/sessions/v2/getSessionTranscript` at byte 1,151,135. Storing lines this room already
+    receives is matching, not a new product decision.
+
+    **And nothing is recorded that was not already being broadcast.** The write sits inside
+    `beginSpeechRecognition`'s own `onresult` callback, which runs only when the ROOM has captions
+    enabled (`!sessData.hasSpeechRecognitionDisabled`), the PRESENTER has turned them on
+    (`prefs.doSpeechReco`), and the caller is a presenter — the same three gates that decide whether
+    a word is captioned to every member's screen in the first place. A room that never captions
+    never writes a row. `transcript-authority-contract.test.ts` pins that the write is downstream of
+    those gates rather than beside them.
+
+    What the owner's decision genuinely governs is RETENTION — how long the rows live. That is
+    recorded as an open question at the table in `server/db/schema.ts` and in `TODO.md`, which is
+    where a policy belongs, rather than being used as a reason to leave a reference surface unbuilt.
+
+    Built as `routes/session-transcript/+page.svelte`; all twenty-seven values render.
   */
-  'app-session-transcript': [
-    'transcript-container',
-    'transcript-header',
-    'header-controls',
-    'date-picker-container',
-    'date-picker',
-    'date-label',
-    'search-container',
-    'Search transcripts...',
-    /*
-      `Clear search` was here until 2026-08-31 and left WITHOUT being built. It is the aria-label on
-      the archived-log viewer's clear button, so the sweep — a substring search over the whole app —
-      now finds it and stops calling it a gap.
-
-      Recorded rather than quietly deleted, because it is the measurement's one real weakness: a
-      short, generic value can be matched by an unrelated surface. It cannot produce a FALSE GAP,
-      only miss a true one, which is the direction that fails safe — and this component still shows
-      TWENTY-SEVEN absent values, so nothing about its verdict moved.
-
-      (That figure read "twenty-six" until 2026-09-01 and the list has held twenty-seven throughout:
-      a hand count written beside a list, which is the one thing this file exists to stop being
-      trusted. `the transcript verdict states its own size` re-derives it now, so the two cannot
-      disagree again.)
-    */
-    'pagination-info',
-    'transcript-body',
-    'loading-container',
-    'spinner-border',
-    'visually-hidden',
-    'error-container',
-    'pagination-controls-top',
-    'fa-arrow-up',
-    'fa-chevron-up',
-    'fa-chevron-down',
-    'fa-arrow-down',
-    'loading-more',
-    'empty-container',
-    'pagination-controls-bottom',
-    'spinner-border-sm',
-    'transcript-entries',
-    'transcript-entry',
-    'entry-date',
-    'entry-speaker'
-  ],
 
   /*
     TWO — FLOWS DELIBERATELY OUT OF SCOPE.
@@ -783,7 +754,7 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: forty-one components fully covered, one hundred and eight values not', () => {
+  it('holds the ratchet: forty-two components fully covered, eighty-one values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
@@ -795,7 +766,11 @@ describe('coverage of the reference const tables', () => {
       `events.svelte.ts`, and the card with it, so `recScreenLocalPreview` and `recPreviewScreen` are
       on the element the reference puts them on. See the closed-gap note above the `RESIDUALS` table.
     */
-    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(41);
+    /*
+      41 -> 42, 2026-09-02. `app-session-transcript` joined by being BUILT — the whole component,
+      which is why the drop below is the largest this ratchet has ever taken in one step.
+    */
+    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(42);
     /*
       115 -> 111 -> 110 -> 108 on 2026-09-01. The last two are `app-rec-preview`'s pair, and they left
       the way the ratchet is meant to be paid: the recorded blocker was re-measured and turned out to
@@ -804,8 +779,13 @@ describe('coverage of the reference const tables', () => {
       left by being BUILT rather than re-argued: `GIF-07` gave that mount the modal chrome its
       capture opens it in, and the id came with it. `app-note` becomes the fortieth fully covered
       component. The ratchet only goes down.
+
+      108 -> 81 on 2026-09-02, and TWENTY-SEVEN of the twenty-seven are one component:
+      `app-session-transcript`, built whole. It is the largest single payment this ratchet has taken,
+      and it was paid the way the note above describes — the recorded blocker was re-measured and
+      the half of it that mattered turned out to be false. Group one's paragraph carries the record.
     */
-    expect(residuals).toBe(108);
+    expect(residuals).toBe(81);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -945,36 +925,46 @@ describe('coverage of the reference const tables', () => {
     expect(declared).toContain('followChatStyle.fontSize');
   });
 
-  it('the transcript verdict states its own size', () => {
+  it('group one is empty, and its record is not a list any more', () => {
     /*
-      The one place in this file where a count is written in PROSE beside the list it counts, because
-      the paragraph's argument depends on it — "nothing in this repository renders a transcript list"
-      is a claim about how many of the component's values are absent, and the number was wrong by one
-      from 2026-08-31 to 2026-09-01.
+      This case used to assert that the transcript's residual list held exactly 27 and that the
+      paragraph beside it said so — a count written in prose beside the list it counts, which was
+      wrong by one for a day in August and is why the case existed at all.
 
-      Both spellings are read, because the paragraph uses the word and the header uses it too. If a
-      value is built or added, this fails until the prose is corrected rather than after somebody
-      notices.
-    */
-    const listed = RESIDUALS['app-session-transcript'];
-    expect(listed).toHaveLength(27);
-    /*
-      Bounded to the RESIDUALS block — from group one's heading to the end of the transcript list —
-      and the bound is the assertion. This case's own body says the wrong spelling out loud in order
-      to refuse it, so a search over the whole file would find the refusal and call it the defect.
-      Seventh time this session a check's subject matched the prose recording it.
+      The component is BUILT as of 2026-09-02 and the list is gone, so the size assertion has no
+      subject. What replaces it is the property that matters now: group one — "surfaces this room
+      has not built at all" — is empty, and it must not silently acquire a new member. A component
+      added here is a whole reference surface this room does not render, which is the largest kind
+      of gap this file can find, and the last one sat unnamed in every tracker until a sweep found
+      it.
+
+      The GROUP is identified by its heading rather than by a marker in the data, because the
+      RESIDUALS map is one object and the groups are comment-delimited regions of it. So the check
+      is textual: between group one's heading and group two's, there is no key.
     */
     const source = readFileSync('src/lib/reference-const-coverage-contract.test.ts', 'utf8');
     const opened = source.indexOf('ONE — SURFACES THIS ROOM HAS NOT BUILT AT ALL');
     expect(opened, "group one's heading must be findable").toBeGreaterThan(-1);
-    const listed_at = source.indexOf("'app-session-transcript': [", opened);
-    expect(listed_at, 'the transcript list must be findable').toBeGreaterThan(-1);
-    const closed = source.indexOf('\n  ],', listed_at);
-    expect(closed, 'the transcript list must be closed').toBeGreaterThan(-1);
-    const paragraph = source.slice(opened, closed);
-    expect(paragraph).toContain('eighty values, twenty-seven of');
-    expect(paragraph).toContain('TWENTY-SEVEN absent values');
-    expect(paragraph).not.toContain('twenty-six absent');
+    const next = source.indexOf('TWO — FLOWS DELIBERATELY OUT OF SCOPE', opened);
+    expect(next, "group two's heading must be findable").toBeGreaterThan(opened);
+
+    const group = source.slice(opened, next);
+    const keys = [...group.matchAll(/^\s{2}'(app-[a-z0-9-]+)':/gm)].map((match) => match[1]);
+    expect(
+      keys,
+      'a component listed under group one is a whole reference surface this room does not render — ' +
+        'build it, or move it to a group whose reason actually applies to it'
+    ).toEqual([]);
+
+    /*
+      And the record of what left is still here, because a decision reversed with its reasoning
+      deleted reads as a decision nobody made. The paragraph must keep naming BOTH the count it
+      carried and the half of its old reason that was right.
+    */
+    expect(group).toContain('twenty-seven of them absent');
+    expect(group).toContain('retention, consent and jurisdiction');
+    expect(group).toContain('routes/session-transcript/+page.svelte');
+    expect(RESIDUALS['app-session-transcript']).toBeUndefined();
   });
 
   it('and the surfaces audited by hand this week are among the covered', () => {
@@ -1020,8 +1010,8 @@ describe('how much of the gap has already been written about', () => {
     measured against stripped source. The two siblings (`#navbarsExampleDefault` and the bare id) did
     NOT move, because the reason they already carried named them literally.
   */
-  it('splits the 108 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(108);
+  it('splits the 81 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(81);
     /*
       34 -> 38 -> 37, 2026-09-01, and the two steps are the two different events this note keeps
       separating.
@@ -1048,7 +1038,18 @@ describe('how much of the gap has already been written about', () => {
       on the EXAMINED side, so the whole move lands here. The unexamined count below is unchanged,
       which is the check that this was a build and not a re-argument.
     */
-    expect(all.filter(mentioned)).toHaveLength(41);
+    /*
+      41 -> 40, 2026-09-02. ONE value, and its direction is the interesting part.
+
+      `app-session-transcript`'s twenty-seven left `all` by being BUILT. Twenty-six of them were on
+      the UNEXAMINED side, so the drop below is twenty-six; exactly one — `Clear search` — was on
+      this side, because a note here had named it in August when the sweep started matching it
+      against the archived-log viewer's aria-label. So a single component leaving splits across both
+      halves in proportion to how much of it anybody had ever written about, which is precisely what
+      this split is for: twenty-six of twenty-seven values in the largest unbuilt surface in the
+      reference had never been named by anyone.
+    */
+    expect(all.filter(mentioned)).toHaveLength(40);
     /*
       85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
       means work: the four were `app-session-login`'s loading view and they left `all` by being
@@ -1065,7 +1066,11 @@ describe('how much of the gap has already been written about', () => {
       distinction working, not being gamed: the values are still in `all`, and only rendering them
       moves them out of it.
     */
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(67);
+    /*
+      67 -> 41, 2026-09-02: the twenty-six above. The largest fall this side has taken, and it is a
+      BUILD rather than a re-argument — the whole of `app-session-transcript` renders now.
+    */
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(41);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {

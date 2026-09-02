@@ -42,27 +42,38 @@ const DETACHED_ALERTS_MESSAGE =
  * ```
  *
  * Both controls were dead links - no handler at all on the menu item, no button on the overlay.
- * They report the gap instead, and on 2026-09-02 the REASON changed, so the sentence did too.
+ * They reported the gap honestly for three weeks, and on 2026-09-02 the gap was closed rather than
+ * re-worded - twice, because the FIRST rewrite that day was also wrong.
  *
- * It used to say the relay was unbuilt: *"`currentCaption` is never assigned … neither half is
- * wired here"*. Both halves are wired, and were read end to end before this was rewritten - the
- * presenter's browser sends at `room/recording.ts:457`, `services/media/src/server.rs:1412` relays
- * it as `speechReco`, `room/media-transport.svelte.ts:734` receives it, and `+page.svelte:648`
- * commits every FINAL line to a 500-entry `captionHistory` that the caption overlay renders today.
+ * ## What the refusal used to say, and why both versions of it were false
  *
- * What is still missing is a transcript the SERVER holds. `captionHistory` is one tab's memory and
- * this control opens a NEW WINDOW, which can read none of it. The reference's own URL cannot be
- * matched either: `#/session-transcript?token=${sesionToken}` puts the controller's session
- * credential into an address bar, browser history and every outbound `Referer` - the refusal
- * already recorded for the Benzinga default URL, for the same reason.
+ * It began as *"`currentCaption` is never assigned … neither half is wired here"*. Every half was
+ * wired and was read end to end before this was touched: `room/recording.ts:457` sends,
+ * `services/media/src/server.rs:1412` relays it as `speechReco`, `room/media-transport.svelte.ts`
+ * receives it, and `+page.svelte` keeps the last 500 FINAL lines for the caption overlay.
  *
- * So the honest message names the window boundary, not a missing feature: the captions exist, in
- * THIS window, and the overlay's history toggle is where they are read. `TODO.md` gap 18 carries
- * the two pieces that would close it.
+ * It was then rewritten to say the captions were held in this window only - true that morning, and
+ * true only because nothing stored them. `session_transcripts` and `session-transcript.remote.ts`
+ * store them now, so the window HAS something to read and this opens it.
+ *
+ * ## The URL is ours, and the difference is a refusal rather than a shortcut
+ *
+ * Upstream opens `#/session-transcript?token=${globals.sesionToken}&name=…`. Ours opens
+ * `/session-transcript` with nothing in the query string. A session credential in an address bar is
+ * also in browser history, in every outbound `Referer` and in any screenshot of the window - the
+ * same refusal `TODO.md` records for the Benzinga default URL. The window is same-origin, so it
+ * arrives with the room's own session cookie, and the server re-derives both the room and the
+ * caller from it rather than believing a parameter.
+ *
+ * The reference's own guard - *"No session token available for transcript"* - therefore has nothing
+ * to guard here and is deliberately not reproduced: there is no token to be missing.
+ *
+ * `_blank`, as upstream. `noopener` is added and upstream has no equivalent: without it the opened
+ * page gets a live `window.opener` handle back into the room, which is a navigation primitive over
+ * the tab holding the session. Upstream in fact USES `window.opener` (it posts
+ * `transcriptWindowClosing` back), and that is the one piece of its behaviour not transcribed -
+ * nothing here listens for that message, so the handle would be a capability with no consumer.
  */
-const TRANSCRIPT_UNAVAILABLE =
-  'The full transcript page is not available in this room. Captions are held in this window only, so a separate page has nothing to read - use the history button on the caption overlay instead.';
-
 const alertExportFormatter = new Intl.DateTimeFormat('en-US', {
   year: '2-digit',
   month: 'numeric',
@@ -249,7 +260,7 @@ export class RoomAlertsPane<Row extends ExportableRow> {
   }
 
   openTranscript() {
-    this.#dialogs.alert = TRANSCRIPT_UNAVAILABLE;
+    window.open('/session-transcript', '_blank', 'noopener');
   }
 
   /**
