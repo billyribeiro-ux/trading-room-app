@@ -429,7 +429,7 @@ export class RoomComposer {
       imageAlertText: '',
       legalDisclosure: false,
       legalDisclosureText: '',
-      fileCount: 0
+      filesTouched: false
     });
     /* `noop` is an empty body, which the caller already refuses; `error` is the URL-scheme message,
        unreachable from a text alert. Neither can post, and neither is worth a dialog here. */

@@ -75,7 +75,16 @@
   looked like every other button in the pane.
 -->
 <div class="scroll">
-  <table>
+  <!--
+    `SCH-07` — const 7 is `[1,"table","table-striped","text-white","w-100"]`, all four carried.
+
+    They are Bootstrap globals on a table inside a SCOPED sheet, and `.table-striped` really is
+    defined twice here (`app.css` and `src/lib/styles/protradingroom-source.css`), so which sheet
+    supplies the striping depends on load order. Carried anyway: this component already depends on
+    global Bootstrap for its `text-bg-*` badge colours, deliberately and for the reason its own
+    sheet gives below. The measurement is in `room-surface-audit-2026-08-31-contract.test.ts`.
+  -->
+  <table class="table table-striped text-white w-100">
     <thead>
       <tr>
         <th scope="col">Date / Time</th>

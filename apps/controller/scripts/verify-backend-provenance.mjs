@@ -202,6 +202,20 @@ const DIVERGED_FROM_IMPORT = new Map([
                                 including the `$argon2id$` prefix and OWASP-parameter assertions.
       api/src/auth/refresh.rs   one import: rand 0.10 no longer re-exports `RngCore` at the root, so
                                 `fill_bytes` now arrives via the `Rng` trait.
+
+                                RE-PINNED 2026-09-02, and this edit is authored here rather than
+                                imported. `revoke_family_for_token` read `family_id` and then called
+                                `revoke_family` with it, outside a transaction; it is now the one
+                                atomic conditional UPDATE `CLAUDE.md` asks for. A carried-forward
+                                note called the pair a TOCTOU and RE-MEASURING refuted that - a
+                                concurrent rotation inserts into the SAME family so the revoke still
+                                catches the successor, an already-revoked family matches nothing
+                                under `revoked_at IS NULL`, and a deleted row does not make the
+                                `family_id` in hand wrong. What was real is the second round trip on
+                                a logout request. Semantics proved on a throwaway PostgreSQL 16
+                                rather than reasoned, because `sqlx::query` is not compile-checked:
+                                2 rows for a known token, 0 for an unknown one (the `Ok(0)` path),
+                                0 on replay, and the neighbouring family untouched.
       api/Dockerfile            builder image rust:1.97.1-alpine3.24 -> rust:1.98.0-alpine3.24 by
                                 resolved digest, and the runtime distroless digest re-resolved.
       rust-toolchain.toml       channel 1.97.1 -> 1.98.0 (stable of 2026-08-18).
@@ -210,7 +224,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/Cargo.toml', '1756786fe07a5e2efddbba28b6c75514dcd14c52862daf057ef978f2b69d37d5'],
   ['services/api/Dockerfile', '23bb473a3f8f0b4478e3b9232405f19b7debb1be734b5ca2159c320f29fd841c'],
   ['services/api/src/auth/password.rs', 'c6b6ce785e1dd22477e1927819c451554baf90291bacb34366cf83502ccd4bb1'],
-  ['services/api/src/auth/refresh.rs', '7f6f803829576d1e94d53d853ca15f610ccd3768ac29af8eba3c3c4d0bfcbbdd'],
+  ['services/api/src/auth/refresh.rs', '1dfee4a4f31c85ffe68189482bbf072703e83a9292b487c1e0c751cf94e30eb2'],
   ['services/media/Cargo.toml', 'e386a431215a4ebedb958f35ca2bc52ac760b1910fdb4f83663a3e9110179b7d'],
   ['services/rust-toolchain.toml', 'c006532ab2e9ff938d021819684751cd16c130aad10fffe5c788c00d09b23231'],
   /*

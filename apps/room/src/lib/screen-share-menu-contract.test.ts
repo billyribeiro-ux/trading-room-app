@@ -120,7 +120,7 @@ describe('SSM-1 — the menu can be opened and driven from the keyboard', () => 
       stops the label being announced twice rather than hiding it. Removing it would be a divergence
       nobody argued for.
     */
-    expect(snippet).toContain('<a aria-hidden="true">');
+    expect(snippet).toContain('<a aria-hidden="true"');
   });
 
   it('routes every row through that one snippet', () => {
@@ -173,35 +173,94 @@ describe('SSM-2 — all six clicks sit on the list item, where the capture split
     expect(BUNDLE).toContain('d(2,"li")(3,"a",163)');
   });
 
-  it('puts the handler on the list item here, for all six', () => {
+  it('splits the six clicks three and three, exactly as the capture does', () => {
     /*
-      ── RE-CHALLENGED 2026-09-02 UNDER "match the dump exactly", AND HELD, WITH THE COST STATED ──
+      ── MATCHED 2026-09-02. The block this replaces refused it on a FALSE DICHOTOMY ──────────────
 
-      The split is real and both halves are read above: three entries carry the click on the `<li>`
-      (consts 185/186/187) and three on the `<a>` (const 163, `d(2,"li")(3,"a",163)`). The
-      observable difference is the padding: on the reference's last three rows a click beside the
-      text does nothing, and here it activates.
+      That block said moving `run` onto the anchor *"would put activation on the node marked hidden
+      from assistive technology, and `activateOnKey` — the keyboard half — is bound to the `<li>`"*,
+      and concluded the two must travel together. **They do not.** A click handler and a keydown
+      handler are independent bindings, and putting them on different nodes is what reproduces the
+      reference exactly:
 
-      **Ours is a superset on three rows, and closing it would cost the keyboard path on those
-      three.** This component's structure already diverges from the capture's by a decision SSM-1
-      records and tests: the `<li>` is the `role="menuitem"` with the accessible name, and the `<a>`
-      keeps the capture's `aria-hidden="true"`. Moving `run` onto that anchor for three rows would
-      put activation on the node marked hidden from assistive technology, and `activateOnKey` — the
-      keyboard half — is bound to the `<li>`. That is the mouse-only defect NTC-2 was opened for.
+        the `<a>`  carries the CLICK on three rows -> the pointer surface is the anchor's text,
+                   which is the reference's own hit target
+        the `<li>` keeps role/tabindex/aria-label and the KEYDOWN on all six -> `SSM-1`'s addition,
+                   which its own note calls "an addition, not a replacement", survives untouched
 
-      So this is NOT one of the four escapes and it is not being claimed as one. It is a divergence
-      with a cost on each side, and the side with the cost to a member using a keyboard is the one
-      this room does not take. **Recorded for the owner rather than closed**, because "three menu
-      rows respond to a click in their padding" is a product judgement, not a measurement — and the
-      measurement, which is what this file is for, is above and unchanged.
+      So there is no cost on either side and nothing left for an owner to judge. The earlier block
+      recorded it as a product judgement because it had bundled the two handlers together; once they
+      are separated the row is an ordinary transcription.
+
+      Which three, read from the sub-templates rather than from the row's prose: `l4e` is
+      `" Stop Sharing All Screens"`, `c4e` is `" Reopen Screenshare Preview"`, `d4e` is the
+      per-screen `" Stop Sharing {screenName}"`. The `<li>`-bound three are Share Screen, the OBS
+      virtual cam and OBS / RTMP.
+
+      Why it is worth matching at all: `.dropdown-menu li` has no rule in
+      `css/complete-app-styles.css` and these anchors are not `.dropdown-item` — bare inline `<a>`
+      with no `href`, so the box is exactly the text. The asymmetry is user-facing.
     */
     const snippet = entrySnippet();
-    expect(snippet).toContain('onclick={run}');
-    /* And never on the anchor, which is the node `aria-hidden` is on. */
-    expect(snippet).not.toContain('<a aria-hidden="true" onclick');
-    /* The keyboard half is on the same element, which is the whole reason the click stays there. */
+
+    /* One parameter decides it, so the split cannot drift row by row. */
+    expect(snippet).toContain("clickTarget: 'item' | 'anchor'");
+    expect(snippet).toContain("onclick={clickTarget === 'item' ? run : undefined}");
+    expect(snippet).toContain("onclick={clickTarget === 'anchor' ? run : undefined}");
+
+    /* The keyboard half stays on the `<li>` in BOTH modes — that is the whole design. */
     expect(snippet).toContain('onkeydown={(event) => activateOnKey(event, run)}');
     expect(snippet).toContain('role="menuitem"');
+    expect(snippet).toContain('tabindex="0"');
+
+    /*
+      And the focusable node is never the `aria-hidden` one. `tabindex` inside an `aria-hidden`
+      subtree would be a defect of OURS — the capture has no focusable node there to transcribe.
+    */
+    const anchorAt = snippet.indexOf('<a aria-hidden');
+    expect(anchorAt, 'the captured anchor is gone from the row').toBeGreaterThan(-1);
+    expect(snippet.slice(anchorAt), 'the anchor must not become focusable').not.toContain(
+      'tabindex'
+    );
+  });
+
+  it('calls it with the mode the capture gives each of the six', () => {
+    /*
+      The snippet alone cannot show this: a parameter that every call site passes `'item'` for is
+      the old behaviour wearing new syntax. Asserted at the CALL SITES, three each.
+    */
+    /*
+      Counted AFTER the snippet closes. Inside it the signature says `clickTarget: 'item' |
+      'anchor'` and the two `onclick` ternaries name both again, so counting the whole file answers
+      five and three — the first draft of this did exactly that and reported a failure that was the
+      test's, not the component's.
+    */
+    const snippetEnd = MENU.indexOf('{/snippet}');
+    expect(snippetEnd, 'the entry snippet is gone').toBeGreaterThan(-1);
+    const code = MENU.slice(snippetEnd);
+    const calls = code.match(/'item'|'anchor'/g) ?? [];
+    expect(
+      calls.filter((mode) => mode === "'item'"),
+      'three rows bind on the <li>'
+    ).toHaveLength(3);
+    expect(
+      calls.filter((mode) => mode === "'anchor'"),
+      'three rows bind on the <a>, per l4e / c4e / d4e'
+    ).toHaveLength(3);
+
+    for (const [label, mode] of [
+      ['stopSharingAllText', "'anchor'"],
+      ['Reopen Screenshare Preview', "'anchor'"],
+      ['Stop Sharing ${screen.screenName}', "'anchor'"],
+      ['shareScreenText', "'item'"],
+      ['virtualCamText', "'item'"],
+      ['OBS / RTMP / Stream / Restream', "'item'"]
+    ] as const) {
+      const at = code.indexOf(label);
+      expect(at, `${label} is gone from the menu`).toBeGreaterThan(-1);
+      /* The mode is within the same `entry(...)` call — the next 260 characters cover the longest. */
+      expect(code.slice(at, at + 260), `${label} must be ${mode}`).toContain(mode);
+    }
   });
 });
 

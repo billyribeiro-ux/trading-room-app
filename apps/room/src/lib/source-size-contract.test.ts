@@ -2241,6 +2241,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `streamingTabAvailable` and `localScreens` are all resolved before they arrive. And has it
       acquired knowledge of the OTHER top-level menus? `menuOpen` is one boolean because the navbar
       owns which menu is open; a second such prop means that ownership has leaked.
+
+      204 -> 230, 2026-09-02, and it passes both of those checks: nothing was decided here and no
+      second menu became visible to it. A raise is a conversation, so here is what the 26 bought.
+
+      `SSM-2` is matched. The capture splits the six clicks three on the `<li>` and three on the
+      `<a>`, and this flattened all six onto the `<li>`. That is a HIT TARGET — these anchors are
+      bare inline `<a>` with no `href` and `.dropdown-menu li` has no rule, so upstream three rows
+      respond on their words and three across the whole row.
+
+      The cost is structural rather than prose: `clickTarget: 'item' | 'anchor'` on the shared
+      snippet takes its signature from one line to seven, two attributes become ternaries, and two
+      call sites reflow past the print width once they carry a fourth argument. Eleven of the 26 are
+      the comment, and it is the SHORT form — the argument, the false dichotomy it corrects, and
+      which three rows are which live in `screen-share-menu-contract.test.ts` where they are
+      asserted. Same split `ModalHost.svelte` took for `USM-18` and `refresh.svelte.ts` for `G16`.
+
+      One parameter and not six call-site handlers, deliberately: a per-row binding is how a split
+      like this drifts back to five-and-one without anybody deciding, and the contract asserts the
+      mode at every call site precisely because a parameter nobody varies is the old behaviour
+      wearing new syntax.
     */
     /*
       208 -> 204, 2026-08-31, SSM-1: `role`/`tabindex`/`aria-label` and an Enter/Space handler on a
@@ -2251,7 +2271,7 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       them: `role="button"` satisfies the rule its missing `href` used to break, and eslint's
       `no-unused-svelte-ignore` is what noticed.
     */
-    max: 204,
+    max: 230,
     why: 'the navbar screen-sharing dropdown; six entries and the four gates between them'
   },
   {
@@ -7653,7 +7673,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       written down rather than discovered — a deletion with no reason over it reads as an oversight,
       and the next author's instinct would be to "fix" it back.
     */
-    max: 672,
+    /*
+      672 -> 678, 2026-09-02, and like `refresh.svelte.ts`'s raise on the same day this one buys
+      BEHAVIOUR rather than prose. A raise is a conversation, so here it is.
+
+      `PAM-13` is matched: the media guard now tests whether a file list EXISTS, as the reference's
+      `fc` does, instead of whether it holds anything. That needed a `$state` boolean and the two
+      assignments that mirror `fc`'s own — the picker at byte 2,123,302 and the reset at 2,128,421 —
+      each carrying the offset it transcribes, because the offsets ARE the transcription and a
+      later reader who cannot see them has no way to check the claim.
+
+      What did NOT come here is the argument: the three states of `fc`, the two predicted harms that
+      measurement refuted, and this room's one lifecycle difference all live in
+      `post-alert-behavior.ts` beside the guard they govern, with the contract that asserts both
+      latch sites. Same split `ModalHost.svelte` took for `USM-18` and `refresh.svelte.ts` for
+      `G16`: the component keeps the evidence, the module keeps the reasoning, and neither holds a
+      copy of the other.
+    */
+    max: 678,
     why: 'the alert composer and its per-open resets'
   },
   {
@@ -8598,7 +8635,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `app-post-alert-modal` rather than in the table's component. Splitting there follows the
       reference; splitting pane from table would cut across it.
     */
-    max: 264,
+    /*
+      264 -> 310, 2026-09-02, and the 46 are a DIALOG this pane did not have.
+
+      `SCH-07`: the reference opens the manage table in a second modal, `#scheduledAlertsModal`, and
+      this pane rendered it inline. The refusal was circular — "a pane embedded in `PostAlertModal`'s
+      body cannot carry a second modal's dialog, because there is no second modal" — which is the
+      shape `SZC-03` was refused on and did not survive either.
+
+      The lines are the `<Modal>` element with the eight captured chrome values, the footer snippet
+      carrying const 11's button, and a pointer. The ARGUMENT is not here: it lives in
+      `room-surface-audit-2026-08-31-contract.test.ts` beside the assertions, which is the split
+      `ModalHost.svelte` took for `USM-18` and `refresh.svelte.ts` for `G16`.
+
+      What to check if this climbs again: the dialog must stay the project's `Modal`. A hand-rolled
+      second dialog would be a second copy of the focus trap, the `inert` handling and `ASR-3`'s
+      focus-on-open, all of which this room ships itself because it loads no Bootstrap JavaScript.
+    */
+    max: 310,
     why: 'the send-later pane and the manage table; one question, one component'
   },
   {
@@ -8615,7 +8669,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
 
       If this climbs, the question is whether the table has started deciding something.
     */
-    max: 164,
+    /*
+      +9, 2026-09-02. `SCH-07`'s const 7 — `[1,"table","table-striped","text-white","w-100"]` — and
+      the note recording that `.table-striped` is defined TWICE in this room, so which sheet
+      supplies the striping depends on load order. Carried because this component already borrows
+      global Bootstrap for its `text-bg-*` badge colours, deliberately.
+    */
+    max: 173,
     why: 'the manage table rows, decoded cell by cell from app-scheduled-alerts-modal'
   },
   {

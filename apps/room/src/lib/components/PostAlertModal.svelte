@@ -74,6 +74,12 @@
   let linkAlertText = $state('');
   let imageAlertText = $state('');
   let files = $state.raw<File[]>([]);
+  /*
+    `PAM-13` — the reference's `fc`. `false` here is its `var fc;` at byte 2,122,856; the two sites
+    that set it below are its other two. The three states, why the guard tests existence rather
+    than length, and the lifecycle difference this room has are in `post-alert-behavior.ts`.
+  */
+  let filesTouched = $state(false);
   let previews = $state.raw<string[]>([]);
   let dragging = $state(false);
   let fileInput = $state<HTMLInputElement>();
@@ -139,6 +145,8 @@
     checkedLabels.clear();
     releasePreviews();
     files = [];
+    /* `fc = []` at byte 2,128,421 — the reset creates the list, so the guard passes from here on. */
+    filesTouched = true;
     alertText = '';
     alertUrl = '';
     imageAlertText = '';
@@ -169,6 +177,8 @@
     if (!fileList) return;
     releasePreviews();
     files = Array.from(fileList);
+    /* `fc = []; for (…) fc.push(i)` at byte 2,123,302 — the picker creates it too. */
+    filesTouched = true;
     previews = files.map((file) => URL.createObjectURL(file));
   }
 
@@ -245,7 +255,7 @@
       imageAlertText,
       legalDisclosure,
       legalDisclosureText,
-      fileCount: files.length,
+      filesTouched,
       labelPrefix
     });
 

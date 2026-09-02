@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -114,20 +114,65 @@ const ALLOWED_PREFIXES = Object.freeze([
   'apps/controller/src/lib/retire-baseline-role-contract.test.ts'
 ]);
 
-/** Every tracked file containing a `ptr_clone` literal, as repository-relative paths. */
+/**
+ * Every tracked file containing a `ptr_clone` literal, as repository-relative paths.
+ *
+ * ## `spawnSync` and an explicit status check, and the reason is a failure this test produced
+ *
+ * On 2026-09-02 this went red inside `pnpm run gate` and green on the very next run and in
+ * isolation. The obvious reading is a flake; `CLAUDE.md` says *"never report a failure without
+ * first ruling out your own tooling"*, and the tooling was the fault.
+ *
+ * **`git grep` exits 1 when it finds nothing and 2 or more when it fails, and `execFileSync` throws
+ * on both.** Measured rather than recalled, in this container: a search for an absent string gives
+ * `spawnSync` status `1`, and `execFileSync` on the same arguments throws with `status 1`.
+ *
+ * Two consequences, and the second is worse than a flake:
+ *
+ *   1. a git that could not run and a genuinely empty sweep were the SAME event to a reader;
+ *   2. the control below — *"finds the reference at all, so an empty sweep cannot pass silently"* —
+ *      **could never fire for the reason its own comment gave.** An empty sweep threw in the reader
+ *      before the assertion was reached, so the `toBeGreaterThan(10)` guard was unreachable on the
+ *      one input it exists for. It was a test that could not fail usefully, and it took going red
+ *      once, on the real thing, to notice.
+ *
+ * Branching on the status separates them. Status 1 is the real subject of the control below: no
+ * matches, so the assertions that follow would all be vacuously true. Status 2+ is a tooling
+ * failure and says so in those words, with git's own stderr, so nobody spends a turn looking for a
+ * rename that did not happen.
+ */
 function filesNamingTheReference(): string[] {
-  const out = execFileSync('git', ['grep', '-lI', 'ptr_clone', '--', '.'], {
+  const run = spawnSync('git', ['grep', '-lI', 'ptr_clone', '--', '.'], {
     cwd: ROOT,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024
   });
-  return out.split('\n').filter(Boolean);
+
+  if (run.error) {
+    throw new Error(`\`git grep\` could not be started, so this sweep measured nothing: ${run.error.message}`);
+  }
+  /* 1 is "no matches" — a real answer, and the empty array the control below exists to catch. */
+  if (run.status === 1) return [];
+  if (run.status !== 0) {
+    throw new Error(
+      `\`git grep\` exited ${run.status}, which is a TOOLING failure and not an empty sweep. ` +
+        `Nothing about the naming boundary has been measured here. git said: ${run.stderr?.trim() || '(nothing)'}`
+    );
+  }
+  return run.stdout.split('\n').filter(Boolean);
 }
 
 describe('the reference name never leaks into live code', () => {
   it('finds the reference at all, so an empty sweep cannot pass silently', () => {
-    // Without this, a renamed directory or a broken `git grep` turns every assertion below into a
-    // vacuous truth — the same guard `ci-package-manager-pin.test.ts` needs, for the same reason.
+    /*
+      Without this, a renamed directory turns every assertion below into a vacuous truth — the same
+      guard `ci-package-manager-pin.test.ts` needs, for the same reason.
+
+      A BROKEN `git grep` no longer reaches this line: it throws in the reader above, naming itself
+      as a tooling failure. That separation is the 2026-09-02 fix and it is what makes this message
+      trustworthy — if this assertion is the one that fires, the sweep really did run and really did
+      find nothing.
+    */
     expect(filesNamingTheReference().length).toBeGreaterThan(10);
   });
 

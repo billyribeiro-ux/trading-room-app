@@ -11,7 +11,23 @@ export interface PostAlertDraft {
   imageAlertText: string;
   legalDisclosure: boolean;
   legalDisclosureText: string;
-  fileCount: number;
+  /**
+   * `PAM-13` — has the file list been TOUCHED, which is what the reference's guard actually tests.
+   *
+   * Upstream is `return fc ? void this.doImagurFileListUpload(e) : void 0`, and `fc` is a
+   * module-level `var` with three states, read at all three of its sites:
+   *
+   *   `var fc;`                       2,122,856   undefined — falsy
+   *   `fc = []; for (…) fc.push(i)`   2,123,302   the drop/select handler — non-empty
+   *   `fc = []`                       2,128,421   the modal's own reset — EMPTY, and TRUTHY
+   *
+   * So the guard is *"has a file list been created"*, not *"does it hold anything"*, and the empty
+   * case is the state the modal sits in after every reset rather than a rare edge.
+   *
+   * This replaced `fileCount: number`, whose `> 0` test could not express the distinction. The count
+   * itself had no other consumer.
+   */
+  filesTouched: boolean;
   /**
    * The composer's checked alert labels, already reduced to their prefix by `alertLabelPrefix`.
    *
@@ -146,7 +162,21 @@ export function composePostAlert(draft: PostAlertDraft): PostAlertComposition {
     if (draft.imageAlertText) body = `${draft.imageAlertText}\n`;
 
     if (!draft.alertUrl) {
-      return draft.fileCount > 0
+      /*
+        `PAM-13`, matched 2026-09-02. This was `draft.fileCount > 0`, refused on the reading that
+        dispatching an empty list *"means reproducing a bug whose only outcomes are a wasted request
+        or an empty alert"*. **Both outcomes were measured and neither happens here:**
+
+          `uploadAlertFiles([])` iterates nothing, so NO request is made — the loop body never runs;
+          `composeUploadedAlert('', [], …)` returns `""`, and `post-alert.remote.ts:54` is
+          `body: z.string().min(1)`, so the boundary refuses an empty body rather than storing one.
+
+        What the old guard DID cost is a real behaviour: type a caption on the img tab, pick no
+        file, press Post, and upstream posts the caption — `composeUploadedAlert('caption\n', [], …)`
+        is `"caption\n"`, which passes `min(1)`. Ours returned `noop` and the presenter got nothing.
+        So matching the reference here adds a working path and removes a silent refusal.
+      */
+      return draft.filesTouched
         ? { status: 'upload', kind: 'media', bodyBeforeUploads: body }
         : { status: 'noop', reason: 'empty-media' };
     }

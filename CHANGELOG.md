@@ -45,6 +45,325 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 16:07 UTC — SCH-07 built: the reference's second modal, on the project's own primitive
+
+The Svelte MCP reconnected, so the two obligations it was blocking are both discharged here.
+
+## The retroactive autofixer pass I said I owed
+
+`ScreenShareMenu.svelte`, `PostAlertModal.svelte` and `refresh.svelte.ts` all return **no issues**.
+
+Two suggestions came back on `PostAlertModal` and both were **artifacts of the extract I hand-wrote
+for the tool**, not findings in the file: `SvelteSet` over a mutable `Set`, and an attachment over
+`bind:this`. The real component already uses `SvelteSet` (line 117) and already uses an attachment
+(lines 197-201) — it is ahead of both.
+
+`ScheduledAlerts` and `ScheduledAlertsTable` return no issues and one suggestion each —
+*"Unexpected mustache interpolation with a string literal value"* on `{' Close '}` and
+`{' Remove '}`. **Declined**, and it is one of the two declines `apps/room/AGENTS.md:99-111` records
+by name: the capture's strings are `v(5," Manage Scheduled Alerts ")` and `v(26," Close ")`, and
+those spaces are evidence every capture comparison here diffs.
+
+## The refusal was circular
+
+*"A pane embedded in `PostAlertModal`'s body cannot carry a second modal's dialog, because there is
+no second modal"* — the absence of the second modal **is** the divergence. Same shape `SZC-03` was
+refused on.
+
+`ScheduledAlerts.svelte` now renders `<Modal id="scheduledAlertsModal">` with the eight captured
+chrome values, read by value from const 0 at byte 2,407,520 and the create block at 2,408,290:
+`modal fade text-white`, `modal-dialog modal-xl`, the `modal-title` `" Manage Scheduled Alerts "`,
+`aria-labelledby="scheduledAlertsModalLabel"`, the `btn-close btn-close-white` dismiss, and a footer
+carrying const 11's `btn btn-primary` `" Close "`. The trigger **opens** rather than toggles, which
+is what `data-bs-toggle="modal"` means and what the inline table had made impossible.
+
+**It is the project's own `Modal` primitive rather than a hand-rolled dialog**, and that is the
+load-bearing choice: the primitive already renders this exact chrome *and* carries the focus trap,
+the `inert` handling and `ASR-3`'s focus-on-open — all of which the reference got from Bootstrap's
+plugin and this room ships itself. A second dialog would have been a second copy of all three.
+`aria-hidden` is the creation-time value via `closedAriaHidden`, on the reading MTS-06/MSM-02/NTC-3
+were disposed on this morning.
+
+## The second argument measured TRUE and was still not a reason to refuse
+
+`.table-striped` really is defined **twice** here — `app.css` and
+`src/lib/styles/protradingroom-source.css` — so which sheet supplies the striping depends on load
+order. Const 7's four classes are carried anyway, because `ScheduledAlertsTable` **already** depends
+on global Bootstrap for its `text-bg-*` badge colours, deliberately and with the reason in its own
+scoped sheet. A rule the file does not follow for the badges cannot decide the table.
+
+## A gate noticed on its own that a dialog had appeared
+
+`alert-report-modal-contract`'s modal census went **23 → 24** and named **10 → 11**, in a file
+nobody would have opened for a scheduling change. That is exactly what asserting the ratio as a
+triple is for, and its comment now says so.
+
+**Verification.** Three negative controls seen RED, each with an asserted anchor so a no-op mutation
+cannot pass as a control: the table classes reverted, the table rendered beside the modal instead of
+inside it, and the trigger back to toggling. Two ceilings argued at their entries — `ScheduledAlerts`
+264 → 310 (the dialog it did not have) and `ScheduledAlertsTable` 164 → 173 — with both comments in
+the short form and the argument beside the assertions. `pnpm run gate` exit 0 in **both** apps.
+
+---
+
+### 2026-09-02 15:23 UTC — SSM-2 matched: the six menu clicks split three and three
+
+## The refusal rested on a false dichotomy
+
+Two verdicts were written on this row before the right one. The contract test said moving `run` onto
+the anchor *"would put activation on the node marked hidden from assistive technology, and
+`activateOnKey` — the keyboard half — is bound to the `<li>`"*, and concluded the two must travel
+together. My re-reading this morning inherited that and marked it an owner decision.
+
+**A click handler and a keydown handler are independent bindings.** Putting them on different nodes
+is exactly what reproduces the reference:
+
+| | goes on | reproduces |
+| --- | --- | --- |
+| the CLICK, three rows | the `<a>` | the pointer surface is the anchor's text — the reference's own hit target |
+| the KEYDOWN, all six | the `<li>` | `SSM-1`'s addition, which its own note calls *"an addition, not a replacement"* |
+
+So there is no cost on either side and nothing left to judge. The focusable node stays the `<li>` and
+never becomes the `aria-hidden` `<a>` — `tabindex` inside an `aria-hidden` subtree would be a defect
+of **ours**, since the capture has no focusable node there to transcribe.
+
+**Why it is worth matching:** this is a HIT TARGET. `.dropdown-menu li` has no rule in
+`css/complete-app-styles.css` and these anchors are not `.dropdown-item` — bare inline `<a>` with no
+`href`, so the box is exactly the text. Upstream three rows respond on their words and three across
+the whole row; that asymmetry was flattened here.
+
+**Which three**, read from the sub-templates rather than the row's prose: `l4e` is
+`" Stop Sharing All Screens"`, `c4e` is `" Reopen Screenshare Preview"`, `d4e` is the per-screen
+`" Stop Sharing {screenName}"`. The `<li>`-bound three are Share Screen, the OBS virtual cam and
+OBS / RTMP.
+
+One parameter on the shared snippet decides it — `clickTarget: 'item' | 'anchor'` — so the split
+cannot drift row by row, and the contract asserts the mode at every one of the six **call sites**
+rather than only in the snippet: a parameter every site passes `'item'` for is the old behaviour
+wearing new syntax.
+
+## Two mount tests went red, which is the behavioural proof
+
+`RoomNavbar.svelte.test.ts` clicked the `<li>` for two of the anchor-bound rows. That no longer
+activates them — so both were updated to the reference's hit target rather than around it. The source
+assertions alone could not have shown the change is real.
+
+**Verification.** Three negative controls seen RED: flattening every row back to `'item'`, moving one
+row to the wrong side, and removing the keyboard path from the `<li>`. **The second PASSED on its
+first attempt because the mutation never applied** — caught by asserting the anchor exists before
+mutating, which is the lesson recorded in the 15:02 entry, now applied. Two of the repository's own
+gates caught me again and both were right: an inlined `indexOf` (bound and asserted found now), and
+the ceiling **204 → 230**, argued at the entry — eleven of the 26 lines are the comment, and it is
+the short form, with the argument living where it is asserted.
+
+The Svelte MCP is still not connected, so its mandated steps could not be run for
+`ScreenShareMenu.svelte`. `svelte-check` 0/0, eslint clean, 26 mount tests green, `pnpm run gate`
+exit 0 in `apps/room`; the autofixer pass was not performed.
+
+---
+
+### 2026-09-02 15:02 UTC — the `aria-selected` family is MATCHED, and my own owner-decision verdict was wrong
+
+## What I got wrong, and how
+
+This morning I re-read `MTS-06`, checked it against the four escapes, and marked it an **owner
+decision** — a collision between *"match the dump exactly"* and `CLAUDE.md`'s *"semantic accessible
+HTML"*. I accepted the row's premise that *"nothing in the update block writes the attribute"* and
+concluded the rendered attribute is the literal.
+
+**The premise is true. The conclusion does not follow — and
+`bootstrap-dropdown-contract.test.ts:200-245` had already said so**, in a disposition written the
+same day covering MTS-06, MSM-02 and NTC-3 together. I re-litigated a settled row without reading
+the contract that settled it, and would have sent a question that was already answered with
+evidence. The wrong verdict is recorded at the row and struck above rather than quietly replaced.
+
+## The evidence, re-measured independently and stronger than it was
+
+An Angular const is the element's attributes **at creation** — everything after the bare `3` marker
+is a binding, and `aria-selected` sits before it in all eight. So Angular never updates it. But every
+one of those consts also carries `data-bs-toggle="tab"`, which hands the anchor to **Bootstrap's Tab
+plugin**, and that plugin writes `aria-selected` on every show and hide.
+
+The contract already said the plugin lives in `scripts.38973a242454fb27.js` — one of four scripts
+`deployed-index.html` loads, and the one chunk this repository does not hold. What it did **not**
+establish is that the chunk is actually loaded, and *"the markup renders `data-bs-toggle`"* is not
+proof: this repository renders the same attributes and consumes none of them.
+
+| counted in `main.d1d09071be31f1ba.js` | |
+| --- | --- |
+| `bootbox.` call sites | **348** |
+| definitions of `bootbox` | **0** |
+| `window.$` reads | **13** |
+| definitions of jQuery | **0** |
+| Bootstrap plugin code (`bs.tab` / `SELECTOR_DATA_TOGGLE` / `class Tab`) | **0** |
+
+**bootbox is a wrapper over Bootstrap's modal and cannot function without Bootstrap's JavaScript.**
+348 call sites — `bootbox.confirm` on every destructive action upstream — prove it functions. So the
+uncaptured chunk supplies jQuery, bootbox **and Bootstrap**, and the Tab and Dropdown plugins are
+running. The inference is a chain now, with no missing link except the bytes themselves.
+
+## So the binding is the match
+
+Freeze the literals and this room renders a DOM the reference **never shows at any moment after
+first paint**: five tabs announcing themselves selected at once, which upstream shows for exactly as
+long as it takes the plugin to run. **There is no collision with `CLAUDE.md` here at all** —
+matching and accessibility agree, and the appearance of a conflict came entirely from reading the
+const table as if it were the rendered DOM.
+
+Governs **FP-04, PAM-15 and PAM-12** identically. All four already bind; nothing to build.
+
+The honest bound is unchanged and is the contract's own: **evidence absent for the rendered value**,
+settled either way by one capture of the running page's DOM.
+
+**Verification.** Three negative controls seen RED on the new assertions: the bootbox count raised
+past what the bundle holds; a definition pattern that DOES match (so bootbox would no longer witness
+a second chunk); a plugin pattern that DOES match (so the argument would be unnecessary). **Two
+earlier attempts at these controls PASSED because the `sed` never applied** — recorded because a
+negative control that silently does nothing is worse than none at all. `pnpm run gate` exit 0 in
+`apps/room`.
+
+---
+
+### 2026-09-02 14:22 UTC — PAM-13 matched: the media guard tests whether a file list EXISTS
+
+The owner delegated the open decisions — decide them on hard evidence, in order to match the original
+app. This is the first, and the evidence **overturned the refusal outright**.
+
+## Both predicted harms were false
+
+PAM-13 was refused because dispatching an empty list would supposedly mean *"a wasted request or an
+empty alert"*. Both were predictions. Traced end to end:
+
+| predicted | measured |
+| --- | --- |
+| a wasted request | `RoomComposer.uploadAlertFiles` is `for (const file of files)` — an empty list iterates nothing, so **no upload is issued at all** |
+| an empty alert | `composeUploadedAlert('', [], …)` returns `""` — measured by calling it, not read off the types — and `post-alert.remote.ts:54` is `body: z.string().min(1)`, so **the boundary refuses it** |
+
+**And the old guard had a cost of its own**: a caption with no file. `composeUploadedAlert('caption\n',
+[], …)` is `"caption\n"`, which passes `min(1)` and posts. A presenter who typed a caption on the img
+tab and pressed Post got **nothing here and an alert upstream**. Matching added a behaviour and
+removed a silent refusal — the opposite of what the refusal assumed.
+
+## `fc` is a tri-state, and the empty case is the common one
+
+| site | byte | state |
+| --- | --- | --- |
+| `var fc;` | 2,122,856 | undefined — falsy |
+| `fc = []; for (…) fc.push(i)` | 2,123,302 | the picker — non-empty |
+| `fc = []` | 2,128,421 | the modal's own reset — **empty, and truthy** |
+
+So the guard is *"has a list been created"*, not *"does it hold anything"*, and the empty case is the
+state the modal sits in after every reset. `fileCount: number` is gone from `PostAlertDraft` —
+replaced by `filesTouched: boolean`, because the count could not express the distinction and had no
+other consumer. `PostAlertModal` sets the latch at exactly the two sites upstream assigns `fc`, each
+carrying the offset it transcribes.
+
+**One lifecycle difference, recorded rather than smoothed over:** `clearInputFields` runs on every
+OPEN here where the reference's reset runs after a send and on close, so `var fc;`'s undefined state
+is reachable upstream on a page's first interaction and is not reachable here. Every state after that
+agrees.
+
+## A negative control found a hole rather than confirming a guard
+
+Four seen RED: restoring the `> 0` test, and removing the latch from **each** of the two sites — which
+the first draft of the contract **could not see at all**, because the pure-function cases cannot tell
+whether the component ever sets the flag. The latch could have been silently un-wired at either end.
+That assertion is now in the contract.
+
+## Two of the repository's own gates caught me, and both were right
+
+- The new slice inlined its `indexOf`, which `slice-anchor-contract` refuses — and the reason is this
+  exact case: `indexOf` returning `-1` slices from the **end**, so a renamed function would leave the
+  assertion reading an empty tail and **passing**. Positions are bound and asserted found now.
+- The ceiling went **672 → 678**, argued at the entry as the ratchet requires, and it buys behaviour
+  rather than prose. `composer.svelte.ts` went **down** to 873.
+
+The component keeps the byte offsets because the offsets **are** the transcription; the argument lives
+in `post-alert-behavior.ts` beside the guard it governs. Same split `ModalHost.svelte` took for USM-18
+and `refresh.svelte.ts` for G16 — neither file holds a copy of the other.
+
+**Verification.** `svelte-check` 0/0, eslint clean, `pnpm run gate` exit 0 in `apps/room`. The Svelte
+MCP is still not connected, so its mandated steps could not be run for `PostAlertModal.svelte`; the
+autofixer pass was not performed and that is stated rather than implied.
+
+---
+
+### 2026-09-02 13:41 UTC — a logout revoke becomes one statement, and a control test that could not fail is fixed
+
+Two findings, and the second was found by the first going red.
+
+## The Rust finding was real; its LABEL was not
+
+A carried-forward note called `revoke_family_for_token` a **TOCTOU**. Re-measured rather than
+inherited, and it is not one. Every way the row can change between the read and the write lands on
+the same answer: a concurrent rotation inserts into the **same** family, so the revoke still catches
+the successor; a family already revoked matches nothing under `revoked_at IS NULL`; a deleted row
+does not make the `family_id` already in hand wrong. **There is no window in which the wrong thing
+happens.**
+
+Two other inherited claims about this file also failed re-measurement:
+
+- `refresh.rs:241`'s `min(created_at) WHERE family_id = $1` was called *unbounded*. There is an
+  index — `refresh_tokens_family_idx ON (family_id)`, `0001_baseline.sql:1062`.
+- `rotate` was called racy. It runs the whole operation in one transaction with
+  `SELECT … FOR UPDATE`, which its own docblock already explains.
+
+**What IS true is the shape**, and `CLAUDE.md` states that rule without reference to races: one
+atomic conditional `UPDATE`. Logout is on the request path, so the second round trip is a network hop
+a member waits for.
+
+**Proved rather than reasoned**, because `sqlx::query` is not compile-time checked — the compiler had
+nothing to say about this SQL. Run against a throwaway **PostgreSQL 16**, over one family of three
+rows (two live, one already revoked) plus a second family:
+
+| case | result |
+| --- | --- |
+| a known token | **2 rows** — the two LIVE rows; the third keeps its timestamp |
+| the second family | **untouched**, `updated_at` still NULL |
+| an UNKNOWN token | **0 rows** — the `Ok(0)` path the `None` arm returned |
+| a replay | **0 rows** — idempotent |
+
+Re-pinned in `verify-backend-provenance.mjs` with the reason at the entry, as editing a `services/**`
+file requires. PASS: 98 imported + 3 authored here.
+
+## A control test that could not fail for the reason it named
+
+`naming-boundary.test.ts` went red inside the controller gate and green on the next run and in
+isolation. The obvious reading is a flake. `CLAUDE.md` says *never report a failure without first
+ruling out your own tooling* — and the tooling was the fault.
+
+**`git grep` exits 1 when it finds nothing and 2+ when it fails, and `execFileSync` throws on both.**
+Measured in this container, not recalled: a search for an absent string gives `spawnSync` status
+`1`, and `execFileSync` on the same arguments throws with `status 1`.
+
+So a git that could not run and a genuinely empty sweep were **the same event** to a reader. Worse:
+the control — *"finds the reference at all, so an empty sweep cannot pass silently"* — **could never
+fire for the reason its own comment gave.** An empty sweep threw in the reader before the assertion
+was reached, so the `toBeGreaterThan(10)` guard was unreachable on the one input it exists for. It
+took going red once, on the real thing, to notice.
+
+Now `spawnSync` with an explicit status branch: `1` returns an empty array so the control is the
+thing that fires; `2+` throws naming itself a **tooling failure** with git's own stderr, so nobody
+spends a turn looking for a rename that did not happen.
+
+## Verification, and what could not be run
+
+`cargo fmt`, `cargo check -p tradingroom-api --features testing`, and
+`cargo clippy -p tradingroom-api --lib --features testing -- -D warnings` all clean. `pnpm run gate`
+exit 0 in **both** apps. Two negative controls seen RED **and they report differently**, which is the
+whole point: a no-match search fires the count assertion; a bad git flag reports *"exited 129, which
+is a TOOLING failure and not an empty sweep"*.
+
+**The Rust suite could not be run here**, stated rather than implied: `cargo test` links
+`mediasoup-sys`, whose build script fails to build `libmediasoup-worker` in this container.
+`--all-targets` clippy fails for the same reason, which is why clippy is scoped to `--lib`. That is
+an environment limit rather than the change — `cargo check` with the same feature set compiles the
+crate — and the SQL is covered by the Postgres run above instead, which is stronger evidence for this
+particular change than a compile would be. The **rust-analyzer MCP is also unavailable**, so its
+mandated `diagnostics` step was not performed.
+
+---
+
 ### 2026-09-02 12:49 UTC — the re-reading is complete: all twenty-nine rows, and four now need the owner
 
 Every `DELIBERATE DIVERGENCE` row in `room-surface-audit-2026-08-30.md` has been read against the
@@ -78,9 +397,14 @@ transcribable today and would be inert rather than wrong.
 What happens when *"match the dump files exactly"* collides with a rule `CLAUDE.md` states **by
 name** — which is the argument for putting it once rather than four times.
 
-- **MTS-06** — transcribing hardcoded `aria-selected` removes the attribute's whole function for its
-  whole audience. Governs **FP-04, PAM-15 and PAM-12** too: four components, so a convention in the
-  reference rather than a slip in one.
+- **MTS-06** — ~~transcribing hardcoded `aria-selected` removes the attribute's whole function for
+  its whole audience~~. **WRONG, and corrected the same day — see the 14:5x entry above.** The row's
+  premise (*"nothing in the update block writes the attribute"*) is true; the conclusion is not.
+  Every one of those consts carries `data-bs-toggle="tab"`, which hands the anchor to Bootstrap's
+  Tab plugin, and that plugin writes `aria-selected` on every show and hide. This was **already
+  disposed** in `bootstrap-dropdown-contract.test.ts`, and re-reading the audit row without reading
+  the contract is what produced the wrong verdict. Not an owner question at all. Same for **FP-04,
+  PAM-15 and PAM-12**.
 - **SSM-2** — the same collision in degree: the only handler lands on an `aria-hidden` node, so the
   control does not exist *at all* for assistive technology.
 - **STV-02** — escape 4 does **not** apply, on the row's own measurement: *"the viewer sees two

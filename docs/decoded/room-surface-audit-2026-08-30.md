@@ -2642,7 +2642,7 @@ onImagePaste(e){const i=this,o=(e.clipboardData||e.originalEvent.clipboardData).
 
 ### PAM-13 — img tab with no URL: the reference dispatches an upload whenever the module-level fc array EXISTS (even when empty); ours requires at least one file
 
-**OWNER DECISION — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC`. No escape applies, so it is work; what it needs first is one answer, and it is named below.**
+**BUILT 2026-09-02 — MATCHED. The one open question was answered by measurement and both predicted harms were false; see below. Recorded as `DELIBERATE DIVERGENCE 2026-08-30 13:54 UTC`, then briefly as an owner decision, until then.**
 
 `return fc ? void this.doImagurFileListUpload(e) : void 0` tests whether a module-level array EXISTS, not whether it holds anything. The 2026-08-30 reading called that a bug that *"differs only where the reference misfires"* — the retired argument, and it also understated how reachable the misfire is. `fc` was traced to all three of its sites and it is a **tri-state**:
 
@@ -2656,9 +2656,35 @@ So the misfire is not a rare edge: `[]` is **the state the modal is left in afte
 
 **Ours is a two-state guard** — `post-alert-behavior.ts:149`, `draft.fileCount > 0 ? upload : { status: 'noop' }` — so there is no `undefined` to distinguish "never touched" from "reset". Transcribing the reference needs that third state back: a latch set on the first pick and on every reset, with the guard reading the latch rather than the count.
 
-**The one question that decides whether this is safe to build, and it is not an agent's to answer:** what this room's uploader does when handed zero files. Upstream's own outcome is *"a wasted request or an empty alert"*, and an empty alert is a row in a multi-tenant fintech room that a presenter did not mean to post. If the answer is that it no-ops, this is a small faithful transcription and should be built. If it posts, matching means shipping a control that emits junk on a sequence a presenter reaches by ordinary use, and that is the owner's call rather than a transcription.
+**ANSWERED AND BUILT 2026-09-02.** The question was what this room's uploader does when handed zero
+files, because the refusal predicted *"a wasted request or an empty alert"*. Traced end to end, and
+**neither happens**:
 
-Named here rather than built, and named rather than left as a divergence, because the difference between those two is exactly what this pass exists to stop being blurred.
+| predicted harm | what was measured |
+| --- | --- |
+| a wasted request | `RoomComposer.uploadAlertFiles` is `for (const file of files)` — an empty list iterates nothing, so **no upload is issued at all** |
+| an empty alert | `composeUploadedAlert('', [], …)` returns `""` — called, not read off the types — and `post-alert.remote.ts:54` is `body: z.string().min(1)`, so **the boundary refuses it** |
+
+So matching costs nothing that was feared. What the old guard DID cost is a working upstream path
+this room silently refused: **a caption with no file.** `composeUploadedAlert('caption\n', [], …)` is
+`"caption\n"`, which passes `min(1)` and posts — so a presenter who typed a caption on the img tab
+and pressed Post got nothing here and an alert upstream. Matching added a behaviour rather than a
+bug, which is the opposite of what the refusal assumed.
+
+`post-alert-behavior.ts` now takes `filesTouched: boolean` in place of `fileCount: number`, whose
+`> 0` test could not express the distinction and which had no other consumer.
+`PostAlertModal.svelte` sets it at **exactly the two sites upstream assigns `fc`** — the picker
+(2,123,302) and the reset (2,128,421).
+
+**One lifecycle difference, recorded rather than smoothed over:** `clearInputFields` runs on every
+OPEN here, where the reference's reset runs after a send and on close. So `var fc;`'s undefined state
+is reachable upstream on the very first interaction of a page and is not reachable here. Every state
+after that agrees.
+
+**Four negative controls seen red**, and one of them found a hole rather than confirming a guard:
+restoring the old `> 0` test; and removing the latch from EACH of the two sites, which the first
+draft of the contract could not see at all — the pure-function cases cannot tell whether the
+component ever sets the flag, so the latch could have been silently un-wired at either end.
 
 **low** · `divergence` · reference byte **2,128,708**
 
@@ -5191,7 +5217,7 @@ decoded by value: it carries no `tabindex` at all, and neither does any of its s
 
 ### MTS-06 — `aria-selected` is derived here and hardcoded on all eight anchors upstream
 
-**DELIBERATE DIVERGENCE 2026-08-31.** Recorded, not matched. Decoded by value from
+**BUILT — MATCHED; the BINDING is what reproduces the rendered attribute. Disposed with `MSM-02` and `NTC-3` in `bootstrap-dropdown-contract.test.ts`. Recorded as `DELIBERATE DIVERGENCE 2026-08-31`, and briefly and wrongly as an owner decision on 2026-09-02, until then.** Decoded by value from
 `app-presentationarea`'s consts table: const 5 (`screens-tab`), 9 (`streams-tab`), 61
 (`videoplayer-tab`), 63 (`swingAlerts-tab`) and 65 (`dayTradeAlerts-tab`) each carry a literal
 `"aria-selected","true"`; const 11 (`notes-tab`), 17 (the files anchor, which carries no id) and 59
@@ -5204,38 +5230,53 @@ reader and never announces the one actually showing. Ours binds it to `mainTab =
 anchors, and `main-tab-strip-gates.svelte.test.ts` asserts exactly one tab answers `true` and that
 it is the one showing.
 
-**RE-READ 2026-09-02 — this is the FOURTH OUTCOME, not an escape, and it is the OWNER's.** The
-reason recorded above was *"reproducing it would reproduce a defect"*, which is retired. Checked
-against the four:
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE. The binding is what MATCHES, and this row was
+DISPOSED with `MSM-02` and `NTC-3` in `bootstrap-dropdown-contract.test.ts:200-245`, where the
+measurement lives.**
 
-* not **SECURITY** — announcing the wrong tab discloses nothing;
-* not **EVIDENCE ABSENT** — the eight consts are read by value and quoted;
-* not **LANGUAGE IMPOSSIBLE** — a literal attribute is the easier thing to write;
-* not **NOT A DIVERGENCE** — `aria-selected` is reference-facing OUTPUT. It is not internal
-  structure, and the consts are plainly reachable: they are the tab strip the room opens on.
+**A correction to my own re-reading, made the same day.** An earlier pass today marked this row an
+OWNER DECISION — a collision between *"match the dump exactly"* and `CLAUDE.md`'s *"semantic
+accessible HTML"* — on the row's premise that *"nothing in the update block writes the attribute"*.
+That premise is true and the conclusion drawn from it is not, and the contract above had already
+said so. Re-litigating a settled disposition without reading it is the failure this document exists
+to prevent, so the wrong verdict is recorded here rather than quietly replaced.
 
-So on the four alone this is work. What stops it being work an agent may simply do is that matching
-collides with a rule `CLAUDE.md` states BY NAME — *"semantic accessible HTML"* — and the collision
-is total rather than partial: the attribute's only consumers are the users who cannot see which tab
-is active, so transcribing the literals removes the whole of its function for the whole of its
-audience. That is a conflict between two owner rules, and the standing rule for those is that an
-agent settles neither direction silently.
+**An Angular const is the element's attributes AT CREATION.** Everything after the bare `3` marker
+is a binding, and `aria-selected` sits BEFORE it in all eight — so Angular never updates it. It does
+not follow that the RENDERED attribute is static, and every one of those consts names who does
+update it: `"data-bs-toggle","tab"`, which hands the anchor to **Bootstrap's Tab plugin**, and that
+plugin writes `aria-selected` on every show and hide.
 
-**The same decision governs three rows, not one**, which is the argument for putting it to the owner
-once: `FP-04` (`FilesPane`), `PAM-15` and `PAM-12` (`PostAlertModal`, where the capture hardcodes
-`"true"` on TWO of three anchors), and this one. Finding the pattern four times is what makes it a
-convention in the reference rather than a slip in one component.
+**Bootstrap's JavaScript is not in this capture, and it is provably loaded.** Re-measured
+independently on 2026-09-02, and this is stronger than the "it is in a chunk we do not hold"
+argument the contract already carried:
 
-**If the owner says transcribe it:** the literals are const 5, 9, 61, 63, 65 → `"true"` and const 11,
-17, 59 → `"false"` here; `nav-tab-text` and `nav-tab-url` → `"true"` and `nav-tab-img` → `"false"` in
-`PostAlertModal`. `main-tab-strip-gates.svelte.test.ts` and `post-alert-render.test.ts` both assert
-the derived behaviour today and are the tests that have to be turned around with it.
+| measured in `main.d1d09071be31f1ba.js` | count |
+| --- | --- |
+| `bootbox.` call sites | **348** |
+| definitions of `bootbox` | **0** |
+| `window.$` reads | **13** |
+| definitions of jQuery | **0** |
+| Bootstrap plugin code (`bs.tab`, `SELECTOR_DATA_TOGGLE`, `class Tab`) | **0** |
 
-**The precedent is this document's own**, twice: `FP-04` and `PAM-15` refuted the identical claim
-against `FilesPane` and `PostAlertModal` — "the reference genuinely hardcodes aria-selected and ours
-genuinely binds it, and the claim's own remedy, that the divergence should stay recorded as
-deliberate, is ALREADY recorded". It was not recorded for this surface, which is why this row exists
-and is closed rather than refuted.
+`deployed-index.html` loads four scripts and this repository holds **one** of them. bootbox is a
+wrapper over Bootstrap's modal component and cannot function without Bootstrap's JavaScript; 348
+call sites prove it functions. So `scripts.38973a242454fb27.js` supplies jQuery, bootbox **and
+Bootstrap**, and the Tab plugin is running.
+
+**Therefore the derived binding is the match, not the divergence.** Freeze the literals and this
+room renders a DOM the reference never shows at any moment after first paint — five tabs announcing
+themselves selected at once, which upstream shows for exactly as long as it takes the plugin to
+run. There is no collision with `CLAUDE.md` here at all: matching and accessibility agree, and the
+appearance of a conflict came entirely from reading the const table as if it were the rendered DOM.
+
+**The bound remains honest and is the contract's own:** this is EVIDENCE ABSENT for the rendered
+value, and one capture of the running page's DOM settles it either way.
+
+**Governs `FP-04`, `PAM-15` and `PAM-12` identically** — all four are one question with one answer,
+and all four already bind. `post-alert-render.test.ts`'s `PAM-12` block should be read with this:
+its "reproducing it would reproduce a defect" framing is the retired argument, and the disposition
+it reaches is right for the reason given here.
 
 This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.
@@ -9413,7 +9454,7 @@ attributes that will be missing from the seventh.
 
 ### SSM-2 — the capture splits the six clicks three on the `<li>` and three on the `<a>`; all six sit on the `<li>` here
 
-**OWNER DECISION — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`; the same rule collision as `MTS-06` and to be answered with it.** This row was ADDED after this document was committed.
+**BUILT 2026-09-02 — MATCHED, three and three. Recorded as `DELIBERATE DIVERGENCE 2026-08-31`, then briefly and wrongly as an owner decision, until then.** This row was ADDED after this document was committed.
 
 Consts 185, 186 and 187 each end `3,"click"`, so Share Screen, OBS / XSPLIT and OBS / RTMP carry the
 handler on the list item. `l4e`, `c4e` and `d4e` instead do `d(2,"li")(3,"a",163)`, where const 163 is
@@ -9423,22 +9464,37 @@ Measured: `.dropdown-menu li` has no rule of its own in `css/complete-app-styles
 anchors are not `.dropdown-item` — they are bare inline `<a>` with no `href`, so an anchor's box is
 exactly its text. Upstream's "Stop Sharing All Screens" is therefore clickable on its words and dead
 on the rest of the row, while "Share Screen" two entries above is clickable across the whole row.
-**RE-READ 2026-09-02 — OWNER DECISION, the same fourth outcome as `MTS-06`, and the row's second
-clause is the whole of it.** The first clause — *"reproducing the split would reproduce a hit-target
-bug"* — is the retired argument. The second is not:
+**MATCHED 2026-09-02, and the refusal rested on a FALSE DICHOTOMY.**
 
-matching puts the ONLY handler on `["aria-hidden","true",3,"click"]`, and `SSM-1`'s focusable element
-lands on that same node. An `aria-hidden` node carrying the only interactive binding is not a control
-announced wrongly; **it is a control that does not exist at all** for anyone using assistive
-technology. That collides with a rule `CLAUDE.md` states by name — *"semantic accessible HTML"* — and
-a conflict between two owner rules is the one thing an agent must not settle silently in either
-direction.
+Two verdicts were written on this row today before the right one. The first re-reading called it an
+OWNER DECISION on the ground that matching *"puts the ONLY handler on an `aria-hidden` node"*; the
+contract test it inherited that from said the same thing — that moving `run` to the anchor would put
+activation on a hidden node *"and `activateOnKey` — the keyboard half — is bound to the `<li>`"*, so
+the two must travel together.
 
-Stronger than `MTS-06` in degree and identical in kind, so the two should be answered together: there
-the reference announces the wrong tab, here it hides the control entirely. **If the owner says
-transcribe:** the handler moves from the `<li>` to the `<a>` on the three affected entries (consts
-185/186/187 versus `l4e` / `c4e` / `d4e`), const 163 keeps its `aria-hidden="true"`, and `SSM-1`'s
-focusable element goes with it.
+**They do not.** A click handler and a keydown handler are independent bindings, and putting them on
+different nodes is exactly what reproduces the reference:
+
+| | where it goes | what it reproduces |
+| --- | --- | --- |
+| the CLICK, on three rows | the `<a>` | the pointer surface is the anchor's text — the reference's own hit target |
+| the KEYDOWN, on all six | the `<li>` | `SSM-1`'s addition, which its own note calls *"an addition, not a replacement"* |
+
+So there is no cost on either side and nothing left to judge. The row read as a product judgement
+only because the two handlers had been bundled together; separated, it is an ordinary transcription.
+The focusable node stays the `<li>` and never becomes the `aria-hidden` `<a>` — `tabindex` inside an
+`aria-hidden` subtree would be a defect of OURS, since the capture has no focusable node there to
+transcribe.
+
+**Which three, read from the sub-templates rather than from this row's prose:** `l4e` is
+`" Stop Sharing All Screens"` (`stopSharingAll`), `c4e` is `" Reopen Screenshare Preview"`
+(`reopenPreviewWindow`), `d4e` is the per-screen `" Stop Sharing {screenName}"`
+(`stopSharingProducer`). The `<li>`-bound three are Share Screen, the OBS virtual cam and OBS / RTMP.
+
+One parameter on the shared snippet decides it — `clickTarget: 'item' | 'anchor'` — so the split
+cannot drift row by row, and `screen-share-menu-contract.test.ts` asserts the mode at every one of
+the six call sites rather than only in the snippet, because a parameter every site passes `'item'`
+for is the old behaviour wearing new syntax.
 
 The measurement behind the hit-target half stands and is worth keeping either way: `.dropdown-menu
 li` has no rule of its own in `css/complete-app-styles.css` and these anchors are not
@@ -10388,7 +10444,7 @@ than one that opens onto "Nothing is scheduled."
 
 ### SCH-07 — The modal chrome — `modal-xl`, `table table-striped text-white`, the "Manage Scheduled Alerts" title and the Close footer — is not reproduced
 
-**BLOCKED — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE 2026-08-31`. No escape applies, so this is WORK; the change is specified in full below and what blocks it is tooling, named at the end.** `ScheduledAlerts.svelte`'s header records why the reference's two components are one here, and
+**BUILT 2026-09-02 — MATCHED. Recorded as `DELIBERATE DIVERGENCE 2026-08-31`, then briefly BLOCKED on tooling while the Svelte MCP was disconnected, until then.** `ScheduledAlerts.svelte`'s header records why the reference's two components are one here, and
 `ScheduledAlertsTable.svelte`'s header records why drawing a row is not the part of that decision
 being revisited. The chrome is what the merge costs: a pane embedded in `PostAlertModal`'s body cannot
 carry a second modal's dialog, title bar and Close button, because there is no second modal.
@@ -10398,47 +10454,37 @@ globals styling a table that is now inside a SCOPED sheet, and the room already 
 generations on two surfaces (recorded in `todo-next.md`). Borrowing a global table skin into a scoped
 component is how the row-striping in one modal starts depending on which generation loaded.
 
-**RE-READ 2026-09-02 — NO ESCAPE APPLIES. This is WORK, and it is the last of the twenty-nine.**
+**BUILT 2026-09-02.** The Svelte MCP reconnected and the mandated workflow was run; the row is
+closed rather than deferred.
 
-Checked against the four and it fails each: not SECURITY; the chrome consts are quoted by value
-below, so not EVIDENCE ABSENT; a modal wrapper is ordinary markup, so not LANGUAGE IMPOSSIBLE; and
-`modal-xl`, a title bar and a Close button are reference-facing OUTPUT rather than internal
-structure.
+**The first argument was circular, in the same way `SZC-03`'s was.** *"A pane embedded in
+`PostAlertModal`'s body cannot carry a second modal's dialog, because there is no second modal"* —
+the absence of the second modal IS the divergence, so it cannot also be the reason for it.
 
-**The first argument is circular, in the same way `SZC-03`'s was.** *"A pane embedded in
-`PostAlertModal`'s body cannot carry a second modal's dialog, because there is no second modal"* — the
-absence of the second modal IS the divergence, so it cannot also be the reason for it. `SZC-03` was
-refused on exactly that shape (*"the guard is the price of a placement this repository chose"*) and
-did not survive the reading either.
+`ScheduledAlerts.svelte` now renders `<Modal id="scheduledAlertsModal">` with the eight captured
+chrome values — `modal fade text-white`, `modal-dialog modal-xl`, the `modal-title`
+`" Manage Scheduled Alerts "`, `aria-labelledby="scheduledAlertsModalLabel"`, the
+`btn-close btn-close-white` dismiss, and a footer carrying const 11's
+`btn btn-primary` `" Close "`. The trigger OPENS rather than toggles, which is what
+`data-bs-toggle="modal"` means and what the inline table had made impossible.
 
-**The second argument is real and is a question for the build, not a reason against it.** Two
-Bootstrap generations do ship on two surfaces here, so a global `table-striped` inside a scoped sheet
-could take its striping from whichever loaded. That decides HOW the chrome is transcribed — whether
-the two globals are carried as-is or reproduced in the component's own sheet under the captured
-names — not whether the dialog exists.
+**It is the project's own `Modal` primitive and not a hand-rolled dialog**, because that primitive
+already renders this exact chrome and carries the focus trap, the `inert` handling and `ASR-3`'s
+focus-on-open — all of which the reference got from Bootstrap's plugin and this room ships itself.
+A second dialog would have been a second copy of all three. `aria-hidden` is the creation-time value
+(`closedAriaHidden`), on the reading `MTS-06`, `MSM-02` and `NTC-3` were disposed on.
 
-**The trigger already points at it.** `ScheduledAlerts.svelte:218` renders const 74's
-`data-bs-toggle="modal" data-bs-target="#scheduledAlertsModal"`, and there is no
-`#scheduledAlertsModal` in this room — the table renders inline instead. So the room already carries
-half of the reference's arrangement, aimed at a dialog that does not exist, and the room ships no
-Bootstrap JavaScript to notice.
+**The second argument measured TRUE and was still not a reason to refuse.** `.table-striped` really
+is defined twice in this room — `app.css` and `src/lib/styles/protradingroom-source.css` — so which
+sheet supplies the striping depends on load order. The four classes are carried anyway, because
+`ScheduledAlertsTable` **already** depends on global Bootstrap for its `text-bg-*` badge colours,
+deliberately and with the reason in its own scoped sheet. A rule the file does not follow for the
+badges cannot decide the table, and the two-generations problem is `todo-next.md`'s rather than
+something matching creates.
 
-**What building it is, exactly**, from the consts already quoted above: a `#scheduledAlertsModal`
-with `tabindex="-1"`, `aria-labelledby="scheduledAlertsModalLabel"`, `aria-hidden="true"` and
-`class="modal fade text-white"`; inside it `modal-dialog modal-xl` > `modal-content` >
-`modal-header` carrying `#scheduledAlertsModalLabel.modal-title` and the
-`btn-close btn-close-white` dismiss; then `modal-body` holding the existing
-`ScheduledAlertsTable` with `class="table table-striped text-white w-100"`.
-
-**Not built in this session, and the reason is tooling rather than judgement.** `CLAUDE.md` makes the
-Svelte MCP mandatory on every task touching a `.svelte` file — `list-sections` and
-`get-documentation` before writing, `svelte-autofixer` until it returns nothing — and that MCP is not
-connected in this session. Splitting a pane into a new dialog component is precisely the class of
-change that rule exists for, so it is named here in full rather than attempted without it. `SCH-05`'s
-two non-chrome rules were built and are unaffected.
-
-The two rules that are NOT chrome — `remove-scheduled-alert-btn` and `alert-date-time-th` — were built
-rather than refused, and are SCH-05.
+**One gate noticed on its own that a dialog had appeared.** `alert-report-modal-contract`'s
+modal census went 23 → 24 and named 10 → 11, in a file nobody would have opened for a scheduling
+change. That is what the triple is asserted for, and its comment now says so.
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
