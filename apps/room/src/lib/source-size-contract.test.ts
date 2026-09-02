@@ -8716,7 +8716,30 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `note-tab-chrome.ts` came out in the same change carrying the constant, the two activations,
       the rename attachment and the measurements behind all three rows.
     */
-    max: 135,
+    /*
+      135 -> 152, 2026-09-02. NTC-3's two halves, which went OPPOSITE WAYS off one const, and the
+      seventeen lines are the argument for why that is not inconsistency.
+
+      Const 126 at byte 2,002,666 is
+      `["id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false",1,
+      "dropdown-toggle"]`.
+
+      `id` takes the literal. This component renders once per note tab in both codebases, so the
+      reference really does emit N elements with one id — a defect, in rendered output, and
+      "reproducing it would reproduce a defect" is not one of the four escapes. The harm is bounded
+      at the code rather than waved at.
+
+      `aria-expanded` stays BOUND. The pair sits before the `1` that opens the class names, so
+      Angular never updates it, and `data-bs-toggle` hands the element to Bootstrap's Dropdown
+      plugin, which does. The const is the creation-time value and not the rendered one; this room
+      ships no Bootstrap JavaScript, so a literal would freeze a DOM the reference never shows after
+      its first paint.
+
+      One measurement, one place: `bootstrap-dropdown-contract.test.ts` carries it for this row,
+      MSM-02 and MTS-06 together, and this note points at it rather than repeating it a third time.
+      The `menuId` prop and the pane's `{const}` that fed it are gone with the change.
+    */
+    max: 152,
     why: 'one note tab and its read-only view'
   },
   {

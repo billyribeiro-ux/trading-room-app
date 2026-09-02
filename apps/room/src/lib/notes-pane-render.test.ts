@@ -84,7 +84,6 @@ describe('NotesPane evidence contract', () => {
         canEdit: true,
         dirty: false,
         onBringEveryone: () => {},
-        menuId: 'notes-pane-menu-59',
         menuOpen: false,
         note: note(59, 'Bible Verses', 0),
         onDelete: () => undefined,
@@ -109,10 +108,10 @@ describe('NotesPane evidence contract', () => {
       const; this assertion is the RENDERED half of it.
     */
     expect(body).toContain(
-      '<span id="notes-pane-menu-59" role="button" tabindex="0" aria-label="Note options" ' +
+      '<span id="dropdownMenuNote" role="button" tabindex="0" aria-label="Note options" ' +
         'data-bs-toggle="dropdown" aria-expanded="false" class="dropdown-toggle">'
     );
-    expect(body).toContain('<ul aria-labelledby="notes-pane-menu-59" class="dropdown-menu">');
+    expect(body).toContain('<ul aria-labelledby="dropdownMenuNote" class="dropdown-menu">');
     expect(body.match(/href="#"/g)).toHaveLength(6);
     /*
       Contiguous, and that is why the menu's snippet takes a REQUIRED icon and Rename Note is

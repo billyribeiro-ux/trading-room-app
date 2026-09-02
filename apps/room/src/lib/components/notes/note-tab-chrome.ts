@@ -49,7 +49,6 @@ export const WELCOME_MAT_TOOLTIP =
 export interface NoteTabContentProps {
   readonly canEdit: boolean;
   readonly dirty: boolean;
-  readonly menuId: string;
   readonly menuOpen: boolean;
   readonly note: RoomNote;
   readonly onDelete: () => void;

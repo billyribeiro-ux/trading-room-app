@@ -45,6 +45,65 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 03:06 UTC — three rows asked for the same frozen attribute, and the const table cannot settle any of them
+
+MTS-06, MSM-02 and NTC-3 each asked this room to replace a BOUND `aria-selected` / `aria-expanded`
+with the static literal the reference's const table carries. It is one question, so it is measured
+once — in `bootstrap-dropdown-contract.test.ts`, which already owns the premise it turns on.
+
+```
+MTS-06  1,994,264  ["id","screens-tab","data-bs-toggle","tab",…,"aria-selected","true",
+                    1,"nav-link",3,"ngClass"]                          … and six more like it
+MSM-02  1,358,083  ["role","button","id","dropdownMenuLink","data-bs-toggle","dropdown",
+                    "aria-haspopup","true","aria-expanded","false",1,"msgMenu",…,3,"ngStyle"]
+NTC-3   2,002,666  ["id","dropdownMenuNote","data-bs-toggle","dropdown","aria-expanded","false",
+                    1,"dropdown-toggle"]
+```
+
+**What the const proves:** an Angular const is the element's attributes AT CREATION, and in all
+three the aria pair sits before the `1` that opens the class names. So Angular never updates these
+attributes upstream. The rows read that correctly.
+
+**What it does not prove:** that the RENDERED attribute is static. Every one of the three declares
+who does update it — `data-bs-toggle="tab"` / `"dropdown"` hands the element to Bootstrap's Tab and
+Dropdown plugins, whose documented job is to write exactly these two attributes on show and hide.
+That plugin lives in `scripts.38973a242454fb27.js`, one of the three chunks `deployed-index.html`
+names and this checkout does not hold — the same absence ROV-03 bounds.
+
+The alternative has to be stated to be dismissed: if the rendered value really were the const's,
+upstream's tab strip would announce **seven** selected tabs at once and every message menu would
+announce itself collapsed while open. Reproducing an upstream defect is matching — but that is a
+claim about the rendered DOM, and the const is not evidence of one.
+
+This room ships no Bootstrap JavaScript (the first assertion in that file), so nothing here would
+write the attribute after creation. **The binding is what reproduces the rendered attribute.**
+EVIDENCE ABSENT for the rendered value, and bounded: one capture of the running page settles it.
+
+## NTC-3's OTHER half went the opposite way, off the same const
+
+`id="dropdownMenuNote"` and `aria-labelledby="dropdownMenuNote"` are now the capture's literals.
+This component renders once per note tab in both codebases, so upstream really does emit N elements
+with one id and N menus labelled by the first gear. That was a recorded divergence — *"matching it
+here would reproduce a defect"* — and it is a defect, in RENDERED output, which is the difference
+between this half and the other one.
+
+The harm is bounded rather than waved at: the ids collide, which is invalid HTML; the accessible
+NAME does not change, because every gear carries the same `aria-label="Note options"` and only one
+`<ul>` takes `.show` at a time.
+
+**Two gates confirmed it without being asked.** `surface-audit-contract` went from five residual
+const values to four — `dropdownMenuNote` left the enumeration's gap list by being built. And
+`eslint` caught `componentId`, which existed only to mint the id that is now a literal; leaving it
+would have been dead scaffolding no dead-export test could see, because it was a template-local
+`{const}`.
+
+**Runtime impact.** None visible. The three aria attributes were already bound and stay bound; the
+note gears now share one id, as the reference's do.
+
+**Verified:** room gate exit 0 at `c675a90` — 341 files, 6,177 passed, 1 skipped. Five negative controls seen red: freezing each of the three
+aria attributes, restoring the per-note id, and doing the id half without the `aria-labelledby` half
+(which points every menu at an element that would not exist).
+
 ### 2026-09-02 02:41 UTC — the compact member reaction pill, and three assertions that hard-coded an empty parameter list
 
 RMSG-06. Four templates repeat the reaction loop; three wrap the pill in

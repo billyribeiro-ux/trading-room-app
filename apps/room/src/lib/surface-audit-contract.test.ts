@@ -955,23 +955,27 @@ describe('app-presentationarea — audited 2026-09-01, the page s other giant', 
     expect(files.length, 'a component was added or removed under lib/components').toBe(94);
   });
 
-  it('is missing the RECORDINGS tab and one recorded divergence, and nothing else', () => {
+  it('is missing the RECORDINGS tab and NOTHING else', () => {
     /*
       `recordings`, `recordings-tab`, `#recordings`, `fa-file-video` and the literal `"Recordings"`
       are one blocked feature: a recordings archive, which needs a service neither database has a
       table for. `TODO.md` carries it as blocked on an archive service, not as a decision.
 
-      `dropdownMenuNote` is `NTC-3`, argued at `notes/NoteTabContent.svelte`: the capture freezes the
-      per-note gear's `id` at that literal, so two open notes would be two elements with one id and
-      every menu's `aria-labelledby` would resolve to the first gear. Reproducing it would reproduce
-      a defect, so the id is per-note here.
+      **`dropdownMenuNote` LEFT THIS LIST on 2026-09-02**, and it left by being built. It was
+      `NTC-3`, a recorded divergence: the capture freezes the per-note gear's `id` at that literal,
+      so the reference emits N elements with one id and N menus labelled by the first gear, and
+      reproducing it was read as reproducing a defect. It is a defect, in rendered output, which is
+      not one of the four things that excuse a divergence — so the literal is worn and the harm is
+      bounded at the code (the ids collide; the accessible name does not change).
+
+      This assertion is where that showed up independently: five residual const values became four
+      without anybody editing this file, which is what an enumeration is for.
     */
     expect(report.constGaps.map((gap) => gap.value)).toEqual([
       'recordings',
       'recordings-tab',
       '#recordings',
-      'fa-file-video',
-      'dropdownMenuNote'
+      'fa-file-video'
     ]);
   });
 
