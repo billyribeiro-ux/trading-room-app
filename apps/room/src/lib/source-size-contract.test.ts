@@ -4919,7 +4919,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       of the expression and unreachable through the type — `RoomFileRow` declares four fields as
       `string`. The visible effect was the wait, not the result, and the note now says so.
     */
-    max: 424,
+    /*
+      424 -> 442, 2026-09-02, and NO code changed: eighteen lines are `FP-06`'s disposition, at the
+      setter it declines to change.
+
+      `console.log("tab", e), this.selectedFileTab = e` at byte 1,960,015. The log is not
+      transcribed as code: it changes the developer console rather than the product, which is
+      internal structure — and this repository already has a consistent practice for upstream's
+      logging, visible in three other files, of transcribing `console.log` calls INTO THE CITATION
+      as evidence rather than executing them. Running one here breaks that pattern for one setter,
+      and would print on every Files-tab click in a product where the console is where a real error
+      has to be visible.
+
+      Worth the lines because without them the next comparison finds a log upstream and none here
+      and adds it — and the comma operator (the reference logs BEFORE assigning) is the detail that
+      would then be got wrong.
+    */
+    max: 442,
     why: 'the file drive; the first slice to collapse a prop list at TWO call sites rather than one'
   },
   {
@@ -8654,7 +8670,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the attribute is written as the spread this repository already uses for its captured
       `ngbtooltip` pairs.
     */
-    max: 732,
+    /*
+      732 -> 759, 2026-09-02. STV-02 — the SECOND reload, one line of code and twenty-six of reason.
+
+      `…setPreference("bufferSizeLevel",e), this.hls && this.loadStream())` at byte 1,908,711. The
+      tail was refused because this room's `$effect` on `bufferSizeLevel` already reloads. It does —
+      and so does upstream's `preferenceChanged` subscription, which `setPreference` on the line
+      before fires. **The reference reloads TWICE per click** and this room reloaded once.
+
+      The lines are the cost, stated rather than hidden: a reload re-fetches the HLS manifest and
+      rebuilds the buffer, so matching doubles a network-heavy operation. A later reader looking at
+      two reloads and finding no reason would be right to delete one, which is exactly what happened
+      the first time.
+
+      The guard is `hls` and not `videoPlayer`, which is the reference's own and is STV-03's whole
+      subject: on the native-HLS path `hls` is null and neither reload runs.
+    */
+    max: 759,
     why: 'the hls.js player, its buffer control and the quality picker'
   },
   {

@@ -99,6 +99,8 @@ const CITED: ReadonlyArray<readonly [number, string]> = [
   [1_903_977, 'setupStream(){let e=`roo'],
   /* STV-04 — the PAIR `setupStream()` ends with; the second half is the row. */
   [1_904_326, 'this.loadStream(),this.startPerformanceMonitoring()}'],
+  /* STV-02 — the SECOND reload, the tail of `setBufferSize`. */
+  [1_908_711, 'setPreference("bufferSizeLevel",e),this.hls&&this.loadStream())'],
   [1_904_378, 'loadStream(){const e=thi'],
   [1_904_725, 'startPerformanceMonitoring(){!'],
   [1_904_918, 'checkAndAdaptPerformance(){if('],
@@ -613,6 +615,34 @@ describe('DTP-02 and SWP-01 — the Ze/Ne split, which is what makes the five no
     /* Exactly two effects, and the load one is first. */
     expect(playerCode.split('$effect(').length - 1).toBe(2);
     expect(loadEffectOpens).toBeLessThan(playerCode.indexOf(BUFFER_EFFECT));
+  });
+});
+
+describe('STV-02 — the buffer control reloads TWICE, as the reference does', () => {
+  it('is the reference behaviour, read at the offset', () => {
+    expect(BUNDLE.slice(1_908_711, 1_908_711 + 62)).toBe(
+      'setPreference("bufferSizeLevel",e),this.hls&&this.loadStream()'
+    );
+  });
+
+  it('calls loadStream directly, on top of the effect that already reloads', () => {
+    /*
+      The row is a SECOND reload, and it really is a second one: `setPreference` on the line before
+      fires upstream's `preferenceChanged` subscription (1,902,159), which reloads, and then the
+      tail reloads again. This room had the effect and not the direct call.
+
+      Guarded on `hls`, which is the reference's own guard and is STV-03's whole subject — on the
+      native-HLS path `hls` is null and neither reload runs.
+    */
+    const at = playerCode.indexOf('function setBufferSize(');
+    expect(at, 'setBufferSize is gone').toBeGreaterThan(-1);
+    const end = playerCode.indexOf('\n  }', at);
+    expect(end, 'setBufferSize is unterminated').toBeGreaterThan(at);
+    const body = playerCode.slice(at, end);
+    expect(body).toContain('onBufferSizeChange?.(level);');
+    expect(body, 'STV-02: the direct reload is gone again').toContain(
+      'if (hls) void loadStream();'
+    );
   });
 });
 

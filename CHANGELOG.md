@@ -45,6 +45,47 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 03:37 UTC — a reload the reference does twice, and a log that is not product output
+
+## STV-02 — it really is a second reload
+
+`…setPreference("bufferSizeLevel", e), this.hls && this.loadStream())` at bundle byte 1,908,711. The
+tail was refused because this room's `$effect` keyed on `bufferSizeLevel` already reloads.
+
+It does — and so does upstream's `preferenceChanged` subscription at 1,902,159, which `setPreference`
+on the line before fires. **So the reference reloads TWICE per click** and this room reloaded once.
+Transcribed, with the cost written at the code rather than hidden: a reload re-fetches the HLS
+manifest and rebuilds the buffer, so matching doubles a network-heavy operation on this control. A
+later reader finding two reloads and no reason would be right to delete one, which is what happened
+the first time.
+
+Guarded on `hls`, not `videoPlayer` — the reference's own guard, and STV-03's whole subject: on the
+native-HLS path `hls` is null and neither reload runs. Its own negative control is separate from the
+row's, because dropping the guard is the plausible wrong fix.
+
+## FP-06 — a `console.log` is not the product
+
+`console.log("tab", e), this.selectedFileTab = e` at byte 1,960,015. NOT transcribed as code, and
+the reason is not taste:
+
+- It changes the developer console, not anything a member or presenter sees. That is internal
+  structure rather than reference-facing output.
+- **This repository already has a consistent practice for upstream's logging**, in
+  `room/recording-frames.ts`, `room/message-delete.ts` and `room/caption-staleness.ts`: the
+  reference's `console.log` calls are transcribed INTO THE CITATION, as evidence of what the
+  reference does, rather than executed. Running one here breaks that pattern for a single setter.
+- All three Files-tab call sites funnel through this setter, so it would print on every tab click,
+  in a product where the console is where a real error has to be visible.
+
+Recorded at the setter with the detail a future build would get wrong — the reference logs BEFORE
+assigning, via the comma operator.
+
+**Runtime impact.** Changing the stream's buffer size now reloads twice, as the reference does.
+Nothing else moves.
+
+**Verified:** room gate exit 0 at `8e7fd35` — 341 files, 6,188 passed, 1 skipped. Two negative controls seen red: dropping the direct reload,
+and dropping its `hls` guard.
+
 ### 2026-09-02 03:30 UTC — `trackBy`, and the one row where Svelte's own documentation settles it
 
 DTP-04 and SWP-04 asked both alert panes to change `{#each visibleAlerts as row (row.id)}` to

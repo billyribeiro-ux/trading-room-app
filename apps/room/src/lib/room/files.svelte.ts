@@ -172,6 +172,24 @@ export class RoomFiles {
     return this.#fileTab;
   }
 
+  /*
+    `FP-06` — `console.log("tab", e), this.selectedFileTab = e` at bundle byte 1,960,015, and the
+    log is NOT transcribed as code. Measured and dispositioned 2026-09-02.
+
+    A `console.log` changes the developer console, not the product: nothing a member or a presenter
+    sees differs, so this is internal structure rather than reference-facing output. And this
+    repository already has a consistent practice for upstream's logging, visible in
+    `room/recording-frames.ts`, `room/message-delete.ts` and `room/caption-staleness.ts` — the
+    reference's `console.log` calls are transcribed INTO THE CITATION, where they are evidence of
+    what the reference does, rather than executed. Running one here would break that pattern for a
+    single setter.
+
+    The cost of the other reading is worth naming: the three call sites all funnel through here, so
+    it would print on every Files-tab click, in a product where the console is where a real error
+    has to be visible.
+
+    The comma operator matters if it is ever built: the reference logs BEFORE assigning.
+  */
   set fileTab(next: FileTab) {
     this.#fileTab = next;
   }
