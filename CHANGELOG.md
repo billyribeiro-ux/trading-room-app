@@ -45,6 +45,52 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 12:36 UTC — five more rows re-read: two were stale, three had reasons that did not survive
+
+Twenty-four of the twenty-nine `DELIBERATE DIVERGENCE` rows are re-read. Every one of the five below
+had a reason that was **true** and was **not one of the four escapes** — and in three cases a better
+reason was sitting underneath it.
+
+## Stale — already matched, nothing had updated the row
+
+- **RMSG-06.** All four reaction repeaters now differ exactly as the reference's four do.
+  `RoomMessage.svelte:496` is `{#snippet reactionStrip(gated: boolean)}` with
+  `{#if !gated || clickedBy.length > 0}`; the card sites pass `true` and the compact site passes
+  `reverseMessage`, so the compact ADMIN row is gated like `V1e` and the compact MEMBER row is not,
+  like `m_e`. **One parameter reproduces the asymmetry instead of flattening it.** The old reason —
+  that matching *"would ship a pill claiming a reaction nobody has made"* — was the retired argument:
+  the pill IS what the reference draws on that one layout.
+- **FP-09.** The trim is gone. The refusal was a taste argument (*"ours is the one whose result a
+  person can predict"*) and its premise was too narrow: **a trailing space is not only typed by
+  accident.** With the trim in place ` png` matched nothing, while the reference matches every row
+  containing `png` — different LISTS, not different answers to an empty query. A second divergence in
+  the same expression went with it: the reference short-circuits an empty term where this ran the
+  whole `Object.values` walk with `''`, which cost the wait rather than the result.
+
+## Reasons replaced, same outcome
+
+**RM-19 — escape 4, and the measurement is decisive.** `copyMessage` writes the stripped text onto
+the message and makes no server call, so upstream the message **stays** stripped: that application is
+push-driven and nothing routinely rebuilds the list. **This room re-reads itself every five seconds** —
+`refresh.svelte.ts` runs `invalidate('room:data')` on a 5000 ms interval, and the load returns bodies
+from the database. So transcribing the line would not reproduce upstream's result; it would produce a
+**flicker** — formatting vanishing for up to five seconds and returning on its own — a third
+behaviour present in neither application. There is no vehicle for the write either: `patchEvidence`
+is scoped to `evidenceKey`, which marks captured fixture rows only.
+
+**SRCH-05 — escape 2, and the row was defending the wrong half.** It argued that a silent cap is the
+worse failure, which is a judgement about which behaviour is better. The escape is one level up, at
+the **cap**: `alert-log.ts:73-84` already records that the reference asks its own server and **the
+bundle shows only the request**, so whatever bound that server applies is uncaptured. There is no
+number to match. Given that a bound must be chosen, `CLAUDE.md` names the alternative — *"an
+unbounded SELECT that grows with usage"* — so the cap stays at 500. The notice is then **not a
+divergence but the disclosure of one**; removing it while keeping the cap would match neither
+application.
+
+**Verification.** `pnpm run gate` exit 0 in `apps/room`.
+
+---
+
 ### 2026-09-02 12:29 UTC — G16's arming delay is matched: the room now ignores its first ten seconds
 
 Nineteen of the twenty-nine `DELIBERATE DIVERGENCE` rows are re-read. This one carries real code.

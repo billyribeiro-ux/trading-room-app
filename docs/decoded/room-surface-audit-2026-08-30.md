@@ -818,7 +818,17 @@ const c=s?`gifExtra_${o}`:`gif_${o}`
 
 ### RM-19 — copyMessage mutates msg.txt upstream before writing to the clipboard
 
-**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 11:20 UTC, not reproduced.** `this.msg.txt = sf(this.msg.txt).result` writes the stripped text back onto the MESSAGE, so copying silently rewrites the one on screen: formatting, links and ticker colouring vanish from the log for everyone looking at that browser, and nothing puts them back. The clipboard content is identical either way. Ours strips into a DETACHED element and leaves the message alone. Recorded rather than silently improved — this is a place where matching the reference would mean reproducing a defect, and the next person comparing the two should find the reason rather than assume the line was missed.
+**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 11:20 UTC, not reproduced.** `this.msg.txt = sf(this.msg.txt).result` writes the stripped text back onto the MESSAGE, so copying silently rewrites the one on screen: formatting, links and ticker colouring vanish from the log for everyone looking at that browser, and nothing puts them back. The clipboard content is identical either way. Ours strips into a DETACHED element and leaves the message alone.
+
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the reason it gave was the retired one.** *"Matching would mean reproducing a defect"* is no longer sufficient; reproducing an upstream defect is matching. What carries instead is a measurement about the two data flows, and it is decisive:
+
+**Upstream's mutation persists; ours could not.** `copyMessage` writes the stripped text onto the message object and makes no server call, so upstream the stripped message stays stripped until something rebuilds the list — and nothing routinely does, because that application is push-driven. **This room re-reads itself every five seconds.** `refresh.svelte.ts` runs `invalidate('room:data')` on a `REFRESH_MS = 5000` interval while the tab is visible; the load returns message bodies from the database, so a local write to `item.body` is replaced on the next tick.
+
+So transcribing the line would not reproduce upstream's rendered result. It would produce a **flicker** — formatting, links and ticker colouring vanishing for up to five seconds and then returning on their own — which is a third behaviour, present in neither application. The divergence is in the surrounding refresh policy, and leaving the message alone is what keeps the rendered output matched.
+
+Worth adding what the mechanics would cost, because it strengthens the reading rather than excusing it: there is no vehicle for the write either. `patchEvidence` is scoped to `evidenceKey`, which marks CAPTURED FIXTURE rows only (`hidden_room_items.evidence_key`), and live rows have none — so matching would need a new client-side body overlay whose only purpose is to be overwritten five seconds later.
+
+The clipboard content is identical either way; `sf(…).result` is the same plain text the detached element produces.
 
 **low** · `divergence` · reference byte **1,355,969**
 
@@ -992,9 +1002,17 @@ function _ge(t,n){if(1&t&&(d(0,"div",3)(1,"a",6),v(2),Xe(3,"date"),u()()),2&t){c
 
 ### RMSG-06 — The compact MEMBER reaction repeater has no `clickedBy` gate; the other three have it, and matching would draw a pill claiming a reaction nobody made
 
-**DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 22:40 UTC, not reproduced.** Four templates repeat the reaction loop. `Oge` (card admin, 1,333,312), `u1e` (card member, 1,341,960) and `V1e` (compact admin, 1,371,615) each wrap the pill in `O(1, e.value.clickedBy.length > 0 ? 1 : -1)`. `m_e` (compact member, 1,379,950) opens `d(0,"span")(1,"span",51)` and renders it unconditionally.
+**BUILT 2026-09-02 — MATCHED, asymmetry and all. Recorded as `DELIBERATE DIVERGENCE 2026-08-30 22:40 UTC` until then.** Four templates repeat the reaction loop. `Oge` (card admin, 1,333,312), `u1e` (card member, 1,341,960) and `V1e` (compact admin, 1,371,615) each wrap the pill in `O(1, e.value.clickedBy.length > 0 ? 1 : -1)`. `m_e` (compact member, 1,379,950) opens `d(0,"span")(1,"span",51)` and renders it unconditionally.
 
-`addRemoveReaction` empties `clickedBy` rather than deleting the key, so a reaction whose last holder removes it draws upstream as `🎉 0` — on a compact member row and on no other row in the product. That is a defect of the kind RM-19 records for `copyMessage`'s write-back: reproducing it would ship a pill claiming a reaction nobody has made, on one layout of four. The gate is applied to all four here, which is what three of them already say, and the contract renders all four layouts so that "one of four differs" is a statement about four rather than about one.
+`addRemoveReaction` empties `clickedBy` rather than deleting the key, so a reaction whose last holder removes it draws upstream as `🎉 0` — on a compact member row and on no other row in the product.
+
+**RE-READ 2026-09-02 — MATCHED, all four repeaters now differ exactly as the reference's four do.** The reason recorded on 2026-08-30 was that reproducing it *"would ship a pill claiming a reaction nobody has made"*, which is the retired argument: the pill IS what the reference draws, on that one layout, and none of the four escapes covers it.
+
+`RoomMessage.svelte:496` is `{#snippet reactionStrip(gated: boolean)}` with `{#if !gated || reaction.clickedBy.length > 0}`. The card sites call `reactionStrip(true)` — `Oge` and `u1e`, both gated — and the compact site calls `reactionStrip(reverseMessage)`, so the compact ADMIN row is gated like `V1e` and the compact MEMBER row is not, like `m_e`. One parameter reproduces the reference's own asymmetry instead of flattening it.
+
+**The parameter is a BOOLEAN and not a count, deliberately.** An earlier draft of the surrounding assertions pinned `reactionStrip()` with an empty parameter list in three places, and this file's own comment two lines above warned against pinning a NUMBER for the same reason — an assertion that hard-codes the shape of a call goes stale the first time the call gains an argument, which is what happened.
+
+The row's second half stands unchanged: unifying the strip is what surfaced the difference, because the compact branch's own second gate on the log type is IMPLIED by its container's, upstream as well as here.
 
 **Found by unifying the strip, which is the second half of this row.** The compact branch held a SECOND copy of the pill list, differing from `reactionStrip` by an inner gate on the log type — `g_e`'s own `O(3, "chat" === e.logType || "alerts" === e.logType && e.isQAMsg ? 3 : -1)` at 1,380,270. That gate is IMPLIED by the container's, upstream as well as here: `__e` renders under `O(36, (enableReactions && "chat" === logType || enableQAReactions && "alerts" === logType && isQAMsg) && checkMsgReactions(msg) ? 36 : -1)` (`b_e`, 1,380,680), every disjunct of which entails a disjunct of the inner one, and `menuAllows.reaction` is that same expression here. So the copy could go, and going is what surfaced that its `{#each}` and the card's gated differently.
 
@@ -2990,10 +3008,29 @@ openAlertSendReport(e){e?this.appService.guiEventBus.emit("doAlertSendReportModa
 `truncated` occurs **exactly once** in the whole bundle, at 1,643,312, inside hls.js ("last AAC PES
 packet truncated…"). The reference's success handler reads only `i.alerts`. This is ours.
 
-Kept because a silent cap is the worse failure: 500 results with no note reads as "that is all there
-is". `alert-report-modal-contract.test.ts` now asserts the full-file count AND the rendered notice, so
-the divergence cannot be tidied away for symmetry with the reference — which is the only way a
-deliberate divergence is actually lost.
+**RE-READ 2026-09-02 — escape 2, EVIDENCE ABSENT, and the row was defending the wrong half.**
+
+It argued that *"a silent cap is the worse failure"*, which is a judgement about which behaviour is
+better and therefore not an escape. The escape is one level up, at the CAP rather than at the notice,
+and `alert-log.ts:73-84` already states it: **the reference asks its own server
+(`getAlertsAdvancedSearch`) and the bundle shows only the REQUEST**, so whatever bound that server
+applies is in no capture this repository holds. There is no number to match. `ALERT_SEARCH_LIMIT` is
+declared as a choice rather than presented as transcribed, which is the discipline this row should
+have cited.
+
+Given that a bound must be chosen, `CLAUDE.md` decides which way the ambiguity resolves and it names
+the alternative by name: *"an unbounded SELECT that grows with usage"* is the shape it forbids, and
+the modal renders every hit in one list with no paging of its own. So the cap stays at 500 — ten
+times the fifty a page load carries, and still a list a browser can draw.
+
+**The notice is then not a divergence at all; it is the disclosure of one.** The reference has no cap
+to announce, so it announces none. Ours has one, and `500 results with no note` would read as *"that
+is all there is"* — a silent wrong answer. Removing the notice while keeping the cap would match
+neither application.
+
+`alert-report-modal-contract.test.ts` asserts the full-file count AND the rendered notice, so this
+cannot be tidied away for symmetry with the reference — which is the only way a deliberate divergence
+is actually lost.
 
 **The first version of that assertion was too weak and its negative control caught it**, which is
 worth recording here because it is the same lesson the register's preface teaches: it checked for the
@@ -4642,15 +4679,31 @@ onFileTabChange(e){console.log("tab",e),this.selectedFileTab=e}
 
 ### FP-09 — Search term is trimmed here and is not trimmed in the reference's filter pipe
 
-**DELIBERATE DIVERGENCE, recorded 2026-08-30.** The reference's `filter` pipe lower-cases the term
+**BUILT 2026-09-02 — MATCHED, plus a second divergence in the same expression. Recorded as `DELIBERATE DIVERGENCE 2026-08-30` until then.** The reference's `filter` pipe lower-cases the term
 and does not trim it (read verbatim at byte 1,914,488), so typing a single space filters the list to
 rows whose text happens to contain a space — most of them, and unpredictably. Ours trims, so a
 whitespace-only query is an empty query and the list is unchanged.
 
-Both are answers to a query nobody means to type. Ours is the one whose result a person can predict,
-and reproducing the other would mean writing a filter that treats the space bar as a search term. The
-divergence is one character of code and this paragraph is the whole of it; nothing else in the pipe
-differs — any string-valued own property, case-insensitive substring, empty term returns the list.
+**RE-READ 2026-09-02 — MATCHED, and the trim is gone. The refusal was a taste argument dressed as a reason.**
+
+It said both are answers to a query nobody means to type and that *"ours is the one whose result a
+person can predict"* — true, and not one of the four escapes. What made it worth acting on rather
+than merely conceding is that the premise was too narrow: **a trailing space is not only typed by
+accident.** With the trim in place, ` png` matched nothing, and this pipe is how the Files pane is
+searched at all. The reference has no trim, so it matches every row containing `png`. Those are
+different LISTS, not different answers to an empty query.
+
+`files.svelte.ts:299` is now `const query = this.#fileSearch.toLowerCase();` with no trim, which is
+the pipe read whole at byte 1,914,488.
+
+**A second divergence was found in the same expression and fixed with it.** The reference
+short-circuits an empty term — `transform(e, i) { return e ? i ? (…) : e : [] }` returns the array
+UNCHANGED — where this ran the whole `Object.values` walk with `''`. Stated precisely, because the
+dramatic reading is wrong: `''.includes('')` is true and `RoomFileRow` types four fields as
+`string`, so no row the type can express was actually dropped. **The visible effect was the wait,
+not the result** — an allocation and an `Object.values` walk per row, on the render that happens
+most, to arrive at the list it started with. That is the shape question `CLAUDE.md` asks of every
+read path, and the answer scales with the room's file count.
 
 **low** · `divergence` · reference byte **1,914,488**
 
