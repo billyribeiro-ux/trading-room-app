@@ -296,26 +296,40 @@
 </script>
 
 <!--
-  `QAM-12` — the reference's root class is BOUND, and the binding is deliberately not reproduced.
+  `QAM-12` — the reference's root class is BOUND, and the binding is reproduced as of 2026-09-02.
 
-  `Rh("modal fade ", o.qaMsg._id, "")` at byte 2,344,038 concatenates the ALERT'S OWN ID onto the
-  class list, so the dialog wears a class named after a database row. Its one reader is four
-  hundred bytes away at 2,334,927:
+  `Rh("modal fade ", o.qaMsg._id, "")` at byte 2,344,038 — Angular's `classMapInterpolate1`, so the
+  produced value is literally `"modal fade " + qaMsg._id + ""`. The dialog wears a class named after
+  a database row. Its one reader, re-measured at 2,334,827 (9,111 bytes away, not the four hundred
+  this note used to claim):
 
   ```js
   yi(`.${e._id}`).on("hidden.bs.modal",()=>{e.hasOwnProperty("unreadQA")&&delete e.unreadQA})
   ```
 
-  — a jQuery selector finding this dialog by that class in order to hang a Bootstrap
-  `hidden.bs.modal` listener on it. MEASURED AND REFUSED, and the refusal is safe because **the
-  effect that listener has is already built**: `RoomModals.closeActive` (`room/modals.svelte.ts:167`)
-  clears `unreadQaAlertIds` for the selected alert on the way out and quotes this very line as its
-  reason. Nothing in this room dispatches `hidden.bs.modal` — the only two occurrences of the string
-  in `src/` are that comment and this one — so the class would be a selector target for a listener
-  that does not exist. A class with no rule and no reader is the "no `.flipped` class with no CSS"
-  case, and this one would additionally be unstable — a different string on every alert.
+  — a jQuery selector finding this dialog by that class to hang a Bootstrap `hidden.bs.modal`
+  listener on it.
 
-  `"fade modal"` against the reference's `"modal fade "` is order alone, which CSS does not read.
+  ## Why the refusal did not survive, and what stays true from it
+
+  Everything that note measured is still true: no CSS rule names the class, nothing here dispatches
+  `hidden.bs.modal`, and the effect that listener has is already built — `RoomModals.closeActive`
+  (`room/modals.svelte.ts:167`) clears `unreadQaAlertIds` on the way out and quotes that very line
+  as its reason. So the class has no reader HERE.
+
+  It has no CSS rule upstream either; its only reader is a listener whose behaviour this room
+  implements without needing to find the element by class. That makes this "nothing exists without a
+  consumer" applied to a value the reference RENDERS, and the rendered `class` attribute is
+  reference-facing output. The listener is the thing with no consumer here, and it is correctly
+  absent; the class is not.
+
+  It also closes a second divergence this note used to wave away in its last line: `"fade modal"`
+  against `"modal fade "` is order alone and CSS does not read order — but the attribute STRING is
+  what the capture holds, and it now matches, trailing space and all.
+
+  Legal, and worth stating: a class token beginning with a digit cannot be written in a CSS selector
+  without escaping, but is perfectly valid in a `class` attribute. Nothing selects it in either
+  codebase, which is exactly the point.
 -->
 <app-alert-qa-modal bind:this={host}>
   <!--
@@ -333,7 +347,7 @@
     id="alertQAModal"
     {open}
     ariaLabelledby="alertQALabel"
-    rootClass="fade modal"
+    rootClass={`modal fade ${targetMessage?.id ?? ''}`}
     rootRole={null}
     rootAttributes={{ 'data-keyboard': 'false', 'data-backdrop': 'static' }}
     dialogRole={null}

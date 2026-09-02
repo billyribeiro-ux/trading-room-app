@@ -347,10 +347,36 @@
       aria-labelledby="nav-tab-text"
       class={tab === 'text' ? 'tab-pane fade show active' : 'tab-pane fade'}
     >
+      <!--
+        PAM-14 — SIX `id` + `name` PAIRS DELETED 2026-09-02, plus one `aria-labelledby`.
+
+        The `app-post-alert-modal` consts table was read in full from byte 2,131,609 rather than
+        sampled, and not one of the five consts behind these controls carries an `id` or a `name`:
+
+          14 ["rows","10","placeholder","Alert Text...","aria-label","Alert Text...",1,"form-control",…]
+          20 ["type","url","placeholder","Link / URL to send to users","aria-label",…,"aria-describedby","addon-url",…]
+          22 ["rows","2","placeholder","Alert Text...","aria-label","Alert Text...",1,"form-control",…]
+          25 ["type","url","placeholder","Image or Video Link to show",…,"aria-describedby","addon-img",…]
+          58 ["type","text",1,"form-control",3,"ngModelChange","ngModel"]
+
+        They were ours, invented, and nothing in this repository read one of them — no `<label for>`,
+        no query selector, no form submission (every field is `bind:value`). Attributes that exist
+        only because a form field "should have" them are the dead scaffolding this repository refuses.
+
+        **The one cost of this match is stated rather than buried.** Const 58's control — the legal
+        disclosure text — carried `aria-labelledby="alert-legal-disclosure-label"` here, and that id
+        belongs to the CHECKBOX above it, so the field's accessible name was "Add Legal Disclosure?":
+        the name of the control that reveals it, not of the control itself. Const 58 has no aria
+        attribute of any kind, so upstream that input is unnamed, and it is unnamed here now.
+        Removing a mis-aimed name is not the same as removing a good one, which is why this is a
+        deletion and not a re-point — but it IS an unnamed input, and the owner should see that
+        sentence rather than discover it.
+
+        The checkbox ids that remain are not this: each one is the target of a `<label for>` and is
+        load-bearing.
+      -->
       <div class="form-group mb-3 mt-3">
         <textarea
-          id="alert-text-body"
-          name="alertTextBody"
           rows="10"
           placeholder="Alert Text..."
           aria-label="Alert Text..."
@@ -373,8 +399,6 @@
           </span>
         </div>
         <input
-          id="alert-url"
-          name="alertUrl"
           type="url"
           placeholder="Link / URL to send to users"
           aria-label="Link / URL to send to users"
@@ -385,8 +409,6 @@
       </div>
       <div class="form-group">
         <textarea
-          id="alert-url-text"
-          name="alertUrlText"
           rows="2"
           placeholder="Alert Text..."
           aria-label="Alert Text..."
@@ -408,8 +430,6 @@
           </span>
         </div>
         <input
-          id="alert-media-url"
-          name="alertMediaUrl"
           type="url"
           placeholder="Image or Video Link to show"
           aria-label="Image or Video Link to show"
@@ -461,8 +481,6 @@
       <div class="clearfix"></div>
       <div class="form-group">
         <textarea
-          id="alert-media-text"
-          name="alertMediaText"
           rows="2"
           placeholder="Alert Text..."
           aria-label="Alert Text..."
@@ -564,14 +582,7 @@
         </div>
         {#if legalDisclosure}
           <div class="mb-1">
-            <input
-              id="alert-legal-disclosure-text"
-              name="legalDisclosureText"
-              type="text"
-              class="form-control"
-              aria-labelledby="alert-legal-disclosure-label"
-              bind:value={legalDisclosureText}
-            />
+            <input type="text" class="form-control" bind:value={legalDisclosureText} />
           </div>
         {/if}
         <!--

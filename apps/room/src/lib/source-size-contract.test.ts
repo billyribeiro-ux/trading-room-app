@@ -2531,7 +2531,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       from the page — reading them from the object every other body in this room already reads is
       what stops the Q&A header disagreeing with the log beneath it about the same two preferences.
     */
-    max: 409,
+    /*
+      409 -> 422, 2026-09-02. QAM-12 — the root class is INTERPOLATED with the alert's id, as
+      `Rh("modal fade ", o.qaMsg._id, "")` at byte 2,344,038 interpolates it.
+
+      Thirteen lines, twelve of them the record of a refusal that did not survive and one the
+      expression. Everything that refusal measured is still true — no CSS rule names the class, and
+      the jQuery `hidden.bs.modal` listener that reads it is correctly absent here because
+      `RoomModals.closeActive` already does its work. What changed is the reading: the LISTENER is
+      the thing with no consumer here; the class is a value the reference renders, and the rendered
+      `class` attribute is reference-facing output.
+
+      It closes a second divergence the old note waved away in its last line — `"fade modal"` against
+      `"modal fade "` — which is why the assertions pin the order separately from the id.
+    */
+    max: 422,
     why: 'app-alert-qa-modal - the Q&A thread on one alert, its own open menu row and its wiring'
   },
   {
@@ -7417,7 +7431,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       is most of the addition. Five more lines for PAM-11's `onconfirm`, threaded through to the
       scheduler pane, which does not own the room's dialog stack.
     */
-    max: 657,
+    /*
+      657 -> 672, 2026-09-02, and the DIFF IS A NET DELETION — thirteen attributes removed, and
+      twenty-eight comment lines added over them.
+
+      PAM-14. The `app-post-alert-modal` consts table was read in full from byte 2,131,609: not one
+      of the five consts behind these controls carries an `id` or a `name`, and this room put both on
+      all six fields. Nothing read one of them — no `<label for>`, no selector, no submission.
+
+      Most of the note is one paragraph that has to be there: const 58's field carried
+      `aria-labelledby` pointing at the CHECKBOX above it, so its accessible name was the name of the
+      control that reveals it. Const 58 has no aria attribute at all, so the field is unnamed
+      upstream and is unnamed here now. That is a real accessibility cost of a match, and it is
+      written down rather than discovered — a deletion with no reason over it reads as an oversight,
+      and the next author's instinct would be to "fix" it back.
+    */
+    max: 672,
     why: 'the alert composer and its per-open resets'
   },
   {
@@ -8046,7 +8075,27 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and points at the file that proves it. That is this entry's own rule — *moving an explanation to
       the code it explains is the extraction itself* — applied to a decode rather than to markup.
     */
-    max: 727,
+    /*
+      727 -> 757, 2026-09-02. SP2-05 — `z("controls", o.showControls)` and the click that writes it.
+
+      The refusal here was unusual and worth keeping visible: it measured that the attribute is FALSE
+      for the life of the component upstream, because the only writer is a click on the `<video>` and
+      the component's own `.webcamScreen { pointer-events: none }` makes that click unreachable. It
+      concluded: do not build it.
+
+      That measurement is the reason it is SAFE to build. Element, handler, binding and the CSS that
+      kills them are all the reference's, and all four already ship here — so transcribed, the pair
+      is exactly as dead here as there. Refusing it was refusing to reproduce an upstream defect.
+
+      Twenty-two of the thirty lines are that argument plus the statement that
+      `pointer-events: none` is now LOAD-BEARING for a second reason: delete it and this room grows a
+      control bar the capture never shows. `screen-pane-contract.test.ts` pins the rule beside the
+      binding for exactly that, with its own negative control.
+
+      Two offsets in the note were corrected before it shipped —
+      `emoji-screen-citation-contract.test.ts` re-reads every byte a file cites and rejected both.
+    */
+    max: 757,
     why: 'the screenshare pane and its zoom/stack controls'
   },
   {

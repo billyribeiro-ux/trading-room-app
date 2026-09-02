@@ -45,6 +45,80 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 01:34 UTC — four more refusals, and a repository gate that caught a citation I had copied from an agent
+
+Batch three of the re-triage. All four were MEASURED REFUSALS, all four measurements were correct,
+and none of the four conclusions was.
+
+## SP2-05 — the measurement that refused it is the reason it is safe
+
+`z("controls", o.showControls)` on the screenshare `<video>`, with a click handler that toggles the
+flag. The refusal measured that `showControls` starts `!1` (byte 1,494,556), that its ONLY writer is
+that click (1,501,400), and that the component's own `.webcamScreen { pointer-events: none }` makes
+the click unreachable — so the attribute is false for the life of the component upstream and no
+control bar ever appears. It concluded: do not build it.
+
+Element, handler, binding and the CSS that kills all three are the reference's, and all of them
+already ship here. Transcribed, the pair is exactly as dead here as it is there. **That rule is now
+load-bearing for a second reason** — delete `pointer-events: none` and this room grows a control bar
+the capture never shows — so `screen-pane-contract.test.ts` pins it beside the binding, with its own
+negative control.
+
+## QAM-12 — the listener is the thing with no consumer, not the class
+
+`Rh("modal fade ", o.qaMsg._id, "")` at 2,344,038 puts the alert's id in the dialog's class list. The
+refusal was right that no CSS rule names it and that its one reader — a jQuery `hidden.bs.modal`
+listener — is correctly absent here, because `RoomModals.closeActive` already does that listener's
+work. But the class is a value the reference RENDERS, and the rendered `class` attribute is
+reference-facing output.
+
+It also closes a divergence the old note waved away in its own last line: `"fade modal"` against
+`"modal fade "`. CSS does not read order; a byte-for-byte comparison does.
+
+## EMOJI2-07 and PAM-14
+
+`EMOJI2-07` — the reference binds `clear()` twice on the search-clear button (`x("click", …)
+("keyup.enter", …)` at 738,430) on a real `<button>`, whose own activation already fires `click` for
+a focused Enter. So one Enter runs it twice upstream. Transcribed: `clear()` is idempotent, and the
+whole cost is one extra pass over an already-empty query.
+
+`PAM-14` — **a net deletion.** The `app-post-alert-modal` consts table was read in full from
+2,131,609: not one of the five consts behind these controls carries an `id` or a `name`, and this
+room put both on all six fields. Nothing read one of them.
+
+**The one accessibility cost of that match is written down rather than discovered.** Const 58's field
+carried `aria-labelledby` pointing at the CHECKBOX above it, so its accessible name was the name of
+the control that reveals it. Const 58 has no aria attribute at all, so the field is unnamed upstream
+and is unnamed here now. Removing a mis-aimed name is not removing a good one — but it is an unnamed
+input, and the owner should read that sentence rather than find it.
+
+## Three of this repository's own gates earned their keep
+
+`emoji-screen-citation-contract.test.ts` re-reads every byte offset a file cites. It rejected the
+SP2-05 note: **both offsets in it were wrong** — each a few dozen bytes past where its own quoted
+text begins — and I had copied them from the re-triage agent without re-measuring. `grep -bo` gave
+the real ones. This is exactly the "points at a real function that is not the one the sentence means"
+failure that file exists for, caught before it shipped instead of a year later.
+
+`screen-pane-contract.test.ts` broke on an assertion of its own that was wrong rather than a
+regression: it pinned the ADJACENCY `muted\n          {@attach attachStream}`, and SP2-05 put
+`onclick` between them. Nothing in the reference makes those two lines neighbours, and a test that
+pins the order of unrelated attributes fails on every future addition and teaches the next author to
+loosen it. It now asserts what SV-SP-10 is actually about: the attribute is present, it is bare, and
+nothing writes `volume` or `muted` at runtime.
+
+`eslint` refused two `svelte-ignore` comments I added defensively for warnings that do not fire.
+
+**Runtime impact.** None visible, and that is the point of three of the four: the controls binding
+and its handler are inert behind the reference's own `pointer-events: none`, the Q&A dialog's extra
+class is selected by nothing, and the emoji clear button now clears twice instead of once. `PAM-14`
+removes thirteen attributes from the rendered post-alert form, one of which was providing a wrong
+accessible name.
+
+**Verified:** room gate exit 0 at `801fb08` — 341 files, 6,155 passed, 1 skipped. Negative controls seen red for all four, plus two wrong-fix
+controls: restoring one deleted `id`, and deleting a checkbox `id` that a real `<label for>` points
+at. Controller untouched, so its gate was not run.
+
 ### 2026-09-02 01:09 UTC — five values the reference ships and this room did not, four of them refused for being inert
 
 The re-triage's second batch. Every one of these was a MEASURED REFUSAL whose measurement was

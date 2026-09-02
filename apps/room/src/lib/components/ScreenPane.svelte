@@ -283,6 +283,13 @@
    *
    * so the popout's magnifier flips its own trio AND the shared zoom mode, then resets the view.
    */
+  /*
+    SP2-05 — `this.showControls=!1` in the reference's constructor at byte 1,494,561. Its only
+    writer is the click on the <video> below, which `.webcamScreen { pointer-events: none }` makes
+    unreachable, so this stays false for the life of the component in both codebases. See the note
+    at the element for why that is the reason to transcribe it rather than the reason not to.
+  */
+  let showControls = $state(false);
   let showZoomCtrlDetached = $state(false);
 
   function togglePanZoomDetached() {
@@ -552,11 +559,30 @@
             `app-presentationarea.full.js:2217` declares its OWN `this.saveData = !1`, a third
             symbol that file never reads again — the three are easy to mistake for each other.
 
-          `z('controls', o.showControls)` on the line above is NOT reproduced, and that is a
-          finding rather than an omission: `showControls` starts `!1` and its only writer is a click
-          handler ON THIS ELEMENT (`…compiled.js:302-305`), which the same component's own
-          `.webcamScreen { pointer-events: none }` (`:357`) makes unreachable. The attribute is
-          therefore false for the life of the component upstream, and no control bar ever appears.
+          `z('controls', o.showControls)` and its click handler are REPRODUCED as of 2026-09-02,
+          and the measurement that used to refuse them is unchanged and still worth reading.
+
+          `showControls` starts `!1` at byte 1,494,556 and its only writer is a click handler ON
+          THIS ELEMENT — `(9,"video",8),x("click",function(){return o.showControls=!o.showControls})`
+          at 1,501,400 — which the same component's own `.webcamScreen { pointer-events: none }`
+          makes unreachable. So the attribute is false for the life of the component upstream and no
+          control bar ever appears.
+
+          Both offsets are the ones `grep -bo` returns and are pinned in
+          `emoji-screen-citation-contract.test.ts`, which re-reads each one. That gate rejected the
+          first draft of this note, whose two offsets were each a few dozen bytes past where their
+          quoted text begins — the exact "points at a real function that is not the one the sentence
+          means" failure the file exists for, caught before it shipped rather than a year later.
+
+          That was read as a reason not to build it. It is the reason it is SAFE to build it: the
+          element, the handler and the binding are all in the capture, and the CSS that makes them
+          inert is the reference's own and already ships here. Transcribed, the pair is exactly as
+          dead here as it is there — which is the match. Refusing it was refusing to reproduce an
+          upstream defect, which is not one of the four escapes.
+
+          **The `pointer-events: none` rule below is load-bearing for this.** Delete it and the click
+          becomes reachable, controls appear, and this room diverges in a direction the capture never
+          goes. It is pinned by this component's contract test for that reason.
         -->
         <!--
           `SP2-03` moved the three status headings OUT of this element and up to the pane root,
@@ -601,9 +627,11 @@
           id="webcamScreen-{id}"
           class={['webcamScreen', { hidden: pictureHidden, 'viewer-only-screen-video': viewerOnlyMode }]}
           autoplay
+          controls={showControls}
           data-ng-dblclick="fullScreen()"
           playsinline
           muted
+          onclick={() => (showControls = !showControls)}
           {@attach attachStream}
         ></video>
       </div>
