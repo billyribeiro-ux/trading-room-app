@@ -7433,11 +7433,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       inside the component is now the paragraph explaining how its gate works.
     */
     /*
-      309 -> 313, 2026-09-02. Four lines: `XCP-07` was re-dispositioned from refused to built, so
-      the entry now carries the measurement that stood, the conclusion that did not, and the
-      precedent that replaced it. The gap list below it went from two rows to one.
+      309 -> 322, 2026-09-02, and it is two corrections in one day rather than growth.
+
+      Four lines for `XCP-07`, re-dispositioned from refused to built, so the entry carries the
+      measurement that stood, the conclusion that did not, and the precedent that replaced it. The
+      gap list below it went from two rows to one.
+
+      Nine more for `XCP-09`, whose UNBLOCK was named wrong. It said a re-capture of
+      `complete-app-styles.css` was required; the 5,818 bytes are in the pinned bundle's `styles:`
+      array, in a file that ships here and that this surface's own contract test already reads. The
+      superseded claim is kept beside the correction, because a blocker that names the wrong missing
+      thing is the failure worth being able to recognise again — and it is the second one found on
+      this file in a day.
     */
-    max: 313,
+    max: 322,
     why: 'the second chat column`s decoded const tables and the decisions taken against them'
   },
   {

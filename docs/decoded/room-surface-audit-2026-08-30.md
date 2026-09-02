@@ -824,8 +824,6 @@ const c=s?`gifExtra_${o}`:`gif_${o}`
 
 **DELIBERATE DIVERGENCE — recorded at the code 2026-08-30 11:20 UTC, not reproduced.** `this.msg.txt = sf(this.msg.txt).result` writes the stripped text back onto the MESSAGE, so copying silently rewrites the one on screen: formatting, links and ticker colouring vanish from the log for everyone looking at that browser, and nothing puts them back. The clipboard content is identical either way. Ours strips into a DETACHED element and leaves the message alone.
 
-**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the reason it gave was the retired one.** *"Matching would mean reproducing a defect"* is no longer sufficient; reproducing an upstream defect is matching. What carries instead is a measurement about the two data flows, and it is decisive:
-
 **Upstream's mutation persists; ours could not.** `copyMessage` writes the stripped text onto the message object and makes no server call, so upstream the stripped message stays stripped until something rebuilds the list — and nothing routinely does, because that application is push-driven. **This room re-reads itself every five seconds.** `refresh.svelte.ts` runs `invalidate('room:data')` on a `REFRESH_MS = 5000` interval while the tab is visible; the load returns message bodies from the database, so a local write to `item.body` is replaced on the next tick.
 
 So transcribing the line would not reproduce upstream's rendered result. It would produce a **flicker** — formatting, links and ticker colouring vanishing for up to five seconds and then returning on their own — which is a third behaviour, present in neither application. The divergence is in the surrounding refresh policy, and leaving the message alone is what keeps the rendered output matched.
@@ -1009,8 +1007,6 @@ function _ge(t,n){if(1&t&&(d(0,"div",3)(1,"a",6),v(2),Xe(3,"date"),u()()),2&t){c
 **BUILT 2026-09-02 — MATCHED, asymmetry and all. Recorded as `DELIBERATE DIVERGENCE 2026-08-30 22:40 UTC` until then.** Four templates repeat the reaction loop. `Oge` (card admin, 1,333,312), `u1e` (card member, 1,341,960) and `V1e` (compact admin, 1,371,615) each wrap the pill in `O(1, e.value.clickedBy.length > 0 ? 1 : -1)`. `m_e` (compact member, 1,379,950) opens `d(0,"span")(1,"span",51)` and renders it unconditionally.
 
 `addRemoveReaction` empties `clickedBy` rather than deleting the key, so a reaction whose last holder removes it draws upstream as `🎉 0` — on a compact member row and on no other row in the product.
-
-**RE-READ 2026-09-02 — MATCHED, all four repeaters now differ exactly as the reference's four do.** The reason recorded on 2026-08-30 was that reproducing it *"would ship a pill claiming a reaction nobody has made"*, which is the retired argument: the pill IS what the reference draws, on that one layout, and none of the four escapes covers it.
 
 `RoomMessage.svelte:496` is `{#snippet reactionStrip(gated: boolean)}` with `{#if !gated || reaction.clickedBy.length > 0}`. The card sites call `reactionStrip(true)` — `Oge` and `u1e`, both gated — and the compact site calls `reactionStrip(reverseMessage)`, so the compact ADMIN row is gated like `V1e` and the compact MEMBER row is not, like `m_e`. One parameter reproduces the reference's own asymmetry instead of flattening it.
 
@@ -1363,6 +1359,8 @@ onAudioDeviceChange(e){console.log("onAudioDeviceChange: "+e),this.appService.gl
 
 **BLOCKED 2026-08-30 03:30 UTC, and the dead write is gone.** The row's diagnosis is exact and the preference write has been removed — `streamingPlayerEnabled` is retired in `dead-preference-keys.ts` so the copies already in accounts are pruned. Wiring it was MEASURED and refused rather than deferred: the reference gets both the state and the link from its own server (`getPlayerLink()` → `invokeAdminCmd("streamStatus")` → `rc.enablePlayer` / `rc.playerURL`, byte 2,170,505), the client composes neither, and that server is not in the capture. What the feature *is*, from the pane's own blurb, is a public page rendering one room's screenshares to whoever holds a link — which needs an anonymous media grant nobody has designed, and `CLAUDE.md` forbids inventing an authority decision. Both buttons are `disabled` with the reason on screen; `stream-player-blocked-contract.test.ts` keeps them that way. **Unblocked by:** a decision on anonymous playback authorization, plus a MediaMTX host.
 
+**RE-READ 2026-09-02 — escape 4, NOT A DIVERGENCE, and the reason it gave was the retired one.** *"Matching would mean reproducing a defect"* is no longer sufficient; reproducing an upstream defect is matching. What carries instead is a measurement about the two data flows, and it is decisive:
+
 **high** · `defect` · reference byte **2,170,728**
 
 ```
@@ -1378,6 +1376,10 @@ enablePlayer(){var e=this;return I(function*(){let i=yield e.appService.invokeAd
 
 **BLOCKED 2026-08-30 03:30 UTC**, on the same absent value as SC-04: `streamingLinkPlayer` is assigned from `rc.playerURL`, which arrives from a server not in the capture. Composing a link here would mean inventing a public playback endpoint and its authorization. Recorded rather than guessed; see the note on SC-04 for what unblocks it.
 
+**RE-READ 2026-09-02 — the blocker holds.** The markup IS in the capture and is transcribable, which is why this row needed re-reading rather than dismissing. What stops it is what the markup would show: `streamingLinkPlayer` has exactly three occurrences in the bundle and its ONLY assignment is `e.streamingLinkPlayer=i.rc.playerURL` at byte 2,170,689. Rendering the textarea here would give a presenter a box labelled *"give this to viewers"* that can never hold anything, and a Copy button that copies an empty string — which is the control-whose-only-effect-is-its-own-label that `CLAUDE.md` forbids by name. Not the same case as USM-18's transcribed dead class: that one renders what the reference renders, this one would render an empty promise.
+
+**RE-READ 2026-09-02 — MATCHED, all four repeaters now differ exactly as the reference's four do.** The reason recorded on 2026-08-30 was that reproducing it *"would ship a pill claiming a reaction nobody has made"*, which is the retired argument: the pill IS what the reference draws, on that one layout, and none of the four escapes covers it.
+
 **medium** · `missing-control` · reference byte **2,143,225**
 
 ```
@@ -1391,6 +1393,10 @@ function yDe(t,n){if(1&t){const e=Y();d(0,"div")(1,"div",105)(2,"label",106),v(3
 ### SC-06 — Stream player state is never seeded from the server (`streamStatus` / getPlayerLink), so the readout always says false on open
 
 **BLOCKED 2026-08-30 15:28 UTC, on the same absent server as SC-04 and SC-05 — it is their seeding half.** The row's own evidence is the argument: `getPlayerLink()` awaits `invokeAdminCmd("streamStatus")` and reads `rc.enablePlayer` and `rc.playerURL` off the answer. Both values come FROM a server that is not in the capture, and the client composes neither. There is nothing here to seed from.
+
+**RE-READ 2026-09-02 — the blocker holds, for SC-04's re-measured reason.** There is no client-side derivation of either value in the bundle; both are read off an `invokeAdminCmd` answer.
+
+**RE-READ 2026-09-02 — the blocker holds, and it was re-measured rather than inherited.** Escape 2, EVIDENCE ABSENT, and the looking is recorded: `streamStatus` occurs **once** in the pinned bundle (byte 2,170,594) and `changePlayerStatus` **twice** (2,170,816 and 2,171,000), all three inside `invokeAdminCmd` calls; `playerURL` occurs **once**, at 2,170,714, as `i.rc.playerURL` read off the answer. The client composes neither value anywhere. The receiver-is-transcribable rule does not rescue this row: what is missing is not a frame the client could accept, it is the value itself.
 
 **What the pane says now is not the defect this row describes, and the difference matters.** `streamPlayerEnabled` no longer exists: SC-04's close removed the dead per-user preference and the state it fed, and the readout is a literal `false` in red beside two `disabled` buttons and an `alert alert-info` saying *"The stream player is not available in this deployment: it needs a public playback page, and there is no server here that issues one."* So `false` is the TRUE state of this deployment rather than a stale default — a seeded value would be seeding a lie. **Unblocked by:** the same two things SC-04 names — a decision on anonymous playback authorization, and a MediaMTX host.
 
@@ -6304,7 +6310,37 @@ which is why `AlertChatArea` reaches its host through a prop and why this column
 
 ### XCP-09 — `app-extra-chat` has no transcribed stylesheet at all, and the capture it would come from never saw the component
 
-**BLOCKED 2026-08-31.** A re-capture unblocks it; a hand-edit is forbidden.
+**BLOCKED 2026-08-31, AND THE BLOCKER WAS RE-NAMED ON 2026-09-02 because the first one was wrong.**
+It was filed as needing a re-capture of `apps/room/css/complete-app-styles.css`, and that premise was
+about the wrong file. The 5,818 bytes are not missing from this repository at all: they are in the
+`styles:` array of the pinned bundle at byte **2,400,462**, in
+`apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, which ships here, is SHA-256 pinned in
+its own `sha256sums.txt`, and is already read by `extra-chat-surface-contract.test.ts`. Sliced on
+2026-09-02, the array opens
+`".navbar[_ngcontent-%COMP%]{font-size:12px;padding:2px}.chatToolbar…"` and runs through `.roomLog`,
+`.chatDisabled` and `.webinarMode` exactly as this row describes them.
+
+What IS true is that `complete-app-styles.css` — a capture of a rendered DOCUMENT — never saw the
+component, because that room had the second column off. The mistake was concluding from that that the
+rules were unobtainable, when the compiled component carries its own styles and the compiled
+component is held here. **A blocker must name the thing that is actually missing**, and this one
+named a file that was never the only source. Same failure class as the four USM-18 verdicts corrected
+the same day.
+
+The remaining question is mechanical rather than evidential and is NOT a hand-edit: `AGENTS.md`
+forbids editing the generated sheet, so the styles reach it through the generator or through a second
+generated artifact with its own pinned input. That is the work.
+
+**What it is actually blocked on, named correctly:** the generator. `AGENTS.md` forbids hand-editing
+a generated artifact, and `captured-runtime-components.css`'s own header names the command that wrote
+it — `pnpm css:sync-captured` — which **no longer exists in `apps/room/package.json` and is among the
+78 evicted `apps/room/scripts/` files that `git ls-files` returns zero for**. So the rules are here,
+the destination is here, and the only thing missing is a published generator that reads the bundle's
+`styles:` array and performs the same `[_ngcontent-%COMP%]` → captured-host translation the existing
+sheet's header describes. That is the work, it is named, and it is separable from any capture run.
+
+*Superseded text, kept because a wrong blocker is worth being able to recognise again:* "**BLOCKED
+2026-08-31.** A re-capture unblocks it; a hand-edit is forbidden."
 
 *This row was ADDED after this document was committed — a second reading on 2026-08-31, not part of
 the two-verifier pass the tables above describe, and therefore deliberately outside them.*
@@ -6322,9 +6358,12 @@ The reason is in the generator's INPUT rather than the generator: `apps/room/css
 That capture was taken from a room with `preferences.extraChatColumn` OFF, so Angular never mounted
 the component and never injected its styles into the document being captured.
 
-**What would unblock it:** a re-capture of `apps/room/css/complete-app-styles.css` from a room with
-the second chat column enabled, followed by `pnpm css:sync-captured`. It is NOT a hand-edit:
-`AGENTS.md` forbids editing a generated artifact and that sheet's own header says so on line 9.
+**What was thought to unblock it:** a re-capture of `apps/room/css/complete-app-styles.css` from a
+room with the second chat column enabled, followed by `pnpm css:sync-captured`. **That is not
+required** — see the re-read above; the rules are in the pinned bundle. What still holds is that it is
+NOT a hand-edit: `AGENTS.md` forbids editing a generated artifact and that sheet's own header says so
+on line 9, so the bundle's `styles:` array has to be read by a generator with its input pinned, the
+way every other generated artifact here is.
 
 **high** · `missing-behaviour` · reference byte **2,400,462**
 

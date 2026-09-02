@@ -45,6 +45,49 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 18:37 UTC — three blockers re-measured; one of them named the wrong missing thing
+
+**Runtime impact: NO.** Documentation, comments and one ceiling. No shipped behaviour changed.
+
+The standing rule is that a recorded blocker is RE-MEASURED, never inherited. Four rows that had been
+sitting as BLOCKED were put back against the pinned bundle.
+
+**SC-04, SC-05, SC-06 hold, and the looking is now on the record.** `streamStatus` occurs once in the
+bundle (byte 2,170,594) and `changePlayerStatus` twice (2,170,816 / 2,171,000), all inside
+`invokeAdminCmd`; `playerURL` occurs once, at 2,170,714, read off the answer as `i.rc.playerURL`.
+`streamingLinkPlayer` has three occurrences and exactly one assignment, from that value. The client
+composes neither. So the receiver-is-transcribable rule does not rescue these: what is missing is not
+a frame the client could accept, it is the value. SC-05's markup IS transcribable and is still
+refused, on the narrower ground that it would render a box labelled *"give this to viewers"* that can
+never hold anything — the control-whose-only-effect-is-its-own-label that `CLAUDE.md` forbids by
+name, and NOT the same case as USM-18's transcribed dead class.
+
+**XCP-09's blocker was wrong, and it is re-named.** It said the 5,818 bytes of `app-extra-chat`
+component styles needed a re-capture of `css/complete-app-styles.css` from a room with the second
+column enabled. They do not. They are in the `styles:` array of the pinned bundle at byte
+**2,400,462** — `apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, which ships in this
+repository, is SHA-256 pinned in its own `sha256sums.txt`, and is already read by
+`extra-chat-surface-contract.test.ts`. Sliced today, the array opens
+`.navbar[_ngcontent-%COMP%]{font-size:12px;padding:2px}.chatToolbar…` and runs through `.roomLog`,
+`.chatDisabled` and `.webinarMode` exactly as the row describes them. The DOCUMENT capture never saw
+the component; the compiled component carries its own rules and is held here.
+
+What it is actually blocked on is the GENERATOR, and that is now named: `AGENTS.md` forbids
+hand-editing a generated artifact, and `captured-runtime-components.css`'s header names the command
+that wrote it — `pnpm css:sync-captured` — which is **no longer in `apps/room/package.json` and is
+among the 78 evicted `apps/room/scripts/` files that `git ls-files` returns zero for**. The work is a
+published generator that reads the bundle's `styles:` array and performs the `[_ngcontent-%COMP%]` to
+captured-host translation that sheet's header describes.
+
+Both the wrong blocker and the correction are kept side by side, in the audit row and at
+`extra-chat-surface.ts`, because **a blocker that names the wrong missing thing is the failure worth
+being able to recognise again** — and it is the second one found on that file in a day.
+
+Verified: `room-surface-audit-counts.test.ts` (the row-shape and totals gate) and the three surface
+tests that read the edited rows. `pnpm run gate` exit 0 in both apps before the push.
+
+---
+
 ### 2026-09-02 18:32 UTC — USM-18 built: the row this repository answered wrong four times
 
 **Runtime impact: YES.** A room setting now crosses to the room, a per-viewer preference pair is

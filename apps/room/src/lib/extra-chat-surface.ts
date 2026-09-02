@@ -169,9 +169,18 @@ export const EXTRA_CHAT_GIF_TRIGGER: Readonly<Record<string, string>> = {
  * too. That capture was taken from a room with `preferences.extraChatColumn` off, so Angular never
  * mounted this component and never injected its styles into the document being captured.
  *
- * The unblock is a re-capture of `complete-app-styles.css` from a room with the second column on,
- * followed by `pnpm css:sync-captured`. It is NOT a hand-edit: `AGENTS.md` forbids editing a
- * generated artifact, and that sheet's own header says so on line 9. It is also why `XCP-01` above
+ * THE UNBLOCK WAS NAMED WRONG UNTIL 2026-09-02, and this is the corrected version. It was recorded as
+ * needing a re-capture of `complete-app-styles.css` from a room with the second column on, and it does
+ * not: those 5,818 bytes are in the `styles:` array of the pinned bundle at byte 2,400,462, in a file
+ * that ships here, is SHA-256 pinned in its own `sha256sums.txt`, and is already read by
+ * `extra-chat-surface-contract.test.ts`. The DOCUMENT capture never saw the component; the compiled
+ * component carries its own rules and is held here.
+ *
+ * What it is actually blocked on is the GENERATOR. `AGENTS.md` forbids hand-editing a generated
+ * artifact, and `captured-runtime-components.css`'s header names the command that wrote it —
+ * `pnpm css:sync-captured` — which is no longer in `apps/room/package.json` and is among the evicted
+ * `apps/room/scripts/` files. The work is a published generator that reads the bundle's `styles:`
+ * array and performs the `[_ngcontent-%COMP%]` to captured-host translation that sheet describes. It is also why `XCP-01` above
  * matters far more than an id normally would — with the component sheet missing, `app.css`'s
  * `#textAreaHolder` family is the only thing left that styles this composer.
  *
