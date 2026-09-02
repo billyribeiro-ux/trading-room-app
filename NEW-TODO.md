@@ -21,7 +21,7 @@ established it says so.
 >
 > | remaining | blocked on |
 > | --- | --- |
-> | `presAreaTabs-recordings` | an archive service. Fully SPECIFIED 2026-08-31 so building it is a transcription — the entitlement, the URL and a measured MediaMTX candidate are all recorded — but zero recordings or archive tables exist in either database |
+> | `presAreaTabs-recordings` | an archive service. Fully SPECIFIED 2026-08-31 so building it is a transcription — the entitlement, the URL and a measured MediaMTX candidate are all recorded, and all three were re-read on 2026-09-02 and match — but no RECORDINGS table exists in either database. (This cell said *"no recordings or archive tables"* until 2026-09-02; `chat_archives` has existed since 2026-08-29, and the imprecision would have read as chat archiving having no storage either.) |
 > | Part 3, v5 | an account the vendor has cleared for v5. Re-tested 2026-08-31: the `/v5` 404 now distinguishes nothing (every version path 404s), and the conclusion rests on its other measurement instead |
 >
 > **THIS TABLE HAD A THIRD ROW UNTIL 2026-09-02 AND THE BODY OF THIS FILE HAD ALREADY DELETED IT.**

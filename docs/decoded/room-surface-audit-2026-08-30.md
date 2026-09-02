@@ -1937,7 +1937,7 @@ z("checked",o.appService.globals.preferences.smallImagePreview&&o.appService.glo
 
 ### G01 — Archives → "Recording" menu item is inert: no `launchRecordings()`
 
-**BLOCKED 2026-08-30 12:55 UTC.** `launchRecordings()` opens `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` in a new tab — **a SERVER page**. There is no archive service here and no recordings or archive table in either database, which is the same blocker `presAreaTabs-recordings` carries and which `TODO.md` already records. Wiring the item would open a tab onto a 404 with a session token in the URL, which is worse than an inert item. What would unblock it: an archive service with a recordings endpoint. The item stays rendered, because it is the reference's own menu and the neighbouring Alert Logs / Chat Logs entries in the same dropdown do work.
+**BLOCKED 2026-08-30 12:55 UTC.** `launchRecordings()` opens `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` in a new tab — **a SERVER page**. There is no archive service here and no RECORDINGS table in either database, which is the same blocker `presAreaTabs-recordings` carries and which `TODO.md` already records. (This said "no recordings or archive table" until 2026-09-02; `chat_archives` has existed since 2026-08-29 — what is absent is a media archive, not archiving.) Wiring the item would open a tab onto a 404 with a session token in the URL, which is worse than an inert item. What would unblock it: an archive service with a recordings endpoint. The item stays rendered, because it is the reference's own menu and the neighbouring Alert Logs / Chat Logs entries in the same dropdown do work.
 
 **high** · `missing-behaviour` · reference byte **2,467,840**
 

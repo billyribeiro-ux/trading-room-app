@@ -338,7 +338,7 @@ Decoded from the manage-page DOM with all 18 dropdowns captured OPEN. **None of 
 | Alert Scheduler | `alert-scheduler-filter-labels.md` §1 | needs an entitlement whose manage control was NOT located, and a server-side scheduler |
 | Benzinga News | `NEW-TODO.md` §2.2 | needs one decode pass for the const-table classes |
 | Mobile app | `NEW-TODO.md` §2.5 | after `docs/MOBILE-APP.md` is read |
-| `presAreaTabs-recordings` | `missing-commands-triage.md` | **NOT BUILT, blocker named** — the pane is one iframe onto a server archive page and we have zero recordings tables |
+| `presAreaTabs-recordings` | `missing-commands-triage.md` | **NOT BUILT, blocker named** — the pane is one iframe onto a server archive page and we have zero recordings tables. Re-read 2026-09-02: the URL, the gate and all three tab occurrences match what the triage records |
 
 ---
 

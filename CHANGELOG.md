@@ -45,6 +45,57 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 20:56 UTC — the last two blocked rows re-measured; both hold, both were imprecise
+
+**Runtime impact: NO.** Documentation and one contract docblock. The two rows this closes out are
+`presAreaTabs-recordings` and `enableDiscord` — the last two the trackers name that are not an owner
+decision, an environment or hardware — and neither turned out to be buildable. What was wrong in both
+was the WORDING of the blocker, which is the thing a future reader acts on.
+
+## `presAreaTabs-recordings` — the blocker holds, the sentence was false
+
+Re-read against the pinned bundle and every recorded detail matches: the tab click at byte 1,917,052,
+the pane's `<iframe [src]="getRecordingsUrl() | noSanitize">` at 1,930,515, the URL
+`${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` at 1,959,918, and the two-term gate
+`archivesAvailableTo() && sessData.recsInRoom` at 2,016,835 and 2,017,632. Building it is still a
+transcription and it still fronts nothing.
+
+**What was wrong is the phrase four documents repeated: *"zero recordings or archive tables in either
+database"*.** `chat_archives` has existed since `861a462`, 2026-08-29 — three months of chat archiving
+with its own table, its own index and its own contract. What is absent is a MEDIA archive. The old
+wording would have told the next reader that archiving has no storage at all, which is exactly the
+kind of sentence that gets acted on. Corrected in `TODO.md`, `NEW-TODO.md`,
+`missing-commands-triage.md`, `room-surface-audit-2026-08-30.md` and `IMPLEMENTATION-LIST.md` — all
+five, in one pass, because correcting the one that was noticed is how the other four go stale.
+
+## `enableDiscord` — one blocker was really two
+
+The row read *"needs a Discord application registration"*. True and incomplete. All three occurrences
+in the bundle lead to a server this deployment does not have:
+
+* `sessData.enableDiscord && !discordState.discordChecked && checkDiscordAuth()` on session load
+  (byte 2,241,709) → `GET ${apiROOT}/discord/v2/status?token=…` (1,160,297);
+* `doDiscordAuth()` → `GET ${apiROOT}/discord/v2/auth/start?token=…` (1,160,186);
+* two presenter-only settings slots, `O(19, …)` and `O(291, …)` at 2,283,599 and 2,288,443, both gated
+  `isPresenter && sessData && sessData.enableDiscord`;
+* `discordState`, six fields at 981,233.
+
+So it needs the registration AND the `/discord/v2/*` endpoints that registration is reached through.
+Transcribing the client half alone ships a presenter-only control whose single action is a request
+that 404s — the same shape `SC-05` is refused for, and worth saying because "needs a registration"
+reads like one procurement step away from buildable.
+
+## One claim this file will no longer make
+
+`setting-coverage-contract.test.ts` said `hasAlertScheduler` was *"the LAST buildable row of this
+enumeration"*. It was not: `smallerImagePreview` left the same list on 2026-09-02. The docblock now
+records both departures and stops making a claim about which is last, because that claim has been
+wrong twice and costs nothing to omit.
+
+`pnpm run gate` exit 0 in both apps.
+
+---
+
 ### 2026-09-02 20:44 UTC — a blocker written three times as an inference, and row 8 closed on a number
 
 **Runtime impact: NO.** No shipped behaviour changed. What changed is that a question recorded as
