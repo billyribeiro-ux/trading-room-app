@@ -385,3 +385,50 @@ the evidence.
 | 12  | ~~`mp3Playing`~~                                | **A duplicate of gap 4**, and closed by the same measurement. Two rows carrying one gap is how one of them goes stale without contradicting anything.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 24  | ~~Nothing SENDS `giveMicScreen`~~               | **NOT WORK — dead in the reference.** All eight occurrences in the pinned bundle were read: three are the socket dispatcher's `case "giveMicScreen"` (1,024,948-1,025,019), one the `appEventBus.subscribe` (1,142,051), one the `unsubFromEvents` list (1,144,370), one a toast subscriber (2,502,557), and two the user-info modal's method declaration and its command string (2,077,604 / 2,077,809). **No element binds it**: there is no `x("click", … giveMicScreen …)` anywhere in the 2,891,205-byte bundle. Building a button would be inventing a control the reference does not render — the same disposition the five operator reset commands carry.                                                                |
 | 29  | ~~Five of seven membership fields are dropped~~ | **ALL SIX ARE CONSUMED.** `hasMic` / `hasCam` / `hasScreen` reach the media join through `joinsMediaAsProducer` (`roster-gates.ts`), read by `media-transport.svelte.ts:58,632` and `events.svelte.ts:518` — and the authority is the SERVER's, which is the divergence that matters: `/api/media/grant` reads the controller's membership rather than believing the client. `hasAdminChat`: `create-room.svelte.ts:387`, `private-chat.svelte.ts:155,447`, `feeds.svelte.ts:11`. `canEditNotes`: `note-gates.ts`, `TabGearMenu.svelte:67`, `PresentationArea.svelte:500`, `ModalHost.svelte:1982`. `denyArchivesAccess`: `create-room.svelte.ts:389`, `roster-gates.ts:66`. Upstream's own three-way join is at byte 1,076,110. |
+
+---
+
+## Gap 18 — the transcript page — RESOLVED 2026-09-02
+
+Closed the same day its reason was corrected, and both halves of that are the record worth keeping.
+
+**In the morning it was withdrawn, not closed.** The row had said _"nothing in this repo produces a
+transcript: `currentCaption` is never assigned … neither half is wired"_, and all three halves were:
+`room/recording.ts` sends each result, `services/media/src/server.rs:1412` relays it as `speechReco`,
+`room/media-transport.svelte.ts` receives it, and `routes/+page.svelte` keeps the last 500 FINAL
+lines for the caption overlay. The row stayed open with the measured blocker instead: `captionHistory`
+is one browser tab's memory and the control opens a NEW WINDOW, which can read none of it.
+
+**In the evening the store and the page were built**, and the second recorded reason — the one in
+`reference-const-coverage-contract.test.ts`, which listed all twenty-seven of the component's values
+as unbuilt — turned out to rest on the same kind of mistake:
+
+> Building the viewer therefore means first deciding to record every spoken word of every session to
+> disk. In a multi-tenant fintech application that is a retention, consent and jurisdiction question
+> and it belongs to the owner, not to a sweep closing a gap.
+
+The observation is right and is not withdrawn. The conclusion was wrong twice:
+
+- **It is what the reference does.** Its client proves its server holds a transcript —
+  `getSessionTranscripts(token, {startDate, page, limit})` posting to
+  `${apiROOT}/sessions/v2/getSessionTranscript`, byte **1,151,135**.
+- **Nothing is recorded that was not already broadcast.** The write sits inside
+  `beginSpeechRecognition`'s own `onresult`, downstream of all three gates that decide whether a word
+  is captioned at all — the room's `hasSpeechRecognitionDisabled`, the presenter's `doSpeechReco`,
+  and `isPresenter()`. A room that never captions never gets a row.
+
+What the owner's decision genuinely governs is **retention** — how long the rows live. That is
+carried as an open question at `session_transcripts` in `server/db/schema.ts`, which is where a
+policy belongs.
+
+**The one divergence is a refusal.** Upstream opens
+`#/session-transcript?token=${globals.sesionToken}&name=…`. Ours opens `/session-transcript` with no
+query string at all: a session credential in an address bar is also in browser history and in every
+outbound `Referer`. The window is same-origin, so the server re-derives the room, the caller and the
+room's NAME from the session cookie.
+
+The row as it stood when it was removed:
+
+```
+| 18  | A transcript page — a SERVER-HELD transcript         | **the recorded reason was false and is withdrawn.** It read _"nothing in this repo produces a transcript: `currentCaption` is never assigned … neither half is wired"_. Both halves are wired and were read end to end: the presenter's browser sends at `room/recording.ts:457` (`signalling.request('sendSpeechReco', …)`), `services/media/src/server.rs:1412` relays it as `speechReco`, `media-transport.svelte.ts:734` receives it, and `+page.svelte:648` commits every FINAL line to a 500-entry `captionHistory` the overlay already renders | what is actually missing is a transcript the SERVER holds. `captionHistory` lives in one tab's memory, and `openTranscriptPage()` opens a **new window**, which can read none of it — so the control still has nothing to open. Two things must land before it can: final captions persisted per room, and a route to render them. The reference's own URL shape cannot be matched: `#/session-transcript?token=${sesionToken}` puts the controller's session credential in an address bar, browser history and every `Referer` — the same refusal already recorded for gap 23. The in-overlay history toggle (`fa-history`) is separate and BUILT. |
+```

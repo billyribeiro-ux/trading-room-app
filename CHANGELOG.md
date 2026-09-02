@@ -45,6 +45,82 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 22:33 UTC — the transcript window, and the second reason it was blocked
+
+`TODO.md` gap 18 is CLOSED, five hours after its first reason was withdrawn as false. Both halves of
+that day are the record: the morning corrected what the row said, and the evening found that the
+OTHER document blocking it was resting on the same kind of mistake.
+
+**The reason in `reference-const-coverage-contract.test.ts`** listed all twenty-seven of
+`app-session-transcript`'s const values as unbuilt because building the viewer *"means first deciding
+to record every spoken word of every session to disk. In a multi-tenant fintech application that is a
+retention, consent and jurisdiction question and it belongs to the owner, not to a sweep closing a
+gap."* The observation is right and is **not** withdrawn. The conclusion was wrong on two counts:
+
+- **It is what the reference does.** Its own client proves its server holds a transcript —
+  `getSessionTranscripts(token, {startDate, page, limit})` posting to
+  `${apiROOT}/sessions/v2/getSessionTranscript`, byte **1,151,135**. Storing lines this room already
+  receives is matching, not a new product decision.
+- **Nothing is recorded that was not already being broadcast.** The write sits inside
+  `beginSpeechRecognition`'s own `onresult`, downstream of all three gates that decide whether a word
+  is captioned at all — the room's `hasSpeechRecognitionDisabled`, the presenter's `doSpeechReco`, and
+  `isPresenter()`. A room that never captions never gets a row. That is asserted **structurally**, by
+  the write's position relative to the guard, and the negative control moved it above and saw it red.
+
+What the owner's decision genuinely governs is **retention** — how long the rows live. Recorded as an
+open question at the table, not answered.
+
+| built | what it is |
+| --- | --- |
+| `session_transcripts` | one room's FINAL caption lines, indexed `(room_short_code, spoken_at)`. The read is one day, 300 rows to a page — upstream's own shape, and what keeps it from growing with the room's history |
+| `server/session-transcript.ts` | the store. `[dayStart, dayEnd)` half-open so a boundary row belongs to exactly one day; newest-first with an id tiebreak, so offset paging is a partition rather than a thing that repeats and drops rows |
+| `routes/session-transcript.remote.ts` | the write (presenter-only) and the read (archives-gated, failing closed on a config the controller could not answer) |
+| `routes/session-transcript/+page.svelte` | `SessionTranscriptComponent`, byte **2,607,394**, transcribed whole: the date picker and its `yyyy-MM-dd` round trip, `formatDate`'s 12-hour clock, the client-side search over `text` and `speaker`, the five navigation buttons rendered twice, and the three-way loading/error/list state machine |
+
+**Runtime impact.** The caption overlay's "Full Transcript History" button opened a dialog saying the
+page was unavailable; it opens the page. A presenter's speech in a room with captions enabled is now
+durable and readable a day at a time.
+
+**ONE DIVERGENCE, AND IT IS A REFUSAL.** Upstream opens
+`#/session-transcript?token=${globals.sesionToken}&name=…`. Ours opens `/session-transcript` with no
+query string: a session credential in an address bar is also in browser history and in every outbound
+`Referer` — the refusal already recorded for the Benzinga default URL. The window is same-origin, so
+the server re-derives the room, the caller **and the room's name** from the session cookie. Nothing
+about a transcript is asserted by the caller — not the room, not the speaker, not the session.
+
+**The write had to go on the SPEAKER's side.** Every browser in the room receives the relayed line, so
+writing where the caption ARRIVES would store one row per listener per sentence. Both shapes "work";
+only one of them stops filling a table.
+
+**Nine negative controls seen red across two contracts, and one found a defect in my own test.** The
+archives gate's assertion was being satisfied by the fail-closed branch's identical 403 message, so
+deleting the gate entirely left it green — the vacuous pass this repository has now met five times.
+Pinned to its own condition.
+
+**Six gates caught the new files, and each was answered rather than silenced.**
+`orphaned-comment-contract` (a docblock with no code under it); `error-page-contract` (124 → **126**
+`error(…)` doors, restated with which two and why); `todo-next-coverage-contract` (a new surface is
+unaudited scope until the table says so — and it found two OTHER rows that had drifted,
+`routes/+page.svelte` and `routes/+error.svelte`); `slice-anchor-contract` (four inlined `indexOf` in
+my own test, bound to asserted locals instead, because `slice(-1)` takes the last character rather
+than failing); `source-size-contract` (five ceilings, each argued at its entry); and
+`reference-const-coverage-contract` — **108 → 81 residuals, its largest single fall**, forty-one → 42
+components fully covered, and group one ("surfaces this room has not built at all") is now EMPTY with
+a gate that keeps it that way.
+
+Twenty-six of those twenty-seven values were on the UNEXAMINED side of that file's split. The largest
+unbuilt surface in the reference had never been named by anyone before a sweep found it.
+
+**Verified:** both gates exit 0, run once each immediately before the push. `svelte-check` 1644 files,
+0 errors, 0 warnings. `svelte-autofixer` clean — it flagged a mutated `Date` and the fix was to stop
+mutating rather than to import `SvelteDate` for a throwaway local, which would have been a reactive
+wrapper with no reactive reader. `session-transcript.test.ts` drives the store against the real
+database: 7 cases, four controls red.
+
+**Not verified, and named: no browser was opened on this page.** The e2e suite has no case for it, and
+what would exercise the read end to end is a room with real captions in it.
+
+
 ### 2026-09-02 21:32 UTC — seven evidence-gap rows were stale, and two comments were the only evidence they stood on
 
 `apps/room/TODO.md`'s evidence-gap table had not been swept this session. Seven rows were
