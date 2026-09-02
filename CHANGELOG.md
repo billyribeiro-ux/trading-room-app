@@ -45,6 +45,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 20:25 UTC — four read-then-write races in the Rust API, three of them denied by a comment
+
+**Runtime impact: YES.** A vote could land on a closed poll, a question on a deleted alert, two note
+tabs on one position, and a login could silently revert a member's password change.
+
+Every one was proved on a live PostgreSQL 16.13 before being touched, running the SOURCE's own
+statement text with the source's own bind order and a second connection racing it. `sqlx::query` is
+not compile-checked, and three of these carried a comment asserting the very property the code did
+not have — so reasoning about them was exactly what had already failed.
+
+## `poll::answer` — a vote on a closed poll
+
+A `SELECT` to validate, a `DELETE`, an `INSERT`, under a docblock reading *"refused by the `WHERE`,
+not by a read-then-write that another request can slip between"*. Sharing a transaction does not
+close that window: at `READ COMMITTED` each statement takes its own snapshot. **With the poll closed
+one second in, the old shape recorded 1 response and the one-statement CTE records 0.** The happy
+path still records one, a re-vote still replaces rather than duplicating, and an out-of-range choice,
+a foreign room and an unknown poll each insert nothing and leave an existing vote untouched.
+
+`FOR SHARE` on the poll row is the other half: without it the `WHERE` is only as good as the
+statement's snapshot; with it a concurrent close waits for the vote instead of overtaking it.
+
+## `alert::ask` — a question on a deleted alert
+
+A `SELECT` then an `INSERT`, under a docblock reading *"resolved through `room_id` in the same
+statement"*. **With the alert soft-deleted one second in, the old shape wrote 1 question and the
+`INSERT … SELECT … FOR SHARE` writes 0**, while a live alert still takes one.
+
+`fetch_optional` rather than `fetch_one` is not a detail: zero rows has to keep arriving as
+`DbError::NotFound`, and `fetch_one` would raise sqlx's own `RowNotFound` — a 500 for a question
+asked on a deleted alert, which is a worse outcome than the race, arrived at while fixing it.
+
+## `note::create` — two tabs on one position
+
+`MAX(position)+1` computed inside the `INSERT`, under a comment reading *"two tabs created at once
+cannot both land on the same number"*. The premise is right and the conclusion is wrong: **four
+inserts released at one clock instant produced `first@1, tab-1@2, tab-2@2, tab-3@2, tab-4@2` — two
+distinct positions for five rows.**
+
+`FOR UPDATE` inside the same statement does not fix it, and that was MEASURED rather than assumed:
+the same four inserts with the room row locked in a CTE produced the same two distinct positions,
+because the lock is granted against a snapshot the statement has already fixed. Taken as its own
+statement first, **seven simultaneous creates produced seven distinct positions.** That measurement
+is why the fix is two statements and not the tidier one.
+
+## The transparent rehash could revert a password change
+
+The upgrade `UPDATE` had no guard, and hashing takes real time by design — a permit and
+`spawn_blocking` see to that. A password CHANGE committing inside that window was overwritten with a
+hash of the OLD password: **the member's new password stopped working, the old one kept working, and
+nothing anywhere reported it.** With a change committing one second into the login, the unguarded
+statement left `OLD-strong-params` and the guarded one left the member's own
+`NEW-password-chosen-by-the-member`; with nothing else touching the row the upgrade still lands.
+
+The result stays ignored on purpose: zero rows means somebody else won the race and their write is
+the correct one, and neither outcome may turn a correct password into an error.
+
+## Verified, and what could not be
+
+`cargo check -p tradingroom-api`, `cargo clippy -p tradingroom-api --lib -- -D warnings` and
+`cargo fmt --all --check` all clean. **The Rust integration suite could not be run and that is stated
+rather than implied:** `cargo test -p tradingroom-api` pulls `mediasoup-sys`, whose build script
+pip-installs `invoke` and compiles a C++ worker, and it fails here for want of the toolchain and the
+disk. None of the three that DID run can see a TOCTOU, which is why the semantics were proved against
+a real database instead.
+
+All four files leave the provenance aggregate for their own pins — 66 untouched to 62 — each with its
+measurement beside its hash, which is the rule that file states for itself. Six negative controls
+seen red against the seal and six more against `backend-race-guards.test.ts`, a new controller
+contract that pins the SHAPE where the hash pins the BYTES: a re-pin made for an unrelated change
+would otherwise carry a removed `FOR SHARE` with it.
+
+`pnpm run gate` exit 0 in both apps — and the counts verifier added an hour ago caught its first
+drift on this commit, which is what it is for.
+
+---
+
 ### 2026-09-02 19:56 UTC — two check-then-await races in the media session
 
 **Runtime impact: YES.** Both leaked server-side resources under overlap, and both leaked silently.

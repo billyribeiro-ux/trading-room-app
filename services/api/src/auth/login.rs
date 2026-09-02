@@ -103,18 +103,41 @@ pub async fn login(
         return Err(LoginError::InvalidCredentials);
     }
 
-    // Transparent upgrade: a hash written with weaker parameters is replaced on a
-    // successful login, so raising the cost constants does not require a password reset.
+    /*
+      Transparent upgrade: a hash written with weaker parameters is replaced on a successful login,
+      so raising the cost constants does not require a password reset.
+
+      `AND password_hash = $4` IS A SECURITY GUARD, not defensive tidiness, and it was missing until
+      2026-09-02. Hashing takes real time by design — that is what a permit and `spawn_blocking` are
+      for — so the window between reading `stored` and writing `upgraded` is long enough to lose a
+      race a member can start themselves. A password CHANGE committing inside it was overwritten by
+      this statement with a hash of the OLD password: the member's new password stopped working, the
+      old one kept working, and nothing anywhere reported it.
+
+      Proved on a throwaway PostgreSQL 16 rather than reasoned, because `sqlx::query` is not
+      compile-checked. With a change committing one second into the login, the unguarded statement
+      left `OLD-strong-params` in the column and the guarded one left the member's own
+      `NEW-password-chosen-by-the-member`. With nothing else touching the row the upgrade still
+      lands, which is the half that keeps this feature working.
+
+      The result stays ignored on purpose. Zero rows means somebody else won the race and their
+      write is the correct one; a failure means the upgrade did not happen and the login is still
+      valid. Neither is the member's problem, and neither may turn a correct password into an error.
+    */
     if let Some(existing) = stored
         && password::needs_rehash(&existing)
         && let Ok(upgraded) = password::hash_password(plain_password).await
     {
-        let _ = sqlx::query("UPDATE users SET password_hash = $2, updated_at = $3 WHERE id = $1")
-            .bind(user.id)
-            .bind(upgraded)
-            .bind(now)
-            .execute(db.identity().pool())
-            .await;
+        let _ = sqlx::query(
+            "UPDATE users SET password_hash = $2, updated_at = $3 \
+             WHERE id = $1 AND password_hash = $4",
+        )
+        .bind(user.id)
+        .bind(upgraded)
+        .bind(now)
+        .bind(&existing)
+        .execute(db.identity().pool())
+        .await;
     }
 
     let _ = sqlx::query("UPDATE users SET last_login_at = $2, updated_at = $2 WHERE id = $1")

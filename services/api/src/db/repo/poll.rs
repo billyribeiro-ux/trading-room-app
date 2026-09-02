@@ -121,15 +121,33 @@ pub async fn close(
 /// Three things are enforced in the statement rather than around it:
 ///
 /// * the poll must belong to this room - a poll id from another room is not found;
-/// * the poll must be `active` - answering a closed poll is refused by the `WHERE`, not by a
-///   read-then-write that another request can slip between;
+/// * the poll must be `active` - answering a closed poll is refused by the `WHERE`;
 /// * `choice_index` must be a real index into `choices`, so a poll with three options cannot
 ///   accumulate votes for option 47.
 ///
-/// One response per member is enforced by deleting first in the same transaction. The schema
-/// has no unique constraint on `(poll_id, member_id)`, so this is the layer that decides a
-/// member votes once - and it says so here rather than leaving the duplicate to be discovered
-/// in a tally.
+/// One response per member is enforced by deleting first, in the same statement. The schema has
+/// no unique constraint on `(poll_id, member_id)`, so this is the layer that decides a member
+/// votes once - and it says so here rather than leaving the duplicate to be discovered in a tally.
+///
+/// # It was THREE statements until 2026-09-02, and the docblock said otherwise
+///
+/// The second bullet used to end *"not by a read-then-write that another request can slip
+/// between"*, and that was exactly what this was: a `SELECT` to validate, a `DELETE`, and an
+/// `INSERT`. Sharing a transaction does not close the window - at `READ COMMITTED` each statement
+/// takes its own snapshot, so a presenter closing the poll between the first and the third
+/// committed, and the vote landed on a closed poll anyway.
+///
+/// Proved on a throwaway PostgreSQL 16 rather than reasoned, because `sqlx::query` is not
+/// compile-checked and this file's own comment had been wrong about it: with the poll closed one
+/// second into the transaction, the old shape recorded **1** response and this one records **0**.
+/// The happy path still records one and a re-vote still replaces rather than duplicates; an
+/// out-of-range choice, a poll from another room and an unknown poll all insert nothing and leave
+/// an existing vote untouched.
+///
+/// `FOR SHARE` on the poll row is the other half. Without it the `WHERE` is only as good as the
+/// statement's snapshot, so a close committing microseconds earlier would still be missed; with it,
+/// a concurrent `UPDATE polls SET state` waits for this vote instead of overtaking it. The row is
+/// one line of a small table and the lock is held for the rest of one transaction.
 pub async fn answer(
     tx: &mut TenantTx<'_>,
     enterprise_id: Uuid,
@@ -138,38 +156,37 @@ pub async fn answer(
     member_id: Uuid,
     choice_index: i32,
 ) -> Result<(), DbError> {
-    let valid: Option<(Uuid,)> = sqlx::query_as(
-        "SELECT id FROM polls \
-         WHERE id = $1 AND room_id = $2 AND state = 'active' \
-           AND $3 >= 0 AND $3 < jsonb_array_length(choices)",
-    )
-    .bind(poll_id)
-    .bind(room_id)
-    .bind(choice_index)
-    .fetch_optional(tx.conn())
-    .await
-    .map_err(DbError::from)?;
-
-    valid.ok_or(DbError::NotFound)?;
-
-    sqlx::query("DELETE FROM poll_responses WHERE poll_id = $1 AND member_id = $2")
-        .bind(poll_id)
-        .bind(member_id)
-        .execute(tx.conn())
-        .await
-        .map_err(DbError::from)?;
-
-    sqlx::query(
-        "INSERT INTO poll_responses (enterprise_id, poll_id, member_id, choice_index) \
-         VALUES ($1, $2, $3, $4)",
+    // One statement. `valid` is the validation, `cleared` the replace, and the `INSERT` runs only
+    // for the rows `valid` yields - so all three either happen or none of them does, and there is
+    // no snapshot between them for a concurrent close to arrive in.
+    let recorded = sqlx::query(
+        "WITH valid AS ( \
+             SELECT 1 FROM polls \
+             WHERE id = $2 AND room_id = $5 AND state = 'active' \
+               AND $4 >= 0 AND $4 < jsonb_array_length(choices) \
+             FOR SHARE \
+         ), cleared AS ( \
+             DELETE FROM poll_responses \
+             WHERE poll_id = $2 AND member_id = $3 AND EXISTS (SELECT 1 FROM valid) \
+         ) \
+         INSERT INTO poll_responses (enterprise_id, poll_id, member_id, choice_index) \
+         SELECT $1, $2, $3, $4 FROM valid",
     )
     .bind(enterprise_id)
     .bind(poll_id)
     .bind(member_id)
     .bind(choice_index)
+    .bind(room_id)
     .execute(tx.conn())
     .await
     .map_err(DbError::from)?;
+
+    // Zero rows means `valid` was empty: a poll from another room, a closed one, or a choice index
+    // outside its options. The caller's `NotFound` is the same answer the three-statement version
+    // gave, arrived at without a second round trip to ask for it.
+    if recorded.rows_affected() == 0 {
+        return Err(DbError::NotFound);
+    }
 
     Ok(())
 }
