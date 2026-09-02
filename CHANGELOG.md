@@ -45,6 +45,62 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 19:56 UTC — two check-then-await races in the media session
+
+**Runtime impact: YES.** Both leaked server-side resources under overlap, and both leaked silently.
+
+## A second transport nobody could close
+
+`createSendTransport` was `if (this.#sendTransport) return it; this.#sendTransport = await
+this.#createTransport('send')`. The field stays null for the whole round trip, so two concurrent
+callers both passed the guard and both asked the server for a transport. **The second assignment
+won, and the first transport was orphaned** — never closed here, unreachable by `close()`, which
+closes the field, and still allocated on the server. `createRecvTransport` was the same shape.
+
+Both directions race for real. The page produces mic and camera from two separate handlers, and
+`consume` calls `createRecvTransport` on a `newProducer` the server sends once per remote producer —
+so a room two people join in the same second issues two before either resolves.
+
+Fixed by memoising the PROMISE, not a boolean: the second caller awaits the first caller's transport
+rather than starting its own. Cleared in `finally`, so a failed attempt does not poison every later
+call with the same error.
+
+## A second consumer for one producer
+
+`consume` guarded on `#consumers.has(producerId)` and then awaited three round trips before writing
+that map. Its own docblock says the dedupe exists because the server's `newProducer` is
+**at-least-once** (`server.rs:88-92`) — a duplicate notification is the EXPECTED case, and two arrive
+back to back, well inside one round trip. So two consumers were built for one producer, the second
+overwrote the first in the map, and the first stayed open and receiving with `stopConsuming` unable
+to name it.
+
+The docblock's own words were already right — *"already being consumed"* — and only the code read
+that as *"already consumed"*. A set of in-flight producer ids now answers the other half, cleared in
+`finally` so a failed negotiation frees the id instead of wedging it for the life of the session:
+without that, every later `newProducer` for it would be deduped away and the stream never drawn.
+`close()` clears both markers with the maps.
+
+## Why this needed a new test file
+
+`session.test.ts` covers the encoding selection, which is pure; everything else in that class is
+three round trips deep, so every existing assertion about it was about SOURCE. **A race is invisible
+to source-reading, to `svelte-check` and to the type system** — both versions type-check, both work
+when called once, and both leak only when two calls overlap.
+
+`session-concurrency.test.ts` mocks the mediasoup `Device` and defers every signalling request, so
+the request COUNT is observed while both calls are still inside the window the old code left open —
+2 before, 1 after. Six cases: both transport directions, the cached path, a failed creation that must
+not poison the next call, the duplicate consume, and a failed consume that must free its id.
+
+Four negative controls seen red, each with its anchor asserted present first: both transports
+restored to check-then-await, the consume dedupe restored to the map alone, and the `finally` that
+frees a failed producer id removed.
+
+`pnpm run gate` exit 0 in both apps. Nothing was opened in a browser: the races are exercised against
+a mocked device, which is what makes them deterministic rather than timing-dependent.
+
+---
+
 ### 2026-09-02 19:40 UTC — six carried findings closed, and a twelfth unenforced verifier
 
 **Runtime impact: YES for two of them** — the typing indicator stops sending a frame per keystroke,

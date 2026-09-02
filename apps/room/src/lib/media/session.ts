@@ -366,8 +366,48 @@ export class MediaSession {
   #device: Device | null = null;
   #sendTransport: Transport | null = null;
   #recvTransport: Transport | null = null;
+  /**
+   * The transport creations that are IN FLIGHT, so two callers cannot each start one.
+   *
+   * `createSendTransport` was `if (this.#sendTransport) return it; this.#sendTransport = await …`,
+   * which is a check-then-await: the field is still null while the round trip is outstanding, so two
+   * concurrent callers both passed the guard and both asked the server for a transport. The second
+   * assignment won, and the FIRST transport was leaked — never closed here, never closed by
+   * `close()` (which only closes the field), and still allocated on the server.
+   *
+   * Both directions can genuinely race. `produce` calls `createSendTransport`, and the page produces
+   * mic and camera from two separate handlers; `consume` calls `createRecvTransport`, and the
+   * server's `newProducer` is at-least-once and arrives once per remote producer, so a room that
+   * two people join at the same moment issues two consumes before either resolves.
+   *
+   * Memoising the PROMISE rather than a boolean is what makes the second caller await the first
+   * caller's transport instead of a second one. Cleared on rejection so a failed attempt does not
+   * poison every later call with the same error — the caller that failed sees the error, the next
+   * caller tries again.
+   */
+  #sendTransportInFlight: Promise<Transport> | null = null;
+  #recvTransportInFlight: Promise<Transport> | null = null;
   readonly #producers = new Map<string, Producer>();
   readonly #consumers = new Map<string, RemoteStream>();
+  /**
+   * The producer ids a `consume` is CURRENTLY negotiating, which the map alone cannot express.
+   *
+   * `consume` guarded on `#consumers.has(producerId)` and then awaited three round trips before
+   * writing the map, so two overlapping calls for one producer both passed and both built a
+   * consumer. The second overwrote the first in the map and the first was leaked: still open on the
+   * server, still receiving, its track never stopped, and `stopConsuming` unable to reach it because
+   * the map no longer names it.
+   *
+   * That is not a hypothetical overlap. The docblock on `consume` says the dedupe exists because the
+   * server's `newProducer` is AT-LEAST-ONCE (`server.rs:88-92`) — a duplicate notification is the
+   * expected case, and two of them arrive back to back, well inside one round trip.
+   *
+   * A set of ids rather than a map of promises: the second caller's answer is `null`, the same
+   * answer it gets for a producer already consumed, so it has nothing to await. The docblock's own
+   * words were already right about this — *"already being consumed"* — and only the code read it as
+   * "already consumed".
+   */
+  readonly #consumesInFlight = new Set<string>();
   #closed = false;
 
   constructor(options: MediaSessionOptions) {
@@ -531,15 +571,29 @@ export class MediaSession {
       // (`server.rs:1132-1134`) would arrive after a whole transport had been built for it.
       throw new SignallingError('forbidden', 'this peer may not produce');
     }
-    this.#sendTransport = await this.#createTransport('send');
-    return this.#sendTransport;
+    this.#sendTransportInFlight ??= this.#createTransport('send')
+      .then((transport) => {
+        this.#sendTransport = transport;
+        return transport;
+      })
+      .finally(() => {
+        this.#sendTransportInFlight = null;
+      });
+    return this.#sendTransportInFlight;
   }
 
   async createRecvTransport(): Promise<Transport> {
     this.#assertOpen();
     if (this.#recvTransport) return this.#recvTransport;
-    this.#recvTransport = await this.#createTransport('recv');
-    return this.#recvTransport;
+    this.#recvTransportInFlight ??= this.#createTransport('recv')
+      .then((transport) => {
+        this.#recvTransport = transport;
+        return transport;
+      })
+      .finally(() => {
+        this.#recvTransportInFlight = null;
+      });
+    return this.#recvTransportInFlight;
   }
 
   async #produce(
@@ -652,45 +706,62 @@ export class MediaSession {
    */
   async consume(info: ProducerInfo): Promise<RemoteStream | null> {
     this.#assertOpen();
-    if (this.#consumers.has(info.producerId)) return null;
-
-    const transport = await this.createRecvTransport();
-    const parameters = await this.#signalling.request('consume', {
-      transportId: transport.id,
-      producerId: info.producerId,
-      rtpCapabilities: this.recvRtpCapabilities
-    });
-
-    // Only the four keys the library destructures (`lib/Transport.d.ts:248`). The capture also
-    // passes `data` and `codecOptions` here (byte 1095040); both are silently ignored by the
-    // library (bundle byte 2716940), so passing them would be noise.
-    const consumer = await transport.consume({
-      id: parameters.id,
-      producerId: parameters.producerId,
-      kind: parameters.kind,
-      rtpParameters: parameters.rtpParameters
-    });
+    /*
+      BOTH STATES, and the second one is the fix. `#consumers` answers "already consumed";
+      `#consumesInFlight` answers "already being consumed", which is what the paragraph above has
+      always claimed and what three awaits' worth of window made false.
+    */
+    if (this.#consumers.has(info.producerId) || this.#consumesInFlight.has(info.producerId)) {
+      return null;
+    }
+    this.#consumesInFlight.add(info.producerId);
 
     try {
-      await this.#signalling.request('resumeConsumer', { consumerId: consumer.id });
-    } catch (error) {
-      consumer.close();
-      throw error;
-    }
+      const transport = await this.createRecvTransport();
+      const parameters = await this.#signalling.request('consume', {
+        transportId: transport.id,
+        producerId: info.producerId,
+        rtpCapabilities: this.recvRtpCapabilities
+      });
 
-    const remote: RemoteStream = {
-      consumer,
-      producerId: info.producerId,
-      peerId: info.peerId,
-      userId: info.userId,
-      displayName: info.displayName,
-      kind: parameters.kind,
-      appData: info.appData,
-      stream: new MediaStream([consumer.track])
-    };
-    this.#consumers.set(info.producerId, remote);
-    consumer.on('transportclose', () => this.#consumers.delete(info.producerId));
-    return remote;
+      // Only the four keys the library destructures (`lib/Transport.d.ts:248`). The capture also
+      // passes `data` and `codecOptions` here (byte 1095040); both are silently ignored by the
+      // library (bundle byte 2716940), so passing them would be noise.
+      const consumer = await transport.consume({
+        id: parameters.id,
+        producerId: parameters.producerId,
+        kind: parameters.kind,
+        rtpParameters: parameters.rtpParameters
+      });
+
+      try {
+        await this.#signalling.request('resumeConsumer', { consumerId: consumer.id });
+      } catch (error) {
+        consumer.close();
+        throw error;
+      }
+
+      const remote: RemoteStream = {
+        consumer,
+        producerId: info.producerId,
+        peerId: info.peerId,
+        userId: info.userId,
+        displayName: info.displayName,
+        kind: parameters.kind,
+        appData: info.appData,
+        stream: new MediaStream([consumer.track])
+      };
+      this.#consumers.set(info.producerId, remote);
+      consumer.on('transportclose', () => this.#consumers.delete(info.producerId));
+      return remote;
+    } finally {
+      /*
+        `finally`, so a failed negotiation does not wedge the producer id forever. On success the map
+        now names it and the first guard takes over; on failure the id is free and the next
+        `newProducer` for it — which the server will send, being at-least-once — can try again.
+      */
+      this.#consumesInFlight.delete(info.producerId);
+    }
   }
 
   /** Closes one consumer locally and tells the server. Safe to call for an unknown producer id. */
@@ -772,6 +843,15 @@ export class MediaSession {
     this.#recvTransport = null;
     this.#producers.clear();
     this.#consumers.clear();
+    /*
+      The in-flight markers go too. A `consume` still awaiting a round trip will find the session
+      closed when it resumes and its `finally` would otherwise delete an id from a set this method
+      is about to be asked to reuse — and a leftover id would make the next session's first
+      `newProducer` for that producer return `null` and never draw the stream.
+    */
+    this.#consumesInFlight.clear();
+    this.#sendTransportInFlight = null;
+    this.#recvTransportInFlight = null;
     this.#device = null;
   }
 
