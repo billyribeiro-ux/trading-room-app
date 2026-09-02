@@ -7653,7 +7653,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       written down rather than discovered — a deletion with no reason over it reads as an oversight,
       and the next author's instinct would be to "fix" it back.
     */
-    max: 672,
+    /*
+      672 -> 678, 2026-09-02, and like `refresh.svelte.ts`'s raise on the same day this one buys
+      BEHAVIOUR rather than prose. A raise is a conversation, so here it is.
+
+      `PAM-13` is matched: the media guard now tests whether a file list EXISTS, as the reference's
+      `fc` does, instead of whether it holds anything. That needed a `$state` boolean and the two
+      assignments that mirror `fc`'s own — the picker at byte 2,123,302 and the reset at 2,128,421 —
+      each carrying the offset it transcribes, because the offsets ARE the transcription and a
+      later reader who cannot see them has no way to check the claim.
+
+      What did NOT come here is the argument: the three states of `fc`, the two predicted harms that
+      measurement refuted, and this room's one lifecycle difference all live in
+      `post-alert-behavior.ts` beside the guard they govern, with the contract that asserts both
+      latch sites. Same split `ModalHost.svelte` took for `USM-18` and `refresh.svelte.ts` for
+      `G16`: the component keeps the evidence, the module keeps the reasoning, and neither holds a
+      copy of the other.
+    */
+    max: 678,
     why: 'the alert composer and its per-open resets'
   },
   {

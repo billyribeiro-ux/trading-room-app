@@ -102,7 +102,7 @@ describe('where it lands in the body', () => {
     imageAlertText: '',
     legalDisclosure: false,
     legalDisclosureText: '',
-    fileCount: 0
+    filesTouched: false
   };
 
   it('is PREPENDED, not appended', () => {

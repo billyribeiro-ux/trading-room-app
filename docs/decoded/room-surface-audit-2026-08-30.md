@@ -2642,7 +2642,7 @@ onImagePaste(e){const i=this,o=(e.clipboardData||e.originalEvent.clipboardData).
 
 ### PAM-13 — img tab with no URL: the reference dispatches an upload whenever the module-level fc array EXISTS (even when empty); ours requires at least one file
 
-**OWNER DECISION — re-dispositioned 2026-09-02 from `DELIBERATE DIVERGENCE — recorded 2026-08-30 13:54 UTC`. No escape applies, so it is work; what it needs first is one answer, and it is named below.**
+**BUILT 2026-09-02 — MATCHED. The one open question was answered by measurement and both predicted harms were false; see below. Recorded as `DELIBERATE DIVERGENCE 2026-08-30 13:54 UTC`, then briefly as an owner decision, until then.**
 
 `return fc ? void this.doImagurFileListUpload(e) : void 0` tests whether a module-level array EXISTS, not whether it holds anything. The 2026-08-30 reading called that a bug that *"differs only where the reference misfires"* — the retired argument, and it also understated how reachable the misfire is. `fc` was traced to all three of its sites and it is a **tri-state**:
 
@@ -2656,9 +2656,35 @@ So the misfire is not a rare edge: `[]` is **the state the modal is left in afte
 
 **Ours is a two-state guard** — `post-alert-behavior.ts:149`, `draft.fileCount > 0 ? upload : { status: 'noop' }` — so there is no `undefined` to distinguish "never touched" from "reset". Transcribing the reference needs that third state back: a latch set on the first pick and on every reset, with the guard reading the latch rather than the count.
 
-**The one question that decides whether this is safe to build, and it is not an agent's to answer:** what this room's uploader does when handed zero files. Upstream's own outcome is *"a wasted request or an empty alert"*, and an empty alert is a row in a multi-tenant fintech room that a presenter did not mean to post. If the answer is that it no-ops, this is a small faithful transcription and should be built. If it posts, matching means shipping a control that emits junk on a sequence a presenter reaches by ordinary use, and that is the owner's call rather than a transcription.
+**ANSWERED AND BUILT 2026-09-02.** The question was what this room's uploader does when handed zero
+files, because the refusal predicted *"a wasted request or an empty alert"*. Traced end to end, and
+**neither happens**:
 
-Named here rather than built, and named rather than left as a divergence, because the difference between those two is exactly what this pass exists to stop being blurred.
+| predicted harm | what was measured |
+| --- | --- |
+| a wasted request | `RoomComposer.uploadAlertFiles` is `for (const file of files)` — an empty list iterates nothing, so **no upload is issued at all** |
+| an empty alert | `composeUploadedAlert('', [], …)` returns `""` — called, not read off the types — and `post-alert.remote.ts:54` is `body: z.string().min(1)`, so **the boundary refuses it** |
+
+So matching costs nothing that was feared. What the old guard DID cost is a working upstream path
+this room silently refused: **a caption with no file.** `composeUploadedAlert('caption\n', [], …)` is
+`"caption\n"`, which passes `min(1)` and posts — so a presenter who typed a caption on the img tab
+and pressed Post got nothing here and an alert upstream. Matching added a behaviour rather than a
+bug, which is the opposite of what the refusal assumed.
+
+`post-alert-behavior.ts` now takes `filesTouched: boolean` in place of `fileCount: number`, whose
+`> 0` test could not express the distinction and which had no other consumer.
+`PostAlertModal.svelte` sets it at **exactly the two sites upstream assigns `fc`** — the picker
+(2,123,302) and the reset (2,128,421).
+
+**One lifecycle difference, recorded rather than smoothed over:** `clearInputFields` runs on every
+OPEN here, where the reference's reset runs after a send and on close. So `var fc;`'s undefined state
+is reachable upstream on the very first interaction of a page and is not reachable here. Every state
+after that agrees.
+
+**Four negative controls seen red**, and one of them found a hole rather than confirming a guard:
+restoring the old `> 0` test; and removing the latch from EACH of the two sites, which the first
+draft of the contract could not see at all — the pure-function cases cannot tell whether the
+component ever sets the flag, so the latch could have been silently un-wired at either end.
 
 **low** · `divergence` · reference byte **2,128,708**
 

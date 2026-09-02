@@ -45,6 +45,70 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 14:22 UTC — PAM-13 matched: the media guard tests whether a file list EXISTS
+
+The owner delegated the open decisions — decide them on hard evidence, in order to match the original
+app. This is the first, and the evidence **overturned the refusal outright**.
+
+## Both predicted harms were false
+
+PAM-13 was refused because dispatching an empty list would supposedly mean *"a wasted request or an
+empty alert"*. Both were predictions. Traced end to end:
+
+| predicted | measured |
+| --- | --- |
+| a wasted request | `RoomComposer.uploadAlertFiles` is `for (const file of files)` — an empty list iterates nothing, so **no upload is issued at all** |
+| an empty alert | `composeUploadedAlert('', [], …)` returns `""` — measured by calling it, not read off the types — and `post-alert.remote.ts:54` is `body: z.string().min(1)`, so **the boundary refuses it** |
+
+**And the old guard had a cost of its own**: a caption with no file. `composeUploadedAlert('caption\n',
+[], …)` is `"caption\n"`, which passes `min(1)` and posts. A presenter who typed a caption on the img
+tab and pressed Post got **nothing here and an alert upstream**. Matching added a behaviour and
+removed a silent refusal — the opposite of what the refusal assumed.
+
+## `fc` is a tri-state, and the empty case is the common one
+
+| site | byte | state |
+| --- | --- | --- |
+| `var fc;` | 2,122,856 | undefined — falsy |
+| `fc = []; for (…) fc.push(i)` | 2,123,302 | the picker — non-empty |
+| `fc = []` | 2,128,421 | the modal's own reset — **empty, and truthy** |
+
+So the guard is *"has a list been created"*, not *"does it hold anything"*, and the empty case is the
+state the modal sits in after every reset. `fileCount: number` is gone from `PostAlertDraft` —
+replaced by `filesTouched: boolean`, because the count could not express the distinction and had no
+other consumer. `PostAlertModal` sets the latch at exactly the two sites upstream assigns `fc`, each
+carrying the offset it transcribes.
+
+**One lifecycle difference, recorded rather than smoothed over:** `clearInputFields` runs on every
+OPEN here where the reference's reset runs after a send and on close, so `var fc;`'s undefined state
+is reachable upstream on a page's first interaction and is not reachable here. Every state after that
+agrees.
+
+## A negative control found a hole rather than confirming a guard
+
+Four seen RED: restoring the `> 0` test, and removing the latch from **each** of the two sites — which
+the first draft of the contract **could not see at all**, because the pure-function cases cannot tell
+whether the component ever sets the flag. The latch could have been silently un-wired at either end.
+That assertion is now in the contract.
+
+## Two of the repository's own gates caught me, and both were right
+
+- The new slice inlined its `indexOf`, which `slice-anchor-contract` refuses — and the reason is this
+  exact case: `indexOf` returning `-1` slices from the **end**, so a renamed function would leave the
+  assertion reading an empty tail and **passing**. Positions are bound and asserted found now.
+- The ceiling went **672 → 678**, argued at the entry as the ratchet requires, and it buys behaviour
+  rather than prose. `composer.svelte.ts` went **down** to 873.
+
+The component keeps the byte offsets because the offsets **are** the transcription; the argument lives
+in `post-alert-behavior.ts` beside the guard it governs. Same split `ModalHost.svelte` took for USM-18
+and `refresh.svelte.ts` for G16 — neither file holds a copy of the other.
+
+**Verification.** `svelte-check` 0/0, eslint clean, `pnpm run gate` exit 0 in `apps/room`. The Svelte
+MCP is still not connected, so its mandated steps could not be run for `PostAlertModal.svelte`; the
+autofixer pass was not performed and that is stated rather than implied.
+
+---
+
 ### 2026-09-02 13:41 UTC — a logout revoke becomes one statement, and a control test that could not fail is fixed
 
 Two findings, and the second was found by the first going red.
