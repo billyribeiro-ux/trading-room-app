@@ -34,7 +34,7 @@ const ALLOWED_TAGS = new Set(['b', 'strong', 'i', 'em', 'u', 'span', 'p', 'br'])
  *
  * For everything else an unknown tag is unwrapped — its children survive, so a stray `<div>` costs
  * a wrapper and not the sentence inside it. For these, the text IS the payload: unwrapping
- * `<script>alert(1)</script>` would paste `alert(1)` into the message as visible text, which is
+ * a `<script>` element would paste its `alert(1)` body into the message as visible text, which is
  * confusing rather than dangerous, and unwrapping `<style>` would leak CSS source into the log.
  */
 const DISCARDED_CONTENT_TAGS = new Set(['script', 'style', 'template', 'noscript', 'iframe']);

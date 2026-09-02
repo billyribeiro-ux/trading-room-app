@@ -83,7 +83,8 @@ const EMPTY_EDITOR_OUTPUT = new Set(['', '<p><br></p>', '<br>', '<p></p>']);
 
 /**
  * Is this editor content empty? Checked AFTER sanitising, because sanitising is what turns
- * `<script>x</script>` into nothing, and a message whose entire content was disallowed must not
+ * a whole `<script>` element into nothing, and a message whose entire content was disallowed must
+ * not
  * post as an empty bubble.
  */
 /*

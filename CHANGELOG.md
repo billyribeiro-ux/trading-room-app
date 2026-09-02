@@ -45,6 +45,78 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 05:24 UTC — the official Svelte CLI could not read this repository, and four characters were why
+
+## Found by running the September blog's `sv migrate sveltekit-3` as a check
+
+`sv 1.0.0-next.6`, task `imports`:
+
+```
+Task 'imports' failed: Unable to process 'src/routes/uploads/[name]/+server.ts'.
+Reason: Unterminated comment — https://svelte.dev/e/js_parse_error
+```
+
+**The file has no unterminated comment.** Its five block comments open and close in order, and a
+lexer tracking strings, template literals and both comment forms walks it to EOF in state `code`
+with zero unclosed blocks. `tsc`, `esbuild`, `svelte-check` and `vite build` are all silent. What it
+has is a security note quoting an attack payload, with a literal script-closing tag inside it.
+Removing that one sequence — nothing else — let the task and the two after it run to completion.
+
+`CLAUDE.md` already states this rule twice, for two other parsers, each earned by a shipped defect:
+no Svelte block inside a comment, no HTML comment marker inside an HTML comment. **This is the third
+parser.** An HTML tokenizer reading script-element content has no notion of comments, strings or
+template literals; the first closing tag it meets ends the element wherever it sits.
+
+## Comments were where it was found, not what the rule is
+
+Probed in that same file, one run each, because *"it was in a comment"* is a hypothesis:
+
+| the tag placed in | what the tool reported |
+| --- | --- |
+| a `//` line comment | `Expected token }` |
+| a single-quoted string | `Unterminated string constant` |
+
+Two different errors, both fatal, neither naming the cause. The new gate in
+`comment-safety-contract.test.ts` is written about the SEQUENCE rather than about where it sits.
+
+Four repairs, each naming the element in prose instead of pasting the tag —
+`uploads/[name]/+server.ts`, `chat-safe-html.ts`, `server/chat-html.ts`, and the controller's
+`sanitize-html.test.ts`. The whole migration then ran clean.
+
+`.test.ts` is exempt, and that is a **measurement**: twelve occurrences remain, every one an XSS
+fixture whose subject IS the payload, and the full migration ran clean with them in place because
+the task does not read test files. Recorded at the gate as the first thing to revisit if a future
+`sv` does read them.
+
+## What the migration found otherwise: nothing
+
+`package-json`, `tsconfig`, `svelte-config`, `environment`, `paths`, `external-redirects`,
+`shallow-routing`, `params`, `imports` and `app-state` are all **no-ops** on this repository — which
+is the answer to "is the SvelteKit 3 migration finished here", measured rather than assumed.
+
+**Two of its tasks must not be run again**, and the reason is written at the gate:
+
+- `tsconfig` strips every comment from `apps/room/tsconfig.json` — 26 lines recording why there is
+  no `paths` block and why `include` is stated — for zero semantic change.
+- `lib-alias` rewrites `$lib` inside **prose**, which corrupts the sentences describing the
+  migration itself: *"SvelteKit 3 replaced the `#lib` alias with Node subpath imports"*, *"rewrote
+  `#lib/mention` to `#lib/mention`"*, *"the `#lib` → `#lib` migration"*.
+  `lib-subpath-imports.test.ts`'s own docblock already recorded the 2026-08-16 codemod making this
+  exact mistake. The tool made it again, to that sentence.
+
+## And a regression of mine, worth naming for how it hid
+
+A comment added in `28b7a53` made a point by writing the reference database name, which
+`naming-boundary.test.ts` refuses. **That test lives in the CONTROLLER suite and polices both
+apps** — so a room change verified with the room gate alone does not see it. The controller gate was
+red on this branch before this commit. The sentence now makes the same argument by naming
+`ops/naming-provenance.md` instead.
+
+**Verification.** Two negative controls seen RED — the sequence in a comment and in a string, both
+in a shipped module — restored green. `svelte-check` 0/0. `pnpm run gate` exit 0 in **both** apps.
+
+---
+
 ### 2026-09-02 04:59 UTC — font preloading matches on source names, from one place instead of two
 
 ## The September 2026 Svelte blog item, applied: `filename` on the `preload` filter's font branch

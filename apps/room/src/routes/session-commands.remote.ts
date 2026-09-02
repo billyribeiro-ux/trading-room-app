@@ -138,9 +138,16 @@ export const softReset = command(z.void(), async () => {
  * }                                                                          // byte 2166484
  * ```
  *
- * The misspelling is upstream's and is transcribed rather than corrected, for the same reason
- * `ptr_clone` keeps its name: a captured string is evidence, and a tidied one no longer matches the
- * thing it was captured from. `mechanical-rename-contract.test.ts` pins the pair.
+ * The misspelling is upstream's and is transcribed rather than corrected, for the same reason the
+ * captured database names are kept rather than tidied (`ops/naming-provenance.md` is the mapping):
+ * a captured string is evidence, and a tidied one no longer matches the thing it was captured
+ * from. `mechanical-rename-contract.test.ts` pins the pair.
+ *
+ * (That sentence used to make the point by writing the reference name itself. It was caught by
+ * `naming-boundary.test.ts`, which is in the CONTROLLER suite and polices both apps — so a room
+ * change verified with the room gate alone does not see it. The rule it enforces is that the
+ * reference name belongs to the database tier, prose included, and naming the mapping document
+ * makes the same argument without spending the token.)
  *
  * ## It was the fifth session control that announced a server act and performed a local one
  *

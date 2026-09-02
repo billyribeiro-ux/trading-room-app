@@ -14,7 +14,7 @@ describe('sanitizeHtml', () => {
   });
 
   it('survives the nested-tag trick that defeats a regex strip', () => {
-    // a naive "remove <script>…</script>" leaves a working <script> behind here
+    // a naive "strip every <script> element with one pass" leaves a working <script> behind here
     const out = sanitizeHtml('<scr<script>ipt>alert(1)</script>');
     expect(out).not.toContain('<script');
     expect(out).not.toContain('<scr');
