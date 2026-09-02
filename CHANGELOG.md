@@ -45,6 +45,75 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 23:40 UTC — the channel model, and two "undecoded" values that were not
+
+`c1c611c`. `processSessData` builds the reference's whole tab strip in ONE expression (pinned bundle,
+bytes 1,146,625-1,147,200) from **six** settings. `hasChannelTabs` crossed alone on 2026-08-31
+because it was a live defect; these are the other five, and they arrive together because a subset of
+the six describes a room the reference cannot be in.
+
+It was a **model change**, which is what `missing-settings-triage.md` said and why it had been left
+unstarted: the reference gives every tab a `type` and has three of them where this room had one.
+
+**TWO THINGS RECORDED AS UNDECIDABLE WERE DECODED BY READING.**
+
+| | recorded | measured 2026-09-02 |
+| --- | --- | --- |
+| **`po`** | *"`po` versus `p` is undecoded: both are private, and nothing in the capture says what the `o` distinguishes"* | three sites say what it is and they agree — the subscription at **1,008,074** and both chat columns' render at **1,437,340** / **2,383,602**, all gating on `isPresenter \|\| user.hasAdminChat` |
+| **`p`** | the same sentence | `type:"p"` occurs **exactly once** in the whole 2,891,205-byte bundle and **no comparison against it exists anywhere**. A `p` channel behaves as an `r` one in the reference's own client, so `extraAdminChannels` is a name describing an intent that client does not enforce |
+
+`p` is carried as a value and treated as `r` for visibility — transcribing what the bundle does
+rather than what its setting name implies, the same call `advancedSearchAlerts` and `h264Enabled` are
+recorded under — and asserted, so the finding cannot be quietly "fixed" into a gate the reference
+does not have.
+
+**The `po` gate is ONE decision here and two in a browser upstream.** Upstream pushes the tab for
+everybody and filters at subscribe and at render, in the client. Both are gates a member steps past
+with a console, and the subscribe one is what decides whether the SERVER sends them the channel's
+messages. Here the tab is never in the list — so `memberChatChannels` never names the channel,
+`isMemberChatChannel` refuses a post to it, and the SSE hub never subscribes them. `hasAdminChat`
+comes off the controller's membership, never off anything the request asserts.
+
+**Runtime impact.** An owner can rename the two built-in tabs, add an admin-only channel, and add
+comma-separated regular and admin channels — five Manage-page settings that stored a value and did
+nothing. A room that has configured none of them is unchanged.
+
+**ONE DIVERGENCE, and it is the one place matching would reproduce a privilege escalation.** Upstream
+pushes an owner-typed name as both `displayName` and `name` with no collision check at all. An
+`extraRegChannels` entry named `adminChat` would be a type-`r` channel — ungated, in everyone's list
+— sharing a name with the type-`po` one, and **the name IS the channel**: `messages.room`, the
+realtime key, the allow-list entry. Refused here, against the same reserved set a badge channel
+already took. Also trimmed, because `"a, b"` upstream yields a channel literally named `" b"`.
+
+**`ChatTab` became `ChatChannelName` in `types.ts`, and that is a correction rather than tidying.**
+Its docblock read *"a chat channel's name, which is also its tab label"*, and the middle clause
+stopped being true the moment an owner could rename the two built-in tabs. `ChatTab` is the OBJECT
+now — `{name, displayName, type}`, the shape the reference itself pushes — and the string took the
+name it always meant.
+
+**Four negative controls seen red:** the `po` gate, the collision refusal, renaming the channel
+instead of the tab, and the trim.
+
+**Nine gates caught the change, and two are worth naming.** `declaration-tag-contract` caught me
+migrating a `{const x = $derived(y)}` **backwards** to `{@const}` — Svelte's own documentation calls
+the latter legacy, and this repository measured that a plain `{const}` compiles to no derived at all,
+so a site migrated that way goes stale silently the moment its state changes. And
+`AlertChatArea.svelte.test.ts` reported `duplicate key undefined` rather than rendering an empty
+strip nobody would have looked at — the note in its own fixture, added 2026-08-30 for exactly this
+failure, earning its place a second time.
+
+**111 of 269 settings are wired**, from 106. Six documents stated that count — `README.md`,
+`OUTSTANDING.md`, `ARCHITECTURE.md`, `admin-surface.md`, `v5.md` and `TODO.md` — and every one was
+corrected. The verifier refuses to pass while any of them disagrees, which is how all six were found
+rather than five.
+
+**Verified:** both gates exit 0. `svelte-check` 1647 files, 0 errors. 55 cases in
+`chat-tabs-contract.test.ts`.
+
+**Not verified, and named: no browser was opened on a room with an admin channel configured.** The
+gate is asserted at the function and through the server seam, not through a rendered strip.
+
+
 ### 2026-09-02 23:01 UTC — "Get my token", and a reason that was true of the reference and false of this room
 
 `d76b1a7`. `INERT_ACTIONS` is down to **three**, and none of the three is unbuilt work: two need a
