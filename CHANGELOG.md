@@ -45,6 +45,93 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 20:44 UTC — a blocker written three times as an inference, and row 8 closed on a number
+
+**Runtime impact: NO.** No shipped behaviour changed. What changed is that a question recorded as
+unanswerable for four weeks now has an answer, and the reason it was recorded as unanswerable was
+wrong three times running.
+
+## `getDisplayMedia` works in this container
+
+The blocker on `streaming-choices.md` rows 6 and 8 has been rewritten twice and was wrong both times:
+
+1. *"needs a human at an OS screen picker; no amount of tooling removes that"* — corrected
+   2026-09-01. `--auto-select-desktop-capture-source` exists for exactly this.
+2. *"blocked on a CAPTURABLE DISPLAY, not on a PERSON"*, on six attempts returning
+   `NotReadableError: Could not start video source` — **corrected 2026-09-02, measured.** Same
+   container, same Chromium 1194, `xvfb-run -a -s "-screen 0 1920x1080x24 +extension COMPOSITE
+   +extension DAMAGE +extension RANDR"`:
+   `{displaySurface:"monitor", width:1920, height:1080, frameRate:30, deviceId:"screen:399:0"}`.
+
+**The way this probe FIRST failed is the more useful half**, because it is how a wrong blocker gets
+written: on `about:blank`, `navigator.mediaDevices` is `undefined` — the page is not a secure
+context. The error has nothing to do with the display and reads like it has everything to do with it.
+Serving the probe from `http://127.0.0.1` fixed it.
+
+So the corrections run three deep, each replacing a confident sentence with another confident
+sentence. **The lesson is not about screen capture: a blocker is a MEASUREMENT, and this one was
+written three times as an inference.**
+
+## Row 8 — DECIDED, and the `Pro` was refuted rather than out-weighed
+
+It read *"removes reliance on libvpx's own heuristic, which is the thing currently deciding 525 kbps
+was enough"*. **525 kbps was never a ceiling.** It was the heuristic spending what nearly-static
+content needed.
+
+Measured on a loopback `RTCPeerConnection` inside one page — so the number is the ENCODER's rather
+than an SFU's — capturing a deliberately busy 1920×1080 surface (three columns of hex and random text
+repainting at 30 Hz, because a static desktop measures libvpx's floor and not its ceiling), with
+`contentHint = 'detail'` as `startScreenSharing` sets it. Twelve two-second samples:
+
+| field | value |
+| --- | --- |
+| `targetBitrate` | **2,500,000** (2,487,392 – 2,500,000) |
+| measured send | 2,476 – 2,613 kbps |
+| `qualityLimitationReason` | `none` |
+| `encoderImplementation` | `libvpx` |
+| codec | `video/VP9` |
+| frame size | 1920×1080 |
+
+**Codec preferences have to be applied BEFORE `createOffer`.** Applied after, they are silently
+ignored — which is how the first run of this probe measured VP8 while believing it had asked for VP9,
+and it is recorded because a measurement of the wrong codec would have looked exactly as convincing.
+
+The decision follows from the number: libvpx already has 2.5 Mbps of headroom and spends it when the
+content asks. A `maxBitrate` at or below that only takes headroom away; above it, it does nothing. A
+`minBitrate` would force spending on frames that do not need it — bandwidth billed to every member so
+a static slide can be sent expensively, which is the row's own `Con`. **And the capture passes
+`encodings: undefined`, so doing nothing is also the match.**
+
+Pinned in `media/session.test.ts`: exactly two `maxBitrate` occurrences, both the transcribed `QS`
+constants from bundle byte 1,071,656, no `minBitrate` anywhere, and the captured path still returning
+no encodings key at all. The assertion is about INVENTION rather than absence, because the two that
+are there are the reference's. Two negative controls seen red.
+
+## Row 6 — still open, blocker named correctly for the first time
+
+**A HIGH-DPI SOURCE and a person judging legibility.** An Xvfb framebuffer at 1920×1080 has no pixels
+for a 1920 cap to remove, and *"is the text sharper"* has no automated answer. The human procedure in
+`MEASURE-SHARE-QUALITY.md` is exactly right for that question and is kept; it is no longer the only
+way anything in that document gets measured.
+
+## Two stale summaries, corrected in the same change
+
+`NEW-TODO.md`'s header table still listed **the five operator reset commands** as blocked on *"a
+central console AND a media plane"*, and `TODO.md`'s header repeated it — while the body of
+`NEW-TODO.md` had retired that row on 2026-09-01 as NOT WORK. Re-swept independently:
+`resetAudioBridge` 2, `resetAudioBridgeOnServer` 2, `resetAllMediaServers` 3, `hardResetMediaServer`
+1, `hardResetMediaServerOnServer` 1, `getMediaServerLost` 1 — **every occurrence is the declaration
+or the command string inside its own body, and there is no call site anywhere in 2,891,205 bytes.**
+Building senders would invent controls the reference does not have.
+
+That file warns two hundred lines below its own header that *"two places recording one thing is how
+one of them goes stale, and the stale one is always the summary"*. It was the summary. Both are
+corrected, and the correction is left visible.
+
+`pnpm run gate` exit 0 in both apps.
+
+---
+
 ### 2026-09-02 20:25 UTC — four read-then-write races in the Rust API, three of them denied by a comment
 
 **Runtime impact: YES.** A vote could land on a closed poll, a question on a deleted alert, two note

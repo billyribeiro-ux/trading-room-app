@@ -9,10 +9,27 @@ Written 2026-08-05.
 > `startScreenSharing`). `TODO.md` row R had recorded that this line needed correcting _"when
 > somebody next opens it"_; this is that.
 
-**Implemented as of 2026-08-29: rows 1, 2 and 4.** Rows 6, 8 and 10 remain open and each needs the
-measurement named in its own entry — rows 6 and 8 need a human at an OS screen picker, because
-`getDisplayMedia` cannot be automated and headless returns a synthetic gradient that compresses too
-easily to show any difference.
+**Implemented as of 2026-08-29: rows 1, 2 and 4. Row 8 is DECIDED on evidence as of 2026-09-02 and
+the answer is NO.** Rows 6 and 10 remain open, each for the reason its own entry now names.
+
+**The sentence this paragraph used to carry was wrong twice over, and both corrections are on the
+record because each was itself a correction.** It read: _"rows 6 and 8 need a human at an OS screen
+picker, because `getDisplayMedia` cannot be automated and headless returns a synthetic gradient that
+compresses too easily to show any difference."_
+
+1. `getDisplayMedia` **can** be automated — corrected 2026-09-01, and `--auto-select-desktop-capture-source`
+   is the flag. The synthetic-gradient half was about `--use-fake-device-for-media-stream`, which is
+   a `getUserMedia` camera flag and was not used in any attempt.
+2. The replacement claim — _"blocked on a CAPTURABLE DISPLAY"_, on six attempts returning
+   `NotReadableError: Could not start video source` — is **also wrong, measured 2026-09-02**. Under
+   `xvfb-run -s "-screen 0 1920x1080x24 +extension COMPOSITE +extension DAMAGE +extension RANDR"`
+   with headed Chromium 1194, `getDisplayMedia` returned a live track:
+   `{displaySurface:"monitor", width:1920, height:1080, frameRate:30, deviceId:"screen:399:0"}`.
+
+   What the first attempt of THAT probe hit is worth keeping, because it is how a wrong blocker gets
+   written: on `about:blank`, `navigator.mediaDevices` is `undefined`, because the page is not a
+   secure context. The failure is nothing to do with the display, and it looks like everything to do
+   with it. Serving the probe page from `http://127.0.0.1` fixed it.
 
 **Read the "Evidence" column before acting on any row.** Some entries are backed by measurements
 taken on this machine; others are reasoning from a spec and are labelled as such. The difference
@@ -193,7 +210,12 @@ The presenter's own camera, currently unconstrained.
   pixels their screen cannot show.
 - **Con** — diverges from a constraint that is byte-identical to the capture.
 - **Evidence** — that we cap at 1920×1080 and deliver exactly that is MEASURED. The Retina benefit
-  is NOT measured on this machine.
+  is NOT measured, and the reason is NOT the one this file used to give.
+- **What actually blocks it, named correctly 2026-09-02** — a HIGH-DPI SOURCE and a person judging
+  legibility. A capturable display exists here (see the header), so the automation half is answered;
+  what an Xvfb framebuffer at 1920×1080 cannot provide is a surface with more pixels than the cap
+  removes, and no measurement of "is the text sharper" is available without an eye. Those are
+  different blockers with different prices, and the earlier one was cheaper to state than to check.
 
 ---
 
@@ -208,16 +230,45 @@ The presenter's own camera, currently unconstrained.
 
 ---
 
-### 8. Explicit `maxBitrate` on the screen encoding
+### 8. Explicit `maxBitrate` on the screen encoding — **DECIDED 2026-09-02: NO**
 
-- **Pro** — removes reliance on libvpx's own heuristic, which is the thing currently deciding
-  525 kbps was enough. A `minBitrate` in particular would stop it under-spending when there is
-  measured headroom (`bandwidth: 0`, `cpu: 0`).
+- **Pro (REFUTED)** — it read _"removes reliance on libvpx's own heuristic, which is the thing
+  currently deciding 525 kbps was enough. A `minBitrate` in particular would stop it under-spending
+  when there is measured headroom."_ **525 kbps was never a ceiling.** It was the heuristic spending
+  what nearly-static content needed.
 - **Con** — sets a floor under everyone's bandwidth. Congestion control currently adapts; a hard
   number stops it adapting downward as gracefully, and a floor is exactly the thing that hurts the
   member on the worst connection.
 - **Con** — the capture passes `encodings: undefined`. Any value here is invented.
-- **Evidence** — that we send `undefined` is MEASURED. The effective default ceiling is NOT.
+- **Evidence — the effective default ceiling IS measured now, and it is 2.5 Mbps.** A loopback
+  `RTCPeerConnection` inside one page, so the number is the ENCODER's rather than an SFU's; the
+  captured surface a deliberately busy 1920×1080 page (three columns of hex and random text
+  repainting at 30 Hz), because a static desktop measures libvpx's floor and not its ceiling;
+  `contentHint = 'detail'` set, as `startScreenSharing` sets it; codec preferences applied BEFORE
+  `createOffer`, because applying them after is silently ignored — which is how the first run of the
+  probe measured VP8 while believing it had asked for VP9.
+
+  Steady state over twelve two-second samples:
+
+  | field                     | value                                                |
+  | ------------------------- | ---------------------------------------------------- |
+  | `targetBitrate`           | **2,500,000** (2,487,392 – 2,500,000 across samples) |
+  | measured send             | 2,476 – 2,613 kbps                                   |
+  | `qualityLimitationReason` | `none`                                               |
+  | `encoderImplementation`   | `libvpx`                                             |
+  | codec                     | `video/VP9`                                          |
+  | frame size                | 1920×1080                                            |
+
+- **The decision, and it follows from the number rather than from taste.** libvpx already has
+  2.5 Mbps of headroom for this track and spends it when the content asks; it spent 525 kbps on the
+  earlier measurement because that screen was nearly still. A `maxBitrate` at or below 2.5 Mbps would
+  only take headroom away; above it, it would do nothing. A `minBitrate` would force spending on
+  frames that do not need it — bandwidth billed to every member so a static slide can be sent
+  expensively. **And the capture passes `encodings: undefined`, so doing nothing is also the match.**
+- **What this measurement does NOT establish**, stated so the number is not over-claimed: it was
+  taken with software rendering under Xvfb, which held the capture to 7–8 encoded fps against the
+  19–20 the room measured on real hardware. Frame RATE therefore is not measured here; the
+  per-second bitrate ceiling is, and it is what the row asked for.
 
 ---
 

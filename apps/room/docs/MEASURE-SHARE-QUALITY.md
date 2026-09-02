@@ -34,17 +34,41 @@ under `xvfb-run` with headed Chromium 1194, `getDisplayMedia({video:true})` neve
 never returns `NotAllowedError`. Permission is granted, the source is selected, and the call gets as
 far as trying to open the capture.
 
-What it returns instead, on six attempts, is **`NotReadableError: Could not start video source`** —
-the container's Xvfb display has no surface Chromium's X11 capturer can open. Tried and still
-failing: `preferCurrentTab` with `--auto-accept-this-tab-capture`, `--enable-usermedia-screen-capturing`,
-`--use-gl=swiftshader`, and `+extension COMPOSITE +extension DAMAGE +extension RANDR` on the Xvfb
-server.
+What it returned on six attempts was **`NotReadableError: Could not start video source`**, and this
+section concluded that the container's Xvfb display has no surface Chromium's X11 capturer can open.
 
-**The distinction is the point, because it changes what unblocks this.** A picker needing a human is
-a permanent, per-run cost that no CI can pay. A display with no capturable surface is an environment
-to fix once — a real X server, or a runner with a display, or a capture backend that works headless.
-Row 6 and row 8 of `streaming-choices.md` are therefore blocked on **a capturable display**, not on
-**a person**, and the two have very different prices.
+## THAT CONCLUSION IS ALSO WRONG — measured 2026-09-02, and it captured
+
+Same container, same Chromium 1194, `xvfb-run -a -s "-screen 0 1920x1080x24 +extension COMPOSITE
++extension DAMAGE +extension RANDR"`, `--auto-select-desktop-capture-source=Entire screen`:
+
+```json
+{
+  "displaySurface": "monitor",
+  "width": 1920,
+  "height": 1080,
+  "frameRate": 30,
+  "cursor": "always",
+  "logicalSurface": true,
+  "deviceId": "screen:399:0"
+}
+```
+
+A live track, not an error. And the way the 2026-09-02 probe FIRST failed is the more useful half of
+this record, because it is exactly how a wrong blocker gets written: on `about:blank`,
+`navigator.mediaDevices` is `undefined`, because the page is not a secure context. The error has
+nothing to do with the display and reads like it has everything to do with it. Serving the probe page
+from `http://127.0.0.1` — which IS a secure context — fixed it.
+
+**So the corrections here run three deep**, and each one replaced a confident sentence with another
+confident sentence: _a human must click a picker_ → _the picker is not the problem, the display is_ →
+_the display is not the problem either_. The lesson is not about screen capture. It is that a blocker
+is a MEASUREMENT and this one was written three times as an inference.
+
+**Row 8 of `streaming-choices.md` is measured and DECIDED as a result** — the default ceiling is
+2.5 Mbps and no explicit `maxBitrate` is set. **Row 6 is still open, and its blocker is named
+correctly now**: a HIGH-DPI SOURCE and a person judging legibility. An Xvfb framebuffer at 1920×1080
+has no pixels for a 1920 cap to remove, and "is the text sharper" has no automated answer.
 
 **One more correction in the same pass.** The claim elsewhere that headless "returns Chrome's
 synthetic gradient, which compresses too easily to show any difference" is about
@@ -52,12 +76,15 @@ synthetic gradient, which compresses too easily to show any difference" is about
 cameras rather than to desktop capture. It was not used in any of the six attempts above, so it is
 not what produced the failure and it is not evidence that automation cannot work.
 
-**What is still true:** the measurement needs a real viewer attached, because an encoder with nobody
-receiving has no reason to spend bits. That half of the argument below is unaffected and is why this
-is a two-session procedure rather than a one-tab one.
+**What is still true, and was confirmed rather than assumed:** the measurement needs a real viewer
+attached, because an encoder with nobody receiving has no reason to spend bits. The 2026-09-02 probe
+satisfied that with a loopback `RTCPeerConnection` inside one page — a second peer connection is a
+real receiver — which is why it could take row 8's number without a second machine. For a
+member-facing quality judgement the two-session procedure below is still the right shape.
 
-**The human procedure below remains correct and remains the fastest way to get the number today.**
-It is not deleted, because until a capturable display exists it is the only way this gets measured.
+**The human procedure below remains correct**, and it is what answers the questions an encoder
+statistic cannot: whether the text on a shared IDE is legible to a member, and whether raising the
+cap changes that. It is not deleted, and it is no longer the only way anything here gets measured.
 
 ---
 
