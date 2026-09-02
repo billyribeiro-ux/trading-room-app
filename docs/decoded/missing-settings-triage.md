@@ -62,7 +62,18 @@ and would be presenter-only here.
 | --- | --- |
 | `h264Enabled` | Byte 1,073,226: `this.forceH264 = this.globals.sessData.h264Enabled \|\| !0`. `!0` is `true`, so the expression is unconditionally true and **the setting has no effect upstream at all**. Wiring it here would be inventing a behaviour the reference does not have. |
 | `advancedSearchAlerts` | Byte 2,043,017: `O(6, sessData.advancedSearchAlerts && "56ba547185ae93560d186ea8" == sessData.ownerdID ? 6 : -1)`. The feature is gated on **one hard-coded owner id**. It is not a room setting, it is a customer-specific branch. |
-| `smallerImagePreview` | Byte 1,436,548 is a room default with a latch, the same shape as the three built on 2026-08-28 — it seeds `preferences.defaultImagePreview` / `smallImagePreview` once. But `smallImagePreview` was closed by evidence on 2026-08-14: its only effect is the class `chat-uploaded-img-sm`, which **has no rule in any of the 52 stylesheets this repository holds**. See `settings-preference-wiring-contract.test.ts`. A default that seeds a preference that styles nothing is not a feature to reproduce. |
+
+---
+
+**`smallerImagePreview` LEFT THIS TABLE ON 2026-09-02, and it is the only row that has.** It sat here
+reading *"a default that seeds a preference that styles nothing is not a feature to reproduce"*, and
+both halves of that were wrong. The pair it seeds is a one-shot LATCH with a real behaviour — the
+room's default reaches a member once and their own later choice survives it — and the class with no
+rule was never this table's question: `CLAUDE.md` forbids a class this repository INVENTS, while
+`btn-ligth` has been the standing precedent for one TRANSCRIBED from the capture since
+`ChatArchiveLogPane` was written. Built as USM-18; `image-preview-latch-contract.test.ts` is the
+contract. **The lesson for the two rows left above: this table's verdicts are measurements, and a
+measurement plus a rule is not the same thing as a disposition.**
 
 ---
 

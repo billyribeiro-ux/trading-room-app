@@ -145,6 +145,21 @@
     longerAlertPopup: boolean;
     qaSoundOn: boolean;
     chatSoundOn: boolean;
+    /**
+     * USM-18 — the two halves of the image-preview pair, passed separately because the reference
+     * renders their AND rather than either one:
+     *
+     * ```js
+     * ngClass(ut(12, B1e, preferences.smallImagePreview && preferences.defaultImagePreview))
+     * ```
+     *
+     * `smallImagePreview` is the member's own switch and `defaultImagePreview` is the latch saying
+     * the room default has been applied to them — `RoomPrefs.latchRoomImagePreview` argues why the
+     * second exists. Collapsing them into one resolved boolean here would hide that the checkbox in
+     * this modal shows the conjunction and writes only the first half, which is upstream's shape.
+     */
+    smallImagePreview: boolean;
+    defaultImagePreview: boolean;
     pollOpenMode: 'setup' | 'auto';
     pollRestoreToken: number;
     activePoll: ActivePoll | null;
@@ -673,6 +688,8 @@
     longerAlertPopup,
     qaSoundOn,
     chatSoundOn,
+    smallImagePreview,
+    defaultImagePreview,
     pollOpenMode,
     pollRestoreToken,
     activePoll,
@@ -1180,7 +1197,6 @@
     'chat-badges-donot-disturb': true,
     'chat-popup-donot-disturb': false,
     'chat-donot-disturb': false,
-    'small-image-preview': false,
     'extra-chat-column': false,
     'chat-always-scroll': false,
     'chat-mem-clear': true,
@@ -1564,29 +1580,40 @@
       onDoNotDisturbChange(input.checked);
       return;
     }
+    /*
+      USM-18. `smallImagePreviewOnChange` (byte 2,253,020) negates the PREFERENCE, not the rendered
+      state — see the transcription at the checkbox. `input.checked` is the negation of the
+      conjunction, which differs from the negation of `smallImagePreview` exactly when the latch is
+      false and the flag is true, and that state is reachable because the latch is never persisted
+      by the toggle. `RoomPrefs.save` mirrors the flag into the latch, which is the second line of
+      that handler.
+    */
+    if (input.id === 'small-image-preview') {
+      onPreferenceChange('smallImagePreview', !smallImagePreview);
+      return;
+    }
     settingChecks[input.id] = input.checked;
     /*
-      Element id -> PREFERENCE NAME, and the `?? input.id` fallback below is why this table has to
-      be right rather than merely present.
+      Element id -> PREFERENCE NAME, and this table is the declaration that a checkbox HAS a
+      consumer. The block below it says what happens to an id that is absent, and it is no longer
+      what the paragraph here used to say.
 
-      An id with no entry here is still persisted — under the id. `+page.svelte` reads preferences
-      by their reference names (`loadedSettings.recordingStartSound`), so an unmapped checkbox
-      writes `app-recording-start-sound`, which nothing reads, and the setting appears to work: the
-      label flips, the POST succeeds, and the sound still plays. That is the same defect class as
-      the dead `app-disable-video` checkbox, but harder to see, because here the consumer exists and
-      is simply never reached.
+      THE HISTORY, because it is the reason the table is exhaustive rather than convenient. This
+      lookup once ended in `?? input.id`, so an unmapped checkbox persisted under its ELEMENT ID.
+      The page reads preferences by the reference's names (`loadedSettings.recordingStartSound`), so
+      the write and the read never met and nothing failed: the label flipped, the POST succeeded, and
+      the sound still played. `#lib/dead-preference-keys.ts` carries the keys that were written
+      before the fallback was removed, because deleting the write does not delete what it wrote.
 
-      The four added on 2026-08-14 each had a live consumer sitting unreached. Every name is the
-      one the reference passes to `setPreference`, read out of `app-user-settings-modal.full.js`
-      rather than inferred from the id:
+      Every name is the one the reference passes to `setPreference`, read out of
+      `app-user-settings-modal.full.js` rather than inferred from the id:
       `recordingStartSoundOnChange` :1106-1113, `recordingStopSoundOnChange` :1114-1121,
-      `pushToTalkOnChange` :1023-1030, and `speechRecoCCOnChange` :990-1008, which sets
-      `speechRecoCC` AND mirrors it into `doSpeechReco` — `doSpeechReco` is the one this room gates
-      speech recognition on, so that is the half carried here.
+      `pushToTalkOnChange` :1023-1030, `speechRecoCCOnChange` :990-1008, which sets `speechRecoCC`
+      AND mirrors it into `doSpeechReco` — the half this room gates speech recognition on — and
+      `smallImagePreviewOnChange` :1197-1221.
 
-      Still unmapped, deliberately: the ids whose preference has no consumer in this room at all
-      (`chat-gif-donot-disturb`, `extra-chat-column`, `chat-mem-clear`, and the rest). Mapping those
-      would move the junk key rather than remove it. They are recorded in `TODO.md`.
+      The ids that are still absent are absent because this room has no consumer for them, not
+      because nobody got to them; mapping one would move a junk key rather than remove it.
     */
     const preferenceKeyByInputId: Record<string, string> = {
       'alert-popup-donot-disturb': 'alertPopup',
@@ -3739,24 +3766,51 @@
               value="Small image preview"
               id="small-image-preview"
               class="form-check-input"
-              {@attach setInputChecked(settingChecks['small-image-preview'])}
+              {@attach setInputChecked(smallImagePreview && defaultImagePreview)}
               onchange={updateSettingCheck}
             />
             <!--
-              USM-18 — `v(218," Smaller image preview "), H(219,Cke,…)(220,Ske,…)` at byte 2,281,312,
-              where `Cke` and `Ske` are `<span>on</span>` and `<span>off</span>`. Every other
-              checkbox in this modal carries that pair and this one did not.
+              USM-18, and the two halves of it that look like mistakes are both transcriptions.
 
-              The conjunct — `checked` and the span gate as `smallImagePreview &&
-              defaultImagePreview` — is not reproduced, and the reason that used to sit here was
-              re-measured on 2026-09-02 and was wrong in its premise: `defaultImagePreview` is a
-              one-shot latch seeding this preference from the ROOM setting `smallerImagePreview`,
-              not a dead duplicate. The measurement, and why it is still unbuilt, are in
-              `setting-coverage-contract.test.ts` beside the schema row and where they run.
+              ```js
+              v(218," Smaller image preview "), H(219,Cke,2,0,"span")(220,Ske,2,0,"span")  // 2,281,312
+              Cke = <span>on</span>   Ske = <span>off</span>                               // 2,233,430
+              z("checked", preferences.smallImagePreview && preferences.defaultImagePreview)
+              O(219,  preferences.smallImagePreview && preferences.defaultImagePreview ? 219 : -1)
+              O(220, !preferences.smallImagePreview && preferences.defaultImagePreview ? 220 : -1)
+              ```
+
+              THE TWO SPANS ARE NOT AN EITHER/OR, and this is the one checkbox in this modal where
+              they are not. Every neighbour compiles to `? 230 : 231` — one index or the other, so
+              exactly one span always renders. This pair compiles to two INDEPENDENT slots, each
+              `? n : -1`, and the off slot additionally requires `defaultImagePreview`. So with both
+              flags false — a member in a room whose default is off, who has never touched this — the
+              label reads "Smaller image preview" and NEITHER word appears. That is what the capture
+              renders, so it is what this renders, and writing it as `{cond ? 'on' : 'off'}` like its
+              neighbours would be the easy way to get it wrong.
+
+              WHY THE HANDLER IS SPECIAL-CASED rather than going through the generic
+              `updateSettingCheck` path: `smallImagePreviewOnChange` at byte 2,253,020 does not read
+              the checkbox at all.
+
+              ```js
+              smallImagePreviewOnChange() {
+                preferences.smallImagePreview  = !preferences.smallImagePreview;
+                preferences.defaultImagePreview = preferences.smallImagePreview;
+                setPreference("smallImagePreview", preferences.smallImagePreview);
+              }
+              ```
+
+              It NEGATES the preference, mirrors it into the latch, and persists only the first. The
+              generic path would send `input.checked`, which is the negation of the CONJUNCTION —
+              the same value in every state except the one this modal can actually reach: a member
+              carrying a persisted `smallImagePreview: true` with the latch false, because the latch
+              is assigned here and never persisted here. `RoomPrefs.save` holds the mirror.
             -->
             <label for="small-image-preview" class="form-check-label"
               >Smaller image preview
-              <span>{settingChecks['small-image-preview'] ? 'on' : 'off'}</span></label
+              {#if smallImagePreview && defaultImagePreview}<span>on</span
+                >{/if}{#if !smallImagePreview && defaultImagePreview}<span>off</span>{/if}</label
             >
           </div>
         </div>

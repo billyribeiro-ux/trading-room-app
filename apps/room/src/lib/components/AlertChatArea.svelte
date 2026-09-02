@@ -105,6 +105,31 @@
      */
     alertsDisplayMode: ChatDisplayMode;
     chatDisplayMode: ChatDisplayMode;
+    /**
+     * USM-18 — the reference's own pair, bound as their AND on the chat log container:
+     *
+     * ```js
+     * z("logType","chat")("displayMode",…)("isPresenter",…)
+     *   ("ngClass", ct(12, B_e, preferences.smallImagePreview && preferences.defaultImagePreview))
+     *                                                                            // byte 1,454,129
+     * B_e = t => ({ "chat-uploaded-img-sm": t })                                    // byte 1,420,656
+     * ```
+     *
+     * The element is `app-roomscroller` — `inputs:{logType,displayMode,isPresenter}` at byte
+     * 1,418,937, which is what identifies the binding chain above as the SCROLLER and not a message.
+     *
+     * `smallImagePreview` is the member's switch; `defaultImagePreview` is the latch recording that
+     * the room's `smallerImagePreview` default has already been applied to them. Both are needed
+     * here because the reference renders the conjunction, not either half.
+     *
+     * `chat-uploaded-img-sm` HAS NO RULE in any of the 52 stylesheets this repository holds, and it
+     * is bound regardless. That is not an oversight and it is not scaffolding: it is what the
+     * capture ships, on the precedent `btn-ligth` set in `ChatArchiveLogPane.svelte` — upstream's
+     * typo for `btn-light`, matching nothing, transcribed and asserted. A dead class we INVENT is
+     * the thing CLAUDE.md forbids; a dead class we TRANSCRIBE has its consumer in the reference.
+     */
+    smallImagePreview: boolean;
+    defaultImagePreview: boolean;
     polls: RoomPolls;
     /** The page owns which menu is open, so only one is open across every column at once. */
     menus: RoomMenus;
@@ -363,6 +388,8 @@
     chatTabs,
     alertsDisplayMode,
     chatDisplayMode,
+    smallImagePreview,
+    defaultImagePreview,
     polls,
     menus,
     isPresenter,
@@ -1150,6 +1177,7 @@
 
           <app-roomscroller
             bind:this={chatScroller}
+            class={{ 'chat-uploaded-img-sm': smallImagePreview && defaultImagePreview }}
             style="overflow-y: scroll; overflow-x: hidden; height: 100%;"
             onscroll={(event: Event) => feedScroll.trackChatScroll(event)}
           >

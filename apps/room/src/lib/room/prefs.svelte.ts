@@ -1,3 +1,5 @@
+import { untrack } from 'svelte';
+
 import { DEFAULT_ALERT_DELIVERY_PREFERENCES } from '#lib/alert-delivery.js';
 import { mirrorPreferenceToLocalStorage } from '#lib/dead-preference-keys.js';
 
@@ -110,6 +112,8 @@ export class RoomPrefs {
   #pushToTalk;
   #videoDisabled;
   #bufferSizeLevel;
+  #smallImagePreview;
+  #defaultImagePreview;
 
   constructor(settingsJson: string | null | undefined, hooks: RoomPrefsHooks) {
     this.#hooks = hooks;
@@ -467,6 +471,25 @@ export class RoomPrefs {
      * room today to an empty pane and no idea why.
      */
     this.#videoDisabled = $state(false);
+    /**
+     * `preferences.smallImagePreview` — the viewer's own "smaller image previews" switch, and
+     * `preferences.defaultImagePreview`, the LATCH that records whether the room's default for it
+     * has already been applied to this member.
+     *
+     * `=== true` for both, and it is the reference's own polarity rather than a choice: the
+     * defaults object initialises the pair to `!1` at bundle byte 979,150, so an absent value is
+     * OFF. Every other preference in this constructor that reads `!== false` does so because the
+     * reference ships it ON; these two ship off.
+     *
+     * They are separate fields and not one, because they answer different questions and the room
+     * renders the AND of them — see {@link latchRoomImagePreview} for what the second one is for,
+     * and `settings-preference-wiring-contract.test.ts` for the three weeks this pair spent
+     * recorded as "a second copy of the same flag", which it is not.
+     */
+    this.#smallImagePreview = $state(loadedSettings.smallImagePreview === true);
+
+    this.#defaultImagePreview = $state(loadedSettings.defaultImagePreview === true);
+
     /* The HLS buffer size, clamped by `stream-buffer.ts` — the module that owns the three levels,
        their names and why a blob value outside them is refused rather than coerced. */
     this.#bufferSizeLevel = $state(streamBufferLevel(loadedSettings.bufferSizeLevel));
@@ -641,6 +664,14 @@ export class RoomPrefs {
     return this.#bufferSizeLevel;
   }
 
+  get smallImagePreview() {
+    return this.#smallImagePreview;
+  }
+
+  get defaultImagePreview() {
+    return this.#defaultImagePreview;
+  }
+
   save(key: string, value: unknown) {
     // Mirror into the decoded snapshot so anything that resolves a preference later in the same
     // session (the split sizes, for instance) sees the write instead of the value the page was
@@ -714,6 +745,29 @@ export class RoomPrefs {
       if (key === 'trimChatLogs') this.#trimChatLogs = value;
       if (key === 'enableRTE') this.#enableRTE = value;
       if (key === 'extraChatColumn') this.#extraChatColumn = value;
+      /*
+        USM-18, and the SECOND line is the whole of it. `smallImagePreviewOnChange`, byte 2,253,020:
+
+          smallImagePreviewOnChange() {
+            preferences.smallImagePreview   = !preferences.smallImagePreview;
+            preferences.defaultImagePreview =  preferences.smallImagePreview;
+            setPreference("smallImagePreview", preferences.smallImagePreview);
+          }
+
+        The flag is mirrored into the LATCH and only the flag is persisted, so `defaultImagePreview`
+        is true for the rest of this session and false again on the next load unless the room's own
+        default latched it. That asymmetry is the reference's; without the mirror the conjunction
+        the modal and both chat logs render could never become true in a room whose default is off,
+        and the checkbox would be a control that changes only its own label.
+
+        `defaultImagePreview` has its own case because {@link latchRoomImagePreview} persists it —
+        the one place upstream calls `setPreference` for that name.
+      */
+      if (key === 'smallImagePreview') {
+        this.#smallImagePreview = value;
+        this.#defaultImagePreview = value;
+      }
+      if (key === 'defaultImagePreview') this.#defaultImagePreview = value;
       if (key === 'visibilityChangeEnabled') this.#visibilityChangeEnabled = value;
       /*
         FIVE MORE whose consumer existed and whose control never reached it, 2026-08-30 — see
@@ -741,6 +795,38 @@ export class RoomPrefs {
     // The value goes as a VALUE — devalue carries it, and `z.json()` is the schema for what the
     // settings blob can hold. It used to be stringified for the wire and parsed back in a `try`.
     this.#hooks.persist(key, value);
+  }
+
+  /**
+   * The ROOM default for the image preview, pushed into this member's own preference exactly once.
+   *
+   * `processSessData`, bundle byte 1,436,631, transcribed:
+   *
+   * ```js
+   * sessData.smallerImagePreview && !preferences.defaultImagePreview && (
+   *   preferences.defaultImagePreview = sessData.smallerImagePreview,
+   *   preferences.smallImagePreview   = sessData.smallerImagePreview,
+   *   setPreference('defaultImagePreview', preferences.defaultImagePreview))
+   * ```
+   *
+   * `defaultImagePreview` is the LATCH — the record that the room's default has reached this member
+   * — and it is the only half persisted here, which is what lets somebody who turned the preview off
+   * stay off against a room default that says on. The toggle in {@link save} is the mirror image.
+   * Both asymmetries are the reference's; `image-preview-latch-contract.test.ts` holds the argument
+   * for each and executes the three behaviours no source-text assertion can reach.
+   *
+   * `untrack` on the guard is load-bearing rather than defensive. The caller is a page `$effect`,
+   * which is how this reaches the browser only — a persist during SSR would be a remote command
+   * issued from a render. Reading the latch inside that effect would make it a dependency of the
+   * effect that writes it, which is the shape `$effect`'s own documentation names as why `untrack`
+   * exists. The two assignments are in the reference's order with one collapse: `save` assigns and
+   * persists together, so nothing can observe the difference and the one-write-path invariant holds.
+   */
+  latchRoomImagePreview(roomDefault: boolean) {
+    if (!roomDefault) return;
+    if (untrack(() => this.#defaultImagePreview)) return;
+    this.#smallImagePreview = roomDefault;
+    this.save('defaultImagePreview', roomDefault);
   }
 
   updateSoundCheck(event: Event) {

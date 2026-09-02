@@ -294,17 +294,28 @@ describe('XCP-07 and XCP-09 — the gaps this column cannot close from its own f
       a re-capture of a component this room has never dumped; neither can be closed by owning more
       files.
     */
-    expect([...EXTRA_CHAT_MEASURED_GAPS]).toEqual(['XCP-07', 'XCP-09']);
+    expect([...EXTRA_CHAT_MEASURED_GAPS]).toEqual(['XCP-09']);
     for (const row of EXTRA_CHAT_MEASURED_GAPS) expect(SURFACE).toContain(row);
-    /* And the one that left is still DOCUMENTED there — the measurement outlives the gap. */
+    /* And the two that left are still DOCUMENTED there — the measurement outlives the gap. */
     expect(SURFACE).toContain('XCP-08');
+    expect(SURFACE).toContain('XCP-07');
   });
 
-  it('XCP-07 — the `ngClass` exists in the reference and the class it names has no rule here', () => {
+  it('XCP-07 — the `ngClass` is in the reference, the class has no rule, and it ships anyway', () => {
+    /*
+      RE-DISPOSITIONED 2026-09-02, the same way `XCP-08` below was. The two reference measurements
+      are unchanged and deliberately kept: what the binding must LOOK like is the thing a future
+      edit can get wrong, and deleting the evidence when the gap closes is how a transcription
+      drifts from its source with nothing left to compare against.
+
+      The CSS assertions stay for a different reason than they were written for. They used to be the
+      argument for refusing the class; they are now the reason the class must never be given a rule
+      HERE — inventing the styling the reference does not have is the failure this pair guards
+      against, and it is a louder one than binding a dead name.
+    */
     expect(at(2_400_160, 'ct(13,B3e')).toBe('ct(13,B3e');
     const b3e = 'B3e=t=>({"chat-uploaded-img-sm":t})';
     expect(at(2_367_305, b3e)).toBe(b3e);
-    /* Paired: the reference HAS it (above), and no stylesheet here answers it (below). */
     expect(APP_CSS).not.toContain('chat-uploaded-img-sm');
     expect(CAPTURED_CSS).not.toContain('chat-uploaded-img-sm');
   });

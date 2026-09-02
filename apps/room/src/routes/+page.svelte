@@ -111,6 +111,29 @@
   });
 
   /**
+   * USM-18 — the ROOM's "Smaller image previews?" default, handed to this member exactly once.
+   *
+   * `processSessData` at bundle byte 1,436,631 does it during session load; `RoomPrefs.latchRoomImagePreview`
+   * carries the transcription and the argument for the latch. What is HERE is only the trigger, and
+   * it is an `$effect` for one reason: effects run in the browser and never during SSR, and the
+   * latch persists — a `setPreference` equivalent called while the page was being server-rendered
+   * would be a remote command issued from a render.
+   *
+   * It is not a `$derived`, because this is an action rather than a value, and it reads exactly one
+   * reactive thing: the room setting. The guard against re-applying is `untrack`ed inside the
+   * method, so the write it performs cannot schedule the effect that performed it.
+   *
+   * `svelte-autofixer` flags calling a function that assigns state from inside an effect, and the
+   * flag is right about the shape: this one does assign, and it persists. It is kept because the
+   * alternative it proposes cannot hold a value the server has to be told about — a `$derived` has
+   * no way to write, and a member's own later choice has to survive the room default being read
+   * again on the next load.
+   */
+  $effect(() => {
+    prefs.latchRoomImagePreview(data.sessData?.smallerImagePreview === true);
+  });
+
+  /**
    * The MediaMTX stream list and its selected tab, owned by `room-mtx.svelte.ts`.
    *
    * The reasoning that used to live here — why `$state.raw`, why this list must never be merged
@@ -1460,6 +1483,8 @@
             {#snippet chatAlertsPane()}
               <AlertChatArea
                 isLimitedPresenter={media.limitedPresenter}
+                smallImagePreview={prefs.smallImagePreview}
+                defaultImagePreview={prefs.defaultImagePreview}
                 extraChatArea={extraChatInnerArea}
                 {broadcasts}
                 {split}
@@ -1627,6 +1652,8 @@
             {#snippet extraChatColumn()}
               <ExtraChatPane
                   bind:tab={chat.extraTab}
+                  smallImagePreview={prefs.smallImagePreview}
+                  defaultImagePreview={prefs.defaultImagePreview}
                   bind:composer={chat.extraComposer}
                   messages={feeds.visibleExtraChat}
                   doNotDisturbOn={prefs.doNotDisturbOn}

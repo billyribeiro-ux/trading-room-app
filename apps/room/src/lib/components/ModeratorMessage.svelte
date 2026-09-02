@@ -39,8 +39,8 @@
     ## Its classes have somewhere to land
 
     All three carry real rules in `captured-runtime-components.css` — `.mod-msg-container` at 4158,
-    `.mod-msg-btn` at 4202 with its `:hover` at 4239. That is the check `blinkingRec` passed and
-    `smallerImagePreview` failed, and it is why this is built and that one is answered NOT A GAP.
+    `.mod-msg-btn` at 4202 with its `:hover` at 4239. A fact about these three, never the test for
+    whether a surface is built: USM-18's class fails it and is transcribed regardless.
   */
   interface Props {
     /** `sessData.modMessage`. Empty or absent means no bar, which is the common case. */

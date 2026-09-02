@@ -602,7 +602,14 @@ describe('the allow-list itself', () => {
         both, and the room had only the flag.
       */
       recordingReminder:
-        '+page.svelte — the owner term of the recording-reminder banner, ANDed with the local runtime flag and the recording state'
+        '+page.svelte — the owner term of the recording-reminder banner, ANDed with the local runtime flag and the recording state',
+      /*
+        USM-18, added 2026-09-02. The room DEFAULT for a per-member preference, and the only entry on
+        this list whose visible effect is a class with no rule in any stylesheet — transcribed rather
+        than corrected, on the `btn-ligth` precedent, and argued at the entry in `room-config.ts`.
+      */
+      smallerImagePreview:
+        'RoomPrefs.latchRoomImagePreview — the one-shot seed of the members own smallImagePreview, latched so their later choice survives it'
     };
     expect(Object.keys(consumers).sort()).toEqual([...ROOM_VISIBLE_SETTINGS].sort());
   });

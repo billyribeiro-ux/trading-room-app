@@ -318,7 +318,11 @@ describe('the write path cannot be bypassed', () => {
       'alertSoundOn',
       'qaSoundOn',
       'pushToTalk',
-      'enableRTE'
+      'enableRTE',
+      /* USM-18's pair. The latch in particular: a setter on it would let any code in the page
+         un-latch a member and hand them the room default a second time. */
+      'smallImagePreview',
+      'defaultImagePreview'
     ];
 
     for (const name of settable) {
@@ -339,5 +343,95 @@ describe('the write path cannot be bypassed', () => {
       (prefs as unknown as Record<string, unknown>).chatGif = false;
     }).toThrow();
     expect(prefs.chatGif).toBe(true);
+  });
+});
+
+describe('USM-18 — the image-preview latch, executed', () => {
+  /*
+    The half of this row that no source-text assertion can reach. `image-preview-latch-contract.test.ts`
+    proves the transcription against the bundle and proves this file contains the right lines; what it
+    cannot do is show that the latch fires ONCE, that the right half is persisted each time, and that a
+    member's own choice survives a room default that disagrees with it. Those are the three ways this
+    feature can be wrong while every string in it is correct.
+  */
+
+  it('both halves default OFF, because the reference initialises them to !1', () => {
+    // `=== true`, unlike `chatGif` next door. Getting this backwards shrinks every image by default.
+    const { prefs } = make('{}');
+    expect(prefs.smallImagePreview).toBe(false);
+    expect(prefs.defaultImagePreview).toBe(false);
+    expect(make('{"smallImagePreview":true}').prefs.smallImagePreview).toBe(true);
+    expect(make('{"defaultImagePreview":true}').prefs.defaultImagePreview).toBe(true);
+  });
+
+  it('applies the room default once, persisting the LATCH and not the flag', () => {
+    const { prefs, persisted } = make('{}');
+    prefs.latchRoomImagePreview(true);
+    expect(prefs.smallImagePreview).toBe(true);
+    expect(prefs.defaultImagePreview).toBe(true);
+    /* Exactly the reference's asymmetry: `setPreference("defaultImagePreview", …)` and nothing else. */
+    expect(persisted).toEqual([['defaultImagePreview', true]]);
+
+    /* Called again in the same session — the guard is the latch, so nothing more is written. */
+    prefs.latchRoomImagePreview(true);
+    expect(persisted).toEqual([['defaultImagePreview', true]]);
+  });
+
+  it('never applies the room default when the room has not set it', () => {
+    const { prefs, persisted } = make('{}');
+    prefs.latchRoomImagePreview(false);
+    expect(prefs.smallImagePreview).toBe(false);
+    expect(prefs.defaultImagePreview).toBe(false);
+    expect(persisted).toEqual([]);
+  });
+
+  it('leaves a member who turned it OFF off, against a room default that says on', () => {
+    /*
+      THE REASON THE LATCH EXISTS, and the one behaviour that a single flag could not produce. The
+      member's stored blob carries the latch, so the room's default is not re-applied on this load
+      and their `smallImagePreview: false` stands.
+    */
+    const { prefs, persisted } = make('{"defaultImagePreview":true,"smallImagePreview":false}');
+    prefs.latchRoomImagePreview(true);
+    expect(prefs.smallImagePreview).toBe(false);
+    expect(persisted).toEqual([]);
+  });
+
+  it('the toggle mirrors the flag into the latch and persists only the flag', () => {
+    /*
+      `smallImagePreviewOnChange`, byte 2,253,020. The mirror is what lets the box act in a room
+      whose default is off — without it the conjunction both chat logs render could never be true
+      there, and the checkbox would be a control that changes only its own label.
+    */
+    const { prefs, persisted } = make('{}');
+    prefs.save('smallImagePreview', true);
+    expect(prefs.smallImagePreview).toBe(true);
+    expect(prefs.defaultImagePreview).toBe(true);
+    expect(persisted).toEqual([['smallImagePreview', true]]);
+
+    prefs.save('smallImagePreview', false);
+    expect(prefs.smallImagePreview).toBe(false);
+    expect(prefs.defaultImagePreview).toBe(false);
+    expect(persisted).toEqual([
+      ['smallImagePreview', true],
+      ['smallImagePreview', false]
+    ]);
+  });
+
+  it('re-runs a reader of the conjunction, which is what both chat logs bind', () => {
+    const { prefs } = make('{}');
+    const seen: boolean[] = [];
+    const stop = $effect.root(() => {
+      $effect(() => {
+        seen.push(prefs.smallImagePreview && prefs.defaultImagePreview);
+      });
+    });
+    flushSync();
+    prefs.latchRoomImagePreview(true);
+    flushSync();
+    prefs.save('smallImagePreview', false);
+    flushSync();
+    stop();
+    expect(seen).toEqual([false, true, false]);
   });
 });

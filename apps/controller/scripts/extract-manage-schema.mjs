@@ -227,6 +227,11 @@ const ROOM_CONSUMED = [
   /* The typing indicator, added 2026-08-28. It gates the SEND as well as the display; see
      `room-config.ts`. */
   'hasTypingIndicator',
+  /* The room default for the per-member image-size preference, added 2026-09-02. A one-shot latch
+     at bundle byte 1,436,631, and the row that was recorded as NOT A GAP on a premise that turned
+     out to be wrong; the argument for crossing it, and for transcribing a class with no rule, is
+     at its entry in `room-config.ts`. */
+  'smallerImagePreview',
   'hideRecs',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
@@ -1007,9 +1012,17 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 // `sessData.<name>` rule misses every read the reference takes inside `processSessData` while the
 // object is still a local. Six settings were invisible that way; this was the one already half-built.
 //
+// 106 since 2026-09-02: `smallerImagePreview`. Thirty-seventh find, and the first that crosses on a
+// PRECEDENT rather than on a new measurement. It has been on the enumeration since the enumeration
+// existed, answered NOT A GAP on a premise re-read this session and found wrong: `defaultImagePreview`
+// is a one-shot latch seeding the member preference from the room default, not a dead second copy of
+// the flag. What did not change is that the pair drives one class with no rule in any stylesheet here
+// — and `btn-ligth`, transcribed and rendered since the archive pane was built, is this repository
+// already having decided that a dead class from the capture is transcribed rather than corrected.
+//
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 105 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 106 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

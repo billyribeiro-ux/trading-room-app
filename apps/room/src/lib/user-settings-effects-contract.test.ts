@@ -169,17 +169,50 @@ describe('USM-17 — switching theme re-seeds the colours the viewer never chose
 });
 
 describe('USM-18 — the label says on or off, like every other one in this modal', () => {
-  it('carries the pair', () => {
-    expect(modal()).toContain("{settingChecks['small-image-preview'] ? 'on' : 'off'}");
+  it('carries the pair as TWO independent slots, which is what the reference compiles to', () => {
+    /*
+      BOTH HALVES CHANGED on 2026-09-02. The label was always here; what it read was
+      `settingChecks['small-image-preview']`, a value written only by its own click, and it read it
+      as a ternary like every neighbour.
+
+      Neither is what the capture does. The gate is the conjunction `smallImagePreview &&
+      defaultImagePreview`, and the two spans are independent slots — `? 219 : -1` and
+      `? 220 : -1`, the second additionally requiring the latch — so with both flags false NEITHER
+      word renders. This is the one checkbox in this modal that is not an either/or.
+      `image-preview-latch-contract.test.ts` reads all of that out of the bundle.
+    */
+    expect(modal()).toContain('setInputChecked(smallImagePreview && defaultImagePreview)');
+    /*
+      Whitespace-tolerant: prettier breaks this label mid-`</span`, so a literal match encodes the
+      formatter's current wrap position rather than the shape. `image-preview-latch-contract.test.ts`
+      records the two drafts that got this wrong.
+    */
+    expect(modal()).toMatch(
+      /\{#if smallImagePreview && defaultImagePreview\}\s*<span>\s*on\s*<\/span\s*>\s*\{\/if\}/
+    );
+    expect(modal()).toMatch(
+      /\{#if !smallImagePreview && defaultImagePreview\}\s*<span>\s*off\s*<\/span\s*>\s*\{\/if\}/
+    );
+    expect(modal()).not.toContain("{smallImagePreview && defaultImagePreview ? 'on' : 'off'}");
   });
 
-  it('and the id stays OUT of the preference table, which is the other half of the row', () => {
+  it('and the id stays OUT of the preference table, for a NEW reason', () => {
     /*
-      Not an omission. The class this pair drives (`chat-uploaded-img-sm`) has no rule in any of the
-      52 stylesheets — `settings-preference-wiring-contract.test.ts` proves it — so mapping the id
-      would persist a value nothing can read. The reference's `smallImagePreview &&
-      defaultImagePreview` conjunct is refused for the same reason.
+      The assertion is unchanged and everything behind it is different, which is why the paragraph
+      is rewritten rather than left alone.
+
+      It used to say mapping the id would persist a value nothing can read, because
+      `chat-uploaded-img-sm` has no rule in any of the 52 stylesheets. That measurement still holds
+      and it was never the question — a class TRANSCRIBED from the capture is not a class this
+      repository invented, which is the `btn-ligth` precedent.
+
+      The id stays out now because the handler is SPECIAL-CASED above the table:
+      `smallImagePreviewOnChange` (byte 2,253,020) negates the PREFERENCE, and the generic path
+      sends `input.checked`, which is the negation of the CONJUNCTION. A row here would silently
+      route it through the wrong one. `setting-coverage-contract.test.ts` carries the argument for
+      building the row at all; `image-preview-latch-contract.test.ts` is its contract.
     */
+    expect(modal()).toContain("if (input.id === 'small-image-preview') {");
     /*
       The OBJECT LITERAL, matched brace to brace — not `blockAt`, which counts `{#`/`{/` and would
       run past the end of a JS object to the next Svelte block and quietly assert over half the

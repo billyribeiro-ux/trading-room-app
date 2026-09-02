@@ -223,7 +223,7 @@ browser.
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **164** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **163** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
@@ -250,10 +250,10 @@ offset:
   is a regression, not progress.
 - **ONE is answered by derivation** — `playChatMessageSoundFor`'s feature is built; the raw value
   deliberately does not cross.
-- **THREE are not gaps at all**, because the reference's own feature does not work: `h264Enabled` is
+- **TWO are not gaps at all**, because the reference's own feature does not work: `h264Enabled` is
   `sessData.h264Enabled || !0`, unconditionally true; `advancedSearchAlerts` is gated on one
-  hard-coded owner id; `smallerImagePreview` seeds a preference whose only class has no rule in any
-  of the 52 stylesheets held here.
+  hard-coded owner id. It was three until 2026-09-02: `smallerImagePreview` was answered NOT A GAP on
+  a premise that was measured wrong, and is built as USM-18.
 - **The rest are BLOCKED** on infrastructure or one owner answer — an archive service, a
   server-owned lock, a second MediaMTX cluster, the `r` recording-bot parameter, a cross-post
   fan-out that occurs zero times in the bundle, or a Discord application registration.
@@ -296,10 +296,12 @@ classes of answer are not work at all:
   gate protects nothing. `internal/room-entry` is the shape that replaces them: the credential stays
   on the controller and the question travels. **Wiring one is a regression wearing an enumeration's
   clothes.**
-- **NOT A GAP — three reproduce a defect.** `h264Enabled` is `sessData.h264Enabled || !0`, so it is
+- **NOT A GAP — two reproduce a defect.** `h264Enabled` is `sessData.h264Enabled || !0`, so it is
   unconditionally true upstream and the setting does nothing at all. `advancedSearchAlerts` is gated
-  on one hard-coded owner id. `smallerImagePreview` seeds a preference whose only effect is a class
-  with no rule in any of the 52 stylesheets this repository holds.
+  on one hard-coded owner id. **`smallerImagePreview` was the third and left on 2026-09-02**: the
+  pair it seeds is a one-shot latch with a real behaviour, and the class with no rule was never the
+  test — `btn-ligth` had already settled that a class TRANSCRIBED from the capture is not a class
+  this repository invented. A measurement plus a rule is not a disposition.
 - **ENUMERATION ARTEFACT — one count is noise, and it is the rule this list needs most.** `name`
   matches `this.name` on unrelated error classes throughout the bundle and so sat near the TOP of
   the list. Its one real read — `globals.sessionName = r.name`, feeding `document.title` — was a
@@ -380,10 +382,11 @@ room started reading it.
 > this line carried the stale count. Two sites, three phrasings, one file: which is the argument for
 > the guard rather than another correction.
 
-The largest by read count are `deleteAlertPW` (12, a credential), `altChatRender` (6) and
-`smallerImagePreview` (6, answered as NOT A GAP). **Read count is not priority** — it is how many
-times the reference mentions a name, and the biggest number on this list is a credential we refuse.
-`enableQAReactions` was second at 10 and is built; `positionsIframe` was fourth at 7 and is built.
+The largest by read count are `deleteAlertPW` (12, a credential) and `altChatRender` (6). **Read
+count is not priority** — it is how many times the reference mentions a name, and the biggest number
+on this list is a credential we refuse. `enableQAReactions` was second at 10 and is built;
+`positionsIframe` was fourth at 7 and is built; `smallerImagePreview` was joint third at 6, was
+answered NOT A GAP for three weeks, and is built as USM-18.
 
 **SEVEN TEST FILES WERE BEING DROPPED FROM EVERY CI RUN**, 2026-08-28, behind a banner announcing
 them as uncovered. `gate/evidence-bound-tests.mjs` matched an evidence-root path anywhere in a test

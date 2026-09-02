@@ -849,6 +849,8 @@
   longerAlertPopup={prefs.longerAlertPopup}
   qaSoundOn={prefs.qaSoundOn}
   chatSoundOn={prefs.chatSoundOn}
+  smallImagePreview={prefs.smallImagePreview}
+  defaultImagePreview={prefs.defaultImagePreview}
   pollOpenMode={polls.openMode}
   pollRestoreToken={polls.restoreToken}
   activePoll={data.activePoll}

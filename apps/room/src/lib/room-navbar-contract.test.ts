@@ -170,8 +170,9 @@ const html = (overrides: Stub = {}) =>
  * `hideWebcamForRoom` is the fifth term of the webcam control's condition (byte 2,489,228) and the
  * only one this room could not evaluate for itself — the other four are facts it already holds about
  * the viewer and their devices. `blinkingRec` gates `breathing-rec` (byte 2,477,678), a class with a
- * real `50% { opacity: 0 }` keyframe in `captured-runtime-components.css`, unlike
- * `smallImagePreview`'s class which styles nothing anywhere and is answered as NOT A GAP.
+ * real `50% { opacity: 0 }` keyframe in `captured-runtime-components.css` — unlike
+ * `smallImagePreview`'s class, which styles nothing anywhere and is transcribed regardless, for the
+ * reason `setting-coverage-contract.test.ts` argues at USM-18.
  *
  * BOTH DIRECTIONS on each, because a gate that refuses everybody is as wrong as one that refuses
  * nobody — and for a room-wide OFF switch the first is the likelier mistake.

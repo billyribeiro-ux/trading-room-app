@@ -45,6 +45,129 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-02 18:37 UTC — three blockers re-measured; one of them named the wrong missing thing
+
+**Runtime impact: NO.** Documentation, comments and one ceiling. No shipped behaviour changed.
+
+The standing rule is that a recorded blocker is RE-MEASURED, never inherited. Four rows that had been
+sitting as BLOCKED were put back against the pinned bundle.
+
+**SC-04, SC-05, SC-06 hold, and the looking is now on the record.** `streamStatus` occurs once in the
+bundle (byte 2,170,594) and `changePlayerStatus` twice (2,170,816 / 2,171,000), all inside
+`invokeAdminCmd`; `playerURL` occurs once, at 2,170,714, read off the answer as `i.rc.playerURL`.
+`streamingLinkPlayer` has three occurrences and exactly one assignment, from that value. The client
+composes neither. So the receiver-is-transcribable rule does not rescue these: what is missing is not
+a frame the client could accept, it is the value. SC-05's markup IS transcribable and is still
+refused, on the narrower ground that it would render a box labelled *"give this to viewers"* that can
+never hold anything — the control-whose-only-effect-is-its-own-label that `CLAUDE.md` forbids by
+name, and NOT the same case as USM-18's transcribed dead class.
+
+**XCP-09's blocker was wrong, and it is re-named.** It said the 5,818 bytes of `app-extra-chat`
+component styles needed a re-capture of `css/complete-app-styles.css` from a room with the second
+column enabled. They do not. They are in the `styles:` array of the pinned bundle at byte
+**2,400,462** — `apps/room/docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js`, which ships in this
+repository, is SHA-256 pinned in its own `sha256sums.txt`, and is already read by
+`extra-chat-surface-contract.test.ts`. Sliced today, the array opens
+`.navbar[_ngcontent-%COMP%]{font-size:12px;padding:2px}.chatToolbar…` and runs through `.roomLog`,
+`.chatDisabled` and `.webinarMode` exactly as the row describes them. The DOCUMENT capture never saw
+the component; the compiled component carries its own rules and is held here.
+
+What it is actually blocked on is the GENERATOR, and that is now named: `AGENTS.md` forbids
+hand-editing a generated artifact, and `captured-runtime-components.css`'s header names the command
+that wrote it — `pnpm css:sync-captured` — which is **no longer in `apps/room/package.json` and is
+among the 78 evicted `apps/room/scripts/` files that `git ls-files` returns zero for**. The work is a
+published generator that reads the bundle's `styles:` array and performs the `[_ngcontent-%COMP%]` to
+captured-host translation that sheet's header describes.
+
+Both the wrong blocker and the correction are kept side by side, in the audit row and at
+`extra-chat-surface.ts`, because **a blocker that names the wrong missing thing is the failure worth
+being able to recognise again** — and it is the second one found on that file in a day.
+
+Verified: `room-surface-audit-counts.test.ts` (the row-shape and totals gate) and the three surface
+tests that read the edited rows. `pnpm run gate` exit 0 in both apps before the push.
+
+---
+
+### 2026-09-02 18:32 UTC — USM-18 built: the row this repository answered wrong four times
+
+**Runtime impact: YES.** A room setting now crosses to the room, a per-viewer preference pair is
+seeded from it, the settings checkbox reports and writes something real, and both chat logs bind a
+class they did not.
+
+`smallerImagePreview` had been `wired: false` since the settings enumeration existed, held back by a
+verdict recorded as settled in four separate files. Every one of those verdicts was re-read against
+the pinned bundle today and every one was wrong or incomplete.
+
+## The four wrong answers, in the order they fell
+
+1. **"Neither preference has a consumer."** `defaultImagePreview` is a ONE-SHOT LATCH, not a second
+   copy of the flag. `processSessData`, byte 1,436,631: when the room default is on and the latch is
+   off, both preferences take the room's value and **the latch alone is persisted**. The room's
+   default reaches a member exactly once, and a member who turned the preview off is not overridden
+   on their next load. A single flag cannot express that.
+
+2. **"A class with no rule must not be bound."** A real `CLAUDE.md` rule applied to the wrong case.
+   It governs classes this repository INVENTS. `btn-ligth` — upstream's typo for `btn-light`,
+   matching no rule anywhere — has been transcribed, rendered and asserted at
+   `ChatArchiveLogPane.svelte:139` since that pane was written, with a contract test that pins both
+   that it ships and that no stylesheet here defines it. **A dead class from the capture has its
+   consumer in the capture.** The row was named for the owner as "a conflict between two owner
+   rules" this morning; the conflict was not real, and the precedent for it was already tested.
+
+3. **"The checked term and the two on/off spans are one conjunct."** The `checked` term is. The
+   spans are not: they compile to two INDEPENDENT slots, `? 219 : -1` and
+   `!smallImagePreview && defaultImagePreview ? 220 : -1`, so with both flags false **neither word
+   renders**. Every other checkbox in that modal compiles to `? n : m`. Writing this one like its
+   neighbours is the tidier edit and it is wrong.
+
+4. **"The toggle at 2,253,193 keeps them in step."** True, incomplete, and the gap was hiding a
+   defect. `smallImagePreviewOnChange` at byte **2,253,020** negates the PREFERENCE, mirrors it into
+   the latch, and persists only the flag. `input.checked` — what the modal's generic path sends — is
+   the negation of the CONJUNCTION, and the two differ in a state this modal can reach, because the
+   toggle never persists the latch. So the id is special-cased above the mapping table rather than
+   added to it.
+
+## What did not change, and now guards the opposite thing
+
+`chat-uploaded-img-sm` has no rule in any of the 52 stylesheets this repository holds. Re-proved
+against `css/complete-app-styles.css` (688,687 bytes), where the same search finds
+`.chat-uploaded-img` with a real `max-height: 50px` rule and the `-sm` variant zero times. That
+assertion is kept and its meaning is inverted: it is now what stops somebody INVENTING the rule the
+reference does not have, which would be a worse divergence than binding a name nothing styles.
+
+## Built
+
+- `smallerImagePreview` on `ROOM_VISIBLE_SETTINGS`, `ROOM_CONSUMED` and `EXPECTED_WIRED_SETTINGS`;
+  wired count 105 → 106; schema regenerated, not hand-edited.
+- `RoomPrefs`: two fields, two getters, two `save` cases and `latchRoomImagePreview` — the session
+  load persists the latch and assigns the flag, the toggle does the reverse. Both asymmetries are the
+  reference's.
+- `+page.svelte`: one `$effect`, which is what keeps the persist out of SSR.
+- `ModalHost.svelte`: the conjunction on `checked`, two independent `{#if}` spans, and the
+  special-cased handler.
+- `AlertChatArea` and `ExtraChatPane`: `class={{ 'chat-uploaded-img-sm': … }}` on both scrollers.
+  `XCP-07` leaves `EXTRA_CHAT_MEASURED_GAPS`, which is down to one row.
+
+## Verified
+
+`image-preview-latch-contract.test.ts` (new, 11 cases) reads every offset above out of the pinned
+bundle and asserts the room half; `prefs.svelte.test.ts` gained 6 executed cases including the one
+behaviour that is the whole reason the latch exists — a member who turned the preview off staying off
+against a room default that says on. **Nine negative controls were run and seen red**, each with its
+anchor asserted present before the mutation: the class binding removed, the off-span rewritten as a
+ternary, the handler's negation replaced with a constant, the `untrack` guard removed, a byte offset
+moved by one, the toggle's mirror deleted, the latch persisting both halves, the seed's polarity
+flipped, and `wired` flipped back to false.
+
+`pnpm run gate` in both apps before the push. Nothing was opened in a browser: the modal markup and
+both class bindings are asserted as source and by `svelte-check`, not rendered.
+
+Six ceilings were raised in `source-size-contract.test.ts` and each is argued at its own entry;
+`ModeratorMessage.svelte` stayed under its ceiling by shortening a sentence that had gone stale
+rather than by raising it.
+
+---
+
 ### 2026-09-02 17:12 UTC — STV-02 was already built, and "the viewer sees two stalls" was never true
 
 Two wrong verdicts were written on this row today before the right one. Both are recorded rather

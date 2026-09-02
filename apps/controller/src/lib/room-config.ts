@@ -502,9 +502,10 @@ export const ROOM_VISIBLE_SETTINGS = [
       iPe = (t, n) => ({ 'breathing-rec': t, recIndicatorStart: n })                byte 2,477,678
 
     `breathing-rec` is a REAL class with a real rule — a `50% { opacity: 0 }` keyframe, carried in
-    `captured-runtime-components.css:4281`. Unlike `smallImagePreview`, whose class styles nothing in
-    any of the 52 stylesheets and which is therefore answered as NOT A GAP, this one has somewhere
-    to land.
+    `captured-runtime-components.css:4281`. `smallImagePreview` is the other side of that check and
+    the reason it is worth naming here: its class styles nothing in any of the 52 stylesheets, and
+    it crosses anyway, because a transcribed dead class is not the same question as an invented one
+    - see the entry for `smallerImagePreview` at the end of this list.
   */
   'blinkingRec',
   /*
@@ -562,8 +563,9 @@ export const ROOM_VISIBLE_SETTINGS = [
     inventing a decision.
 
     Its three classes — `mod-msg-container`, `mod-msg-btn`, `mod-msg` — all carry real rules in
-    `captured-runtime-components.css`, which is the check `blinkingRec` passed and
-    `smallerImagePreview` failed.
+    `captured-runtime-components.css`, which is the check `blinkingRec` also passed. It is a fact
+    about these three classes and it was never the test for whether a setting crosses:
+    `smallerImagePreview` fails it and crosses regardless, for the reason recorded at its own entry.
   */
   'modMessage',
   /*
@@ -1091,7 +1093,40 @@ export const ROOM_VISIBLE_SETTINGS = [
     is the missing term rather than a new feature - without it an owner cannot switch the reminder
     off at all.
   */
-  'recordingReminder'
+  'recordingReminder',
+  /*
+    "Smaller image previews?" - the room default for a per-member image-size preference, and the
+    row that spent three weeks recorded as NOT A GAP on a premise that was measured wrong.
+
+      sessData.smallerImagePreview && !preferences.defaultImagePreview && (
+        preferences.defaultImagePreview = sessData.smallerImagePreview,
+        preferences.smallImagePreview   = sessData.smallerImagePreview,
+        setPreference("defaultImagePreview", preferences.defaultImagePreview))   byte 1,436,631
+
+    A ONE-SHOT LATCH inside processSessData, not a duplicate flag. The room default is pushed into
+    the member own preference exactly once and the latch is persisted, so a member who turned the
+    preview off stays off against a room default that says on. That is a real behaviour and it is
+    why this crosses.
+
+    THE OTHER MEASUREMENT DID NOT CHANGE and is not the reason it was held back any more. The one
+    visible thing the pair drives is
+    `ngClass(B1e, preferences.smallImagePreview && preferences.defaultImagePreview)` with
+    `B1e = t => ({"chat-uploaded-img-sm": t})` on the chat log container, and that class has no
+    rule in any of the 52 stylesheets this repository holds - the grep that finds it zero times
+    finds the control class `chat-gif-muted` immediately, and the nearest real rule targets a
+    DIFFERENT class, `.alert-chat-box-sm .chat-uploaded-img .uploaded-img`.
+
+    So the reference itself renders a class that styles nothing, and that is transcribed rather
+    than corrected, on the precedent this repository already set and tested: `btn-ligth`, upstream
+    own typo for `btn-light`, matches no rule anywhere and is rendered at
+    `apps/room/src/lib/components/ChatArchiveLogPane.svelte:139` with
+    `chat-archive-log-contract.test.ts` asserting both that it ships and that no stylesheet here
+    defines it. The CLAUDE.md rule against a class with no CSS governs classes this repository
+    INVENTS; a transcribed dead class has its consumer in the capture.
+
+    NO APOSTROPHES AND NO CLOSING SQUARE BRACKET IN THIS BLOCK - see the warning above.
+  */
+  'smallerImagePreview'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);
