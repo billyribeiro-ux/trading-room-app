@@ -3437,7 +3437,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `onlargepreview` for `SP2-04`. The call site is where a screen's per-screen state is handed to
       its pane, and there is nothing here to extract that is not that.
     */
-    max: 1109,
+    /*
+      1109 -> 1151, 2026-09-02, and all forty-two lines are one comment declaring ONE character.
+
+      `app-scplayer.full.js:13-15` builds its iframe `src` with `&amp;auto_play=true` — an HTML
+      entity inside a JavaScript template literal — so the reference requests a parameter named
+      `amp;auto_play` and its hidden player never starts. This room emits `&auto_play=true`.
+
+      `room-component-gap-register.md`'s R-13 recorded that as *"a deliberate behavioural divergence
+      from the capture that was never declared"* and asked for the reason at the call site or the
+      entity restored. The reason is the forty-two lines: the upstream behaviour is UNREACHABLE
+      rather than merely different (the element is hidden, with no control to press), the feature has
+      a presenter behind it, and the change is one reversible token.
+
+      A silent correction is the thing `~/CLAUDE.md` forbids. This is the price of not having one,
+      and `soundcloud-autoplay-contract.test.ts` asserts BOTH halves — the URL and the argument —
+      because the fix without the reason is exactly the state R-13 objected to.
+    */
+    max: 1151,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {

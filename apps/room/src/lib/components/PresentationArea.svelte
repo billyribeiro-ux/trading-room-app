@@ -1023,6 +1023,48 @@
         />
       {/if}
       {#if media.soundCloudUrl && media.soundCloudPlaying}
+        <!--
+          ── `app-scplayer`, and the ONE character this room changed ─────────────────────────────
+
+          Every attribute, id and inline style below is the capture's — the hidden `soundCloudDiv`
+          parked a full viewport below the fold, the 100%×150 iframe, `scrolling="no"`,
+          `frameborder="no"`, `allow="autoplay; encrypted-media"`. It is audio-only by design: a
+          player nobody can see, let alone press play on.
+
+          ## The divergence, declared 2026-09-02 because it had been SILENT
+
+          `app-scplayer.full.js:13-15` builds its `src` character for character as:
+
+          ```js
+          `https://w.soundcloud.com/player/?url=${this.scUrl}&amp;auto_play=true`
+          ```
+
+          **That is an HTML entity inside a JavaScript template literal.** No HTML parser ever sees
+          it, so the URL the reference actually requests carries a parameter named `amp;auto_play` —
+          and `auto_play=true` therefore **never takes effect upstream**. Their hidden player does
+          not start.
+
+          Ours emits `&auto_play=true`, the entity corrected, so it does.
+
+          ## Why the fix is KEPT rather than the entity restored
+
+          `~/CLAUDE.md` says to transcribe rather than correct, and this is the exception being
+          argued rather than assumed. Three things decide it:
+
+          * **The upstream behaviour is unreachable, not merely different.** The element is
+            `visibility:hidden` at `bottom: calc(-100vh + 100px)`. There is no control to press. A
+            faithful transcription is a component that can never make a sound, which is not a
+            behaviour anybody chose — it is a typo that happens to disable the feature.
+          * **The feature has a presenter behind it.** `soundCloudPlaying` is set by a room
+            broadcast; a presenter starts music for everybody. Reproducing the entity would make
+            that control silent for every member and leave nothing on screen to say why.
+          * **It is one character and it is reversible.** Restoring `&amp;` is a one-token change if
+            a capture ever shows the reference's own player working.
+
+          `room-component-gap-register.md`'s R-13 asked for exactly this: *"keep the fix and write
+          the reason at the call site, or restore the entity. Do not leave it silent."* This is the
+          first half.
+        -->
         <app-scplayer>
           <div
             id="soundCloudDiv"
