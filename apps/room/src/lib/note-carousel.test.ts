@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -23,20 +21,15 @@ import {
  * `replaceCarouselInEditor()` writes the edited version out. What matters is that a note saved by
  * the reference opens here with the same interval, height and slides — so these tests parse the
  * reference's own output shape and assert on what comes out the other side.
+ *
+ * ## The reference component moved out of this file on 2026-09-03, and here is why
+ *
+ * `docs/source` is gitignored, so a MODULE-SCOPE read of `app-note.full.js` excluded all twenty-two
+ * cases here from every checkout without the dumps — this container, and CI. Eighteen of them build
+ * a real Tiptap document and read nothing but this repository. `note-carousel-capture.test.ts` holds
+ * the four that read the reference, as the whole `what the capture actually contains` block: every
+ * assertion in it was about the original and none about us, so nothing had to be split in half.
  */
-/*
-  Resolved from the project root rather than from `import.meta.url`, which every other evidence test
-  here uses. Under `@vitest-environment jsdom` that value is an `http:` URL, not a `file:` one, and
-  `readFileSync` refuses it — the failure is "The URL must be of scheme file".
-
-  The length is asserted immediately so that a wrong working directory is a loud failure rather than
-  an empty string quietly satisfying every `toContain` below.
-*/
-const REFERENCE = readFileSync(
-  resolve(process.cwd(), 'docs/source/components/app-note.full.js'),
-  'utf8'
-);
-
 /** Exactly what `generateCarouselHtml()` emits, for two slides, one of them linked. */
 const STORED = [
   `<div data-ptr-carousel='{"interval":7,"height":60}' style="position:relative;width:100%;height:60%;overflow:hidden;background:#111;user-select:none;">`,
@@ -67,33 +60,6 @@ function element(html: string): HTMLElement {
   host.innerHTML = html;
   return host.firstElementChild as HTMLElement;
 }
-
-describe('what the capture actually contains', () => {
-  it('read the reference component at all', () => {
-    // Guards the `resolve(process.cwd(), …)` above: an unreadable file would make every
-    // `toContain` in this block vacuous rather than red.
-    expect(REFERENCE.length).toBeGreaterThan(40_000);
-  });
-
-  it('renders an Edit Carousel button gated on the note already holding one', () => {
-    expect(REFERENCE).toContain("[1, 'btn', 'btn-secondary', 'text-center', 'm-1', 3, 'click']");
-    expect(REFERENCE).toContain("[1, 'fas', 'fa-images']");
-    expect(REFERENCE).toContain("v(2, ' Edit Carousel ')");
-    expect(REFERENCE).toContain('O(10, e.carouselInNote ? 10 : -1)');
-    expect(REFERENCE).toContain("includes('data-ptr-carousel')");
-  });
-
-  it('swings the modal heading and its submit button on the same flag', () => {
-    expect(REFERENCE).toContain("e.isEditingCarousel ? 'Edit' : 'Insert', ' Image Carousel '");
-    expect(REFERENCE).toContain("e.isEditingCarousel ? 'Save Changes' : 'Insert Carousel', ' '");
-  });
-
-  it('takes the first carousel and replaces the first, which is the behaviour we diverge from', () => {
-    // `editCarousel()` and `replaceCarouselInEditor()` both reach for it the same way.
-    expect(REFERENCE).toContain("querySelector('[data-ptr-carousel]')");
-    expect(REFERENCE).toContain("querySelector('.ptr-carousel-track')");
-  });
-});
 
 describe('numericRange', () => {
   it('accepts a number inside the range and rejects everything else', () => {

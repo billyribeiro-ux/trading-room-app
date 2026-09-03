@@ -25,6 +25,14 @@ import { ngbTooltip } from './ngb-tooltip';
  * stylesheet, SHA-256 pinned by `dump-contract.test.ts`. The collector could not read the live
  * sheets — all eight were CORS-blocked, and it recorded that as an error rather than as an empty
  * result — so the rules come from the pinned copy instead.
+ *
+ * ## That stylesheet moved out of this file on 2026-09-03, and here is why
+ *
+ * It is gitignored, so a MODULE-SCOPE read of it excluded all twenty-one cases here from every
+ * checkout without the dumps — this container, and CI. The collector's own JSON is COMMITTED, so
+ * eighteen of them never needed anything that was missing. `ngb-tooltip-capture.test.ts` holds the
+ * three reference-sheet assertions and is named for what each one anchors; what stays here is every
+ * claim about the capture and about the sheet this application applies.
  */
 
 const cwd = process.cwd();
@@ -41,12 +49,7 @@ const CAPTURE = JSON.parse(
   }[];
 };
 
-/** The reference's own stylesheet, pinned. */
-const REFERENCE_SHEET = readFileSync(
-  resolve(cwd, 'docs/source/styles.d622cb9ed2bbc221.css'),
-  'utf8'
-);
-/** The sheet this app actually applies. */
+/** The sheet this app actually applies. The reference's own is `ngb-tooltip-capture.test.ts`. */
 const APPLIED_SHEET = readFileSync(resolve(cwd, 'css/complete-app-styles.css'), 'utf8');
 
 /** The one captured example: `placement="left"`, which is what all nine wired sites use. */
@@ -168,32 +171,22 @@ describe('what we build matches what the original rendered', () => {
   });
 });
 
-describe('the classes we emit are ones the reference stylesheet actually paints', () => {
+describe('the classes we emit are ones the APPLIED stylesheet actually paints', () => {
   /*
-    The collector could not read the live sheets — all eight CORS-blocked — so this is asserted
-    against the reference's own pinned stylesheet instead. A class with no rule is an invisible
-    element, and this repository has shipped a `.flipped` with no CSS before.
+    A class with no rule is an invisible element, and this repository has shipped a `.flipped` with
+    no CSS before. The reference half of each assertion below — that the rule we match is one the
+    original genuinely paints — is `ngb-tooltip-capture.test.ts`, which reads a gitignored sheet.
+    What is here is the claim about THIS application, and it is the half that can regress.
   */
   it('has a rule for the direction class the capture carried', () => {
     const direction = CAPTURED.tooltip!.attrs.class.match(/bs-tooltip-[a-z-]+/)![0];
     expect(direction).toBe('bs-tooltip-start');
-    expect(REFERENCE_SHEET).toContain(`.${direction} .tooltip-arrow`);
     expect(APPLIED_SHEET).toContain(`.${direction} .tooltip-arrow`);
   });
 
-  it('has rules for the element parts, in both sheets', () => {
-    for (const sheet of [REFERENCE_SHEET, APPLIED_SHEET]) {
-      expect(sheet).toContain('.tooltip-inner');
-      expect(sheet).toContain('.tooltip-arrow');
-    }
-  });
-
-  it('paints the arrow through the pseudo-element, in the captured direction', () => {
-    // `.bs-tooltip-start .tooltip-arrow:before` sets `border-left-color`, which is why a left-placed
-    // arrow points right. Anchored to the direction the capture recorded, not to a fixed string.
-    expect(REFERENCE_SHEET).toMatch(
-      /\.bs-tooltip-start \.tooltip-arrow:before\{[^}]*border-left-color/
-    );
+  it('has rules for both element parts', () => {
+    expect(APPLIED_SHEET).toContain('.tooltip-inner');
+    expect(APPLIED_SHEET).toContain('.tooltip-arrow');
   });
 });
 

@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { buildMessageChrome } from './room-message-chrome.js';
+
 /*
   Chat badges — the SUPPLY, which is what was missing rather than the rendering.
 
@@ -33,10 +35,16 @@ import { describe, expect, it } from 'vitest';
   lookup that can only fail.
 */
 
-const BUNDLE = readFileSync(
-  new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-  'utf8'
-);
+/*
+  THE BUNDLE READ THAT SAT HERE IS IN `chat-badge-supply-capture.test.ts`.
+
+  Two cases needed it — that the reference keeps definitions in a hash keyed by id, and that the dark
+  variant is a LOOKUP rather than a flag. It was a MODULE-SCOPE read of a gitignored path, so it
+  excluded all thirteen cases in this file on every checkout without the dumps, CI included; among
+  them `keys members by md5(email), never by address`, which is the assertion that member addresses
+  do not cross the boundary. The eleven that stayed read the controller endpoint, the room load,
+  `feeds.svelte.ts` and `RoomMessage.svelte`, every one of them committed.
+*/
 const ENDPOINT = readFileSync(
   new URL('../../../controller/src/routes/internal/room-config/[code]/+server.ts', import.meta.url),
   'utf8'
@@ -56,17 +64,6 @@ const endpointCode = stripComments(ENDPOINT);
 const feedsModule = readFileSync(new URL('room/feeds.svelte.ts', import.meta.url), 'utf8');
 const pageCode = stripComments(PAGE);
 const messageCode = stripComments(MESSAGE);
-
-describe('the reference', () => {
-  it('keeps definitions in a hash and ids on the message', () => {
-    expect(BUNDLE).toContain('badgesH');
-    expect(BUNDLE.replace(/\s+/g, '')).toContain('sessData.badgesH[this.msg.b[o]]');
-  });
-
-  it('swaps the whole definition for the dark variant — a LOOKUP, not a flag', () => {
-    expect(BUNDLE.replace(/\s+/g, '')).toContain('badgesH[r.darkTheme]');
-  });
-});
 
 describe('level 1 — the controller sends it', () => {
   it('sends definitions and a hash-keyed assignment map', () => {
@@ -150,25 +147,53 @@ describe('level 3 — the page joins it onto each message', () => {
 
   it('feeds all four gates the component already had', () => {
     /*
-      RE-POINTED 2026-08-15. The four used to be counted as shorthand props at each `RoomMessage`.
-      They are now four of the sixteen in `messageChrome`, which every message list spreads — so the
-      question "do all four reach the component" is answered once, at the object, instead of once per
-      call site.
+      RE-POINTED TWICE, and the second time is why this is now EXECUTED rather than matched.
 
-      Positive first: the chrome is FOUND and is built here, before membership is asserted.
+      2026-08-15: the four used to be counted as shorthand props at each `RoomMessage`. They became
+      four of the members of `messageChrome`, which every message list spreads, so the question "do
+      all four reach the component" is answered once at the object instead of once per call site.
+
+      2026-09-03: the twenty-two lines that built that object left `+page.svelte` for
+      `buildMessageChrome` in `#lib/room-message-chrome.ts` — the page now passes SOURCES, and two of
+      these four (`showBadgesToPresentersOnly`, `disableStarYears`) are read off `sessData` inside the
+      builder and are not spelled in the page at all. This assertion went on slicing `+page.svelte`
+      for them, and could not object, because a module-scope capture read had taken the whole file
+      out of every run. It was measurably wrong the moment it could execute.
+
+      So the subject is the BUILDER, and it is called rather than read. A text match over the
+      builder would have the same failure mode one move later; a returned object cannot claim a
+      member it does not have.
     */
-    const from = pageCode.indexOf('const messageChrome');
-    expect(from, 'messageChrome is not built in +page.svelte').toBeGreaterThan(-1);
-    const chrome = pageCode.slice(from, pageCode.indexOf('\n  });', from));
-
+    const chrome = buildMessageChrome({
+      user: { id: 1, emailHash: 'h', displayName: 'A', role: 'user' },
+      sessData: { showBadgesToPresentersOnly: true, disableStarYears: true },
+      theme: 'dark',
+      chatStyle: {
+        color: '#fff',
+        tickerColor: '#fff',
+        usernameColor: '#fff',
+        bgColor: '#000',
+        fontSize: 14,
+        playSound: false
+      },
+      chatGif: false,
+      chatBadges: true,
+      enableBadges: true,
+      presenterMessagesOnTheRight: false,
+      viewerIsLimitedPresenter: false
+    });
     for (const gate of [
       'chatBadges',
       'enableBadges',
       'showBadgesToPresentersOnly',
       'disableStarYears'
-    ]) {
-      expect(chrome, `${gate} must be in the chrome every message list spreads`).toContain(gate);
+    ] as const) {
+      expect(chrome[gate], `${gate} must be in the chrome every message list spreads`).toBe(true);
     }
+
+    // ...and the page still builds the chrome THROUGH that builder, rather than beside it.
+    expect(pageCode).toContain('const messageChrome: RoomMessageChrome = $derived(');
+    expect(pageCode).toContain('buildMessageChrome({');
 
     /*
       And it reaches all THREE lists — the alerts and chat lists, which moved to `AlertChatArea` on

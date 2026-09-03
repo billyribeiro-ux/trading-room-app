@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
 import NoteEditor from './components/notes/NoteEditor.svelte';
@@ -15,14 +14,19 @@ import type { NoteVersion } from './types';
  *
  * `docs/source/components/app-note.full.js` is the reference component in full — the toggle is
  * `C0e`, the panel is `w0e`, one row is `S0e`, and every class comes from that component's own
- * `consts` table. This file pins BOTH halves, the way `stream-ingest.test.ts` does: what the
+ * `consts` table. This file used to pin BOTH halves, the way `stream-ingest.test.ts` does: what the
  * capture actually contains, so a future reader can see the markup was transcribed rather than
  * invented, and what we render, so it cannot drift away from it.
+ *
+ * ## The first half moved on 2026-09-03, and here is why
+ *
+ * `docs/source` is gitignored, so a MODULE-SCOPE read of it excluded all seventeen cases here from
+ * every checkout without the dumps — this container, and CI. Four needed the capture;
+ * `note-version-history-capture.test.ts` holds them, as the `what the capture actually contains`
+ * block this file had already separated them into. The thirteen that stayed are the SECOND half:
+ * they execute `noteVersionPreview`, `noteVersionDate` and the revert sentence, and render
+ * `NoteEditor` to read the HTML it emits. Both halves still exist; only one needs a dump to run.
  */
-const REFERENCE = readFileSync(
-  new URL('../../docs/source/components/app-note.full.js', import.meta.url),
-  'utf8'
-);
 
 const ISO = '2026-08-11T14:32:05.000Z';
 
@@ -54,45 +58,6 @@ function editor(props: {
     }
   }).body;
 }
-
-describe('what the capture actually contains', () => {
-  it('builds the toggle from consts 16 and 17, labelled with the count', () => {
-    expect(REFERENCE).toContain("[1, 'btn', 'btn-warning', 'text-center', 'm-1', 3, 'click']");
-    expect(REFERENCE).toContain("[1, 'fas', 'fa-history']");
-    expect(REFERENCE).toContain("Ne(' Version History (', e.prevVersions.length, ') ')");
-    expect(REFERENCE).toContain("Et('active', e.showVersionHistory)");
-  });
-
-  it('builds the panel and one row from consts 13 and 18-25', () => {
-    expect(REFERENCE).toContain("[1, 'version-history-panel', 'card', 'mt-2', 'mb-2']");
-    expect(REFERENCE).toContain("[1, 'card-header']");
-    expect(REFERENCE).toContain("[1, 'list-group', 'list-group-flush']");
-    expect(REFERENCE).toContain(
-      "[1, 'list-group-item', 'd-flex', 'justify-content-between', 'align-items-center']"
-    );
-    expect(REFERENCE).toContain("[1, 'badge', 'bg-secondary', 'text-light']");
-    expect(REFERENCE).toContain("[1, 'version-preview', 3, 'innerHTML']");
-    expect(REFERENCE).toContain("[1, 'btn', 'btn-sm', 'btn-outline-primary', 3, 'click']");
-    expect(REFERENCE).toContain("[1, 'fas', 'fa-undo']");
-    expect(REFERENCE).toContain("v(4, ' Previous Versions')");
-  });
-
-  it('gates the toggle on there being history at all, not on a disabled state', () => {
-    expect(REFERENCE).toContain('O(11, e.prevVersions.length > 0 ? 11 : -1)');
-    expect(REFERENCE).toContain('O(15, e.showVersionHistory ? 15 : -1)');
-  });
-
-  it('states the preview algorithm and the revert sentence verbatim', () => {
-    expect(REFERENCE).toContain(".replace(/<[^>]*>/g, ' ')");
-    expect(REFERENCE).toContain(".replace(/\\s+/g, ' ')");
-    expect(REFERENCE).toContain("return i.length > 100 ? i.substring(0, 100) + '...' : i;");
-    // Single-quoted on purpose: the reference builds this with a template literal, so the
-    // interpolation is part of the text being matched rather than something to evaluate here.
-    expect(REFERENCE).toContain(
-      'Are you sure you want to revert to the version from ${e.date}? Your current content will be replaced.'
-    );
-  });
-});
 
 describe('noteVersionPreview', () => {
   it('turns tags into a space rather than deleting them', () => {

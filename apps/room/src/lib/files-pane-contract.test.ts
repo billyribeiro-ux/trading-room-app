@@ -11,6 +11,7 @@ import {
   sortFiles,
   toggleFileSort
 } from '#lib/file-sort.js';
+import { codeOf } from './source-comments.js';
 
 /*
   The controller, stubbed — for the ONE action in this pane that talks to it.
@@ -120,10 +121,21 @@ const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'u
   `#lib/room/files.svelte.ts` — see `RoomFiles`.
 */
 const filesModule = readFileSync(new URL('room/files.svelte.ts', import.meta.url), 'utf8');
-const bundle = readFileSync(
-  new URL('../../docs/source/components/app-presentationarea.full.js', import.meta.url),
-  'utf8'
-);
+/*
+  THE CAPTURE READ THAT USED TO SIT HERE IS IN `files-pane-capture.test.ts`, AND THE MOVE IS THE
+  POINT OF THIS PARAGRAPH.
+
+  `const bundle = readFileSync('../../docs/source/components/app-presentationarea.full.js')` was a
+  MODULE-SCOPE read of a gitignored capture root, so `gate/evidence-bound-tests.mjs` excluded this
+  entire file — all sixty-four cases — on every checkout without the dumps, which is this container
+  and which is CI. Eight of those cases touched the capture. The other fifty-six read files that are
+  committed, among them the twelve `files-pane.remote.ts` authority cases that pin one room out of
+  another room's files.
+
+  The eight are anchors: each says the artefact a transcription below was taken FROM still says what
+  it was transcribed as. They are named for what they anchor, so the two halves can be paired by a
+  reader who holds the dumps. Every seam below names the sibling.
+*/
 
 /**
  * The `{#if ...}` conditions still OPEN at the first occurrence of a marker.
@@ -148,13 +160,10 @@ function guardsFor(marker: string) {
 }
 
 describe('files pane permissions', () => {
-  it('still reads the captured gating out of the bundle', () => {
-    // If these vanish, the assertions below are pinned to nothing and must be re-derived.
-    expect(bundle).toContain('O(77, o.isP ? 77 : -1)');
-    expect(bundle).toContain('O(81, o.isP ? 81 : -1)');
-    expect(bundle).toContain('O(83, o.isP && o.mp3Playing ? 83 : -1)');
-  });
-
+  /*
+    The anchor — that the update block still gates 77, 81 and 83 on `o.isP` — is
+    `files-pane-capture.test.ts`, `the update block the permission gates are transcribed from`.
+  */
   it('gates Delete Selected and Upload on the presenter', () => {
     expect(guardsFor('st-fileDeleteSelected')).toContain('isPresenter');
     expect(guardsFor('st-fileUpload')).toContain('isPresenter');
@@ -192,7 +201,7 @@ describe('files table', () => {
       The heading is real in the reference and stays pinned in the bundle; what changed is that its
       gate (`sessionFiles` FALSY) cannot arise behind a loader that ends in `.all()`.
     */
-    expect(bundle).toContain("v(1, 'No room files found.')");
+    // The heading's presence in the capture is anchored in `files-pane-capture.test.ts`.
     expect(pane).not.toContain('<h4 class="mt-4 text-center">');
   });
 
@@ -202,7 +211,7 @@ describe('files table', () => {
       and labels its rows. Asserting the expression as a STRING here only ever proved the text
       existed; it is EXECUTED now, which is what the move bought.
     */
-    expect(bundle).toContain('i.round(e.size / 1024)');
+    // `i.round(e.size / 1024)` is anchored in `files-pane-capture.test.ts`.
     expect(fileSizeInKb(1024)).toBe(1);
     expect(fileSizeInKb(1536), 'rounds, per `i.round`').toBe(2);
     expect(fileSizeInKb(0)).toBe(0);
@@ -266,19 +275,13 @@ const squash = (css: string) => css.replace(/\s+/g, '').replace(/;}/g, '}');
 const fileSort = readFileSync(new URL('file-sort.ts', import.meta.url), 'utf8');
 
 describe('files sort bar: the evidence it is pinned to', () => {
-  it('was genuinely absent from the OLDER capture, which is why it was first built from a paste', () => {
-    const captured = readFileSync(
-      new URL('../../css/complete-app-styles.css', import.meta.url),
-      'utf8'
-    );
-    const main = readFileSync(
-      new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-      'utf8'
-    );
-    expect(main).not.toContain('st-fileSortBar');
-    expect(captured).not.toContain('.st-fileSortBar');
-  });
-
+  /*
+    The OLDER capture's silence about this bar — the recorded reason its first build was a paste
+    rather than a transcription — is `files-pane-capture.test.ts`, `the OLDER capture, which did not
+    have the sort bar`. It reads `docs/source/main.d6d3c112b59b7d0d.js`, which is gitignored. The v4
+    half below is COMMITTED and runs everywhere, which is why every fact this block pins comes from
+    it.
+  */
   it('is present in the v4 capture, which is where every fact below now comes from', () => {
     /*
       If any of these vanish, every assertion in the blocks below is pinned to nothing and has to be
@@ -730,38 +733,27 @@ describe('file rows', () => {
 });
 
 describe('the room opens on Screens', () => {
-  it('matches new-evidence/presenter-tab, where screens-tab is the active one', () => {
-    const evidence = readFileSync(
-      new URL('../../new-evidence/presenter-tab', import.meta.url),
-      'utf8'
-    );
-    const screensTab = evidence.slice(evidence.indexOf('id="screens-tab"'));
-    expect(screensTab.slice(0, screensTab.indexOf('>'))).toContain('aria-selected="true"');
-    expect(evidence).toContain('class="nav-link active"');
+  it('defaults the main tab to screens, not notes', () => {
+    /*
+      The evidence — `new-evidence/presenter-tab`, in which `screens-tab` carries
+      `aria-selected="true"` — is anchored in `files-pane-capture.test.ts`, `the presenter-tab
+      capture`. That directory is gitignored; this default is ours and is asserted here.
 
-    // The room defaulted to 'notes', so a member landed on an empty Notes pane.
+      The room defaulted to 'notes', so a member landed on an empty Notes pane.
+    */
     expect(page).toContain("let mainTab: MainTab = $state('screens')");
   });
 });
 
-/*
-  The const table, with the newlines and indentation of the pretty-printed bundle removed.
-
-  Every const in `app-presentationarea.full.js` is an array literal broken across lines, so a
-  `toContain` against the raw text can only ever match one element at a time - which is how a claim
-  about "the attributes this element does NOT have" becomes unwritable. Flattened, a whole const is
-  one string and can be pinned entire.
-*/
-const consts = bundle.replace(/\n\s*/g, '');
-
 describe('the files search input', () => {
-  it('carries no id and no name, because const 39 carries neither', () => {
-    expect(consts).toContain(
-      "['type','text','placeholder','Search files...','aria-label','search'," +
-        "'aria-describedby','addon-wrapping',1,'form-control',3,'ngModelChange','ngModel']"
-    );
+  it('carries no id and no name, as the tag itself rather than as the file', () => {
+    /*
+      Const 39 — which carries neither attribute, and is what makes this a MATCH rather than an
+      omission — is anchored in `files-pane-capture.test.ts`.
 
-    // The tag itself, not the file: the note above it names both attributes it no longer has.
+      SLICED TO THE TAG, not searched whole-file: the note above the element names both attributes
+      it no longer has.
+    */
     const at = pane.indexOf('placeholder="Search files..."');
     expect(at).toBeGreaterThan(-1);
     const tag = pane.slice(pane.lastIndexOf('<input', at), pane.indexOf('/>', at));
@@ -836,14 +828,10 @@ describe('the alert-sound row buttons', () => {
     unchanged; they are what the markup is checked against.
   */
   it('is transcribed from consts 261/262/263, with the original`s typo corrected', () => {
-    expect(consts).toContain(
-      "['type','button','title','Overwrite Cash Register Sound',1,'btn','ml-2','btn-info'," +
-        "'set-alert-sound-btn',3,'click']"
-    );
-    expect(consts).toContain(
-      "['pe','button','title','Remove Overwrited Cash Register Sound',1,'btn','ml-2','btn-info'," +
-        "'set-alert-sound-btn',3,'click']"
-    );
+    /*
+      The two consts themselves are anchored in `files-pane-capture.test.ts` — including const 263's
+      `pe="button"`, which is what the correction asserted below is a correction OF.
+    */
 
     // Both buttons, with the class whose rule already ships.
     const bridged = readFileSync(
@@ -888,8 +876,26 @@ describe('the alert-sound row buttons', () => {
     */
     expect(pane).toContain("{#if alertSoundButton === 'set'}");
     expect(pane).toContain("{:else if alertSoundButton === 'remove'}");
-    // ...and the one answer both branches read is computed once per row.
-    expect(pane).toContain('{const alertSoundButton = $derived(alertSoundButtonFor(');
+    /*
+      ...and the one answer both branches read is computed ONCE per row, in a declaration tag.
+
+      MATCHED ACROSS THE LINE BREAK. This asserted the whole call on one line and had been wrong
+      since prettier wrapped it — the arguments are long enough that `$derived(` and
+      `alertSoundButtonFor(` sit on separate lines. The file could not run, so nothing said so.
+      Whitespace between the two is collapsed rather than assumed, which is the only form of this
+      assertion a formatter cannot break; the pairing is still what is pinned.
+    */
+    const declaredAt = pane.indexOf('{const alertSoundButton = $derived(');
+    expect(declaredAt, 'the declaration tag must be findable').toBeGreaterThan(-1);
+    const declaration = pane.slice(declaredAt);
+    expect(declaration.slice(0, 160).replace(/\s+/g, ' ')).toContain(
+      '{const alertSoundButton = $derived( alertSoundButtonFor('
+    );
+    /*
+      And it is the CURRENT form, not the legacy one — `{@const}` is what `{const x = $derived(y)}`
+      replaced, and `declaration-tag-contract.test.ts` owns that rule across the app.
+    */
+    expect(pane).not.toContain('{@const alertSoundButton');
   });
 
   it('wires both buttons to the action that PERSISTS the choice', () => {
@@ -925,9 +931,23 @@ describe('the alert-sound row buttons', () => {
     // The two are still SEPARATE. Folding the setting into the broadcast would persist nothing.
     expect(filesPane).toContain('export const fileMediaCommand = command(');
 
+    /*
+      ...and NOT through a form action. This asserted `export const actions: Actions = {` was
+      present and that this write was absent FROM it — a correct pair while that block existed. It
+      is gone: `+page.server.ts` exports a load and nothing else since every mutation became a
+      remote command, and its own first line says so. The pair is re-stated against what the file
+      holds now, which is a STRONGER claim than the one it replaces: not "this write is not among
+      the form actions" but "there are no form actions for it to be among".
+    */
     const server = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
-    expect(server).toContain('export const actions: Actions = {');
-    expect(server).not.toContain('overwriteCashRegisterSound: async ({ request, locals }) => {');
+    expect(server).not.toContain('export const actions');
+    /*
+      COMMENT-STRIPPED, and the first attempt at this line proved why: `+page.server.ts` names
+      `overwriteCashRegisterSound` once, in the note recording which import left WITH it. A whole-
+      file `not.toContain` matches that sentence and fails on the documentation of the very move it
+      is asserting. The trap this file has now met six times; the fix is always to strip the prose.
+    */
+    expect(codeOf('+page.server.ts', server)).not.toContain('overwriteCashRegisterSound');
 
     expect(pane).toContain('onclick={() => files.setAlertSound(item.url, true)}');
     expect(pane).toContain('onclick={() => files.setAlertSound(item.url, false)}');
@@ -950,7 +970,7 @@ describe('the alert-sound row buttons', () => {
       dropped; `videoOnlyMode` is still absent and still not a setting, which
       `files-gates.test.ts` pins separately.
     */
-    expect(bundle).toContain("z('hidden', o.hideFiles)");
+    // `z('hidden', o.hideFiles)` on BOTH elements is anchored in `files-pane-capture.test.ts`.
     const roomConfig = readFileSync(
       new URL('server/room-config-client.ts', import.meta.url),
       'utf8'
@@ -964,9 +984,26 @@ describe('the alert-sound row buttons', () => {
       honest: either one alone leaves a tab that opens nothing or a pane still reachable from a tab
       that is gone, which is the whole point of the assertion.
     */
-    expect(presentationArea).toContain(
+    /*
+      THE TAB MOVED. `ul#mainTabs` became `MainTabStrip.svelte` on 2026-08-28, and this assertion
+      went on reading `PresentationArea.svelte` — where the `li` no longer is. It could not fail,
+      because the file it lives in could not run. The gate is still in two components and reading
+      both is still what keeps the pair honest; one of the two addresses changed.
+    */
+    const mainTabStrip = readFileSync(
+      new URL('./components/MainTabStrip.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(mainTabStrip).toContain(
       '<li role="presentation" class="nav-item" hidden={files.filesHidden}>'
     );
+    // ...and the strip is reached from the component that also renders the pane, with `files` whole.
+    const stripAt = presentationArea.indexOf('<MainTabStrip');
+    expect(stripAt, 'the MainTabStrip invocation must be findable').toBeGreaterThan(-1);
+    const strip = presentationArea.slice(stripAt);
+    const stripEnd = strip.indexOf('/>');
+    expect(stripEnd, 'the invocation must be closed').toBeGreaterThan(-1);
+    expect(strip.slice(0, stripEnd)).toContain('{files}');
     const filesPaneEl = pane.slice(pane.indexOf('id="files"'));
     expect(filesPaneEl.slice(0, filesPaneEl.indexOf('>'))).toContain('hidden={files.filesHidden}');
     /*
