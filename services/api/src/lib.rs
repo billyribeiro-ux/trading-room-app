@@ -7,5 +7,6 @@ pub mod html;
 pub mod http;
 pub mod jobs;
 pub mod limits;
+pub mod openapi;
 pub mod provision;
 pub mod realtime;

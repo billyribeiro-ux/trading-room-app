@@ -47,11 +47,15 @@ async fn it_creates_a_tenant_the_api_can_actually_serve() {
     let row = sqlx::query(
         "SELECT r.name AS room_name, r.enterprise_id, e.slug, u.email::text AS email, \
                 u.display_name, u.password_hash, u.email_hash, m.role, \
+                account_member.role AS account_role, \
                 (SELECT count(*) FROM room_state s \
                   WHERE s.room_id = r.id AND s.enterprise_id = r.enterprise_id) AS states \
          FROM rooms r \
          JOIN enterprises e ON e.id = r.enterprise_id \
          JOIN users u ON u.id = r.owner_id \
+         JOIN enterprise_memberships account_member \
+           ON account_member.enterprise_id = r.enterprise_id \
+          AND account_member.user_id = u.id \
          JOIN room_members m ON m.room_id = r.id AND m.user_id = u.id \
          WHERE r.id = $1",
     )
@@ -66,6 +70,7 @@ async fn it_creates_a_tenant_the_api_can_actually_serve() {
     assert_eq!(row.get::<String, _>("display_name"), DISPLAY);
     // Owner, not member: the account has to be able to run the room it was created for.
     assert_eq!(row.get::<String, _>("role"), "owner");
+    assert_eq!(row.get::<String, _>("account_role"), "owner");
     // Without this row `GET /rooms/{id}` has nothing to describe.
     assert_eq!(row.get::<i64, _>("states"), 1);
 
@@ -85,6 +90,65 @@ async fn it_creates_a_tenant_the_api_can_actually_serve() {
     assert!(
         hash.starts_with("$argon2id$"),
         "expected an argon2id hash, got {hash}"
+    );
+}
+
+#[tokio::test]
+async fn changing_the_provisioned_owner_transfers_account_and_room_authority_atomically() {
+    let (_scratch, pool) = migrated().await;
+    let room_id = provisioned(&pool).await;
+
+    provision::provision(
+        &pool,
+        NAME,
+        SLUG,
+        ROOM,
+        "replacement-owner@example.test",
+        "Replacement Owner",
+        "replacement-owner-password".to_owned(),
+    )
+    .await
+    .expect("owner transfer should converge");
+
+    let owners: Vec<(String, String)> = sqlx::query_as(
+        "SELECT users.email::text, membership.role \
+         FROM enterprise_memberships AS membership \
+         INNER JOIN users ON users.id = membership.user_id \
+         WHERE membership.enterprise_id = (SELECT enterprise_id FROM rooms WHERE id = $1) \
+         ORDER BY users.email",
+    )
+    .bind(room_id)
+    .fetch_all(&pool)
+    .await
+    .expect("read account authority");
+    assert_eq!(
+        owners,
+        [("replacement-owner@example.test".into(), "owner".into())],
+        "the former user must not retain account authority"
+    );
+
+    let room_authority: Vec<(String, String, bool)> = sqlx::query_as(
+        "SELECT users.email::text, member.role, rooms.owner_id = users.id \
+         FROM room_members AS member \
+         INNER JOIN users ON users.id = member.user_id \
+         INNER JOIN rooms ON rooms.id = member.room_id \
+         WHERE member.room_id = $1 \
+         ORDER BY users.email",
+    )
+    .bind(room_id)
+    .fetch_all(&pool)
+    .await
+    .expect("read room authority");
+    assert_eq!(
+        room_authority,
+        [
+            ("owner@example.test".into(), "member".into(), false),
+            (
+                "replacement-owner@example.test".into(),
+                "owner".into(),
+                true
+            ),
+        ]
     );
 }
 

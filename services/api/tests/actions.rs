@@ -8,7 +8,8 @@
 mod support;
 
 use support::{
-    ACME_MEMBER, ACME_MODERATOR, ACME_OWNER, ACME_ROOM, ACME_TARGET, BETA_OWNER, BETA_ROOM, Harness,
+    ACME_ENTERPRISE, ACME_MEMBER, ACME_MODERATOR, ACME_OWNER, ACME_ROOM, ACME_TARGET, BETA_OWNER,
+    BETA_ROOM, Harness,
 };
 use uuid::Uuid;
 
@@ -923,6 +924,73 @@ async fn renaming_yourself_changes_only_your_own_membership() {
 }
 
 // ---------------------------------------------------------------- account
+
+#[tokio::test]
+async fn account_bootstrap_uses_database_identity_and_stays_inside_the_callers_tenant() {
+    let h = Harness::start().await;
+    // A valid access token can outlive a display-name change. The bootstrap response must use
+    // current database state rather than replaying the signed display name from the cookie.
+    let owner = h.cookie_for(ACME_OWNER, "Stale Token Name");
+
+    let body = h.get("/api/v1/account", Some(&owner)).await.ok();
+    assert_eq!(body["user"]["id"], ACME_OWNER.to_string());
+    assert_eq!(body["user"]["displayName"], "Ada Owner");
+    assert_eq!(body["user"]["isPlatformAdmin"], false);
+    assert_eq!(body["user"]["isGuest"], false);
+    assert!(body["user"]["preferences"].is_object(), "{body}");
+
+    let accounts = body["accounts"].as_array().expect("an accounts array");
+    assert_eq!(accounts.len(), 1, "another tenant leaked into {body}");
+    assert_eq!(accounts[0]["id"], ACME_ENTERPRISE.to_string());
+    assert_eq!(accounts[0]["name"], "Acme Trading");
+    assert_eq!(accounts[0]["slug"], "acme-trading");
+    assert_eq!(accounts[0]["role"], "owner");
+
+    let rooms = accounts[0]["rooms"].as_array().expect("a rooms array");
+    assert_eq!(rooms.len(), 1, "unexpected room membership in {body}");
+    assert_eq!(rooms[0]["id"], ACME_ROOM.to_string());
+    assert_eq!(rooms[0]["name"], "Main Room");
+    assert_eq!(rooms[0]["role"], "owner");
+
+    let encoded = body.to_string();
+    assert!(
+        !encoded.contains("Beta Trading"),
+        "tenant name leaked: {body}"
+    );
+    assert!(
+        !encoded.contains(&BETA_ROOM.to_string()),
+        "tenant room leaked: {body}"
+    );
+    for forbidden_key in [
+        "email",
+        "emailHash",
+        "phone",
+        "discordId",
+        "passwordHash",
+        "accessToken",
+        "refreshToken",
+    ] {
+        assert!(
+            !encoded.contains(&format!("\"{forbidden_key}\"")),
+            "account bootstrap exposed {forbidden_key}: {body}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn account_bootstrap_requires_a_current_database_identity() {
+    let h = Harness::start().await;
+    assert_eq!(h.get("/api/v1/account", None).await.status, 401);
+
+    // Signature validity alone is insufficient: a deleted account must not bootstrap from
+    // claims cached in an otherwise valid access token.
+    let absent_user = Uuid::from_u128(0xd000_0001_0000_4000_8000_0000_0000_0001);
+    let absent_cookie = h.cookie_for(absent_user, "Deleted User");
+    assert_eq!(
+        h.get("/api/v1/account", Some(&absent_cookie)).await.status,
+        401
+    );
+}
 
 #[tokio::test]
 async fn a_preference_is_merged_rather_than_replacing_the_object() {

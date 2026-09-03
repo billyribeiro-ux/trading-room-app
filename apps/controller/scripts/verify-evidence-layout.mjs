@@ -126,7 +126,7 @@ for (const artifact of requiredArtifacts) {
 }
 
 const restoredArtifacts = new Map([
-  ['account-page/file1', '64145eddde2cad155ccc174b2f6460c6a968a8a80291357f5688aef85b84c3ab'],
+  ['account-page/file1', '112fce566bf6cd9362d0a3055344cc95558db59fcc078fc33cccf9acfcc2f556'],
   ['account-page/upload-image-badge-prompt.html', 'fb4e934f761f15fb2eac26882ce6ebac9b6628f6f3b8ab48b20ad521a6c7c43f']
 ]);
 for (const [artifact, expectedDigest] of restoredArtifacts) {

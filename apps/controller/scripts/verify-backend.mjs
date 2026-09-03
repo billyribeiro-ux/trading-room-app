@@ -128,6 +128,19 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0010_retire_ptr_clone_app.sql',
     sha256: 'f38b8ee829abb7e0525d4f31ccb389ddafad9e92c309c53a18ddc9969e1e5251'
+  }),
+  /*
+    Authored and reviewed 2026-09-03 for cutover Gate 2. This is the first migration that makes
+    account owner/admin authority explicit rather than inferring it from one room's role. It is
+    forward-only; refuses an ambiguous historic owner backfill; enforces the two account roles and
+    at most one owner; applies the reviewed tenant RLS policy; revokes all direct runtime table
+    access; and exposes only a user-bounded SECURITY DEFINER resolver with a pinned search_path and
+    no PUBLIC execute grant. Its live PostgreSQL migration/ACL/RLS/negative controls are in
+    services/api/tests/migrations.rs.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0011_enterprise_memberships.sql',
+    sha256: '37f96aad9a4451848bbad3733edfdab52d05b173a0d00f1c20d2a0f6c15592d1'
   })
 ]);
 

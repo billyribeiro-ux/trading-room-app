@@ -2,7 +2,33 @@
 
 **Execution date:** 2026-09-03
 **Scope:** `TODO.md`, `NEW-TODO.md`, `todo-next.md`, controller, room, Rust services, evidence gates, database migrations, production builds, and browser journeys.
-**Outcome:** every repository-buildable gap identified by the hard audit is implemented. Remaining work requires external vendor state, licensed staging software, physical acceptance hardware, production credentials/resources, or an owner decision; none is honestly satisfiable by writing more code in this checkout.
+**Outcome of the original TODO parity audit:** every repository-buildable gap identified in that
+parity scope is implemented. A subsequent production-architecture audit found an additional,
+separate cutover program in `apps/controller/docs/PRODUCTION-CUTOVER-PLAN.md`: the deployed legacy
+controller and room stores have not yet moved onto the Rust/PostgreSQL authority. That program is
+not represented as complete here merely because the reconstructed feature surfaces work.
+
+## Production-authority implementation update — 2026-09-03
+
+| Cutover boundary | Current hard status | Repository evidence | Remaining exit condition |
+| --- | --- | --- | --- |
+| Gate 0 — domain containment | Mixed: code controls complete; legal, contact transport, monitoring, and optional history rewrite remain external/owner-gated | `apps/controller/docs/PRODUCTION-CUTOVER-PLAN.md` Gate 0 | Owner/vendor actions named by each unchecked row |
+| Gate 1 — backend SSOT/security drift | Local and hosted source gates exist; current immutable release publication/deployment/rollback evidence is not complete | backend CI, migration attestor, provenance seals | Registry/signing/provenance/target rollback exercise |
+| Gate 2 — account bootstrap | First five repository deliverables implemented in the current working tree; staging deployment remains external | migration `0011`; `/api/v1/account`; scoped OpenAPI; generated server client; exact-cookie and negative tests | Full gates, commit/push, then staging database/API deploy plus backup restore proof |
+| Gate 3 — feature migration | Not started by the Gate 2 slice | legacy SvelteKit controller and Rust route inventories | Profile, rooms, settings, membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time |
+| Gate 4 — signup/payment/entitlements | Not production-authoritative | existing controller signup/email scaffolding and provider-independent ledgers | Verified recovery/email, idempotent billing webhooks, subscription facts, central entitlements, legal approval, provider smoke |
+| Gate 5 — media promotion | Stage 1 boundary proof only; browser is not wired to the Rust media contract | media service tests and deployment plan | session response, audience-bound grants, TURN, rotation/draining/observability, native dependency clearance, device/load/recovery evidence |
+
+The implementation loop therefore follows this order and does not skip authority boundaries:
+
+1. finish and seal Gate 2 with full Rust/controller gates and current documentation;
+2. migrate Gate 3 slices end to end, each with forward-only schema, Rust policy, typed BFF, UI,
+   negative authorization tests, and rollback-compatible data conversion;
+3. centralize Gate 4 identity, billing, subscription, and entitlement authority before opening
+   signup or payment traffic;
+4. complete Gate 5 control-plane/media integration and its real-network acceptance matrix;
+5. build immutable release artifacts and execute the external staging/production gates without
+   converting missing credentials, vendor approvals, or human acceptance into false code checkmarks.
 
 ## Completion standard
 
@@ -201,7 +227,7 @@ Measured on the final working tree:
 | Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,184 tests, production build            |
 | Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
 | Controller `pnpm quality`         | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, production build                   |
-| Controller Vitest                 | 121 files / 1,233 tests; documented totals independently verified at four sites                                                                 |
+| Controller Vitest                 | 122 files / 1,261 tests; documented totals independently verified at four sites                                                                 |
 | Controller Playwright             | 9/9 Chromium journeys against the adapter-node production artifact                                                                              |
 | Controller PostgreSQL integration | 9 files / 59 tests against disposable provisioned PostgreSQL                                                                                    |
 | Rust non-database gate            | format/check green; 114/114 media tests; every API test target compiled with `testing`                                                          |

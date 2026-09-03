@@ -125,9 +125,9 @@ pub async fn close(
 /// * `choice_index` must be a real index into `choices`, so a poll with three options cannot
 ///   accumulate votes for option 47.
 ///
-/// One response per member is enforced by deleting first, in the same statement. The schema has
-/// no unique constraint on `(poll_id, member_id)`, so this is the layer that decides a member
-/// votes once - and it says so here rather than leaving the duplicate to be discovered in a tally.
+/// One response per member is enforced by the schema's
+/// `poll_responses_tenant_poll_member_unique` constraint and an atomic upsert. The conflict target
+/// includes `enterprise_id`, so even the uniqueness boundary retains the tenant key.
 ///
 /// # It was THREE statements until 2026-09-02, and the docblock said otherwise
 ///
@@ -144,6 +144,12 @@ pub async fn close(
 /// out-of-range choice, a poll from another room and an unknown poll all insert nothing and leave
 /// an existing vote untouched.
 ///
+/// The first one-statement rewrite used a data-modifying `cleared` CTE followed by an INSERT. That
+/// looked atomic but PostgreSQL executes sibling data-modifying CTEs under one snapshot: the
+/// INSERT still collided with the response row the DELETE targeted. The existing re-vote test
+/// caught it as `23505`/`already exists`. `ON CONFLICT ON CONSTRAINT` expresses the operation the
+/// database actually provides and never depends on one sibling CTE observing another's write.
+///
 /// `FOR SHARE` on the poll row is the other half. Without it the `WHERE` is only as good as the
 /// statement's snapshot, so a close committing microseconds earlier would still be missed; with it,
 /// a concurrent `UPDATE polls SET state` waits for this vote instead of overtaking it. The row is
@@ -156,21 +162,19 @@ pub async fn answer(
     member_id: Uuid,
     choice_index: i32,
 ) -> Result<(), DbError> {
-    // One statement. `valid` is the validation, `cleared` the replace, and the `INSERT` runs only
-    // for the rows `valid` yields - so all three either happen or none of them does, and there is
-    // no snapshot between them for a concurrent close to arrive in.
+    // One statement. `valid` is the validation and the INSERT/ON CONFLICT pair is the replacement.
+    // Invalid input yields no source row, so it cannot erase or update a previous valid response.
     let recorded = sqlx::query(
         "WITH valid AS ( \
              SELECT 1 FROM polls \
              WHERE id = $2 AND room_id = $5 AND state = 'active' \
                AND $4 >= 0 AND $4 < jsonb_array_length(choices) \
              FOR SHARE \
-         ), cleared AS ( \
-             DELETE FROM poll_responses \
-             WHERE poll_id = $2 AND member_id = $3 AND EXISTS (SELECT 1 FROM valid) \
          ) \
          INSERT INTO poll_responses (enterprise_id, poll_id, member_id, choice_index) \
-         SELECT $1, $2, $3, $4 FROM valid",
+         SELECT $1, $2, $3, $4 FROM valid \
+         ON CONFLICT ON CONSTRAINT poll_responses_tenant_poll_member_unique \
+         DO UPDATE SET choice_index = EXCLUDED.choice_index",
     )
     .bind(enterprise_id)
     .bind(poll_id)

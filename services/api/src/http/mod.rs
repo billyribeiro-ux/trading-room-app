@@ -138,6 +138,7 @@ pub fn router(state: Arc<AppState>, request_timeout: Duration) -> Router {
         // Unauthenticated on purpose: it carries no ids and no paths, and putting a session in
         // front of it means every scraper needs a credential to rotate.
         .route("/metrics", get(metrics::metrics))
+        .route("/api/openapi.json", get(openapi))
         .route("/api/auth/login", post(login_handler))
         .route("/api/auth/refresh", post(refresh_handler))
         .route("/api/auth/logout", post(logout_handler))
@@ -290,6 +291,12 @@ async fn healthz() -> impl IntoResponse {
     (StatusCode::OK, Json(serde_json::json!({ "status": "ok" })))
 }
 
+/// Machine-readable public contract. It contains schemas and cookie names, never credentials or
+/// deployment addresses, and is generated from the same Rust module the client snapshot pins.
+async fn openapi() -> impl IntoResponse {
+    (StatusCode::OK, Json(crate::openapi::document()))
+}
+
 /// Readiness: only true if this instance can serve both durable requests and cross-instance
 /// realtime delivery.
 async fn readyz(State(state): State<Arc<AppState>>) -> Response {
@@ -372,8 +379,9 @@ fn cookie(name: &str, value: &str, max_age: Duration, path: &str) -> String {
     format!(
         "{name}={value}; Max-Age={}; Path={path}; HttpOnly; Secure; SameSite={}",
         max_age.as_secs(),
-        // The refresh cookie is only ever sent to the auth endpoints, so Strict costs
-        // nothing and removes it from every ordinary cross-site navigation.
+        // The refresh token never authorizes resource endpoints. SameSite=Strict keeps it
+        // off ordinary cross-site navigation while Path=/ preserves the enforced __Host-
+        // prefix contract.
         if name == REFRESH_COOKIE {
             "Strict"
         } else {
@@ -447,7 +455,7 @@ pub(crate) fn issue_session(
             REFRESH_COOKIE,
             refresh_token,
             limits::REFRESH_TOKEN_TTL,
-            "/api/auth",
+            "/",
         )
         .parse()
         .map_err(|_| ApiError::Internal("malformed cookie".into()))?,
@@ -611,7 +619,7 @@ async fn logout_handler(
 
     let mut response = StatusCode::NO_CONTENT.into_response();
     let response_headers = response.headers_mut();
-    for (name, path) in [(ACCESS_COOKIE, "/"), (REFRESH_COOKIE, "/api/auth")] {
+    for (name, path) in [(ACCESS_COOKIE, "/"), (REFRESH_COOKIE, "/")] {
         response_headers.append(
             header::SET_COOKIE,
             expired_cookie(name, path)
@@ -681,10 +689,11 @@ mod tests {
     }
 
     #[test]
-    fn the_refresh_cookie_is_strict_and_scoped_to_the_auth_endpoints() {
-        let value = cookie(REFRESH_COOKIE, "abc", Duration::from_secs(60), "/api/auth");
+    fn the_refresh_cookie_is_strict_and_meets_the_host_prefix_contract() {
+        let value = cookie(REFRESH_COOKIE, "abc", Duration::from_secs(60), "/");
         assert!(value.contains("SameSite=Strict"), "{value}");
-        assert!(value.contains("Path=/api/auth"), "{value}");
+        assert!(value.contains("Path=/"), "{value}");
+        assert!(!value.contains("Domain="), "{value}");
     }
 
     #[test]

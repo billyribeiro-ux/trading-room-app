@@ -10,12 +10,14 @@
 //! warning about a file that is, in aggregate, entirely used.
 #![allow(dead_code)]
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use ed25519_dalek::SigningKey;
+use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use time::OffsetDateTime;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tradingroom_api::auth::token::{self, AccessClaims};
 use tradingroom_api::db::Db;
 use tradingroom_api::http::{ACCESS_COOKIE, AppState, router};
@@ -78,16 +80,39 @@ pub struct Harness {
     db: Db,
     admin: PgPool,
     signing_key: SigningKey,
+    server: tokio::task::JoinHandle<()>,
+    _concurrency_permit: OwnedSemaphorePermit,
+}
+
+/// Each harness owns three database pools plus a TCP listener.
+///
+/// The action target crossed macOS's 256-descriptor default when two account tests took it from
+/// 27 to 29 concurrent harnesses. Worse, the detached Axum tasks kept their listeners and pools
+/// alive after their tests ended. Bound the peak independently of the test runner's thread count;
+/// [`Drop`] below handles the lifetime leak.
+const MAX_CONCURRENT_HARNESSES: usize = 6;
+static HARNESS_CONCURRENCY: OnceLock<Arc<Semaphore>> = OnceLock::new();
+
+fn harness_concurrency() -> Arc<Semaphore> {
+    HARNESS_CONCURRENCY
+        .get_or_init(|| Arc::new(Semaphore::new(MAX_CONCURRENT_HARNESSES)))
+        .clone()
 }
 
 impl Harness {
     pub async fn start() -> Self {
+        let concurrency_permit = harness_concurrency()
+            .acquire_owned()
+            .await
+            .expect("the harness semaphore must remain open");
         let signing_key = SigningKey::from_bytes(&[42u8; 32]);
-        let admin = PgPool::connect(&owner_url())
+        let admin = PgPoolOptions::new()
+            .max_connections(1)
+            .connect(&owner_url())
             .await
             .expect("connect as the fixture owner");
         let state = Arc::new(AppState::new(
-            Db::connect(&database_url(), 5, limits::DB_ACQUIRE_TIMEOUT)
+            Db::connect(&database_url(), 2, limits::DB_ACQUIRE_TIMEOUT)
                 .await
                 .expect("connect"),
             signing_key.clone(),
@@ -100,7 +125,7 @@ impl Harness {
             .expect("bind an ephemeral port");
         let address = listener.local_addr().expect("addr").to_string();
 
-        tokio::spawn(async move {
+        let server = tokio::spawn(async move {
             let _ = axum::serve(
                 listener,
                 router(state, limits::REQUEST_TIMEOUT)
@@ -111,11 +136,13 @@ impl Harness {
 
         Self {
             address,
-            db: Db::connect(&database_url(), 5, limits::DB_ACQUIRE_TIMEOUT)
+            db: Db::connect(&database_url(), 1, limits::DB_ACQUIRE_TIMEOUT)
                 .await
                 .expect("connect"),
             admin,
             signing_key,
+            server,
+            _concurrency_permit: concurrency_permit,
         }
     }
 
@@ -452,6 +479,15 @@ impl Harness {
             .fetch_one(&self.admin)
             .await
             .expect("admin audit scalar")
+    }
+}
+
+impl Drop for Harness {
+    fn drop(&mut self) {
+        // Dropping a JoinHandle detaches its task. Explicit cancellation is load-bearing: without
+        // it, every completed test leaves one listener and the AppState's pool alive until the
+        // integration-test process exits.
+        self.server.abort();
     }
 }
 

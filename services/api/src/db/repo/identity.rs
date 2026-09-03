@@ -15,6 +15,32 @@ use uuid::Uuid;
 
 use crate::db::{Db, DbError};
 
+/// Current, non-secret identity for an authenticated account bootstrap.
+///
+/// Deliberately excludes email, hashes, phone and provider ids. A signed access token proves who
+/// the caller was when it was issued; this database read proves that identity still exists and
+/// supplies mutable fields without trusting stale claims.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentProfile {
+    pub id: Uuid,
+    pub display_name: String,
+    pub is_platform_admin: bool,
+    pub is_guest: bool,
+    pub preferences: Value,
+}
+
+pub async fn current_profile(db: &Db, user_id: Uuid) -> Result<Option<CurrentProfile>, DbError> {
+    sqlx::query_as(
+        "SELECT id, display_name, is_platform_admin, is_guest, preferences \
+         FROM users WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(db.identity_pool())
+    .await
+    .map_err(DbError::from)
+}
+
 /// Replaces one key inside `users.preferences`.
 ///
 /// `jsonb_set` rather than reading the object, editing it in Rust and writing it back: the
