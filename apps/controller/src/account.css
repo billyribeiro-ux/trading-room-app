@@ -1161,6 +1161,9 @@ span.acc-label {
   .acc-table-responsive > .acc-table > tbody > tr:last-child > th {
     border-bottom: 0;
   }
+  .acc-profile-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .acc-mt-15 {
   margin-top: 15px;
@@ -2065,9 +2068,4 @@ body.modal-open {
 .acc-profile-saved {
   margin-left: 10px;
   color: rgb(60, 118, 61);
-}
-@media (max-width: 640px) {
-  .acc-profile-grid {
-    grid-template-columns: 1fr;
-  }
 }
