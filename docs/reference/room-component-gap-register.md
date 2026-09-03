@@ -463,28 +463,55 @@ reachable — it is the parent work item, not a seventh row.
 `<audio autoplay="autoplay" hidden="true" id="webcam">` after it (`:352`) — a page-level audio sink
 outliving every page.
 
-**Subscriptions, with their exact strings** (all bootbox, all absent from `apps/room/src`):
+**Subscriptions, with their exact strings** (all bootbox). The parenthetical here read *"all absent
+from `apps/room/src`"* until **2026-09-03**, when the row was re-measured file by file rather than
+inherited: **eleven of the thirteen are built.** The `Ours` column below is that measurement, and the
+two that were genuinely open are settled underneath it.
 
-| event | effect |
-|---|---|
-| `getSessionState` | `currentState=='closed'` → `currPage='closed'`; `=='open' && currPage=='login'` → `'chat'`, emit `appDataReady`, `loadSessionLogs()` |
-| `doSessionAuthFail` | once-only latch; `sessData.loginErrorMsg` or `Sorry, your session has expired or is invalid, please log in again`; then `loginErrorURL` redirect; `disconnectAll()` |
-| `hardReset` | `The room is being reset by an administrator. Click OK to continue...` → reload |
-| `kickPage` | `kickedMsg = payload`, `currPage='kicked'` |
-| `closedPage` | `currPage='closed'` |
-| `openSession` | `The session is now open, click here to reload the page and enter` → reload |
-| `forceReload` | `You need to reload this page to continue` → reload |
-| `permsChangeReload` | `An admin has changed your room permissions, you need to reload this page to continue` → `{apiROOT}/sessions/v2/reAuthSessionTok?sessionID=…&tok=…&r=1` |
-| `doMsgDelete` | `shiftDelete` skips the confirm; else `Are you sure you want to delete this message by {n}. text: {txt}` |
-| `usersDoMsgDelete` | `Are you sure you want to delete your message: {txt}` |
-| `doAlertDelete` | `Are you sure you want to delete this alert by {n}. text: {txt}` → `deleteAlertMessage()` |
-| `doQAAlertDelete` | same string, `deleteQAAlert({qaMsgID, msgIndex})` |
-| `debugLogResp` | shows `#debug-log-modal`, sets `#debugLogModalTxt` to the lines joined by `\n` |
+| event | effect | ours, measured 2026-09-03 |
+|---|---|---|
+| `getSessionState` | `currentState=='closed'` → `currPage='closed'`; `=='open' && currPage=='login'` → `'chat'`, emit `appDataReady`, `loadSessionLogs()` | **not a divergence** — see below |
+| `doSessionAuthFail` | once-only latch; `sessData.loginErrorMsg` or `Sorry, your session has expired or is invalid, please log in again`; then `loginErrorURL` redirect; `disconnectAll()` | **built** — see below |
+| `hardReset` | `The room is being reset by an administrator. Click OK to continue...` → reload | `events.svelte.ts` |
+| `kickPage` | `kickedMsg = payload`, `currPage='kicked'` | `private-commands.ts`, `KickedPage.svelte` |
+| `closedPage` | `currPage='closed'` | `events.svelte.ts`, built 2026-09-03 with the door itself |
+| `openSession` | `The session is now open, click here to reload the page and enter` → reload | `events.svelte.ts` |
+| `forceReload` | `You need to reload this page to continue` → reload | `private-commands.ts`, `addressed-channel.ts` |
+| `permsChangeReload` | `An admin has changed your room permissions, you need to reload this page to continue` → `{apiROOT}/sessions/v2/reAuthSessionTok?sessionID=…&tok=…&r=1` | `dialogs.svelte.ts`, `user-actions.svelte.ts`; the `reAuthSessionTok` redirect stays REFUSED — that route is confirmed absent from the bundle |
+| `doMsgDelete` | `shiftDelete` skips the confirm; else `Are you sure you want to delete this message by {n}. text: {txt}` | `message-delete.ts:172` |
+| `usersDoMsgDelete` | `Are you sure you want to delete your message: {txt}` | `message-delete.ts:173` — the same function's other branch, which is why the NAME is absent and the behaviour is not |
+| `doAlertDelete` | `Are you sure you want to delete this alert by {n}. text: {txt}` → `deleteAlertMessage()` | `message-delete.ts:119`; `deleteAlertPW` reaches ELEVEN files, so the claim below that it has no occurrence is stale too |
+| `doQAAlertDelete` | same string, `deleteQAAlert({qaMsgID, msgIndex})` | `message-delete.ts` |
+| `debugLogResp` | shows `#debug-log-modal`, sets `#debugLogModalTxt` to the lines joined by `\n` | `debug-log.svelte.ts`, `debug-log.remote.ts` |
+
+**`getSessionState` — NOT A DIVERGENCE, and the whole family reads as one.** It is an internal
+event-bus name, not a server frame: emitted when a `getMyState`/`getRoomState` frame assigns
+`globals.roomState` (byte 1,013,755) and again after `getMyRepeater` (1,021,461). Two subscribers,
+both read whole. `handleSessionState()` (1,162,077) branches on `roomState.status == 'closed'` →
+`disconnectAll()` + `closeRoom`, else emits `chatMode` and initialises the media handlers.
+`app-root`'s (2,595,730) is the SPA page switch. Every reference-facing output has a counterpart
+here arrived at differently: the closed branch is `closedPage` → the server door, `chatMode` is
+`changeChatMode`, the media init is `media-transport`, and `currPage 'login' → 'chat'` has no
+counterpart because this room's entry is a server route rather than a page inside the shell.
+
+**`doSessionAuthFail` — BUILT, as `sessionRevoked`.** Its four emitters are all socket-authenticate
+failures (993,162 / 993,292 / 993,379, and a disconnect with code 4500 at 997,931); this room
+authenticates the SSE request by cookie, and `sess/[room]/events/+server.ts` sends
+`{cmd:'sessionRevoked', reason, message}` and tears the stream down **in the same tick**. That is
+also why the once-only latch is not transcribed: upstream latches the alert because its socket can
+fail repeatedly, and here the connection ends with the frame. `loginErrorMsg` and `loginErrorURL`
+are both `wired: true` and honoured — at the door (`room-entry.ts:212-213`), at SSO, and on the
+reload the revoked member is sent through, which means the redirect is decided by the server from
+settings it owns rather than shipped to every browser.
 
 **`deleteAlertMessage()`** is a gate, not a wrapper: when `sessData.deleteAlertPW` is set it prompts
 `Please enter the password to delete this alert:` and compares `trim()` against it, alerting
-`Wrong password!` on a mismatch. **`deleteAlertPW` has no occurrence in `apps/room/src`** — so in our
-room a password-protected alert deletion is not password-protected.
+`Wrong password!` on a mismatch. The sentence that stood here — *"`deleteAlertPW` has no occurrence
+in `apps/room/src`, so in our room a password-protected alert deletion is not password-protected"* —
+was **true when written and is false now**, re-measured 2026-09-03: the name reaches eleven files,
+and the gate is `internal/room-alert-delete-auth/[code]` on the controller with
+`alert-delete-auth.remote.ts` and `server/alert-delete-access.ts` here. The credential STAYS on the
+controller and the question travels, which is the same shape as `room-notes-auth` beside it.
 
 **Three more init behaviours with no counterpart here:**
 
@@ -496,9 +523,33 @@ room a password-protected alert deletion is not password-protected.
 - the admin-in-iframe check — perms `'a'` and `window.location !== window.parent.location` →
   confirm `You seem to be a presenter and be running inside an iframe, click OK to load the page in
   regular mode so that you can present` → `window.parent.location = window.location + '&kt=1'`.
-  This is what `kt` is for, and both halves are absent here.
+  **BUILT 2026-09-03** as `lib/room/iframe-breakout.ts`, called once from the page's `onMount`. It
+  was the one row in the whole of R-12 that survived the re-measurement as genuinely absent.
+
+  Three divergences, each argued at the module: the authority is the SERVER's `isPresenter` and not
+  a token this browser decoded (upstream's `decodeToken(a).perms` is client-asserted authority, which
+  is the 2026-08-07 escalation by name); `kt=1` is appended with `URL.searchParams` because this room
+  strips the token from the address bar on entry, so upstream's concatenation would glue a parameter
+  to a query-less path; and the swallowing `catch` around the parent read IS transcribed, cross-origin
+  silence included, because reproducing an upstream defect is not a reason to diverge.
+
+  **`kt` has exactly one occurrence in the 2,891,205-byte bundle and it is that write — nothing reads
+  it**, which is what the sentence above ("this is what `kt` is for") could not have known. That
+  measurement is pinned in `iframe-breakout-capture.test.ts` so a later reader cannot conclude the
+  value was dropped from something upstream depended on.
+
+  One thing the module measures and deliberately does NOT decide: `apps/room` sets no
+  `X-Frame-Options` and no `frame-ancestors` anywhere, so this room can be framed today. That is what
+  makes the control reachable rather than dead code — and whether the room SHOULD be frameable is an
+  owner's product question, because closing it would break every operator embedding the room.
 - `ngAfterViewInit` validates the saved theme against `globals.chatStyle`'s own keys and falls back
-  to `lightTheme` with `Invalid theme "X" found, falling back to lightTheme`.
+  to `lightTheme` with `Invalid theme "X" found, falling back to lightTheme`. **NOT A DIVERGENCE**,
+  re-measured 2026-09-03: upstream's theme is a free-form preference key checked against
+  `chatStyle`'s keys at READ time, so a bad stored value is reachable there. Here it is a
+  `user_settings.theme` column with two values, written only by `saveTheme` (a `z.enum` that refuses
+  everything else) and by `ensureSettings` (`'light'`), and read from the ROW rather than from the
+  preferences blob — so `savePreference('theme', …)` cannot reach it either. The fallback would be a
+  branch nothing can enter.
 
 `playChatMessageSoundFor` also lands here (`:73-84`): `app-root` splits the comma list, hashes each
 address and pushes it into `globals.playChatMessageSoundFor`. Our `+page.svelte:7469-7473` already
