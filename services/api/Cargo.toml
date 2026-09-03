@@ -51,6 +51,11 @@ argon2 = { version = "0.6.0", features = ["alloc"] }
 password-hash = { version = "0.6", features = ["alloc", "getrandom", "phc"] }
 rand = "0.10"
 subtle = "2.6"
+# Temporary Gate 3 bridge for controller hashes. The legacy controller stored Node
+# `crypto.scryptSync` output as `saltHex:keyHex`; a successful login immediately
+# upgrades it to the Argon2id profile above. Low-level only: no second password
+# envelope may be created by this service.
+scrypt = { version = "0.12.0", default-features = false }
 
 # Only for `StreamExt`/`SinkExt` on the split WebSocket. axum re-exports neither.
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }

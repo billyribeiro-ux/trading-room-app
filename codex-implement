@@ -15,7 +15,7 @@ not represented as complete here merely because the reconstructed feature surfac
 | Gate 0 — domain containment | Mixed: code controls complete; legal, contact transport, monitoring, and optional history rewrite remain external/owner-gated | `apps/controller/docs/PRODUCTION-CUTOVER-PLAN.md` Gate 0 | Owner/vendor actions named by each unchecked row |
 | Gate 1 — backend SSOT/security drift | Local and hosted source gates exist; current immutable release publication/deployment/rollback evidence is not complete | backend CI, migration attestor, provenance seals | Registry/signing/provenance/target rollback exercise |
 | Gate 2 — account bootstrap | First five repository deliverables implemented in the current working tree; staging deployment remains external | migration `0011`; `/api/v1/account`; scoped OpenAPI; generated server client; exact-cookie and negative tests | Full gates, commit/push, then staging database/API deploy plus backup restore proof |
-| Gate 3 — feature migration | Not started by the Gate 2 slice | legacy SvelteKit controller and Rust route inventories | Profile, rooms, settings, membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time |
+| Gate 3 — feature migration | Conversion foundation implemented and locally proven; product slices remain open | controller migration `0018`; Rust migration `0012`; `cutover-profile-authority.mjs`; protected-workflow E2E verifier; legacy-scrypt HTTP upgrade proof | Profile UI/API authority, then rooms, settings, membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time |
 | Gate 4 — signup/payment/entitlements | Not production-authoritative | existing controller signup/email scaffolding and provider-independent ledgers | Verified recovery/email, idempotent billing webhooks, subscription facts, central entitlements, legal approval, provider smoke |
 | Gate 5 — media promotion | Stage 1 boundary proof only; browser is not wired to the Rust media contract | media service tests and deployment plan | session response, audience-bound grants, TURN, rotation/draining/observability, native dependency clearance, device/load/recovery evidence |
 
@@ -209,12 +209,22 @@ The public `/v5` pathname is not the v5 build selector; `/v3`, `/v4`, `/v5`, and
 
 ## Database and configuration changes
 
-Controller migrations are forward-only and registered through version 17:
+Controller migrations are forward-only and registered through version 18:
 
 1. `0014-alert-delivery-ledger.js` — dispatches and per-recipient attempts.
 2. `0015-discord-oauth.js` — linked identity and expiring single-use OAuth state.
 3. `0016-alert-dispatch-links.js` — source/target dispatch relationships.
 4. `0017-alert-cross-post-suppression.js` — immutable `dontCrossPost` dispatch input.
+5. `0018-authority-identity-mappings.js` — nullable one-to-one UUID links to canonical Rust
+   enterprise/user authority, with reconciliation timestamps.
+
+Rust migration `0012_legacy_cutover_ledger.sql` adds enterprise suspension parity plus owner-only
+conversion run and entity-mapping ledgers. The runtime role has no access. The Gate 3 importer is
+cross-database by design: it commits a source-fingerprinted target ledger first and then the source
+mapping columns, making that unavoidable failure window resumable without inventing distributed
+transactions. Its E2E verifier proved ownership refusal, plan, apply, independent verify,
+source-drift refusal, rollback, and cleanup on PostgreSQL 17. A real Rust HTTP login separately
+proved an imported Node scrypt credential is immediately compare-and-swap upgraded to Argon2id.
 
 The room's SQLite startup migration path upgrades existing installations in place for the alert outbox, scheduled-alert suppression, recording catalog/logs, public-player grants, and trial-bearing sessions. New deployment configuration includes Discord OAuth values, `MEDIA_CLUSTER_HOSTS_JSON`, and the existing controller/room/media signing secrets. Missing security-critical configuration fails closed or presents an explicit unconfigured state.
 
@@ -227,7 +237,7 @@ Measured on the final working tree:
 | Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,184 tests, production build            |
 | Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
 | Controller `pnpm quality`         | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, production build                   |
-| Controller Vitest                 | 122 files / 1,261 tests; documented totals independently verified at four sites                                                                 |
+| Controller Vitest                 | 124 files / 1,265 tests; documented totals independently verified at four sites                                                                 |
 | Controller Playwright             | 9/9 Chromium journeys against the adapter-node production artifact                                                                              |
 | Controller PostgreSQL integration | 9 files / 59 tests against disposable provisioned PostgreSQL                                                                                    |
 | Rust non-database gate            | format/check green; 114/114 media tests; every API test target compiled with `testing`                                                          |

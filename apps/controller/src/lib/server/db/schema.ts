@@ -7,6 +7,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   type AnyPgColumn
 } from 'drizzle-orm/pg-core';
 
@@ -68,6 +69,14 @@ export const accounts = pgTable('accounts', {
   suspendedAt: timestamp('suspended_at', { withTimezone: true }),
   suspendedBy: text('suspended_by'),
   suspendedReason: text('suspended_reason'),
+  /**
+   * Stable strangler mapping to the Rust/PostgreSQL enterprise authority.
+   *
+   * Nullable until the Gate 3 importer has reconciled this row. Runtime cutover mode refuses an
+   * unmapped identity; it never guesses from a display name, email domain, or coincident row id.
+   */
+  authorityEnterpriseId: uuid('authority_enterprise_id').unique(),
+  authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull()
 });
 
@@ -97,6 +106,9 @@ export const users = pgTable(
      * opposite of the point; rows that predate this column are backfilled once, in migration 1.
      */
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    /** Canonical Rust identity id; populated and verified by the offline Gate 3 importer. */
+    authorityUserId: uuid('authority_user_id').unique(),
+    authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull()
   },
   (t) => [uniqueIndex('users_email_idx').on(t.email)]

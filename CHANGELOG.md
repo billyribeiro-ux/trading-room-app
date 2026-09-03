@@ -45,6 +45,45 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 19:01 EDT — Gate 3 gained a resumable identity converter and one-way credential bridge
+
+**Runtime impact: yes after migration and operator invocation; no production conversion or deploy
+is claimed.** This establishes the safety boundary required before the first Gate 3 profile writer
+can move from the controller database to Rust/PostgreSQL authority.
+
+Controller migration `0018` adds nullable, unique UUID mappings for accounts and authenticating
+users. Rust migration `0012` adds enterprise suspension parity and two owner-only ledgers: immutable
+source/target identity mappings and lifecycle evidence for each scoped conversion run. The runtime
+role cannot read or mutate either ledger. Counts and SHA-256 digests are retained; email addresses,
+password hashes, and database URLs are never written to converter output.
+
+The profile converter is intentionally not a pretend distributed transaction. It fingerprints a
+named source, reads it at repeatable-read isolation, validates owners, normalized-email uniqueness,
+credential envelopes, and prior mappings, commits stable target UUIDs plus the recovery ledger
+first, and then writes source reconciliation links. A retry resumes the committed target mapping.
+Plan/apply/verify refuse target collisions, source/ledger disagreement, source drift, and a source
+UUID that points at an existing canonical row without target-side ownership evidence. Automated
+rollback refuses any user whose canonical credential was upgraded, changed, or used; on the safe
+path it deletes the imported authority graph, clears source links, and retains rolled-back evidence.
+
+Rust authentication now reads the controller's exact historic Node scrypt envelope—16-byte hex
+salt and 64-byte hex key with N=16384/r=8/p=1—through a bounded worker, with strict decoding and
+constant-time comparison. Argon2id PHC remains the only credential format Rust writes. The existing
+compare-and-swap rehash path upgrades a successfully authenticated legacy hash without overwriting
+a concurrent password change.
+
+Measured proof on PostgreSQL 17: the isolated converter completed ownership-refusal → plan → apply
+→ verify → source-drift-refusal → guarded rollback and proved both target deletion and source-link
+cleanup. The focused Rust migration security test passed after its red run exposed and corrected a
+missing fingerprint in the test insert. A real HTTP login starting from a Node scrypt fixture passed,
+and the stored value was then Argon2id and still verified. Six controller contract files passed 29
+assertions; backend migration integrity passed 12 pinned migrations and the provenance seal passed
+98 imported plus eight locally authored service files. The full locked Rust gate passed formatting,
+Clippy with warnings denied, and all 443 tests (318 API plus 125 media). The exact controller quality
+gate passed 124 files/1,265 tests, all 9 Chromium journeys, and the production adapter build. The
+converter proof is now a required step of the protected backend workflow and passed again after the
+full gate: ownership refusal, plan, apply, verify, drift refusal, and guarded rollback.
+
 ### 2026-09-03 18:11 EDT — account authority became explicit, and the Rust boundary reached SvelteKit without crossing the browser
 
 **Runtime impact: yes after deployment; no production deployment is claimed.** This is the first

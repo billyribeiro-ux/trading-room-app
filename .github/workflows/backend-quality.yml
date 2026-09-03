@@ -183,7 +183,7 @@ jobs:
           # came from — so a change to any of the three matched NOTHING and skipped the
           # very gate that proves it. `scripts/build-api-release-evidence.sh` is the one
           # that genuinely sits at the root, and it is listed separately.
-          if printf '%s\n' "$changed" | grep -qE '^(services/|ops/|apps/controller/scripts/verify-backend|apps/controller/scripts/verify-api-release-artifact|apps/controller/scripts/verify-rust-advisories|scripts/build-api-release-evidence\.sh|\.github/workflows/backend-quality\.yml)'; then
+          if printf '%s\n' "$changed" | grep -qE '^(services/|ops/|apps/controller/scripts/(verify-backend|verify-api-release-artifact|verify-rust-advisories|cutover-profile-authority|verify-profile-cutover-e2e)|apps/controller/src/lib/server/db/migrations/|scripts/build-api-release-evidence\.sh|\.github/workflows/backend-quality\.yml)'; then
             echo "reason=backend paths changed" >> "$GITHUB_OUTPUT"
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
@@ -279,6 +279,10 @@ jobs:
           fi
           echo "pnpm $actual, matching the packageManager pin"
 
+      - name: Install the profile-conversion verifier dependencies
+        if: steps.scope.outputs.backend == 'true'
+        run: pnpm install --frozen-lockfile --filter proroom-control --ignore-scripts
+
       - name: Install and show the repository-pinned Rust toolchain
         if: steps.scope.outputs.backend == 'true'
         working-directory: services
@@ -364,6 +368,12 @@ jobs:
         run: >-
           psql -h 127.0.0.1 -U ptr_clone -d ptr_clone -v ON_ERROR_STOP=1
           -f services/api/fixtures/seed.sql
+
+      - name: Prove the profile authority conversion and guarded rollback
+        if: steps.scope.outputs.backend == 'true'
+        env:
+          CUTOVER_TARGET_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
+        run: node apps/controller/scripts/verify-profile-cutover-e2e.mjs
 
       - name: Verify formatting
         if: steps.scope.outputs.backend == 'true'

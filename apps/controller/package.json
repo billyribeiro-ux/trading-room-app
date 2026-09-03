@@ -41,6 +41,7 @@
     "schema:verify": "node scripts/verify-room-settings-schema.mjs",
     "backend:migrations:verify": "node scripts/verify-backend.mjs --migrations-only && node scripts/verify-backend-provenance.mjs",
     "backend:check": "node scripts/verify-backend.mjs",
+    "backend:cutover:verify": "node scripts/verify-profile-cutover-e2e.mjs",
     "backend:provenance:verify": "node scripts/verify-backend-provenance.mjs",
     "backend:advisories": "node scripts/verify-rust-advisories.mjs",
     "backend:postgres:attest": "cargo run --locked --manifest-path services/Cargo.toml -p tradingroom-api --bin postgres-release-attestation --",

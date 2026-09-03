@@ -42,14 +42,12 @@ const BASELINE_PUBLIC_TABLES: i64 = 23;
 /// ...and how many of those carry FORCE ROW LEVEL SECURITY.
 const BASELINE_FORCE_RLS: i64 = 20;
 
-/// What the **whole** migration set leaves behind: the baseline plus `room_events` from `0003`,
-/// `saved_polls` from `0007`, and `enterprise_memberships` from `0011`. Spelled as
-/// `BASELINE + n` rather than as a literal so that
-/// adding a table without adding its RLS policy shows up here as an arithmetic mismatch rather
-/// than as a number somebody updated by hand.
-const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 3;
-/// All three added tables are tenant-scoped, so all three are FORCE RLS. The two constants move together;
-/// a table added with an `enterprise_id` and no policy makes them disagree, which is the point.
+/// What the **whole** migration set leaves behind: three tenant tables plus the two owner-only
+/// Gate 3 conversion-ledger tables. Spelled as `BASELINE + n` rather than as a literal so a table
+/// addition is a deliberate review point instead of a count somebody updates without reading.
+const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 5;
+/// The three request-path tables are FORCE RLS. The two conversion tables deliberately are not:
+/// they are offline owner-only operational evidence and the runtime role receives no privilege.
 const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 3;
 
 async fn public_table_count(pool: &PgPool) -> i64 {
@@ -1025,6 +1023,109 @@ async fn enterprise_memberships_are_explicit_bounded_and_tenant_hardened() {
     );
 
     runtime.close().await;
+    scratch.finish(owner).await;
+}
+
+#[tokio::test]
+async fn legacy_cutover_mapping_is_owner_only_unique_and_auditable() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    let enterprise_status_constraint: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pg_constraint \
+         WHERE conname = 'enterprises_status_check' \
+           AND conrelid = 'public.enterprises'::regclass)",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect enterprise status constraint");
+    assert!(enterprise_status_constraint);
+
+    let run_id: Uuid = sqlx::query_scalar(
+        "INSERT INTO legacy_cutover_runs \
+           (source_system, source_fingerprint, scope, status, source_counts, target_counts) \
+         VALUES ('controller-postgres', repeat('a', 64), 'profile', 'running', \
+                 '{\"accounts\":1,\"users\":1}'::jsonb, '{}'::jsonb) \
+         RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("start an auditable import run");
+
+    let target = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO legacy_entity_mappings \
+           (source_system, source_fingerprint, entity_type, legacy_id, target_id, run_id, source_digest) \
+         VALUES ('controller-postgres', repeat('a', 64), 'user', '42', $1, $2, repeat('b', 64))",
+    )
+    .bind(target)
+    .bind(run_id)
+    .execute(&owner)
+    .await
+    .expect("record one mapping");
+
+    let duplicate_source = sqlx::query(
+        "INSERT INTO legacy_entity_mappings \
+           (source_system, source_fingerprint, entity_type, legacy_id, target_id, run_id, source_digest) \
+         VALUES ('controller-postgres', repeat('a', 64), 'user', '42', gen_random_uuid(), $1, repeat('c', 64))",
+    )
+    .bind(run_id)
+    .execute(&owner)
+    .await
+    .expect_err("one legacy identity must never map to two targets");
+    assert_eq!(
+        duplicate_source
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("23505")
+    );
+
+    let duplicate_target = sqlx::query(
+        "INSERT INTO legacy_entity_mappings \
+           (source_system, source_fingerprint, entity_type, legacy_id, target_id, run_id, source_digest) \
+         VALUES ('controller-postgres', repeat('a', 64), 'user', '43', $1, $2, repeat('c', 64))",
+    )
+    .bind(target)
+    .bind(run_id)
+    .execute(&owner)
+    .await
+    .expect_err("one target identity must never claim two legacy identities");
+    assert_eq!(
+        duplicate_target
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("23505")
+    );
+
+    for statement in [
+        "INSERT INTO legacy_cutover_runs \
+           (source_system, source_fingerprint, scope, status, source_counts, target_counts) \
+         VALUES ('controller-postgres', repeat('x', 64), 'profile', 'running', '{}'::jsonb, '{}'::jsonb)",
+        "UPDATE legacy_cutover_runs SET status = 'verified' WHERE id = '00000000-0000-0000-0000-000000000000'",
+        "SELECT count(*) FROM legacy_entity_mappings",
+    ] {
+        let runtime = PgPoolOptions::new()
+            .max_connections(1)
+            .connect(&scratch_url(&runtime_url(), &scratch.name))
+            .await
+            .expect("connect as runtime");
+        let error = sqlx::query(statement)
+            .execute(&runtime)
+            .await
+            .expect_err("runtime must not read or mutate the offline conversion ledger");
+        assert_eq!(
+            error
+                .as_database_error()
+                .and_then(|database_error| database_error.code())
+                .as_deref(),
+            Some("42501")
+        );
+        runtime.close().await;
+    }
+
     scratch.finish(owner).await;
 }
 

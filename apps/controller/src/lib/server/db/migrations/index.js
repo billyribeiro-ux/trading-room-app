@@ -16,6 +16,7 @@ import { sql as alertDeliveryLedger } from './0014-alert-delivery-ledger.js';
 import { sql as discordOauth } from './0015-discord-oauth.js';
 import { sql as alertDispatchLinks } from './0016-alert-dispatch-links.js';
 import { sql as alertCrossPostSuppression } from './0017-alert-cross-post-suppression.js';
+import { sql as authorityIdentityMappings } from './0018-authority-identity-mappings.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -155,6 +156,11 @@ export const MIGRATIONS = [
     version: 17,
     name: 'alert_cross_post_suppression',
     sql: alertCrossPostSuppression
+  },
+  {
+    version: 18,
+    name: 'authority_identity_mappings',
+    sql: authorityIdentityMappings
   }
 ];
 
