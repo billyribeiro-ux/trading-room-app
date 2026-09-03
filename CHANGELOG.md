@@ -45,6 +45,79 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 01:48 UTC — a presenter inside somebody's iframe, and eleven of thirteen already built
+
+`7831887`. **Runtime impact: yes**, for one control — a presenter who opened the room inside an
+embed is now offered the way out of it. The rest of this entry is measurement, and it is the larger
+half.
+
+`docs/reference/room-component-gap-register.md`'s R-12 lists thirteen `app-root` subscriptions and
+three init behaviours as *"all absent from `apps/room/src`"*. Re-measured file by file rather than
+inherited: **eleven of the thirteen are built.** `usersDoMsgDelete`'s string is at
+`message-delete.ts:173` — the same function's other branch, which is exactly why the NAME was absent
+and the behaviour was not, and why a name search is not a measurement. The register's separate claim
+that *"`deleteAlertPW` has no occurrence in `apps/room/src`, so in our room a password-protected
+alert deletion is not password-protected"* was true when written and is false now: eleven files, and
+the gate is `internal/room-alert-delete-auth` with the credential staying on the controller.
+
+**Two more were settled by reading, not building.**
+
+`getSessionState` is an internal event-bus name and not a server frame — emitted when a
+`getMyState`/`getRoomState` frame assigns `globals.roomState`, and again after `getMyRepeater`. Both
+subscribers read whole (bytes 1,162,077 and 2,595,730). Every reference-facing output has a
+counterpart here arrived at differently: the closed branch is `disconnectAll` plus a page swap,
+which is `closedPage` → the server door twenty minutes earlier in this changelog; `chatMode` is
+`changeChatMode`; the media init is `media-transport`; and `currPage 'login' → 'chat'` has no
+counterpart at all, because this room's entry is a server route rather than a page inside the shell.
+
+`doSessionAuthFail` is built, as `sessionRevoked`. Its four emitters are socket-authenticate
+failures (993,162 / 993,292 / 993,379, and a code-4500 disconnect at 997,931); this room
+authenticates the SSE request by cookie and tears the stream down **in the same tick** as the frame.
+That is also why upstream's once-only latch is not transcribed — it exists because a socket can fail
+repeatedly, and here the connection ends with the message. `loginErrorMsg` and `loginErrorURL` are
+both honoured, on the server, from settings the server owns rather than shipped to every browser.
+
+The theme fallback — `Invalid theme "X" found, falling back to lightTheme` — is **not a divergence**.
+Upstream's theme is a free-form preference key checked against `chatStyle`'s keys at read time, so a
+bad stored value is reachable there. Here it is a `user_settings.theme` column with two values,
+written only by `saveTheme` (a `z.enum` that refuses everything else) and read from the ROW rather
+than the preferences blob, so `savePreference('theme', …)` cannot reach it either. Building the
+fallback would mean writing a branch nothing can enter.
+
+**What survived as work** is `lib/room/iframe-breakout.ts`, called once from the page's `onMount`. A
+presenter cannot present from inside an embed — screen share, the device picker and the webcam
+prompt all need a top-level document — so the reference offers a break-out rather than failing later
+with a permissions error nobody can act on. Three divergences, each argued at the module:
+
+* **the authority is the SERVER's.** Upstream reads `decodeToken(a).perms == "a"` — the browser
+  decoding the token out of its own address bar and believing it. That is the 2026-08-07 privilege
+  escalation by name, on a control that navigates a top frame, and it is not transcribed for any
+  reason.
+* **`kt=1` is appended with `URL.searchParams`.** Upstream concatenates `"&kt=1"`, which is correct
+  only because it is reached with a token in the query; this room strips the token on entry, so the
+  same four characters would glue a parameter to a query-less path. `kt` has **exactly one
+  occurrence in the 2,891,205-byte bundle and it is that write** — nothing reads it — so the
+  reference-facing output is that the parameter is present, and that count is pinned rather than
+  remembered.
+* **the swallowing `catch` is transcribed, cross-origin silence included.** `window.self !==
+  window.top` answers without throwing and would cover the case upstream stays silent in, and "it
+  would reproduce an upstream defect" has never been a reason to diverge here.
+
+**Measured and deliberately not decided:** `apps/room` sets no `X-Frame-Options` and no
+`frame-ancestors` anywhere — `hooks.server.ts` sets one security header and it is `Referrer-Policy`.
+That is what makes this control reachable rather than dead code. Whether the room *should* be
+frameable is an owner's product question, because closing it breaks every operator embedding the
+room today, so it is recorded at the module rather than taken.
+
+Five negative controls, each run alone and seen red. A capture-bound test file was written and then
+**deleted**, and the reason is kept in the merged file rather than quietly dropped: it claimed that
+reading the bundle made it evidence-bound and excluded on CI, which is false —
+`docs/source-v4-2026-08-15/` is committed, five files under `git ls-files`, and the gitignored root
+the discovery matches is `docs/source`, a different path. `evidence-partition.test.ts` stayed at 42
+throughout, which is what settled it.
+
+Full room suite 6,352 passed, 1 skipped; `pnpm run gate` exit 0. The controller was not touched.
+
 ### 2026-09-03 01:28 UTC — the session door: nothing in either application could close a room
 
 `16853a2`. **Runtime impact: yes.** Two presenter controls that reported success and changed nothing
