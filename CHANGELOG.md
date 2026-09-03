@@ -45,6 +45,39 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 11:20 UTC — the six tabs beside the forty-five commands, and a false green they almost gave
+
+`365b6dd`. **Runtime impact: no.** A document section and one more assertion.
+
+The guard added earlier covered the forty-five absent COMMANDS and left the six absent TABS beside
+them unguarded. Measured: **four of the six had no answer in the tracker either.**
+
+All six are NAME absences — every one of those tabs is rendered here — and what the names turn out to
+be worth is the useful part. `presAreaTabs-<name>` is the class the reference puts on each tab
+anchor, and **only one of the eight carries any styling at all**, measured in the reference's own
+`styles.ee2a710065b60389.css`: `presAreaTabs-notes` five times, `presAreaTabs-screens` once, nothing
+else. So `MainTabStrip.svelte` carries `class="nav-link presAreaTabs-notes"` on exactly one anchor
+and no class on the other six — this repository's *"no `.flipped` class with no CSS"* rule applied
+honestly, rather than seven decorative hooks nothing selects.
+
+The single `screens` occurrence is not a tab rule at all: `#presAreaTabs-screens-panel .btn-link`
+targets a link inside the PANEL, and this room renders no `.btn-link` in `PresentationArea.svelte`.
+A rule with no subject here — and giving the panel an id to satisfy it would be inventing the element
+the rule wants.
+
+`recordings` is the one that is not a name absence, and it stays absent: nothing produces a
+recording, no recordings table exists in either database, and `main-tab-strip-gates.svelte.test.ts`
+enforces the tab's absence rather than leaving it to drift.
+
+**A false green, caught before it counted.** The tab names are matched WITH their `presAreaTabs-`
+prefix. An unqualified search reported `files` and `streams` as answered — both words occur in
+ordinary prose throughout that document — which would have left the guard looking like it worked
+while two tabs had nothing written about them at all. Asserted in the same case as the commands
+rather than a second one, because it is one property: a pinned absence with no answer, and splitting
+it would invite the next list to be added without the guard.
+
+Negative control seen red. `pnpm run gate` exit 0.
+
 ### 2026-09-03 03:07 UTC — thirty-one commands their own tracker had never mentioned
 
 `90433a5`. **Runtime impact: no.** A document and a guard. The number is the entry.
