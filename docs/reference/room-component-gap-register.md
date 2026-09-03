@@ -486,8 +486,8 @@ written them down, and four of them are wired at one end only.
 |---|---|---|
 | `id` | session id, `loadGlobals(r)` | `session/+page.server.ts:154` |
 | `tok` | `storePassedToken` / `getPassedToken`, `decodeToken` | **absent** — this app authenticates from the session cookie |
-| `sl` | `=1` → `skeepLogin`, `logginIn`, `doSessionLoginWithToken(tok)` | **SET, never READ** — `+page.svelte:2540` |
-| `forcedStream` | `globals.forcedStreamServer` | **SET, never READ** — `ModalHost.svelte:2215` |
+| `sl` | `=1` → `skeepLogin`, `logginIn`, `doSessionLoginWithToken(tok)` | **SET, never read — KEPT and recorded** at `alerts-pane.ts` `detach()`, 2026-09-02 |
+| `forcedStream` | `globals.forcedStreamServer` | **no longer set** — the `(test it)` anchor was removed 2026-09-03; `forced-stream-refusal-contract.test.ts` |
 | `dscreen` | `isDetached`, `currPage='detachedScreen'` | `+page.svelte:566` (different shape — R-6) |
 | `r` | `videoOnlyMode`, **and gates the entire init block** | **absent** — recorded honest gap (`+page.svelte:8793`) |
 | `vo` | `=1` viewerOnly; `=2` viewerOnly **+ viewerOnlyModeLimited** | `+page.svelte:1450`; `Limited` unmodelled, recorded at `:1439` |
@@ -496,15 +496,38 @@ written them down, and four of them are wired at one end only.
 | `email` | `globals.loginEmail` | `session/+page.server.ts:175` |
 | `name` | `globals.loginNick` | `session/+page.server.ts:174` |
 | `dlf` | `=1` → `disableLoginForm` | `session/+page.server.ts:190` |
-| `kt` | `=1` → `globals.kt` | **absent** |
+| `kt` | `=1` → `globals.kt` | **written** by the iframe break-out (2026-09-03), read by nobody — and by nobody upstream either: one occurrence in the bundle, at its own write |
 | `changePasswordUID` | `globals.changePasswordUID` | **absent** |
 
-**`sl` and `forcedStream` are the finding.** Both are links this app GENERATES and cannot HONOUR:
-`detachAlerts()` appends `sl=1` to the popout URL and `ModalHost` builds a `?forcedStream=` invite
-link, and no code in `apps/room/src` reads either. Upstream `sl=1` is what makes the detached chat
-window log itself in. Ours works anyway — the popout inherits the session cookie, which is exactly
-why `tok` was deliberately dropped (`+page.svelte:2523-2526`) — so `sl=1` is **residue of that same
-decision that nobody removed.** Either drop it or record it beside the `tok` note.
+**`sl` and `forcedStream` were the finding, and BOTH ARE SETTLED — differently, which is the useful
+part.** Both were links this app generated and could not honour.
+
+`sl=1` is **KEPT and recorded**, 2026-09-02, at `alerts-pane.ts`'s `detach()`. Upstream it makes the
+detached chat window log itself in; ours works anyway because the popout inherits the session cookie,
+which is exactly why `tok` was deliberately dropped. Dropping `tok` is what makes `sl` inert here, so
+the two go together and the note sits beside that one. A transcribed parameter a member never sees,
+which claims nothing, is not worth removing: that direction only makes the next diff against the
+capture harder to read.
+
+`forcedStream` is **REMOVED**, 2026-09-03, and the asymmetry is the point — it is not the same case.
+`sl=1` is a parameter in a URL nobody looks at; `forcedStream` was an anchor labelled `(test it)`
+that a presenter CLICKS. It was honest on the day it was written for one reason only: the `{#if}`
+around it never opened, because `targetUser.streamServer` has no producer yet. Its own note said
+*"it becomes a defect the moment a media host lands"* — and that is a trap a comment cannot hold,
+because whoever lands `STREAM_SERVER_MTX` is editing `user-detail.ts`, not this component, and arms
+it from a value supplied over there.
+
+The reader was never going to be built, so the anchor had no future: a media host taken from a query
+parameter is an authority the CLIENT asserts, and a link reading `?forcedStream=evil.example` sent to
+a member points their camera and microphone at somebody else's SFU. `forced-stream-refusal-contract.test.ts`
+sweeps every shipped file for the parameter, asserts the modal builds no such URL, and asserts the
+diagnostic VALUE still renders — so the refusal is enforced rather than described. The divergence is
+stated where the markup is: upstream shows the host and an affordance to test it; this room shows the
+host.
+
+`kt` gained a WRITER on 2026-09-03 (the presenter-in-an-iframe break-out, R-12) and still has no
+reader — in this room or in the reference, where the parameter occurs exactly once in 2,891,205
+bytes, at its own write.
 
 `r` deserves a second look too: upstream the WHOLE init block is `if (!f)`, so `?r=1` skips token
 handling, login and the `beforeunload` unsubscribe entirely — and the `f && '1' === f` line that sets

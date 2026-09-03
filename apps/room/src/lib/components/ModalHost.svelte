@@ -17,7 +17,6 @@
   import { ROOM_PERMISSION_KEYS, type RoomPermissionKey } from '#lib/permission-keys.js';
   import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '#lib/stream-ingest.js';
   import { invalidateAll } from '$app/navigation';
-  import { resolve } from '$app/paths';
   import { onMount, untrack } from 'svelte';
   import type { CaptureSettings } from '#lib/capture-settings.js';
   import type {
@@ -2550,56 +2549,45 @@
                       <td>
                         {targetUser.streamServer ?? 'n/a'}
                         <!--
-                          ── A TRAP SET FOR WHOEVER LANDS THE MEDIA HOST, recorded 2026-09-02 ────
+                          ── THE "(test it)" LINK IS NOT RENDERED, AND THAT IS A REFUSAL ──────────
 
                           `dTe` at bundle byte 2,063,494 — `v(1,"(test it)")` with
-                          `my("href","",e.locHref,"&forcedStream=",e.user.data.streamServer)` — is
+                          `my("href","",e.locHref,"&forcedStream=",e.user.data.streamServer)`. It was
                           transcribed here, and upstream it WORKS: `app-root` reads `?forcedStream=`
                           into `globals.forcedStreamServer`, and `setMyRepeater` at byte 1,026,712
                           prefers it over whatever the server assigns.
 
-                          THIS ROOM READS THE PARAMETER NOWHERE, so the link is wired at one end
-                          only. It is not a lying control TODAY only because the `{#if}` around it
-                          never opens: `targetUser.streamServer` has no producer here — see
-                          `server/user-detail.ts`, where it is one of three cells left reading `n/a`
-                          rather than filled with something unfalsifiable, blocked on a
-                          `STREAM_SERVER_MTX` host.
+                          THIS ROOM READS THE PARAMETER NOWHERE, and will not — see below. So the
+                          anchor was wired at one end only, and it was honest for exactly one reason:
+                          the `{#if}` around it never opened, because `targetUser.streamServer` has
+                          no producer here (`server/user-detail.ts`, one of three cells left reading
+                          `n/a` rather than filled with something unfalsifiable, blocked on a
+                          `STREAM_SERVER_MTX` host).
 
-                          **It becomes a defect the moment that host lands.** Supply `streamServer`
-                          and this anchor starts rendering, a presenter clicks "(test it)" to
-                          diagnose a member's stream server, and the room reloads having tested
-                          nothing.
+                          ## The anchor is GONE rather than annotated, changed 2026-09-03
 
-                          ## And the reader must NOT simply be built, which is the part worth the
-                          ## note rather than a TODO row
+                          The note that stood here was forty-four lines and said, correctly, *"it
+                          becomes a defect the moment that host lands"*. A comment cannot hold that:
+                          whoever lands the media host is editing `user-detail.ts` and the MTX
+                          wiring, has no reason to open this file, and arms the trap from a value
+                          supplied over there. The note named its own honest end state — *"a
+                          diagnostic VALUE with no '(test it)' affordance"* — so that is now simply
+                          the state.
 
-                          Two independent reasons, and the first is a refusal:
+                          **The argument moved with the enforcement**, which is what buys these lines
+                          back: `forced-stream-refusal-contract.test.ts` carries both reasons the
+                          reader must not be built (a host from a query parameter is an authority the
+                          CLIENT asserts, pointing a member's camera at somebody else's SFU; and
+                          there is no fleet to select from, the same blocker
+                          `missing-commands-triage.md` records for `getMyRepeater`), sweeps every
+                          shipped file for the parameter, and asserts this cell still renders the
+                          value.
 
-                          * **A media host from a query parameter is an authority the client
-                            asserts.** A link with `?forcedStream=evil.example` sent to a member
-                            would point their browser's publish at somebody else's SFU — camera and
-                            microphone, in a multi-tenant fintech room. `CLAUDE.md` names this class
-                            by itself: every authority decision is made on the server from data the
-                            server owns. `mediaSignallingUrl()` resolves one endpoint from
-                            `MEDIA_WS_URL`, server-side, and that is the shape to keep.
-                          * **There is no fleet to select from.** Upstream `forcedStreamServer`
-                            overrides an ASSIGNMENT — `getMyRepeater` asks the server which repeater
-                            to use after a reconnect and the answer comes out of a pool. This
-                            deployment has one media plane and no assignment step, which is the same
-                            blocker `docs/decoded/missing-commands-triage.md` now records for
-                            `getMyRepeater` itself.
-
-                          So the honest end state, when `streamServer` is supplied, is a diagnostic
-                          VALUE with no "(test it)" affordance — or one that reaches a server-side
-                          allow-list of hosts the operator owns. Not this anchor.
+                          A DIVERGENCE, stated as one: upstream shows the host and an affordance to
+                          test it; this room shows the host. If a fleet and a server-side allow-list
+                          of operator-owned hosts ever exist, the affordance can come back pointed at
+                          that list — never at a value from the address bar.
                         -->
-                        {#if targetUser.streamServer}
-                          <a
-                            href="{resolve('/')}?forcedStream={encodeURIComponent(
-                              targetUser.streamServer
-                            )}">(test it)</a
-                          >
-                        {/if}
                       </td>
                     </tr>
                     <tr>

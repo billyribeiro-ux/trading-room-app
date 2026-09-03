@@ -45,6 +45,65 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 02:26 UTC — a trap disarmed rather than documented, and R-11's last three parameters
+
+`13d6cd4`. **Runtime impact: yes, narrowly.** One anchor no longer renders in the user-info modal. It
+could not render today either — the `{#if}` around it has never opened — so nothing a member or
+presenter sees changes now. What changes is what happens later.
+
+A forty-four-line comment beside that anchor said, correctly, that it *"becomes a defect the moment a
+media host lands"*. **Being right is what made a comment the wrong instrument.**
+
+`dTe` at bundle byte 2,063,494 is a `(test it)` link building `?forcedStream=<host>`. Upstream
+`app-root` reads that into `globals.forcedStreamServer` and `setMyRepeater` (byte 1,026,712) prefers
+it over whatever the server assigns. This room reads it nowhere, so the anchor was wired at one end
+only — honest on the day it was written for exactly one reason: `targetUser.streamServer` has no
+producer yet, so the guard never opens.
+
+Whoever lands `STREAM_SERVER_MTX` will be editing `server/user-detail.ts` and the MTX wiring. They
+have no reason to open a six-thousand-line modal component, and supplying the value from over there
+arms the trap without anyone reading the paragraph warning about it. A presenter would then click
+"(test it)" to diagnose a member's stream server and the room would reload having tested nothing. The
+note had already named its own honest end state — *"a diagnostic VALUE with no '(test it)'
+affordance"* — so that is now simply the state. The host still renders; the affordance does not.
+
+**The reader was never going to be built**, which is why the anchor had no future. A media host taken
+from a query parameter is an authority the CLIENT asserts: a link reading `?forcedStream=evil.example`
+sent to a member points their browser's publish — camera and microphone, in a multi-tenant fintech
+room — at somebody else's SFU. And there is no fleet to select from: upstream's `forcedStreamServer`
+overrides an assignment that comes out of a pool, the same blocker recorded for `getMyRepeater`.
+
+`forced-stream-refusal-contract.test.ts` sweeps every shipped file for the parameter, asserts the
+modal builds no such URL, asserts the diagnostic value still renders, and asserts `mediaSignallingUrl`
+still resolves one endpoint from `MEDIA_WS_URL` server-side. Four negative controls seen red.
+
+**Two of my own assertions were wrong before they were right**, and both are recorded at the code
+rather than quietly corrected. The sweep first matched the bare string and flagged
+`StreamTabs.svelte`, whose `forcedStreamId` is `forcedScreenMTXID` — the eye badge, nothing to do
+with a query string; the boundary is explicit now and a positive control keeps the badge from being
+"fixed" away to pass a sweep. And a negative control reported its offender as `es/+page.svelte`,
+because the path prefix was sliced relative to `src/lib/` for files under `src/routes/`. A security
+sweep whose failure message misnames the file is one somebody argues with instead of fixing.
+
+**R-11's three open parameters are settled, and the asymmetry between two of them is the finding.**
+`sl=1` is KEPT and recorded — a parameter in a popout URL nobody looks at, which claims nothing, and
+removing a transcribed parameter because this deployment does not need it only makes the next diff
+against the capture harder to read. `forcedStream` is REMOVED, because it was not that: it was an
+anchor labelled "(test it)" that a presenter clicks. `kt` gained a writer forty minutes ago with the
+iframe break-out and still has no reader — nor does it upstream, where it occurs once in 2,891,205
+bytes, at its own write.
+
+**The ratchet ran in both directions on one anchor, one day apart.** `ModalHost.svelte` 6,136 →
+6,124, then 6,123 when `eslint` found the `$app/paths` import leaving with the anchor that used it.
+The raise from 2026-09-02 is kept in the entry beside the lower rather than edited away: the thing
+extracted was an ARGUMENT, and it went somewhere it could be enforced instead of read.
+
+`surface-audit-contract.test.ts` now expects exactly one text gap on `app-user-info-modal` and
+**names** it. An audit that reports "one literal missing" without saying which is an audit somebody
+silences.
+
+`pnpm run gate` exit 0.
+
 ### 2026-09-03 02:11 UTC — R-6's two open actions, and a comment that described upstream in the present tense
 
 `e64a8bf`. **Runtime impact: no.** A divergence recorded, a comment corrected, a contract added, and

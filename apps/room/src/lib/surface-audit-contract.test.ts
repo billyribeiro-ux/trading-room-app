@@ -1060,7 +1060,23 @@ describe('app-user-info-modal — audited 2026-09-01, and its nine gaps are TWO 
     ]);
   });
 
-  it('and renders every text literal, avatar menu included', () => {
-    expect(report.textGaps).toEqual([]);
+  it('renders every text literal but ONE, and the one is a refusal', () => {
+    /*
+      `(test it)` — `dTe`, bundle byte 2,063,494 — is the only text literal from this surface that
+      this room does not render, and it left on 2026-09-03 rather than never having arrived.
+
+      It was an anchor building `?forcedStream=<host>`. Upstream `app-root` reads that parameter into
+      `globals.forcedStreamServer` and `setMyRepeater` prefers it over the server's assignment; this
+      room reads it nowhere and will not, because a media host taken from a query parameter is an
+      authority the CLIENT asserts — a link reading `?forcedStream=evil.example` sent to a member
+      points their camera and microphone at somebody else's SFU.
+
+      Listed here as a NAMED gap rather than left to make `textGaps` non-empty anonymously. An audit
+      that reports "one text literal missing" and does not say which is an audit somebody silences.
+      `forced-stream-refusal-contract.test.ts` holds the property, sweeps every shipped file for the
+      parameter, and asserts the diagnostic VALUE beside it still renders — the host is still shown,
+      only the affordance to point a browser at an arbitrary one is gone.
+    */
+    expect(report.textGaps).toEqual(['(test it)']);
   });
 });
