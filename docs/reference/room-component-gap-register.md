@@ -123,7 +123,13 @@ status table below carries an explicit `NOT AUDITED` count rather than implying 
 
 ---
 
-## R-1 — `app-typing-indicator-dots` is not built, and it belongs in the chat panes
+## R-1 — `app-typing-indicator-dots` — **BUILT**; the heading below is what it said before
+
+> **Re-measured 2026-09-03.** The heading read *"is not built, and it belongs in the chat panes"*.
+> It is `lib/components/TypingIndicatorDots.svelte`, 110 lines, rendered by `AlertChatArea.svelte`
+> and `ExtraChatPane.svelte` — the two chat panes the heading names. The reference reading below is
+> unchanged and is what it was built from; only the verdict was stale.
+
 
 **Reference, read whole** (`app-typing-indicator-dots.full.js`, 1,231 B — 4 decls):
 
@@ -154,7 +160,12 @@ arrived with the captured stylesheet; the feature did not.
 **Blocks:** the "someone is typing" affordance in both chat columns. **Needs:** a wire signal for
 typing — the transport half is not established here and must not be invented.
 
-## R-2 — `app-positions-container` is not built
+## R-2 — `app-positions-container` — **BUILT**
+
+> **Re-measured 2026-09-03.** `lib/components/PositionsContainer.svelte`, 74 lines, rendered by
+> `PresentationArea.svelte`, with `positions-iframe.ts` and `positions-iframe-contract.test.ts`
+> beside it. The reference reading below is unchanged.
+
 
 **Reference, read whole** (`app-positions-container.full.js`, 2,531 B — 3 decls):
 
@@ -174,7 +185,11 @@ div.positionOverlay.animated.fadeIn > iframe[src]
 **Note for whoever builds it:** it embeds a THIRD-PARTY URL from room settings in an iframe with the
 sanitiser bypassed. That is a security decision to take deliberately, not to copy.
 
-## R-3 — `app-kicked-page` is not built
+## R-3 — `app-kicked-page` — **BUILT**
+
+> **Re-measured 2026-09-03.** `lib/components/KickedPage.svelte`, 114 lines, rendered from
+> `routes/+page.svelte`. The reference reading below is unchanged.
+
 
 **Reference, read whole** (`app-kicked-page.full.js`, 822 B — 4 decls):
 
@@ -340,15 +355,41 @@ overflow-y: auto` box. Everything else on the page is chrome around it.
   sanitiser-bypassed, overridden wholesale by `sessData.altBenzingaLinkURL` when non-empty.
   **It puts the session token in a third-party URL** — a security decision to take deliberately.
 
-**Ours:** nothing. `closedTxt`, `closed-container`, `roomV4Link`, `simUserCount`, `alwaysShowRoster`
-and `hideAppInfo` have **no occurrence anywhere in `apps/room/src`**. `archivesAvailableTo()` IS
-built and pinned (`lib/roster-gates.ts:54`, bundle-pinned in `roster-gates.test.ts:52-57`), so the
-gate exists even though the page that also uses it does not. The `sessionClosed` hits in
-`lib/media/session.ts` and `lib/media/signalling.ts` are a mediasoup error string and unrelated —
-`roster-gates.test.ts:733` already says so in as many words.
+**Ours — RE-MEASURED 2026-09-03, and the paragraph that stood here was materially false.** It read
+*"nothing. `closedTxt`, `closed-container`, `roomV4Link`, `simUserCount`, `alwaysShowRoster` and
+`hideAppInfo` have no occurrence anywhere in `apps/room/src`"*. Five of those six exist:
 
-**Blocks:** everything a member sees after a session ends. Today they would see the live room.
-**Needs:** `sessData.currentState` and `sessData.closedTxt` on the wire — see R-11.
+| identifier | ours |
+|---|---|
+| `closedTxt` | `room_state.closed_message`, written by `saveCloseMessage` and read by `server/closed-room-message.ts` |
+| `closed-container` | `routes/+error.svelte` — the same class name, on the page that actually answers a closed room |
+| `simUserCount` | `room/roster.svelte.ts`, `RoomNavbar.svelte`, delivered by `room-config-client.ts` |
+| `alwaysShowRoster` | `room/gates.ts`, `RoomNavbar.svelte`, `+page.svelte`; `always-show-roster-contract.test.ts` |
+| `hideAppInfo` | `RoomSidebar.svelte` |
+| `roomV4Link` | **absent**, and it is the one that should be: it is the "Try v3" link whose label and URL disagree, and it belongs to a shell this room deliberately does not build |
+
+`archivesAvailableTo()` is built and pinned (`lib/roster-gates.ts:54`, bundle-pinned in
+`roster-gates.test.ts:52-57`). The `sessionClosed` hits in `lib/media/session.ts` and
+`lib/media/signalling.ts` are a mediasoup error string and unrelated — `roster-gates.test.ts:733`
+already says so in as many words.
+
+**Blocks: nothing, as of 2026-09-03.** The line here read *"everything a member sees after a session
+ends. Today they would see the live room"*, and the second half was the true and important part —
+not because the refusal was missing, but because **nothing could ever set the column it refuses
+on.** `decideRoomEntry` has always answered `roomState !== 'open'` with the presenter's own close
+message; `rooms.state` was written at room creation and nowhere else, the controller's `setState`
+form action had no form posting to it, and the room's "Save Message and Close Session" wrote a
+per-user preference with zero readers. That door is built — `internal/room-state/[code]`,
+`closeSession`/`openSession`, and a `closedPage` frame for the people already inside.
+
+**The structural divergence stands and is deliberate.** A closed room here is answered by the SERVER,
+through the same door every arrival uses, rendered by `+error.svelte` with the stored message —
+rather than by a second client shell that mounts nine modals of its own. That keeps one sentence in
+one place; a second closed-page component would have to be told what the first one says. What this
+room therefore does not offer a member on a closed page is the chrome: the Archives dropdown, the
+roster, `Get Random User`, and the `Open Session` button, all of which live in the LIVE room here.
+
+**Needs, for the shell itself:** an owner decision that the chrome is wanted after a session ends.
 
 ## R-6 — `app-detached-screen`: ours diverges structurally, and the divergence is undeclared
 
@@ -397,7 +438,12 @@ popout; the reference's boots a consumer and nothing else.
 
 That is arguably the better shape for a SvelteKit app — one route, one component tree — but it is a
 **structural divergence with a per-popout cost** and `CLAUDE.md` requires those to be recorded at the
-call site. They are not. **Action: record it, or narrow the popout.**
+call site. **DONE 2026-09-03** — `RoomScreens.detach` in `lib/room/screens.svelte.ts` now carries it,
+with the cost stated as it actually falls (per popout, not per session: a presenter detaching three
+screens holds four full rooms open, four SSE connections, four rosters) and the reason narrowing was
+NOT taken — a second route whose only job is to be a smaller copy of a page this app already renders
+is a thing that then drifts, which is the failure this repository has met twice already. Narrowing
+stays available; it is now a decision made on evidence rather than an omission nobody noticed.
 
 **One dead emission of ours:** `closeScreenPopout()` (`:633-644`) posts
 `{cmd:'screeenStopped', presID}` and then calls `popout.close()` on the next line. **No
@@ -410,6 +456,24 @@ unreachable one above. The `close()` on the next line is what actually does the 
 *(Corrected during pass 3. This row first read "nothing listens for a `message` event", which a
 reader checking it would have found contradicted by `:6979` and reasonably concluded the row was
 wrong. The claim is about `window`/`postMessage`, and it now says so.)*
+
+**Re-measured 2026-09-03, and the finding is larger than one dead emission.** There is no
+`window.addEventListener('message', …)` anywhere in `apps/room/src`, so BOTH transcribed posts reach
+nobody here — `screeenStopped` above, and `windowClosing` from `RoomWindowHandlers.beforeUnload`.
+`window-handlers.ts`'s docblock described upstream's listener in a way that read as though this room
+had one, which made the load-bearing half look like a duplicate.
+
+**What actually re-attaches** is the opener registering `beforeunload` ON THE CHILD `Window` —
+same-origin, and what upstream's own screen popout does (`s.onbeforeunload = () => emit(
+"reatachScreenShare", i.pres._id)`). `RoomAlertsPane.detach` and `RoomScreens.detach` each hold one,
+and each is a line somebody tidying "the duplicate" would remove while leaving the post that does
+nothing. `popout-reattach-contract.test.ts` pins both listeners, pins that no module adds a `window`
+message listener, and carries a positive control so the sweep cannot pass by the room having no
+message handling at all. Three negative controls seen red.
+
+Both posts are KEPT. They are transcription, a member never sees them, and they claim nothing — the
+same resolution `alerts-pane.ts` reached for `sl=1`. What was wrong was a comment claiming an
+effect, not the lines.
 
 ---
 

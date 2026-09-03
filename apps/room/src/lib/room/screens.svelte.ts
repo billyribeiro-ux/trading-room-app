@@ -374,6 +374,28 @@ export class RoomScreens {
    * detaching a screen opened a window that redirected straight to the login page. The real
    * contract is the ROOM itself with `?dscreen=1`, which is also how the popout recognises itself:
    * the captured component reads `isDetachedCtrl = params.has("dscreen") && params.has("presID")`.
+   *
+   * ## A STRUCTURAL DIVERGENCE WITH A PER-POPOUT COST, recorded here 2026-09-03
+   *
+   * `room-component-gap-register.md`'s R-6 asked for this in as many words — *"Action: record it, or
+   * narrow the popout"* — and it had gone unrecorded since the popout was built.
+   *
+   * The URL above is the reference's, exactly. What opens is not. Upstream's `?dscreen=1` mounts
+   * `app-detached-screen`, a 3,815-byte component that is a screen consumer and nothing else:
+   * `app-root` switches `currPage` to `'detachedScreen'` and renders it INSTEAD OF `app-room`. Ours
+   * is the whole room wearing `class:detach-screen` (`+page.svelte:1324`), so every popout boots
+   * chat, roster, alerts, the SSE subscription and the media transport in order to show one screen.
+   *
+   * **That is a real cost and it is per popout, not per session.** A presenter detaching three
+   * screens holds four full rooms open, four SSE connections, four rosters.
+   *
+   * It is kept, and the reason is not inertia. Narrowing it means a second route with its own load,
+   * its own media transport wiring and its own auth path, whose only job is to be a smaller copy of
+   * a page this app already renders — and the two would then drift, which is the failure this
+   * repository has met repeatedly (a second closed-page shell told what the first one says; a
+   * second chat-log formatter). The divergence is DECLARED so the next reader weighs it with the
+   * cost in front of them, which is what R-6 actually asked for; narrowing stays available and is
+   * now a decision somebody makes on evidence rather than an omission nobody noticed.
    */
   detach(screenId: string) {
     const screen = this.#screens().find((entry) => entry.id === screenId);

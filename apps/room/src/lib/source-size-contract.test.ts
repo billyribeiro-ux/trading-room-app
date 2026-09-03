@@ -1351,7 +1351,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `beginSplit` deliberately did NOT come with it: it has two consumers (`RoomShell` and
       `AlertChatArea`), so the page stays its owner. A shared handler is not a window handler.
     */
-    max: 234,
+    /*
+      234 -> 252, 2026-09-03, and all eighteen lines are one corrected paragraph.
+
+      `beforeUnload`'s docblock quoted upstream's `window.addEventListener("message", …)` and then
+      said *"it is how the opener learns the popout closed"* — present tense, no subject change. Read
+      here, that describes THIS room, and it is false: there is no `window` message listener anywhere
+      in `apps/room/src`. What actually re-attaches is the opener holding the child `Window` and
+      registering `beforeunload` on it, in `alerts-pane.ts` and `screens.svelte.ts`.
+
+      The cost of leaving it was a reader deleting the RIGHT line. The two sit close together and one
+      of them reads like a duplicate of the other; the one that works has no comment beside it and
+      the one that reaches nobody had a paragraph explaining why it mattered.
+
+      The post itself is kept — transcription, invisible to a member, claiming nothing — and
+      `popout-reattach-contract.test.ts` now pins both halves so the pairing survives the next tidy.
+    */
+    max: 252,
     why: 'the window listeners - bindings stay on the element, bodies and citations move here'
   },
   {
@@ -5342,7 +5358,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and points at the file that proves it. That is this entry's own rule — *moving an explanation to
       the code it explains is the extraction itself* — applied to a decode rather than to markup.
     */
-    max: 535,
+    /*
+      535 -> 557, 2026-09-03. Twenty-two lines, no code, and they are a divergence this repository's
+      own rules had required to be written down since the popout was built.
+
+      `room-component-gap-register.md`'s R-6 asked for it in as many words — *"Action: record it, or
+      narrow the popout"*. Upstream's `?dscreen=1` mounts `app-detached-screen`, 3,815 bytes that
+      consume a screen and nothing else, rendered INSTEAD OF `app-room`. Ours is the whole room
+      wearing `class:detach-screen`, so every popout boots chat, roster, alerts, the SSE subscription
+      and the media transport to show one screen — per popout, not per session.
+
+      RECORDED rather than narrowed, and the note says why: a second route whose only job is to be a
+      smaller copy of a page this app already renders is a thing that then drifts, which is the
+      failure met twice here already. Narrowing stays available and is now a decision somebody makes
+      with the cost in front of them.
+
+      If this climbs, the question is whether the popout gained BEHAVIOUR — in which case narrowing
+      has become cheaper than the note — rather than whether the note can be shortened. It cannot;
+      it is the thing R-6 asked for.
+    */
+    max: 557,
     why: 'the screen viewer; the transport keeps the list, this keeps the three ids that point into it'
   },
   {
