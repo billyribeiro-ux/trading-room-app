@@ -183,6 +183,29 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'resetAudioBridgeOnServer',
   'resetMediaServer',
   'resetSession',
+  /*
+    `saveAndCloseSession` and `setSessionState` — the DOOR, and both are name absences over a feature
+    that is built. Read whole 2026-09-03, because until that day the feature genuinely was not built
+    and this list would have been right by accident.
+
+    Upstream, byte 2,165,132:
+
+      saveAndCloseSession() { let e = $("#summernoteClosedMsg").summernote("code");
+        this.done(); globals.sessData.closedTxt = e;
+        sendServerAdminCommand("saveAndCloseSession", {closedMsg: e}) }
+
+    and `setSessionState(e) { this.send("setSessionState", e) }` at 1,026,934 — a thin wrapper with
+    TWO occurrences in the whole bundle, its declaration and the `send` inside it. Its callers are
+    not in the capture, so what the reference passes it cannot be read here.
+
+    This room does both acts through `saveCloseMessage` and `closeSession`
+    (`session-commands.remote.ts`), which store `room_state.closed_message` and write `rooms.state`
+    through `internal/room-state/[code]`. Different transport, same two acts, and the ordering the
+    reference implies — message first, close second — is enforced by `close-message.ts`.
+
+    They stay on this list because the list is what our SOURCE names, and it names neither. The
+    footer's rule is the whole point: an absent identifier is not an absent feature.
+  */
   'saveAndCloseSession',
   'setSessionState',
   'setUserProfilePic',

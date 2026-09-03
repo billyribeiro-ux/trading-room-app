@@ -74,15 +74,32 @@ hid work behind a confident-sounding category.
 Recorded permanently. Each was a plausible-looking gap that survived a full read of the bundle and
 died on contact with our source.
 
-| command | where we already do it |
+> ### ⚠️ EVERY CITATION IN THIS TABLE WAS A MARKUP CITATION, AND THIS DOCUMENT SAYS WHY THAT IS WRONG
+>
+> Rewritten 2026-09-03 to cite the COMMAND. The version that stood here pointed at
+> `ModalHost.svelte` for five of the seven rows — at a BUTTON — and the section two hundred lines
+> below already draws the lesson in as many words: *"a markup search cannot tell a wired control
+> from an inert one"*, and *"NONE of the six had a command behind it when it was written"*.
+>
+> The cost was not hypothetical. On 2026-09-03 `saveAndCloseSession` was measured end to end and it
+> was the largest liar in the application: the button wrote `savePreference('sessionOpen', false)` —
+> a key with **zero readers anywhere in `apps/room/src`** — while `rooms.state`, the column
+> `decideRoomEntry` actually refuses entry on, had no writer in either application. A presenter
+> closed the session, was told `Message Saved`, and the room admitted everybody as before, for the
+> entire life of the feature. **This table said "we already build this" the whole time**, and its
+> citation was the button that did nothing.
+>
+> Each row now names the remote command, and the date it gained one.
+
+| command | the COMMAND behind it, and when it got one |
 | --- | --- |
-| `hardResetSession` | apps/room/src/lib/components/ModalHost.svelte (two buttons); handler at apps/room/src/routes/+page.svelte |
-| `lockSession` | apps/controller/src/lib/room-entry.ts |
-| `saveAndCloseSession` | apps/room/src/lib/components/ModalHost.svelte |
-| `saveCloseMessage` | apps/room/src/lib/components/ModalHost.svelte (button, label "Just Save Close Message"); apps/room/src/routes/+page.svelte (handler: 'Message Saved' alert, modal deliberately not closed) |
-| `savePresenterColors` | apps/room/src/lib/components/ModalHost.svelte |
-| `softResetSession` | apps/room/src/lib/components/ModalHost.svelte |
-| `stopRecMtx` | apps/room/src/routes/+page.svelte — `stopRecording`, `broadcastRecordingState('stopRec')` and the `broadcastRecordingState` definition; apps/room/src/routes/+page.server.ts (recordingState actio |
+| `hardResetSession` | `hardReset` — `session-commands.remote.ts`, 2026-08-27. Was two buttons over a local `invalidateAll()` |
+| `lockSession` | `lockSession` — `session-commands.remote.ts`; enforced by `decideRoomEntry` in `apps/controller/src/lib/room-entry.ts`. The three Lock Session buttons wrote `sessionLocked`/`sessionLockKick`, keys with zero readers, until 2026-09-02 |
+| `saveAndCloseSession` | `closeSession` — `session-commands.remote.ts`, **2026-09-03**, and it is the row above's example. It writes `rooms.state = 'closed'` through `internal/room-state/[code]` and publishes `closedPage` for the people already inside |
+| `saveCloseMessage` | `saveCloseMessage` — `session-commands.remote.ts`, 2026-08-27, storing `room_state.closed_message`. The citation here used to read *"handler: 'Message Saved' alert, modal deliberately not closed"*, which was a description of the inert version |
+| `savePresenterColors` | `savePresenterColors` — `presenter-colors.remote.ts` |
+| `softResetSession` | `softReset` — `session-commands.remote.ts`, 2026-08-26 |
+| `stopRecMtx` | `recordingState` — `recording-state.remote.ts`, with `broadcastRecordingState('stopRec')` on the room side |
 
 ### One was contested, and I resolved it by reading rather than averaging
 
