@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, globSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
@@ -18,8 +19,8 @@ import { describe, expect, it } from 'vitest';
  *   `formatStripeAmount`. That directory has never held that file; the artifact is
  *   `evidence-dumps/manage-app-2026-08-31/app.min.js`, and the OFFSET was right all along —
  *   `formatStripeAmount` is at exactly 183,815 there, measured with `indexOf` on the file's bytes.
- * - `room-config-boundary.test.ts` credited the seam probe's finding to
- *   `scripts/room-config-seam-e2e.mjs`; that governed script is present again.
+ * - `room-config-boundary.test.ts` credited the seam probe's finding to an ignored, workstation-only
+ *   script rather than the tracked Playwright spec that replaced it.
  * - `api-docs.ts` carried `Regenerate: node scripts/extract-api-docs.mjs`, an instruction naming a
  *   generator no commit has ever added under any path.
  * - `editable-display.test.ts` said "Reproduce with" against a capture output never committed.
@@ -43,8 +44,23 @@ import { describe, expect, it } from 'vitest';
 const CITATION =
   /(?<![\w./-])(?:apps\/[\w-]+\/)?(?:src|gate|ops|e2e|scripts|evidence-dumps)\/[\w./-]+\.(?:mjs|json|svelte|html|css|sql|md|ts|js)(?![\w-])/g;
 
-/** This app, the repository root, the sibling app, and the framework's own source. */
-const BASES = ['', '../../', '../room/', 'node_modules/svelte/', 'node_modules/@sveltejs/kit/'];
+/** Repository candidates pair the on-disk resolution with the path Git must actually ship. */
+const REPOSITORY_BASES = [
+  { disk: '', tracked: 'apps/controller/' },
+  { disk: '../../', tracked: '' },
+  { disk: '../room/', tracked: 'apps/room/' }
+] as const;
+
+/** Framework citations are installed dependencies rather than repository-owned files. */
+const DEPENDENCY_BASES = ['node_modules/svelte/', 'node_modules/@sveltejs/kit/'] as const;
+
+const TRACKED = new Set(
+  execFileSync('git', ['ls-files', '-z'], { cwd: '../..', encoding: 'utf8' }).split('\0').filter(Boolean)
+);
+
+const opensFromCleanCheckout = (path: string): boolean =>
+  REPOSITORY_BASES.some((base) => existsSync(base.disk + path) && TRACKED.has(base.tracked + path)) ||
+  DEPENDENCY_BASES.some((base) => existsSync(base + path));
 
 /**
  * The citations that cannot be opened, each with what was MEASURED about it.
@@ -118,13 +134,20 @@ describe('the sweep is measuring something', () => {
     const truncated = CITATIONS.filter((citation) => citation.path.endsWith('rects-baseline.js'));
     expect(truncated).toEqual([]);
     expect(CITATIONS.some((citation) => citation.path.endsWith('.json'))).toBe(true);
+
+    /*
+      A developer workstation can still contain the old ignored Room probe. That local file is the
+      exact condition that hid the hosted failure, so it remains a negative control for the resolver:
+      an ignored file is not something a clean checkout can cite.
+    */
+    expect(opensFromCleanCheckout('apps/room/scripts/audit-behavior-coverage.mjs')).toBe(false);
   });
 });
 
 describe('every cited path opens, or is listed with what was measured about it', () => {
   it('names each disagreement, rather than failing on the first', () => {
     const unopenable = [
-      ...new Set(CITATIONS.filter(({ path }) => !BASES.some((base) => existsSync(base + path))).map(({ path }) => path))
+      ...new Set(CITATIONS.filter(({ path }) => !opensFromCleanCheckout(path)).map(({ path }) => path))
     ].sort();
     expect(
       unopenable,

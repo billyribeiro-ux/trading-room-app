@@ -63,8 +63,8 @@ const gitAvailable = TRACKED !== null;
  * Matched on path SEGMENTS, never as a substring.
  *
  * The first version of this asked git for `*coverage*` and failed on
- * `apps/room/scripts/audit-behavior-coverage.mjs` — a hand-written source file whose NAME contains
- * the word. That is the check being wrong rather than the repository, and it is exactly the trap
+ * the former `audit-behavior-coverage.mjs` Room script — a hand-written source file whose NAME
+ * contains the word. That is the check being wrong rather than the repository, and it is exactly the trap
  * this file's own header warns about: a sweep that cries wolf gets deleted, and then nothing is
  * guarded at all. A directory is a violation only when a whole path component equals its name.
  *

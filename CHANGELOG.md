@@ -45,6 +45,27 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 19:17 EDT — clean-checkout contracts stopped borrowing workstation state
+
+**Runtime impact: no; this changes test fixtures, comments, and CI contracts only.** Two hosted
+failures exposed opposite forms of the same defect. The controller's comment-path sweep accepted two
+retired Room scripts because ignored copies happened to exist locally, while the Room permission
+refresh contract required `ROOM_JWT_SECRET` but only passed locally because the ignored `.env`
+supplied one.
+
+Repository citations must now both exist and appear in `git ls-files`; installed Svelte/SvelteKit
+source citations retain their dependency-specific existence check. The stale prose points only to
+tracked evidence, and an ignored Room probe is an explicit negative control for the resolver. The
+permission test keeps the real signed controller-write client and supplies deterministic values
+through `$app/env/private`, so it still proves commit-before-notify ordering without depending on a
+machine secret.
+
+Measured verification before commit: the controller regression passed 38 assertions across three
+files, its exact `quality` pipeline passed 124 files/1,265 tests plus all 9 Chromium journeys and the
+production build, and the isolated Room permission contract passed both cases. A clean-worktree Room
+gate is run before push so the owner's unrelated untracked conflict copies cannot contaminate its
+source-inventory contracts.
+
 ### 2026-09-03 19:01 EDT — Gate 3 gained a resumable identity converter and one-way credential bridge
 
 **Runtime impact: yes after migration and operator invocation; no production conversion or deploy
