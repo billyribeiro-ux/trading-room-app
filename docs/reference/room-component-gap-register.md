@@ -22,6 +22,31 @@ recorded. **Never mark a row closed on reasoning alone.**
 
 **Part B is where the money is.** P-1 alone is a cancelled member still receiving the product.
 
+---
+
+## Where Part A stands — swept 2026-09-03, every row put against the tree
+
+This register was written between 2026-08-16 and pass 3, and **it was stale in the safe direction on
+almost every row**: more is built than it records. That direction is the dangerous one for a
+tracker, because a reader building from it rebuilds shipped components. Each row now carries the
+measurement and the citation that settled it.
+
+| row | state |
+|---|---|
+| R-1 `app-typing-indicator-dots` | **BUILT** — `TypingIndicatorDots.svelte`, rendered by both chat panes |
+| R-2 `app-positions-container` | **BUILT** — `PositionsContainer.svelte`, rendered by `PresentationArea` |
+| R-3 `app-kicked-page` | **BUILT** — `KickedPage.svelte`, rendered by the page |
+| R-4 `app-session-transcript` | **BUILT** 2026-09-02 — the recorded blocker (*"`currentCaption` is never assigned"*) was false; the docblock asserting it was the only evidence it stood on |
+| R-5 `app-closed-session-page` | **the door is built; the SHELL is a declared architectural divergence.** Five of the six identifiers this row called absent exist. What a member does not get on a closed page is the chrome, and whether that chrome is wanted is the owner's |
+| R-6 `app-detached-screen` | **both actions done** 2026-09-03 — the structural divergence recorded at the call site with its per-popout cost, and a comment that described upstream's listener in the present tense corrected. `popout-reattach-contract.test.ts` pins the half that actually works |
+| R-11 the query-parameter contract | **settled.** `sl` kept and recorded, `forcedStream` removed (it was an anchor a presenter clicks, not a parameter nobody sees), `kt` written by the iframe break-out and read by nobody — upstream included |
+| R-12 `app-root`'s shell | **eleven of thirteen subscriptions built**; `getSessionState` is not a divergence, `doSessionAuthFail` is `sessionRevoked`, the theme fallback would be an unreachable branch, and the one genuinely absent control — the presenter-in-an-iframe break-out — was built 2026-09-03 |
+| R-13 `app-scplayer` | **DONE** — the divergence declared at the call site and pinned in `soundcloud-autoplay-contract.test.ts`, which asserts the URL *and* the argument |
+| R-14 `app-ytplayer` | **BUILT** — the blocker was built first and the prop followed it, which is the order this row itself insisted on |
+
+**What is actually left in Part A is one owner decision** (R-5's closed-page chrome) and one standing
+divergence kept on purpose (R-6's popout, with its cost written down).
+
 ## The corpus
 
 `apps/room/docs/source/` — an Angular 17 room build: `main.d6d3c112b59b7d0d.js` (2,887,876 bytes),
@@ -206,7 +231,7 @@ page a kicked member lands on does not exist.**
 
 Note `d-flex-column` — not Bootstrap's `flex-column`. Transcribe it; do not correct it.
 
-## R-4 — `app-session-transcript` is a whole page, not a link
+## R-4 — `app-session-transcript` is a whole page, not a link — **BUILT**
 
 **Reference, read whole** (`app-session-transcript.full.js`, 20,427 B — 20 decls, 6 vars).
 
@@ -269,14 +294,29 @@ then `span.entry-speaker{speaker}` then `: {text} `. `formatDate` is
 **Closing handshake:** when `window.opener` exists, `beforeunload` posts the string
 `'transcriptWindowClosing'` to the opener at `window.location.origin`.
 
-**Ours:** `openTranscriptPage()` (`+page.svelte:2581`) sets `bootboxAlert` to `TRANSCRIPT_UNAVAILABLE`.
-That stub is honest and its comment (`:2560-2577`) records the real blocker: `currentCaption` is never
-assigned, so this repo produces no transcript rows to serve. **The stub is correct; the page, the
-route, the API and the storage are all absent.** Nothing in `src` matches `transcriptWindowClosing`.
+**Ours — BUILT 2026-09-02, and the blocker below is the second one in this register that turned out
+to be false.** The paragraph that stood here read: *"`openTranscriptPage()` sets `bootboxAlert` to
+`TRANSCRIPT_UNAVAILABLE`. That stub is honest and its comment records the real blocker:
+`currentCaption` is never assigned, so this repo produces no transcript rows to serve. The stub is
+correct; the page, the route, the API and the storage are all absent."*
 
-**Blocks:** "Transcript History" in the Archives menu and "Full Transcript History" on the caption
-overlay — both currently reach the stub. **Needs:** speech-reco results persisted server-side first;
-building the page before there is anything to read would be the invented-data failure.
+`currentCaption` **is** assigned — by `media-transport.svelte.ts`, fed by `services/media` — and the
+docblock asserting otherwise was itself the only evidence the blocker stood on. The page, the route,
+the store and the API all exist now: `routes/session-transcript/+page.svelte` (the component
+transcribed whole from bundle byte 2,607,394 — the date picker and its `yyyy-MM-dd` round trip,
+`formatDate`'s 12-hour clock, client-side search over `text` and `speaker`, 300-row server paging,
+the five navigation buttons rendered twice, and the three-way loading/error/list state machine),
+`server/session-transcript.ts`, and `session-transcript.remote.ts` with the write presenter-gated and
+the read archives-gated.
+
+**One divergence, and it is a refusal:** upstream's transcript URL carries `globals.sesionToken`.
+Ours carries no query string at all — the server re-derives the room, the caller and the room's NAME
+from the session cookie.
+
+**Blocks: nothing.** *"Needs: speech-reco results persisted server-side first; building the page
+before there is anything to read would be the invented-data failure"* was the right rule and it was
+followed — the data is this room's own relayed captions, and the reference's server holds a transcript
+too (`getSessionTranscripts`, byte 1,151,135), so nothing was invented to fill it.
 
 ## R-5 — `app-closed-session-page` is a second room shell, not a message
 
@@ -391,7 +431,7 @@ roster, `Get Random User`, and the `Open Session` button, all of which live in t
 
 **Needs, for the shell itself:** an owner decision that the chrome is wanted after a session ends.
 
-## R-6 — `app-detached-screen`: ours diverges structurally, and the divergence is undeclared
+## R-6 — `app-detached-screen`: ours diverges structurally — **the divergence is declared now**
 
 **Reference, read whole** (`app-detached-screen.full.js`, 3,815 B — 2 decls, 2 vars).
 
@@ -725,7 +765,7 @@ back empty and would have supported "the debug modal is not built". It is built,
 `ModalHost.svelte:3841`, with the exact `textarea#debugLogModalTxt rows="1000" readonly`. The grep
 was truncated by its own `head -30`. **Absence reported from a search is not absence.**
 
-## R-13 — `app-scplayer`: we silently fixed a reference bug
+## R-13 — `app-scplayer`: we fixed a reference bug — **silently once; declared and pinned now**
 
 **Reference, read whole** (`app-scplayer.full.js`, 1,532 B). One input, `scUrl`; renders only when
 `url` is set:
@@ -751,11 +791,29 @@ for accessibility, and emits `&auto_play=true` — the entity corrected. So our 
 the reference's does not.
 
 **This is almost certainly the intended behaviour** — a hidden audio player nobody can press play on
-is useless otherwise — but it is a **deliberate behavioural divergence from the capture that was
-never declared**, and `~/CLAUDE.md` says to transcribe rather than correct. **Action:** keep the fix
-and write the reason at the call site, or restore the entity. Do not leave it silent.
+is useless otherwise — but it was a **deliberate behavioural divergence from the capture that was
+never declared**, and `~/CLAUDE.md` says to transcribe rather than correct. The action was: keep the
+fix and write the reason at the call site, or restore the entity; do not leave it silent.
 
-## R-14 — `app-ytplayer`: the late-join seek, blocked and already declared
+**DONE.** `PresentationArea.svelte:1036-1050` carries the whole derivation — the template literal,
+why no HTML parser ever sees the entity, that the reference's own player therefore does not start,
+and why the fix is kept rather than the entity restored. `soundcloud-autoplay-contract.test.ts`
+asserts BOTH halves: the URL the room emits, and the prose that argues for it. Pinning only the URL
+would have let the argument be deleted while the divergence stayed.
+
+## R-14 — `app-ytplayer`: the late-join seek — **BUILT**; the blocker was re-measured and gone
+
+> **Re-measured 2026-09-03.** This row's recorded blocker was *"needs a persisted room video state,
+> which this room does not have"*. That is no longer true, and the row is the one that says so:
+> `lib/room/media-replay.ts` reads the stored `ytUrl` and `ytStartTime` and derives
+> `ytStartSeconds = Math.round((now - ytStartTime) / 1000)`, the reference's own arithmetic;
+> `YoutubePlayerOverlay.svelte` takes `startSeconds` (defaulted to 0, as `playYTURL(e, i = 0)` does)
+> and appends `start=` onto the trailing `&` the URL already carried. Two capture details are
+> recorded there rather than normalised away: the offset goes on the VIDEO-ID form only, because a
+> playlist seek would be a seek into whichever item happens to be first; and it is `i ? … : ""`
+> rather than `start=0`, so a live play — every play a member is present for — makes the same request
+> it always did. The reading below is unchanged and is what it was built from.
+
 
 **Reference, read whole** (`app-ytplayer.full.js`, 3,730 B). Inputs `startTime` and `ytURL`; the
 `ytURL` setter calls `playYTURL(url, this.startTime)`, which appends the offset:
@@ -791,20 +849,22 @@ converts it to elapsed seconds. The LIVE command never carries it — this fires
 — a **trailing `&` with nothing after it**, which is precisely the reference's expression with the
 `+ (i ? 'start='+i : '')` dropped.
 
-**This gap was already declared, and pass 3 corrected this row to say so.** `+page.svelte:7183-7201`
-carries the whole derivation with its byte offsets, states that the replay "needs a persisted room
-video state, which this room does not have, so the offset here is always the live command's 0 and no
-`start=` is appended", records it in `TODO.md`, and warns explicitly against inventing a `startTime`
-onto the wire to make the branch look implemented. `for-all-broadcast-contract.test.ts:179-189` pins
-the same derivation from the other side.
+**This gap was declared before it was built, and the ORDER is the whole lesson of the row.**
+`+page.svelte` carried the derivation with its byte offsets, stated that the replay *"needs a
+persisted room video state, which this room does not have, so the offset here is always the live
+command's 0 and no `start=` is appended"*, and warned explicitly against inventing a `startTime` onto
+the wire to make the branch look implemented. `for-all-broadcast-contract.test.ts` pinned the same
+derivation from the other side.
 
-**So the correct reading is: known, reasoned, deliberately unbuilt — not an oversight.** The first
-draft of this row called it "understood and documented and then not built", which invited exactly the
-invented-`startTime` fix the source comment forbids.
+**Then the blocker was built, and the prop followed it.** `lib/room/media-replay.ts` reads the stored
+`ytUrl` and `ytStartTime` and derives `ytStartSeconds = Math.round((now - ytStartTime) / 1000)` — the
+reference's own arithmetic — and `YoutubePlayerOverlay.svelte` takes `startSeconds` and appends
+`start=` onto the trailing `&` that had no other purpose.
 
-**Consequence, unchanged and still real:** a member who joins ten minutes into a broadcast video
-starts it at 0:00 while everyone else is at 10:00. **Needs, in order:** persisted room video state
-carrying the start instant, *then* the prop. Not the prop first.
+**"Needs, in order: persisted room video state carrying the start instant, THEN the prop. Not the
+prop first."** That sentence stood in this row while the row was open, and it is what happened. The
+consequence it named — a member joining ten minutes into a broadcast starting at 0:00 while everyone
+else is at 10:00 — is gone.
 
 **Its twin is NOT a gap, and this is why the pair is recorded together.** The same file passes
 `startTime: roomState.mp3StartTime` on late join (`:2638-2643`) — but the `playMP3ForAll` subscriber

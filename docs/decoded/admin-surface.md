@@ -881,8 +881,8 @@ for reference behaviour.
 
 ### E.5 — The honest gap that is not a diff: `wired`
 
-Our schema carries a `wired` flag meaning "something actually consumes this value". **112 of 269 are
-wired. 157 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
+Our schema carries a `wired` flag meaning "something actually consumes this value". **113 of 269 are
+wired. 156 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
 
 **This section said "58 wired, 211 not" until 2026-08-29**, and listed those 58 by name. The count
 had nearly doubled underneath it. Both the number and the roster below are now regenerated from
@@ -911,7 +911,7 @@ Wired (106), alphabetically:
 `hideChatLog`, `hideFiles`, `hideMobileCredentials`, `hideNotes`, `hidePoweredBy`, `hideRecs`,
 `hideWebcamForRoom`, `hideWelcomeTo`, `individualVolumeControls`, `isChatOnlyRoom`, `isLocked`,
 `loginErrorMsg`, `loginErrorURL`, `modAlertFilterList`, `modMessage`, `name`, `nickFilter`,
-`onlyPresentersVisibleToViewers`, `overlayUserIdOnScreenshare`, `overwriteCashRegisterSound`,
+`onlyPresentersVisibleToViewers`, `openLoginLink`, `overlayUserIdOnScreenshare`, `overwriteCashRegisterSound`,
 `positionsIframe`, `positionsIframeUrl`, `presenterMsgsOnTheRight`, `ptrMobileAppEnabled`,
 `recordingReminder`, `restreamToURL`, `rosterCountVisibleToViewers`, `rosterVisibleToViewers`,
 `showArchivesToSpecificPresenters`, `showArchivesToUsers`, `showBadgesToPresentersOnly`,
@@ -921,7 +921,7 @@ Wired (106), alphabetically:
 `tokenExpiresIn`, `useMediaMTX`, `userJoinAndLeavePopup`, `userPM`, `userToPresenterPM`,
 `userUploads`, `usernameInstructions`, `usersCanDeleteOwnMsgs`, `usersPublicReply`, `webinarPW`.
 
-The 157 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
+The 156 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
 `saveRecsToVimeo` and the four Vimeo fields), most of the streaming fields (`obsBroadcastRoom`,
 `obsStreamKey`, `restreamToURLKey`, `hasYTStreaming` — `restreamToURL` beside them was wired on
 2026-08-30 and is the one exception), every SMS field

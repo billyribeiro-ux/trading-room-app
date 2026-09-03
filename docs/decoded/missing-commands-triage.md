@@ -74,15 +74,32 @@ hid work behind a confident-sounding category.
 Recorded permanently. Each was a plausible-looking gap that survived a full read of the bundle and
 died on contact with our source.
 
-| command | where we already do it |
+> ### ⚠️ EVERY CITATION IN THIS TABLE WAS A MARKUP CITATION, AND THIS DOCUMENT SAYS WHY THAT IS WRONG
+>
+> Rewritten 2026-09-03 to cite the COMMAND. The version that stood here pointed at
+> `ModalHost.svelte` for five of the seven rows — at a BUTTON — and the section two hundred lines
+> below already draws the lesson in as many words: *"a markup search cannot tell a wired control
+> from an inert one"*, and *"NONE of the six had a command behind it when it was written"*.
+>
+> The cost was not hypothetical. On 2026-09-03 `saveAndCloseSession` was measured end to end and it
+> was the largest liar in the application: the button wrote `savePreference('sessionOpen', false)` —
+> a key with **zero readers anywhere in `apps/room/src`** — while `rooms.state`, the column
+> `decideRoomEntry` actually refuses entry on, had no writer in either application. A presenter
+> closed the session, was told `Message Saved`, and the room admitted everybody as before, for the
+> entire life of the feature. **This table said "we already build this" the whole time**, and its
+> citation was the button that did nothing.
+>
+> Each row now names the remote command, and the date it gained one.
+
+| command | the COMMAND behind it, and when it got one |
 | --- | --- |
-| `hardResetSession` | apps/room/src/lib/components/ModalHost.svelte (two buttons); handler at apps/room/src/routes/+page.svelte |
-| `lockSession` | apps/controller/src/lib/room-entry.ts |
-| `saveAndCloseSession` | apps/room/src/lib/components/ModalHost.svelte |
-| `saveCloseMessage` | apps/room/src/lib/components/ModalHost.svelte (button, label "Just Save Close Message"); apps/room/src/routes/+page.svelte (handler: 'Message Saved' alert, modal deliberately not closed) |
-| `savePresenterColors` | apps/room/src/lib/components/ModalHost.svelte |
-| `softResetSession` | apps/room/src/lib/components/ModalHost.svelte |
-| `stopRecMtx` | apps/room/src/routes/+page.svelte — `stopRecording`, `broadcastRecordingState('stopRec')` and the `broadcastRecordingState` definition; apps/room/src/routes/+page.server.ts (recordingState actio |
+| `hardResetSession` | `hardReset` — `session-commands.remote.ts`, 2026-08-27. Was two buttons over a local `invalidateAll()` |
+| `lockSession` | `lockSession` — `session-commands.remote.ts`; enforced by `decideRoomEntry` in `apps/controller/src/lib/room-entry.ts`. The three Lock Session buttons wrote `sessionLocked`/`sessionLockKick`, keys with zero readers, until 2026-09-02 |
+| `saveAndCloseSession` | `closeSession` — `session-commands.remote.ts`, **2026-09-03**, and it is the row above's example. It writes `rooms.state = 'closed'` through `internal/room-state/[code]` and publishes `closedPage` for the people already inside |
+| `saveCloseMessage` | `saveCloseMessage` — `session-commands.remote.ts`, 2026-08-27, storing `room_state.closed_message`. The citation here used to read *"handler: 'Message Saved' alert, modal deliberately not closed"*, which was a description of the inert version |
+| `savePresenterColors` | `savePresenterColors` — `presenter-colors.remote.ts` |
+| `softResetSession` | `softReset` — `session-commands.remote.ts`, 2026-08-26 |
+| `stopRecMtx` | `recordingState` — `recording-state.remote.ts`, with `broadcastRecordingState('stopRec')` on the room side |
 
 ### One was contested, and I resolved it by reading rather than averaging
 
@@ -306,6 +323,122 @@ Two further things follow, and the second is the more useful:
    to be measured from what calls it.
 
 ---
+
+---
+
+## The THIRTY-ONE that this document had never mentioned — answered 2026-09-03
+
+**How this was found.** The settings side closed exactly this hole on 2026-08-30, and the note it
+left says why: *"THE LIST NAMED ITS TRACKER AND NOTHING EVER OPENED IT."*
+`setting-coverage-contract.test.ts` grew an assertion that every name on its list has a disposition
+section in this document's sibling. The COMMANDS side had no such assertion, so the same drift was
+free to happen here — and it had. Of the forty-five names
+`feature-coverage-contract.test.ts` pins as absent from our source, **thirty-one did not appear
+anywhere in this file**, as a plain substring.
+
+Every one is answered below from the bundle, with the offset that settles it.
+`feature-coverage-contract.test.ts` now asserts that each pinned name is MENTIONED here, so the list
+and its tracker cannot part company again. That assertion refuses SILENCE; it does not claim the
+answers are right.
+
+### Built here under another name — remote functions where the reference sends socket commands
+
+| reference | ours |
+| --- | --- |
+| `alertQAMsg` | `sendAlertQAReply(alertID, msg, n)`. `askQuestion` / `replyMessage` / `reactToQuestion`, `alert-questions.remote.ts` |
+| `deleteQAAlertMsg` | `deleteQAAlert(e)`. `deleteQuestion`, `alert-questions.remote.ts` |
+| `chatReactions` | `manageChatReactions(msgID, reactions, reactionDetails, type, msgIndex)`. `messageAction`, `message-actions.remote.ts` |
+| `userDeleteChatMsg` | `userDeleteMessage(e)` — the MEMBER's own delete, distinct from the admin `deleteChatMsg` beside it. `messageAction`, gated by `usersCanDeleteOwnMsgs` in `message-delete.ts` |
+| `doShowMsgToAll` | receiver: `guiEventBus.emit("doShowMsgToAll", i.msg)`. `showMsgToAll` in `message-actions.remote.ts` and `message-actions.svelte.ts` |
+| `editUsernameByUser` | receiver. `editUsername`, plus the receiver in `user-actions.svelte.ts` |
+| `getChatLog` | `send("getChatLog", {channel, page})` — main on load, offTopic when the extra column is on. `loadOlderChatMessages` and the page load |
+| `getAlertsLog` | `send("getAlertsLog", {page: 0})` on load. `loadOlderAlerts` and the page load |
+| `getScheduledAlerts` | `send("getScheduledAlerts", null)`, gated on `hasAlertScheduler`. `listScheduledAlerts` |
+| `getSessionNotes` | `send("getSessionNotes")` on load. The notes pane load; `listUserNotes` for the per-member half |
+| `getSessionFiles` | a REST `sessions/v2/cmd` with `cmd: "getSessionFiles"`, not a socket command at all. The Files pane load |
+| `privMsg` | `send("privMsg", {peerID, msg, n, recvdNick, recvdAvt, …})`. `sendPrivateMessage`, `private-chat.remote.ts` |
+| `getPCLog` / `getAllPCLogs` / `getAllUserPM` | the three PM-log receivers. `loadPrivateChatLog` and `loadPeerPrivateMessageHistory` |
+| `doPCLogSearch` | the PM-log SEARCH receiver, `globals.privChatSearchResults`. **Server-side here too** — `searchThread` in `server/private-chat.ts`, reached through `loadPrivateChatLog` with a term, into the same separate bucket the reference keeps (`private-chat.svelte.ts`, "one search's own bucket, so it cannot overwrite the thread") |
+| `updateUserPM` | `send("updateUserPM", …)` when a PM peer first appears. Folded into `sendPrivateMessage`, which creates the peer as a consequence of the send rather than as a second call |
+| `changeUserPerms` | receiver: `disconnect()` then `emit("permsChangeReload")`. `savePermissions` sends; the `permsChangeReload` receiver is in `dialogs.svelte.ts` and `user-actions.svelte.ts`. The `reAuthSessionTok` redirect stays refused — that route is confirmed absent from the bundle |
+| `resetSession` | receiver, guarded by `!globals.videoOnlyMode`. `softReset` / `hardReset` and their receivers |
+| `stopWebcam` | receiver: `emit("stopWebcam", i.muser)`. `presenterCommand('mutecam')`, carried out by the peer it names |
+
+### Not a command at all
+
+| reference | what it actually is |
+| --- | --- |
+| `chatMsg` | an INTERNAL `appEventBus` event raised when a chat message arrives, not something sent to a server. Ours is the SSE `chat` channel into `RoomChat` |
+| `getMyState` | `socket.transmit("cmd", {cmd: "getMyState"})` fired on channel subscribe — the socket transport asking for its own state. This room's page load delivers that state, which is R-12's `getSessionState` family read from the other end |
+| `userLoggedIn` | the socket LOGIN handshake, retried three times inside the connect loop. This application authenticates at the HTTP layer from the session cookie, so there is no in-band login to send |
+| `connectToRoom` | `socket.emit("cmd", {cmd: "connectToRoom", roomID, name, email, perms})` inside the mediasoup service's own `connect`. Media-plane internal; ours is the join in `lib/media/signalling.ts` |
+| `stopConsumer` | `socket.emit("cmd", {cmd: "stopConsumer", consumerId})` — a mediasoup consumer teardown, media-plane internal |
+| `callScreeen` | a `postMessage` to the screen POPOUT, not a server command. R-6 records that its receiving branch is unreachable in the shipped bundle: `((i = 'callScreeen') ? … )` is an ASSIGNMENT, so the comparison is always truthy and the sibling branch never runs |
+| `pingPopup` | `pingBack()` — `parent.postMessage({cmd: "pingPopup"})`, and R-6 records `pingBack` as **defined and bound to nothing**. Unreachable upstream |
+| `demux` | hls.js's own worker message (43 occurrences, all library). Noise, and the reason this document has a Noise section |
+
+### Blocked, and on the same thing as their neighbours
+
+| reference | blocked on |
+| --- | --- |
+| `startRecMtx` | `sendServerAdminCommand("startRecMtx", {streams: mtxStreams})`. A MediaMTX host at `STREAM_SERVER_MTX`. `recordingState` is the room's half and ships |
+| `getSessionMediaState` | `send("getSessionMediaState")`, and its MTX twin. The same media plane |
+
+### The door, and it is the one that changed this month
+
+`saveAndCloseSession` and `setSessionState` are answered in the false-gaps table above and in
+`feature-coverage-contract.test.ts`. Both are NAME absences over a feature that was genuinely not
+built until 2026-09-03 — which is exactly why a table that cites markup is not evidence.
+
+### The six presentation-area TABS, answered the same day and for the same reason
+
+`feature-coverage-contract.test.ts` pins six of the reference's eight `presAreaTabs-*` names as
+absent from our source, and the same guard now applies to them. All six are NAME absences: every one
+of those tabs is rendered here.
+
+**What the names actually are.** `presAreaTabs-<name>` is the CLASS the reference puts on each tab
+anchor, and in two cases also an ID. `MainTabStrip.svelte` renders them as `mainTab` values on a
+`#mainTabs .mainTabset` list — the reference's own container id and class — and the `MainTab` union
+in `lib/types.ts` names each one against its `presAreaTabs-` key:
+
+| reference | ours |
+| --- | --- |
+| `presAreaTabs-files` | `mainTab === 'files'`, gated on `hideFiles` |
+| `presAreaTabs-streams` | `mainTab === 'streams'` |
+| `presAreaTabs-swingAlerts` | `mainTab === 'swingAlerts'`, present only with `hasSwingTradeAlerts` |
+| `presAreaTabs-dayTradeAlerts` | `mainTab === 'dayTradeAlerts'`, present only with `hasDayTradeAlerts`. The tab KEY is `dayTradeAlerts` (byte 1,918,012) and the visible label is the shorter `Day Trades` (byte 1,918,110), which is why the two do not match |
+| `presAreaTabs-videoplayer` | `mainTab === 'videoplayer'` |
+| `presAreaTabs-recordings` | **not rendered** — see the last paragraph of this section |
+
+**Only ONE of the eight names carries styling, and we carry that one.** Measured in the reference's
+own `styles.ee2a710065b60389.css`: `presAreaTabs-notes` appears five times and
+`presAreaTabs-screens` once. Nothing else. The notes rules are
+
+```css
+.mainTabset #presAreaTabs-notes.active,
+.mainTabset .nav-item.show #presAreaTabs-notes { background-color: var(--notes-tabs-bg) }
+.mainTabset .presAreaTabs-notes.active,
+.mainTabset .nav-item.show .presAreaTabs-notes { border-color: …; border-bottom: transparent;
+  padding-bottom: 15px; margin-bottom: -1px; border-radius: 3px 3px 0 0;
+  background-color: var(--notes-tabs-bg) }
+.presAreaTabs-notes.active { position: relative; z-index: 10 }
+```
+
+and `MainTabStrip.svelte` is the one tab that carries `class="nav-link presAreaTabs-notes"` for
+exactly that reason, with the three rules consolidated into `app.css`'s
+`#mainTabs > li > a.presAreaTabs-notes.active`. The other six anchors carry no such class because no
+rule anywhere would select it, which is this repository's *"no `.flipped` class with no CSS"* rule
+applied honestly rather than by adding seven decorative hooks.
+
+**The single `screens` occurrence is not a tab rule at all**: `#presAreaTabs-screens-panel .btn-link
+{ color: var(--note-tabs-color) }` targets a link inside the PANEL, and this room renders no
+`.btn-link` in `PresentationArea.svelte`. A rule with no subject here, and giving the panel an id to
+satisfy it would be inventing the element the rule wants.
+
+**`recordings` is the one that is not a name absence.** There is no recordings tab, deliberately —
+nothing produces a recording, no recordings table exists in either database, and
+`main-tab-strip-gates.svelte.test.ts` enforces the tab's absence rather than leaving it to drift.
+`NEW-TODO.md` carries it as blocked on an archive service.
 
 ## Method, so this can be re-run and challenged
 

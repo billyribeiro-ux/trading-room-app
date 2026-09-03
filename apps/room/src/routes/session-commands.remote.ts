@@ -2,7 +2,8 @@ import { command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
 import { presenterRoom, requireUser } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
-import { roomState } from '#lib/server/db/schema.js';
+import { roomState, sessions } from '#lib/server/db/schema.js';
+import { and, eq, ne } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 import { publishRosterToRoom, publishToRoom } from '#lib/server/room-events.js';
 import { writeRoomSetting, writeRoomState } from '#lib/server/room-config-client.js';
@@ -216,15 +217,74 @@ export const reloadSessionConfig = command(z.void(), async () => {
  * `session-hard-reset` button wrote a PREFERENCE and told nobody, so every other client sat there
  * while the presenter's own page reloaded.
  *
- * The preference write STAYS. It is what makes the reset survive a client that was not connected to
- * hear the frame, and it is read by the next page load either way. This adds the half that reaches
- * the people who ARE connected.
+ * ## `revoke`, and the sentence that used to stand here was FALSE
+ *
+ * It read: *"The preference write STAYS. It is what makes the reset survive a client that was not
+ * connected to hear the frame, and it is read by the next page load either way."* Measured
+ * 2026-09-03: `sessionTokensRevoked` had **zero readers anywhere in `apps/room/src`** — its only
+ * other occurrence in the whole application is a comment in `user-settings.remote.ts` using it as
+ * an example of a long key name. Nothing read it on the next page load or at any other time, and
+ * the docblock was the only evidence the write stood on. The same shape as `sessionOpen`,
+ * `sessionLocked` and `sessionLockKick`, and the fourth found this week.
+ *
+ * **`sessionTokensRevoked` is not even upstream's name**: it occurs ZERO times in the 2,891,205-byte
+ * bundle. It was this room's own invention, a per-user boolean standing in for a flag on a server
+ * command. Upstream has two menu entries and one command, bytes 2,169,105 and 2,169,459:
+ *
+ * ```js
+ * hardReset()          { confirm(…) → sendServerAdminCommand("hardResetSession", {revoke: !1}) }
+ * hardResetAndRevoke() { confirm(…) → sendServerAdminCommand("hardResetSession", {revoke: !0}) }
+ * ```
+ *
+ * So **"Hard Reset and Revoke Tokens" did exactly what "Hard Reset" did** — two controls, one
+ * behaviour, and the distinction a presenter chose was dropped on the floor.
+ *
+ * ## What `revoke` DOES here, which is a decision
+ *
+ * The reference's server is not in the capture, so what it does with the flag cannot be read. The
+ * flag itself is transcribed exactly; the act behind it is ours, and it is bounded on purpose:
+ * every session **in this room** except the caller's own is deleted.
+ *
+ *   scoped by `roomShortCode`   the column `/session` writes on entry. It is what makes this a room
+ *                               act rather than an account one — a member of two rooms keeps the
+ *                               other, which is the least surprising reading of a control that
+ *                               lives in Session Control
+ *   the CALLER is spared        a presenter who signs themselves out by pressing a button on their
+ *                               own toolbar is a self-inflicted denial no operator wants, and they
+ *                               are about to reload anyway — the frame below tells them to
+ *
+ * **The frame is what members actually feel**, and it is why this needs no new receiver: every
+ * client reloads, the reload finds no session, and the door asks them to sign in. The minute-poll in
+ * `sess/[room]/events` is only the backstop for a client that ignored the frame, and its sentence
+ * was widened the same day to cover this cause honestly rather than assert newest-wins.
  */
-export const hardReset = command(z.void(), async () => {
+export const hardReset = command(z.object({ revoke: z.boolean() }), async ({ revoke }) => {
   ensureDatabase();
   const room = presenterRoom();
+  const { locals } = getRequestEvent();
+
+  /*
+    BEFORE the frame, for the reason `closeSession` gives one door over: the durable state changes
+    before anything tells anybody it has. A client that reloaded on the frame while its session row
+    still existed would walk straight back in, and the revoke would have done nothing to the only
+    people it was aimed at.
+  */
+  if (revoke) {
+    const revoked = db
+      .delete(sessions)
+      .where(and(eq(sessions.roomShortCode, room), ne(sessions.id, locals.sessionId ?? '')))
+      .run();
+    console.warn('[session] revoked room sessions', { room, count: revoked.changes });
+  }
+
   publishToRoom(room, { channel: 'cmds', data: { cmd: 'hardReset' } });
-  recordSessionEvent(room, 'Session reset', 'Hard reset — every connection dropped and rebuilt.');
+  recordSessionEvent(
+    room,
+    'Session reset',
+    revoke
+      ? 'Hard reset — every connection dropped and rebuilt, and every session in this room revoked.'
+      : 'Hard reset — every connection dropped and rebuilt.'
+  );
 });
 
 /**

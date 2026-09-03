@@ -35,8 +35,16 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { capturePath, readCapture } from './capture-root.mjs';
 
-const CAPTURE = '/Users/billyribeiro/Desktop/new-room/scripts/collect-account-2026-08-08T20-19-23-396Z.json';
+/*
+  The path was a LITERAL into one person's home directory until 2026-09-03, and running this script
+  anywhere else produced an `ENOENT` whose most prominent detail was that directory.
+  `src/lib/reference-capture.ts` had solved exactly this for the test suites on 2026-08-15 and
+  recorded the same failure in its own header; this script never adopted it. `capture-root.mjs` is
+  the `.mjs` half, and `readCapture` reports a missing capture as a sentence somebody can act on.
+*/
+const CAPTURE = capturePath('scripts/collect-account-2026-08-08T20-19-23-396Z.json');
 const DEFAULT_CSS = new URL('../src/account.css', import.meta.url);
 const OUT = new URL('../docs/generated/account-style-contract.json', import.meta.url);
 
@@ -62,7 +70,14 @@ const rawCss = readFileSync(cssPath, 'utf8');
  * One of them, `manage:dontTouch`, is additionally a mis-capture — byte-identical to
  * `manage:header[18..89]` — so anything ingesting this file generically pins those 72 nodes twice.
  */
-const run = JSON.parse(readFileSync(CAPTURE, 'utf8'));
+/*
+  `readCapture` and not `readFileSync`: absence here means this program has nothing to verify, so it
+  exits naming the file, the root and the override rather than throwing a stack trace whose most
+  prominent line is a directory on a machine the reader does not have.
+*/
+const run = JSON.parse(
+  readCapture('scripts/collect-account-2026-08-08T20-19-23-396Z.json', 'the account page capture')
+);
 const ACCOUNT_CAPTURES = ['account:page', 'account:sessionsTable'];
 
 /**

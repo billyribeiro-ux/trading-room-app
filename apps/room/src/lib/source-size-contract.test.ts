@@ -810,7 +810,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       divergences ALREADY left — the module is 145 lines to this call's seven. What is here is the
       wiring, which is what the composition root is for.
     */
-    max: 1944,
+    /*
+      1944 -> 1960, 2026-09-03, for `openLoginLink`. SIXTEEN lines, of which the code is five: the
+      import, and the call with its one dep.
+
+      The eleven are the paragraph saying WHY this is `onMount` and not a `$effect` — `window.open`
+      does not exist during SSR — and pointing at the three divergences that live at the module
+      rather than restating them here. That split is deliberate: the argument for `noopener`, for the
+      trimmed empty check, and for a blocked popup being silent is 30 lines, and it belongs beside
+      the rule it governs, not beside the wiring.
+
+      Not extracted further by this entry's own standard: the rule and every divergence ALREADY left
+      — the module is 101 lines to this call's five. What is here is the composition root doing what
+      a composition root is for.
+    */
+    max: 1960,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   /*
@@ -5894,7 +5908,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       says so out loud rather than swallowing, because a presenter told nothing has no way to tell a
       locked room from an unlocked one.
     */
-    max: 125,
+    /*
+      125 -> 129, 2026-09-03, and every line is prose over a REMOVAL: four members of the
+      `savePreference` conduit went — the option, the field, the assignment and the pass-through —
+      and the header's own dependency-surface argument had to be corrected from four collaborators
+      to three.
+
+      That argument is this class's whole justification for existing separately, so leaving it saying
+      "four" would have left the seam resting on a count that was no longer true. The surface got
+      SMALLER, which is the same argument pointing the same way, and it is worth the four lines to
+      say so rather than to quietly edit a number.
+    */
+    max: 129,
     why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
   },
   {
@@ -6510,6 +6535,34 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     why: 'the recording and media-reset frames - setRecPreview, stopRecMsg, softResetDone'
   },
   {
+    file: 'lib/room/open-login-link.ts',
+    /*
+      THE OPERATOR'S OWN PAGE, opened once as a member enters. Built 2026-09-03 and capped in the
+      same commit, at the size it landed.
+
+      102 lines carrying about 12 of code — a type guard, a trim, and one call. The ratio is the
+      module rather than an accident of it, and the prose is three DIVERGENCES that a reader would
+      otherwise reverse in the belief they were tidying:
+
+        `noopener`      added, and upstream passes nothing. Without it the operator's page holds a
+                        live `window.opener` back into a fintech room. It is not invented here —
+                        `alerts-pane.ts` and `RoomSidebar.svelte`'s tip button already make this
+                        exact call the same way, and the module names both
+        the TRIM        upstream's guard is bare truthiness, so a textarea holding one newline opens
+                        `about:blank` for every member of that room. Reproducing that has no upside:
+                        no operator MEANT to publish a blank window
+        the SILENCE     a blocked popup says nothing, where `alerts-pane.detach` raises a dialog for
+                        its own. The difference is that a member PRESSED "Detach" and is owed an
+                        answer; nobody asked for this one, and it fires on entry
+
+      If this climbs, the question is whether a second entry-time hook arrived — in which case the
+      file is about entry hooks and the name is wrong — not whether the three notes can be trimmed.
+      They are the whole reason the module exists rather than five lines in `onMount`.
+    */
+    max: 102,
+    why: 'opens the operator s configured page once on entry; three divergences argued at the code'
+  },
+  {
     file: 'lib/room/iframe-breakout.ts',
     /*
       THE PRESENTER-IN-AN-IFRAME BREAK-OUT, built 2026-09-03 and capped in the same commit, at the
@@ -6593,7 +6646,34 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       an absence, and the header's own claim — "FOUR OF THESE FIVE SPENT MONTHS ON THE WRONG SIDE OF
       THAT LINE" — keeps its fifth example.
     */
-    max: 119,
+    /*
+      119 -> 130, 2026-09-03, and the eleven lines are the SECOND write deleted from this file in one
+      day. `savePreference('sessionTokensRevoked', …)` was on the hard-reset branch, and its note is
+      what is left where it stood.
+
+      It is the fourth key of the family this file has now retired and the only one that was never
+      upstream's name — ZERO occurrences in the bundle. The other three stood in for room-level acts
+      the reference performs on a server; this one stood in for an ARGUMENT. Upstream sends one
+      command with `{revoke: !1}` or `{revoke: !0}` (bytes 2,169,105 and 2,169,459), so writing a
+      preference instead meant *"Hard Reset"* and *"Hard Reset and Revoke Tokens"* were one control
+      wearing two labels.
+
+      The header's own claim — "FOUR OF THESE FIVE SPENT MONTHS ON THE WRONG SIDE OF THAT LINE" —
+      keeps its examples, and this branch is now the one that shows both halves: a write deleted and
+      an argument travelling in its place.
+    */
+    /*
+      130 -> 140 the same day, and the ten lines are the DEP that left with the write.
+
+      `savePreference` was on this file's own `SessionRoomCommandDeps` and nothing here called it any
+      more. The note where it sat is the record, because the removal reached four files: the option
+      on `RoomSessionControl`, its field, the pass-through in `RoomUserActions` and the argument at
+      the composition root all held a function so that this one could not use it.
+
+      Both raises today are notes over deletions, which is the shape this entry's header calls the
+      cheapest kind of growth and the most expensive kind of silence.
+    */
+    max: 140,
     why: 'the session acts that send; the four that only write a preference are a table'
   },
   {

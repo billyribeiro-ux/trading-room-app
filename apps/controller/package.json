@@ -48,6 +48,10 @@
     "backend:licenses": "cargo deny --manifest-path services/Cargo.toml --locked --all-features check licenses bans sources",
     "test:db": "vitest run --config vitest.db.config.ts",
     "manage:styles": "node scripts/verify-manage-styles.mjs",
+    "account:styles": "node scripts/verify-account-styles.mjs",
+    "account:styles:controls": "node scripts/verify-account-styles.controls.mjs",
+    "deployed:media": "node scripts/verify-deployed-media.mjs",
+    "deployed:production": "node scripts/verify-deployed-production.mjs",
     "api-post-routes:extract": "node scripts/extract-api-post-routes.mjs",
     "emoji:extract": "node scripts/extract-emoji-picker.mjs",
     "gate": "pnpm run format:check && pnpm run lint && pnpm run check && pnpm run test:gates && pnpm run test:unit && pnpm run test:counts:report && pnpm run build"

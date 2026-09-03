@@ -45,6 +45,374 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 12:23 UTC — a capture nothing asserted against was hiding fifty-seven assertions, four of them wrong
+
+`1a53536` and `253efda`. **Runtime impact: no.** Test partitioning and four corrected assertions.
+
+`settings-preference-wiring-contract.test.ts` read
+`docs/source/components/app-user-settings-modal.full.js` at MODULE SCOPE. That is a gitignored
+capture root, so `gate/evidence-bound-tests.mjs` excluded **the whole file** on any checkout without
+the dumps — this container, and CI. **Fifty-eight cases; one used the capture.**
+
+And the excluded half had drifted:
+
+* the dead-key list asserted `toHaveLength(23)` against 27. Four session keys were retired into it
+  across 2026-09-02 and 2026-09-03 — `sessionLocked`, `sessionLockKick`, `sessionOpen`,
+  `sessionTokensRevoked` — and the one test that counts them could not object;
+* its invented-name group was pinned at four names against eight, the same four keys;
+* the element-id count was derived as `reaching - 1 - 6`, asking for 22 against 19 — and could not
+  have been right in principle either, because that group is the CLOSED historical set the
+  `?? input.id` fallback once wrote as junk, and deriving a closed set from a live count goes wrong
+  the next time somebody adds a checkbox. Which is what happened;
+* the recording sounds matched a shape a documented extraction had replaced — the three receivers
+  moved to `recording-frames.ts` and their pairing into `ROOM_RECORDING_COMMANDS`. Asserted against
+  the table now, including upstream's quirk that `resumeRec` pairs the START sound with the STOP
+  preference, which the old regex would have lost.
+
+Two instrument bugs came out with them, both introduced when `ReactionPrefsPane` was extracted:
+counting raw occurrences of the handler mixed 28 checkboxes with 1 prop hand-off, and the id sweep
+reported `undefined` for that segment because a prop has no id before it.
+
+**`roster-gates.test.ts` was the same shape** — one module-scope read of the OLDER bundle for seven
+transcription cases, excluding all sixty-eight. Sixty-one needed nothing but this repository, **and
+one of them was wrong**: it asserted `command?.cmd === 'playMP3ForAll'` against `events.svelte.ts`,
+and those branches left that file on 2026-08-27 with the other six "for all" receivers. Stale for a
+week, invisible. The offsets could not be repointed at the committed v4 bundle, which is a different
+build — 2,891,205 bytes against 2,887,876.
+
+**A measurement of mine was wrong, and it is worth more than the fix.** I read three more files the
+same way, split their stylesheet assertions out, and was about to commit 109 "recovered" assertions.
+They were never excluded: `css/complete-app-styles.css` is committed and present, and `css` is listed
+as an evidence root but the exclusion only fires for roots that are MISSING. The suite total moving
+6,456 → 6,457 across three "recoveries" is what exposed it — 146 cases cannot arrive as one.
+Reverted whole, tree verified clean, and the instrument rebuilt to consult the missing-root list
+rather than the root names. **I measured "is this path an evidence root" when the question was "is
+this path absent", and a confident wrong answer looked exactly like a finding.**
+
+The room suite goes 6,392 → 6,518 passing. The excluded count is unchanged at 42 throughout: each
+split moved one file out of the set and one in.
+
+`pnpm run gate` exit 0.
+
+### 2026-09-03 12:05 UTC — four gates nobody could run, and three that named one person's home directory
+
+`35e2527`. **Runtime impact: no.** Scripts, a helper and a guard. Nothing the site serves changed.
+
+`verify-account-styles.mjs` is a real verifier with its own positive-control suite — the sibling of
+`verify-manage-styles.mjs`, which its own header says *"has caught real, user-visible colour bugs in
+`manage.css` that every other gate in the project passed"*. Running it in this container produced an
+`ENOENT` naming `/Users/billyribeiro/Desktop/new-room/…` — a stack trace whose most prominent detail
+is a directory the reader does not have. Two more scripts held the same literal, and **four
+verifiers were invoked by no `package.json` script at all**: that one, its controls, and the two
+deployed smokes.
+
+**The fix already existed in the other half of the repository.**
+`src/lib/reference-capture.ts` solved this on 2026-08-15, and its header records the identical
+failure in almost the same words: *"Five test files held the absolute path as a literal. They passed
+on the owner's machine and threw `ENOENT` anywhere else — two at module scope, which fails the whole
+SUITE rather than a test, so the reason was buried in a stack trace instead of being stated."* The
+test suites adopted it; the scripts never did. **A fix that lands in one half of a repository is a
+fix the other half will re-earn.**
+
+`scripts/capture-root.mjs` is the `.mjs` half — a deliberate second copy, for the reason
+`extract-manage-schema.mjs` gives when it duplicates `ROOM_VISIBLE_SETTINGS`: these are plain `node`
+invocations with no build step and cannot import the `.ts` module. It carries BOTH roots, because
+the captures live in two places and one variable would have been wrong for whichever half it did not
+describe. And it EXITS rather than throws — a builder with no capture has nothing to build, so the
+honest outcome is a sentence naming the file, the root, the override, and why the captures are
+absent from this repository at all.
+
+**The guard is the part that lasts.** `capture-root-contract.test.ts` sweeps every `.mjs` under the
+controller's `scripts/` and the room's `gate/` and `e2e/` for an absolute home path, so the fourth
+one cannot arrive quietly. It checks the instrument first — a glob matching nothing would pass over
+an empty universe, the vacuity failure this repository has now met five times — and it pins the
+duplicated default against the `.ts` module's, reading it from SOURCE rather than importing it,
+because an import would compare two overrides instead of two defaults.
+
+The four orphaned verifiers are **named but deliberately not gated**: two need a live host, two need
+a capture that is not here, and adding them would break the gate for everyone — the same treatment
+`verify-room-settings-schema.mjs` gets. What changes is that an operator holding the evidence now has
+a command instead of a file path. Both halves are asserted: named, and absent from `gate`.
+
+Three negative controls seen red, and one of them came from the repository itself — a generic
+`scripts/x.mjs` I wrote in a comment was caught by `comment-path-citations-contract`, which
+correctly read it as a citation to a file that cannot be opened.
+
+`pnpm run gate` exit 0 in both apps. The controller's documented counts moved 1197 → 1204 tests and
+117 → 118 files.
+
+### 2026-09-03 11:44 UTC — "Hard Reset and Revoke Tokens" did exactly what "Hard Reset" did
+
+`8ea026c`. **Runtime impact: yes.** Two menu entries that were one control now differ, and the one
+that says it revokes sessions revokes them.
+
+**Not found by a gate.** Found by doing what `CLAUDE.md`'s *"Before saying done"* section asks —
+re-read the diff and check that every comment claiming something still matches the next line.
+
+`hardReset`'s docblock said: *"The preference write STAYS. It is what makes the reset survive a
+client that was not connected to hear the frame, and **it is read by the next page load either
+way**."* `sessionTokensRevoked` had **zero readers anywhere in `apps/room/src`** — its only other
+occurrence in the application is a comment using it as an example of a long key name. That sentence
+was the only evidence the write stood on: the second false docblock this week, after R-4's blocker,
+which collapsed the same way.
+
+**And it is not upstream's name.** Zero occurrences in the 2,891,205-byte bundle — this room invented
+a key for a value that was never meant to be stored. Upstream has one command and two callers, bytes
+2,169,105 and 2,169,459, differing only in `{revoke: !1}` versus `{revoke: !0}`. This room sent
+neither, so the two entries were **one control wearing two labels**, and the distinction a presenter
+chose was dropped on the floor.
+
+**What revoke does now is a decision**, because the reference's server is not in the capture. The
+flag is transcribed exactly; the act behind it is bounded twice, each bound recorded at the command.
+Scoped by `roomShortCode`, so a member of two rooms keeps the other and this stays a room act rather
+than an account one. And the CALLER is spared — a presenter who signs themselves out with a button on
+their own toolbar is a self-inflicted denial no operator wants. The delete goes **before** the frame,
+for the reason `closeSession` gives one door over: a client that reloads while its session row still
+exists walks straight back in.
+
+**A sentence that would have lied to a member.** `live-access.ts`'s minute-poll is the backstop for a
+client that ignores the frame, and its `session-ended` message said *"this account signed in
+somewhere else. Only one device can be signed in at a time."* Its own rule docblock has always listed
+two causes; a presenter revoke makes three. The rule cannot tell them apart and is not made to — all
+three are "the session row is gone" — so the sentence covers its causes now instead of asserting
+one, keeping the newest-wins explanation as one case rather than the case.
+
+**A dead conduit, four files deep.** With both writes gone, `savePreference` was an injected
+collaborator nothing called — what this repository refuses one level up, in `close-message.ts`'s own
+words. The whole chain went: the dep, the option and field on `RoomSessionControl`, the pass-through
+in `RoomUserActions`, and the argument at the composition root. **Four files held a function so that
+a fifth could not call it.** `session-control.ts`'s dependency-surface argument — its entire
+justification for existing separately — said "they need FOUR things"; it says three, because the
+surface got smaller and the argument points the same way.
+
+In `user-actions.svelte.test.ts` the `saved` array is now structurally empty rather than empty by
+behaviour, and that is recorded at the assertion so a reader does not delete it as dead: it is the
+record of a defect that has now taken four keys — `sessionLocked`, `sessionLockKick`, `sessionOpen`
+and `sessionTokensRevoked`.
+
+Nine cases, five negative controls seen red. **Two mistakes of my own, both recorded**: `git checkout
+--` during a control reverted an uncommitted entry along with the mutation — the exact failure this
+session's method already warns about — and a ceiling raise first landed on the WRONG entry, because
+`max: 119,` is not unique in a ten-thousand-line file. The second was caught by re-reading the diff,
+which showed one ceiling changed and named it.
+
+`pnpm run gate` exit 0.
+
+### 2026-09-03 11:20 UTC — the six tabs beside the forty-five commands, and a false green they almost gave
+
+`365b6dd`. **Runtime impact: no.** A document section and one more assertion.
+
+The guard added earlier covered the forty-five absent COMMANDS and left the six absent TABS beside
+them unguarded. Measured: **four of the six had no answer in the tracker either.**
+
+All six are NAME absences — every one of those tabs is rendered here — and what the names turn out to
+be worth is the useful part. `presAreaTabs-<name>` is the class the reference puts on each tab
+anchor, and **only one of the eight carries any styling at all**, measured in the reference's own
+`styles.ee2a710065b60389.css`: `presAreaTabs-notes` five times, `presAreaTabs-screens` once, nothing
+else. So `MainTabStrip.svelte` carries `class="nav-link presAreaTabs-notes"` on exactly one anchor
+and no class on the other six — this repository's *"no `.flipped` class with no CSS"* rule applied
+honestly, rather than seven decorative hooks nothing selects.
+
+The single `screens` occurrence is not a tab rule at all: `#presAreaTabs-screens-panel .btn-link`
+targets a link inside the PANEL, and this room renders no `.btn-link` in `PresentationArea.svelte`.
+A rule with no subject here — and giving the panel an id to satisfy it would be inventing the element
+the rule wants.
+
+`recordings` is the one that is not a name absence, and it stays absent: nothing produces a
+recording, no recordings table exists in either database, and `main-tab-strip-gates.svelte.test.ts`
+enforces the tab's absence rather than leaving it to drift.
+
+**A false green, caught before it counted.** The tab names are matched WITH their `presAreaTabs-`
+prefix. An unqualified search reported `files` and `streams` as answered — both words occur in
+ordinary prose throughout that document — which would have left the guard looking like it worked
+while two tabs had nothing written about them at all. Asserted in the same case as the commands
+rather than a second one, because it is one property: a pinned absence with no answer, and splitting
+it would invite the next list to be added without the guard.
+
+Negative control seen red. `pnpm run gate` exit 0.
+
+### 2026-09-03 03:07 UTC — thirty-one commands their own tracker had never mentioned
+
+`90433a5`. **Runtime impact: no.** A document and a guard. The number is the entry.
+
+`feature-coverage-contract.test.ts` pins forty-five reference commands as absent from our source and
+names `missing-commands-triage.md` as where the answers live. **Thirty-one of the forty-five did not
+appear anywhere in that document**, as a plain substring. Not answered wrongly — not mentioned.
+
+This is the same hole the settings side closed on 2026-08-30, whose note says why in its own words:
+*"THE LIST NAMED ITS TRACKER AND NOTHING EVER OPENED IT."* That side grew an assertion that every
+name it pins has a disposition. The commands side never did, so the same drift was free here, and it
+had already happened.
+
+All thirty-one are answered from the bundle:
+
+* **Eighteen are built here under another name**, because this room uses remote functions where the
+  reference sends socket commands — the QA pair, `chatReactions` → `messageAction`,
+  `userDeleteChatMsg` (the MEMBER's own delete, distinct from the admin one beside it in the
+  capture), the three PM-log receivers, `privMsg` → `sendPrivateMessage`, the two log fetches,
+  `getSessionNotes`, `getSessionFiles` (a REST call upstream, not a socket command at all),
+  `changeUserPerms`, `resetSession`, `stopWebcam`, and `doPCLogSearch` — which is **server-side here
+  too**, `searchThread` in `server/private-chat.ts`, into the same separate results bucket the
+  reference keeps so a search cannot overwrite the thread.
+* **Eight are not commands.** `chatMsg` is an internal event-bus name for an arriving message;
+  `getMyState` and `userLoggedIn` are the socket transport's own handshake, and this application
+  authenticates at the HTTP layer; `connectToRoom` and `stopConsumer` are mediasoup internals;
+  `demux` is hls.js. Two are **unreachable upstream**: `callScreeen`'s receiving branch is dead in
+  the shipped bundle — `((i = 'callScreeen') ? … )` is an assignment, so the comparison is always
+  truthy — and `pingBack`, which posts `pingPopup`, is defined and bound to nothing.
+* **Two are blocked** on the same MediaMTX host as their neighbours.
+* **Two are the door**, `saveAndCloseSession` and `setSessionState` — name absences over a feature
+  that was genuinely not built until this morning, which is exactly why a table citing markup is not
+  evidence.
+
+**The guard.** Every pinned name must now be MENTIONED in the tracker, with the instrument checked
+first so an empty read cannot pass by having nothing to disagree with. It refuses silence and does
+not claim the answers are right — most of this list is "not a command at all" or "blocked", so a
+test demanding work would be wrong about most of it. A plain substring deliberately: the document
+answers in tables, in prose and inside fenced blocks, and a parser demanding one shape would refuse
+honest writing.
+
+**My first negative control for that guard was a no-op and passed.** I replaced only the second
+column of the `demux` row and left the name in the first. Same shape as the missing trailing comma
+earlier today: a mutation that does not change what the test reads is indistinguishable from a
+vacuous test. Redone against every occurrence, seen red, restored.
+
+`pnpm run gate` exit 0.
+
+### 2026-09-03 03:00 UTC — the false-gaps table cited buttons, and one of those buttons lied
+
+`852ba3c`. **Runtime impact: no.** Two documents. The reason it is an entry of its own is what the
+table was wrong about.
+
+`missing-commands-triage.md`'s *"seven false gaps — we already build these"* cited
+`ModalHost.svelte` for five of its seven rows. **At a button.** The same document draws the lesson
+two hundred lines below in as many words — *"a markup search cannot tell a wired control from an
+inert one"*, and *"NONE of the six had a command behind it when it was written"* — and the table it
+is about was never brought into line with it.
+
+The cost was not hypothetical. `saveAndCloseSession` was measured end to end this morning and it was
+the largest liar in the application: the button wrote `savePreference('sessionOpen', false)`, a key
+with zero readers anywhere in `apps/room/src`, while `rooms.state` — the column `decideRoomEntry`
+actually refuses entry on — had no writer in either application. **This table said "we already build
+this" the whole time**, and its citation was the button that did nothing.
+
+Every row now names the remote command and the date it gained one. `saveCloseMessage`'s old citation
+is the clearest case of the shape: it read *"handler: 'Message Saved' alert, modal deliberately not
+closed"* — a description of the INERT version, presented as evidence of the built one.
+
+Also recorded, in `feature-coverage-contract.test.ts`: `saveAndCloseSession` and `setSessionState`
+stay on the not-named-in-our-source list and are now NAME absences over a built feature rather than
+gaps. Read whole: upstream's `saveAndCloseSession()` at byte 2,165,132 takes the summernote body and
+sends `{closedMsg}`; `setSessionState(e) { this.send("setSessionState", e) }` at 1,026,934 is a thin
+wrapper with two occurrences in the entire bundle — its declaration and the send inside it — and its
+callers are not in the capture, so what the reference passes it cannot be read here. This room does
+both acts through `saveCloseMessage` and `closeSession`. **Until this morning that entry would have
+been right by accident**, which is why it is dated rather than simply written.
+
+`pnpm run gate` exit 0.
+
+### 2026-09-03 02:53 UTC — openLoginLink wired: the one of nineteen unwired settings that was work
+
+`b9e0c6c`. **Runtime impact: yes.** A room whose owner has set "Open link on login?" now opens that
+page once as a member enters. It had been stored and inert.
+
+`gate/audit-setting-coverage.mjs` enumerates the settings the REFERENCE reads in its own browser and
+this room does not. Nineteen, and every one was put against the bundle rather than counted:
+
+* **seven** are the credentials that stay on the controller by design — wiring one is a regression;
+* **four** are blocked on a host or a service that does not exist here;
+* **three** are answered by another mechanism, travelling as a QUESTION instead of a value;
+* **one**, `isNewIndicatorOn`, waits on an owner answer — `isNew` is server-produced in all fourteen
+  of its bundle occurrences, so no capture holds the rule and none can;
+* **three are UNREACHABLE UPSTREAM**, and that class is the find of the sweep:
+  `advancedSearchAlerts` is gated on `ownerdID == "56ba547185ae93560d186ea8"` — a hardcoded account
+  id, so the branch is dead for every room but the vendor's own; `h264Enabled` is read as
+  `this.forceH264 = sessData.h264Enabled || !0`, and the `|| true` means the setting cannot change
+  the value it feeds, so wiring it would give it an effect the reference does not have; and
+  `playChatMessageSoundFor` is a declared refusal;
+* **one** was work.
+
+**The decision this reverses was careful, and half of it was right**, so the reversal is recorded in
+three places rather than taken quietly. `openLoginLink` was DECIDED "NOT A GAP" on 2026-08-28 with a
+contract test asserting it stayed unbuilt:
+
+*"It runs during component initialisation rather than from a click, and the options string is
+precisely the popup shape browsers block without a user gesture."* True, and not a reason to refuse a
+feature an operator configured on purpose. Every popup this room already opens is under the same
+browser policy — the transcript window, the detached chat, the screen popout, the recording preview.
+Refusing on this ground is the *"it would reproduce an upstream defect"* argument, which this
+repository's standing method does not accept as an escape.
+
+*"Because the statement is in BOTH chat components, a member with the extra chat column gets it
+twice."* A real upstream defect, measured correctly — and it shaped the build rather than blocking
+it. **Ours fires once**: the call is in the page's `onMount`, not in a chat component, so the extra
+column cannot double it.
+
+*"Building it 'safely' — as a link the member can click — would be inventing a control the capture
+does not have."* Right, and honoured. There is no link.
+
+**Three divergences, each argued at the module.** `noopener` is added, and it is this room's own
+precedent rather than a decision invented at one call site — `alerts-pane.ts` and
+`RoomSidebar.svelte`'s tip button already make this exact call the same way, the latter with an
+operator-supplied URL; without it the operator's page holds a live `window.opener` back into a
+fintech room, and the reference-facing output is unchanged. The empty check TRIMS, because upstream's
+bare truthiness opens `about:blank` for a textarea holding one newline. And a blocked popup is
+SILENT here while `alerts-pane.detach` raises a dialog for its own — there a member pressed "Detach"
+and is owed an answer; here nobody asked for anything.
+
+Twelve cases, five negative controls seen red: upstream's bare truthiness, the feature string
+normalised, `noopener` dropped, the value taken from the URL instead of the server, and `window`
+reaching into the pure rule. The bundle assertions pin the feature string character for character,
+the truthiness guard around it, and that the reference passes **no** `noopener` there — the negative
+half of the divergence, taken from the capture rather than assumed.
+
+112 → 113 wired. Six documents restating the count were updated, along with the unwired half of each
+sentence beside it (157 → 156), the wired roster in `admin-surface.md`, and the verifier's own union
+note. `openLoginLink` also came OFF `room-entry.ts`'s `UNENFORCED_SETTINGS`, with the deletion
+recorded where it sat: it never belonged to `decideRoomEntry`, because nothing about it decides who
+gets in.
+
+`pnpm run gate` exit 0 in both apps.
+
+### 2026-09-03 02:31 UTC — the room gap register swept: eight of ten rows were stale, all one way
+
+`1e98133`. **Runtime impact: no.** No source changed. This is the register, and the reason it is its
+own entry is that a reader building from it would have rebuilt three shipped components.
+
+It was written between 2026-08-16 and pass 3 and had not been re-measured since. Every row put
+against the tree, with the citation that settles it written in:
+
+* **R-1, R-2, R-3** headed *"is not built"* — all three are built and rendered, and R-1's own heading
+  said where it belonged: `TypingIndicatorDots.svelte` is rendered by the two chat panes it names.
+* **R-4's blocker was false.** It read *"the stub is correct; the page, the route, the API and the
+  storage are all absent"*, because *"`currentCaption` is never assigned"* — and the docblock
+  asserting that was the only evidence the blocker stood on. `currentCaption` is assigned by
+  `media-transport.svelte.ts`, fed by `services/media`; the page, route, store and API were built on
+  2026-09-02.
+* **R-5's "Ours: nothing"** named six identifiers as absent everywhere. Five exist. Only `roomV4Link`
+  is absent and it is the one that should be — it belongs to a shell this room deliberately does not
+  build.
+* **R-13's action is done** — *"keep the fix and write the reason at the call site, or restore the
+  entity; do not leave it silent"* — and `soundcloud-autoplay-contract.test.ts` pins the URL **and**
+  the argument. Pinning only the URL would have let the argument be deleted while the divergence
+  stayed.
+* **R-14 was "blocked on persisted room video state".** The blocker was built and the prop followed
+  it, which is the order the row itself insisted on in as many words: *"persisted room video state
+  carrying the start instant, THEN the prop. Not the prop first."* The consequence it named — a
+  member joining ten minutes into a broadcast starting at 0:00 while everyone else is at 10:00 — is
+  gone.
+
+Every one of these is stale **in the safe direction**: more is built than recorded. That is the
+dangerous direction for a tracker, and it is now the fourth document this week to have been so. The
+header carries a ten-row table so the question is answerable without reading eight hundred lines.
+
+**What is actually left in Part A is one owner decision** — whether a closed page should carry the
+chrome (Archives, roster, Get Random User, Open Session) that this room's server-side refusal does
+not — and one standing divergence kept on purpose: R-6's popout, with its per-popout cost written
+down at the call site.
+
+`pnpm run gate` exit 0.
+
 ### 2026-09-03 02:26 UTC — a trap disarmed rather than documented, and R-11's last three parameters
 
 `13d6cd4`. **Runtime impact: yes, narrowly.** One anchor no longer renders in the user-info modal. It

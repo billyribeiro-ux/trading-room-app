@@ -1024,7 +1024,6 @@ export function createRoom(deps: RoomDeps) {
     isPresenter: () => isPresenter,
     talking: () => media.talking,
     rosterUsers: () => roster.users,
-    savePreference: (key, value) => prefs.save(key, value),
     openModal: (name) => modals.open(name),
     closeModal: () => (modals.modal = null),
     closeUserMenu: () => menus.openUserMenu(null),

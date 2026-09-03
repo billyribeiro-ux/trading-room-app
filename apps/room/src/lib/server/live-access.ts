@@ -92,8 +92,22 @@ export type LiveAccessVerdict =
  * the one that gets them to renew."*
  */
 export const LIVE_ACCESS_MESSAGES: Readonly<Record<LiveAccessDenial, string>> = {
+  /*
+    THREE CAUSES, and until 2026-09-03 this sentence named one of them as if it were the only one.
+
+    `decideLiveAccess`'s own docblock has always listed two — *"evicted by a newer login, or logged
+    out on another device"* — and the message asserted the first. A presenter's Hard Reset and Revoke
+    Tokens added a third that day, and a member told "this account signed in somewhere else" when a
+    presenter had just reset the room would be reading a confident, specific, wrong explanation.
+
+    The rule CANNOT tell them apart and is not made to: all three are "the session row is gone", the
+    one local fact this room owns outright, and inventing a distinction the input does not carry is
+    how a rule starts guessing. So the sentence covers its causes instead — keeping the newest-wins
+    explanation, which this module argues is worth having commercially, as one case rather than the
+    case.
+  */
   'session-ended':
-    'You have been signed out because this account signed in somewhere else. Only one device can be signed in at a time.',
+    'You have been signed out of this room. That happens when this account signs in somewhere else — only one device at a time — or when a presenter resets the room. Signing in again will bring you back.',
   'entitlement-lapsed':
     'Your access to this room has ended. If your subscription has lapsed, renewing it will let you back in.',
   unconfirmed:

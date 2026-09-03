@@ -14,7 +14,10 @@ import { handleSessionRoomCommand, type SessionRoomCommandDeps } from './session
  * detail and not a statement about what they are.
  *
  * The evidence that the seam is real rather than convenient is the DEPENDENCY SURFACE. Eleven action
- * names moved and they need four things — `dialogs`, `closeModal`, `reload`, `savePreference`. They
+ * names moved and they need THREE things — `dialogs`, `closeModal`, `reload`. It was four until
+ * 2026-09-03, when `savePreference` left with the second of the two writes it existed for: both were
+ * room-level acts written into the clicking presenter's own settings blob, under keys with zero
+ * readers. The surface got SMALLER, which is the same argument pointing the same way. They
  * touch no roster, no target user, no presenter command, no `localStorage` key, none of the muted or
  * followed lists. A group that takes a quarter of its old home's collaborators with it was a
  * separate thing already.
@@ -43,7 +46,6 @@ export class RoomSessionControl {
     dialogs: RoomDialogs;
     closeModal: () => void;
     reload: () => Promise<void>;
-    savePreference: (key: string, value: boolean) => void;
     /**
      * `lockSession` — the room's door, written on the CONTROLLER.
      *
@@ -55,23 +57,25 @@ export class RoomSessionControl {
     this.#dialogs = options.dialogs;
     this.#closeModal = options.closeModal;
     this.#reload = options.reload;
-    this.#savePreference = options.savePreference;
     this.#lockSession = options.lockSession;
   }
 
   readonly #dialogs: RoomDialogs;
   readonly #closeModal: () => void;
   readonly #reload: () => Promise<void>;
-  readonly #savePreference: (key: string, value: boolean) => void;
   readonly #lockSession: (payload: { lock: boolean; kick: boolean }) => Promise<unknown>;
 
-  /** The four collaborators, as one object, so the extracted group takes them without a fifth copy. */
+  /**
+   * The THREE collaborators, as one object, so the extracted group takes them without a fourth copy.
+   *
+   * Four until 2026-09-03. `savePreference` left with the second of the two writes it existed for;
+   * the header above records why, and `session-room-commands.ts` records it where the write sat.
+   */
   get #deps(): SessionRoomCommandDeps {
     return {
       dialogs: this.#dialogs,
       closeModal: this.#closeModal,
-      reload: this.#reload,
-      savePreference: this.#savePreference
+      reload: this.#reload
     };
   }
 

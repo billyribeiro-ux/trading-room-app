@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 112 of 269 are wired today.
+// nothing in the room reads it yet. 113 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -101,7 +101,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "custLogoutURL", section: "settings", type: "textarea", label: "Custom Logout URL", help: "If set, Logout button will use this URL", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
   { name: "rosterVisibleToViewers", section: "settings", type: "checkbox", label: "Show Roster ?", help: "If disabled only presenters will see the user count and the roster", helpShape: "muted", helpOutside: false, captured: true, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "hideWelcomeTo", section: "settings", type: "checkbox", label: "Hide Welcome To Message?", help: "If enabled, it will hide welcome message on the login page", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },
-  { name: "openLoginLink", section: "settings", type: "textarea", label: "Open link on login?", help: "If enabled, it will open the link set in this setting on a new tab", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: false },
+  { name: "openLoginLink", section: "settings", type: "textarea", label: "Open link on login?", help: "If enabled, it will open the link set in this setting on a new tab", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "loginErrorURL", section: "settings", type: "textarea", label: "Custom login error URL redirect", help: "On the login error it will redirect users to this url", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "loginErrorMsg", section: "settings", type: "textarea", label: "Custom login error message", help: "On the login error it will display this message to users", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: null, wired: true },
   { name: "onlyPresentersVisibleToViewers", section: "settings", type: "checkbox", label: "Show only Presenters in the roster?", help: "If enabled, users will see only presenters in the roster", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: null, wired: true },

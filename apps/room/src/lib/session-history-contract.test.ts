@@ -169,10 +169,26 @@ describe('what gets recorded', () => {
 
   it('the two resets, told apart in the VALUE', async () => {
     await as(presenter, ROOM, () => softReset());
-    await as(presenter, ROOM, () => hardReset());
+    await as(presenter, ROOM, () => hardReset({ revoke: false }));
     expect(names()).toEqual(['Session reset', 'Session reset']);
     expect(values()[0]).toContain('Hard reset');
     expect(values()[1]).toContain('Soft reset');
+  });
+
+  it('and the two HARD resets are told apart too, which they were not', async () => {
+    /*
+      Added 2026-09-03 with the flag. *"Hard Reset"* and *"Hard Reset and Revoke Tokens"* are two
+      menu entries over one upstream command distinguished only by `{revoke}` — and this room wrote
+      a per-user preference with zero readers instead of sending it, so the two did the same thing
+      and the history could not tell them apart either.
+
+      Asserted on the VALUE rather than the name, because the name is the same act: a presenter
+      reading their own history needs to know which of the two they pressed, and the row is the only
+      record that survives the reload both of them trigger.
+    */
+    await as(presenter, ROOM, () => hardReset({ revoke: true }));
+    expect(names()).toEqual(['Session reset']);
+    expect(values()[0]).toContain('every session in this room revoked');
   });
 
   it('a session reopening, and the DOOR it opened', async () => {

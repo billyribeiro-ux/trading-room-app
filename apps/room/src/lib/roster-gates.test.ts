@@ -25,10 +25,6 @@ import {
   without the expression it claims to transcribe also changing. `docs/source/**` is SHA-256
   pinned, so these strings are stable by construction.
 */
-const bundle = readFileSync(
-  new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-  'utf8'
-);
 /*
   `.room-sidebar` became `RoomSidebar.svelte` on 2026-08-15 — the second of the five template
   regions. Assertions read out of the reference bundle are untouched, because the evidence did not
@@ -48,75 +44,21 @@ const viewer = (overrides: Partial<RosterViewer> = {}): RosterViewer => ({
 
 const session = (overrides: RosterSessionFlags = {}): RosterSessionFlags => ({ ...overrides });
 
-describe('the gates are transcriptions, not inventions', () => {
-  it('pins archivesAvailableTo() in the shipped bundle', () => {
-    expect(bundle).toContain(
-      'globals.isPresenter&&!this.appService.globals.isLimitedPresenter?!(this.appService.globals.sessData.showArchivesToSpecificPresenters'
-    );
-    expect(bundle).toContain(
-      '.showArchivesToUsers||this.appService.globals.user.denyArchivesAccess)'
-    );
-  });
+/*
+  THE SEVEN BUNDLE TRANSCRIPTIONS MOVED to `roster-gates-capture.test.ts` on 2026-09-03.
 
-  it('pins the four sidebar gates', () => {
-    // O(44) - the Users block.
-    expect(bundle).toContain(
-      'sessData.onlyPresentersVisibleToViewers||e.appService.globals.sessData.rosterVisibleToViewers||e.appService.globals.isPresenter||e.appService.globals.user.hasAdminChat?44:-1'
-    );
-    // O(6) - the badge, gated apart from the list.
-    expect(bundle).toContain(
-      'sessData.rosterCountVisibleToViewers||i.appService.globals.isPresenter?6:-1'
-    );
-    // O(43) - Get Random User.
-    expect(bundle).toContain('O(43,e.appService.globals.isPresenter?43:-1)');
-    // O(15) - the "Sort by Trials" tick.
-    expect(bundle).toContain('O(15,i.isSortFTUsers?15:-1)');
-  });
+  They were the only consumers of `docs/source/main.d6d3c112b59b7d0d.js` in this file, and that path
+  is a MISSING capture root here — so `gate/evidence-bound-tests.mjs` excluded all sixty-eight cases
+  on every checkout without the dumps, including CI. Sixty-one of them read this repository's own
+  modules and components and needed nothing else.
 
-  it('pins the per-row gate, which is a different expression from O(44)', () => {
-    expect(bundle).toContain(
-      'sessData.onlyPresentersVisibleToViewers&&(e.isP||e.hasAdminChat)||i.appService.globals.sessData.rosterVisibleToViewers||i.appService.globals.isPresenter||i.appService.globals.user.hasAdminChat&&(e.isP||e.hasAdminChat||i.appService.globals.user.userXrefID===e.userXrefID)?1:-1'
-    );
-  });
+  The same shape as `settings-preference-wiring-contract.test.ts` the same day, where one such read
+  hid fifty-seven assertions and four of them had drifted while nobody could run them.
 
-  it('pins both list pipes and the class map', () => {
-    expect(bundle).toContain(
-      'transform(e,i){return i?e.sort((o,s)=>o.isP?o:s.isP?s:o.nick.toLowerCase()>s.nick.toLowerCase()?1:-1):e}'
-    );
-    expect(bundle).toContain(
-      'transform(e,i){return i?e.filter(s=>s.isFT).sort((s,r)=>s.nick.toLowerCase()>r.nick.toLowerCase()?1:-1):e}'
-    );
-    expect(bundle).toContain('u2e=(t,n)=>({regUser:t,presUser:n})');
-    expect(bundle).toContain('qB=t=>({"btn-dark":t})');
-  });
-
-  it('pins getRandomUser()s candidate set and the two-candidate minimum', () => {
-    expect(bundle).toContain(
-      'let o=e.appService.globals.roster.filter(r=>!r.isP),{uniqueUsers:s}=e.uniqueRoster(o)'
-    );
-    expect(bundle).toContain('i&&(s=s.filter(r=>r.isFT)),e.randomUser(s)');
-    expect(bundle).toContain('randomUser(e){const i=this;var o=e.length;if(o>=2)');
-    expect(RANDOM_USER_MINIMUM).toBe(2);
-  });
-
-  it('pins searchUsers, clearUserSearch and the Enter-only keyup', () => {
-    expect(bundle).toContain(
-      'doUserSearch(e){13==e.keyCode&&(this.userSearchTermTxt?this.searchUsers():this.clearUserSearch())}'
-    );
-    expect(bundle).toContain(
-      'clearUserSearch(){P("Clear search..."),this.visibleRoster=this.appService.globals.roster}'
-    );
-  });
-
-  it('pins the search inputs captured attributes verbatim', () => {
-    expect(bundle).toContain(
-      '"type","search","id","userSearchTermInput","placeholder","Search by nick or email,enter to search","aria-label","Search","aria-describedby","addon-search",1,"form-control"'
-    );
-    expect(SIDEBAR).toContain('placeholder="Search by nick or email,enter to search"');
-    expect(SIDEBAR).toContain('aria-describedby="addon-search"');
-  });
-});
-
+  The offsets could NOT simply be repointed at the committed v4 bundle: `docs/source/` is the OLDER
+  build (2,887,876 bytes) and `docs/source-v4-2026-08-15/` is the current one (2,891,205), so every
+  byte offset here belongs to the file it was read from.
+*/
 describe('archivesAvailableTo', () => {
   it('gives a full presenter archives when no allowlist exists', () => {
     expect(archivesAvailableTo(viewer({ isPresenter: true }), session())).toBe(true);
@@ -661,10 +603,25 @@ describe('room-wide sound', () => {
   const pageSource = readFileSync('src/routes/+page.svelte', 'utf8');
 
   it('receives both commands, not just sends them', () => {
-    // Receiving is the stream's; sending is still the page's.
-    const eventsSource = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
-    expect(eventsSource).toContain("command?.cmd === 'playMP3ForAll'");
-    expect(eventsSource).toContain("command?.cmd === 'stopMp3ForAll'");
+    /*
+      Receiving is the stream's; sending is still the page's.
+
+      READ FROM `for-all-broadcasts.ts` SINCE 2026-09-03, and the correction is the point rather than
+      a detail. This asserted the two branches against `events.svelte.ts`, and they left it on
+      2026-08-27 with the other six "for all" receivers — an extraction that file's own ceiling entry
+      argues for at length: *"The one group on the `cmds` channel that shares a collaborator: every
+      branch reaches `RoomBroadcasts`."*
+
+      The assertion went stale that day and **could not fail**, because this file read
+      `docs/source/main.d6d3c112b59b7d0d.js` at module scope and was excluded from every run without
+      the captures. It was found by splitting that read out, not by anything noticing.
+    */
+    const receivers = readFileSync(
+      new URL('./room/for-all-broadcasts.ts', import.meta.url),
+      'utf8'
+    );
+    expect(receivers).toContain("command?.cmd === 'playMP3ForAll'");
+    expect(receivers).toContain("command?.cmd === 'stopMp3ForAll'");
   });
 
   it('binds the audio element to the url, so something actually plays', () => {

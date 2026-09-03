@@ -30,8 +30,11 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { siteCapturePath } from './capture-root.mjs';
 
-const CAPTURE = process.argv[2] ?? '/Users/billyribeiro/Desktop/pro-trading-room-website/ptr1.json';
+// The argument still wins; the DEFAULT is `PTR_SITE_CAPTURE_ROOT` now rather than a literal into one
+// person's home directory. See `capture-root.mjs` for why the scripts carry their own copy.
+const CAPTURE = process.argv[2] ?? siteCapturePath('ptr1.json');
 const OUT = new URL('../docs/generated/manage-style-contract.json', import.meta.url);
 
 /**

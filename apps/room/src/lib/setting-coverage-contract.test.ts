@@ -180,7 +180,26 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
   'allRoomsWelcomeMatPW',
   'isNewIndicatorOn',
-  'openLoginLink',
+  /*
+    `openLoginLink` LEFT THIS LIST on 2026-09-03, and it was the ONE of the nineteen that was work.
+
+    Its triage disposition was that it stays unbuilt, on two grounds recorded in
+    `custom-player-contract.test.ts`: it fires during component init rather than from a click, so
+    browsers block it silently; and the statement exists in BOTH chat components, so a member with
+    the extra chat column gets it twice.
+
+    The first is not a reason to refuse a feature an operator configured on purpose — every popup
+    this room already opens is under the same browser policy, and refusing on that ground is the
+    "it would reproduce an upstream defect" argument this repository's method does not accept. The
+    second is a real upstream defect and it shaped the build rather than blocking it: the call is in
+    the page's `onMount`, so it fires ONCE and the extra column cannot double it.
+
+    That leaves EIGHTEEN, and what the sweep found about the rest is worth as much as the build.
+    Three are UNREACHABLE UPSTREAM — `advancedSearchAlerts` is gated on a hardcoded owner id,
+    `h264Enabled` is read as `|| !0` so the setting cannot change the value it feeds, and
+    `playChatMessageSoundFor` is a declared refusal. Seven are the credentials. Four wait on a host
+    or a service. Three travel as a question instead of a value. One waits on the owner.
+  */
   'authMode',
   'enableDiscord',
   /*

@@ -86,6 +86,20 @@ const LOGIN_CONSUMED = [
  * generated file does not exist yet.
  */
 const ROOM_CONSUMED = [
+  /* "Open link on login?" - the operator's own page, opened once as a member enters.
+
+     Bundle bytes 1,437,913 and 2,384,175, in the room component's post-login setup:
+     `sessData.openLoginLink && window.open(sessData.openLoginLink, "_blank",
+     "resizable=yes,top=0,left=0,width=800,height=400")`. One consumer,
+     `lib/room/open-login-link.ts`, called from the page's onMount.
+
+     113 since 2026-09-03, and it came off `audit-setting-coverage.mjs`'s own list of nineteen the
+     reference reads and this room did not. Of that nineteen, seven are the credentials that
+     deliberately stay on the controller, four are blocked on a host or a service, three are
+     answered by another mechanism, and three are UNREACHABLE UPSTREAM - `advancedSearchAlerts`
+     is gated on a hardcoded owner id, `h264Enabled` is read as `|| !0` so the setting cannot
+     change the value, and `playChatMessageSoundFor` is a declared refusal. This was the one left. */
+  'openLoginLink',
   /* Two consumers in `RoomMessage.svelte`: `presenter-msg-right` on the body and
      `presenter-reactions-right` on the reaction row. Added 2026-08-14 when the room began
      reading it; its three manage-page neighbours (`enableBadges`,
@@ -1070,7 +1084,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 112 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 113 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

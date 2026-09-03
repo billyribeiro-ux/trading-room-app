@@ -36,6 +36,7 @@
   import { promoteLegacySplitSizes } from '#lib/room/split-legacy-migration.js';
   import { applyRoomDefaults } from '#lib/room/room-defaults.js';
   import { offerIframeBreakout } from '#lib/room/iframe-breakout.js';
+  import { openLoginLink } from '#lib/room/open-login-link.js';
   import {
     chatStyleAfterThemeSwitch,
     defaultChatStyleForTheme,
@@ -1057,6 +1058,21 @@
       navigateTop: (target) => {
         window.parent.location.href = target;
       }
+    });
+
+    /*
+      `openLoginLink` — the operator's own page, opened once as this member enters.
+
+      Upstream fires it in the room component's post-login setup, in the same statement that applies
+      `chatDisabledForTrials` (bytes 1,437,913 and 2,384,175). `onMount` is that moment here, and it
+      must be `onMount` for the plainest reason: `window.open` does not exist during SSR.
+
+      Three divergences live at the module — `noopener` (this room's own precedent, twice), the
+      trimmed empty check (upstream would open `about:blank` for a textarea holding a newline), and
+      why a blocked popup is silent here while `alerts-pane.detach` raises a dialog for its own.
+    */
+    openLoginLink(data.sessData?.openLoginLink, {
+      open: (url, target, features) => void window.open(url, target, features)
     });
 
     // `loadChatMode()` and `loadAlertsMode()`, once on mount. The module holds the whole rule and

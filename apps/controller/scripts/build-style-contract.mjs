@@ -37,6 +37,14 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+/*
+  The two capture roots were LITERALS into one person's home directory until 2026-09-03.
+  `src/lib/reference-capture.ts` had solved this for the test suites on 2026-08-15; the scripts never
+  adopted it, and `capture-root.mjs` is the `.mjs` half. Both roots are overridable, and this file
+  already continues without a capture it cannot read — the paths simply stop naming a machine nobody
+  else has.
+*/
+import { CAPTURE_ROOT, capturePath, siteCapturePath } from './capture-root.mjs';
 
 const OUT = new URL('../docs/generated/style-contract.json', import.meta.url);
 
@@ -152,7 +160,7 @@ function ingest(label, nodes) {
 const sources = [];
 
 /* ── the original forensic capture ─────────────────────────────────────────── */
-const PTR1 = '/Users/billyribeiro/Desktop/pro-trading-room-website/ptr1.json';
+const PTR1 = siteCapturePath('ptr1.json');
 try {
   const ptr1 = JSON.parse(readFileSync(PTR1, 'utf8'));
   const baseline = ptr1.caps.find((c) => c.label === 'baseline-room');
@@ -169,7 +177,7 @@ try {
 }
 
 /* ── every live collector run on the Desktop ───────────────────────────────── */
-const SEARCH = ['/Users/billyribeiro/Desktop/new-room', '/Users/billyribeiro/Desktop/new-room/scripts'];
+const SEARCH = [CAPTURE_ROOT, capturePath('scripts')];
 for (const dir of SEARCH) {
   // No initialiser: the `catch` always continues, so a value here could never be read.
   let entries;
