@@ -45,6 +45,55 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 12:23 UTC — a capture nothing asserted against was hiding fifty-seven assertions, four of them wrong
+
+`1a53536` and `253efda`. **Runtime impact: no.** Test partitioning and four corrected assertions.
+
+`settings-preference-wiring-contract.test.ts` read
+`docs/source/components/app-user-settings-modal.full.js` at MODULE SCOPE. That is a gitignored
+capture root, so `gate/evidence-bound-tests.mjs` excluded **the whole file** on any checkout without
+the dumps — this container, and CI. **Fifty-eight cases; one used the capture.**
+
+And the excluded half had drifted:
+
+* the dead-key list asserted `toHaveLength(23)` against 27. Four session keys were retired into it
+  across 2026-09-02 and 2026-09-03 — `sessionLocked`, `sessionLockKick`, `sessionOpen`,
+  `sessionTokensRevoked` — and the one test that counts them could not object;
+* its invented-name group was pinned at four names against eight, the same four keys;
+* the element-id count was derived as `reaching - 1 - 6`, asking for 22 against 19 — and could not
+  have been right in principle either, because that group is the CLOSED historical set the
+  `?? input.id` fallback once wrote as junk, and deriving a closed set from a live count goes wrong
+  the next time somebody adds a checkbox. Which is what happened;
+* the recording sounds matched a shape a documented extraction had replaced — the three receivers
+  moved to `recording-frames.ts` and their pairing into `ROOM_RECORDING_COMMANDS`. Asserted against
+  the table now, including upstream's quirk that `resumeRec` pairs the START sound with the STOP
+  preference, which the old regex would have lost.
+
+Two instrument bugs came out with them, both introduced when `ReactionPrefsPane` was extracted:
+counting raw occurrences of the handler mixed 28 checkboxes with 1 prop hand-off, and the id sweep
+reported `undefined` for that segment because a prop has no id before it.
+
+**`roster-gates.test.ts` was the same shape** — one module-scope read of the OLDER bundle for seven
+transcription cases, excluding all sixty-eight. Sixty-one needed nothing but this repository, **and
+one of them was wrong**: it asserted `command?.cmd === 'playMP3ForAll'` against `events.svelte.ts`,
+and those branches left that file on 2026-08-27 with the other six "for all" receivers. Stale for a
+week, invisible. The offsets could not be repointed at the committed v4 bundle, which is a different
+build — 2,891,205 bytes against 2,887,876.
+
+**A measurement of mine was wrong, and it is worth more than the fix.** I read three more files the
+same way, split their stylesheet assertions out, and was about to commit 109 "recovered" assertions.
+They were never excluded: `css/complete-app-styles.css` is committed and present, and `css` is listed
+as an evidence root but the exclusion only fires for roots that are MISSING. The suite total moving
+6,456 → 6,457 across three "recoveries" is what exposed it — 146 cases cannot arrive as one.
+Reverted whole, tree verified clean, and the instrument rebuilt to consult the missing-root list
+rather than the root names. **I measured "is this path an evidence root" when the question was "is
+this path absent", and a confident wrong answer looked exactly like a finding.**
+
+The room suite goes 6,392 → 6,518 passing. The excluded count is unchanged at 42 throughout: each
+split moved one file out of the set and one in.
+
+`pnpm run gate` exit 0.
+
 ### 2026-09-03 12:05 UTC — four gates nobody could run, and three that named one person's home directory
 
 `35e2527`. **Runtime impact: no.** Scripts, a helper and a guard. Nothing the site serves changed.
