@@ -45,6 +45,54 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 03:07 UTC — thirty-one commands their own tracker had never mentioned
+
+`90433a5`. **Runtime impact: no.** A document and a guard. The number is the entry.
+
+`feature-coverage-contract.test.ts` pins forty-five reference commands as absent from our source and
+names `missing-commands-triage.md` as where the answers live. **Thirty-one of the forty-five did not
+appear anywhere in that document**, as a plain substring. Not answered wrongly — not mentioned.
+
+This is the same hole the settings side closed on 2026-08-30, whose note says why in its own words:
+*"THE LIST NAMED ITS TRACKER AND NOTHING EVER OPENED IT."* That side grew an assertion that every
+name it pins has a disposition. The commands side never did, so the same drift was free here, and it
+had already happened.
+
+All thirty-one are answered from the bundle:
+
+* **Eighteen are built here under another name**, because this room uses remote functions where the
+  reference sends socket commands — the QA pair, `chatReactions` → `messageAction`,
+  `userDeleteChatMsg` (the MEMBER's own delete, distinct from the admin one beside it in the
+  capture), the three PM-log receivers, `privMsg` → `sendPrivateMessage`, the two log fetches,
+  `getSessionNotes`, `getSessionFiles` (a REST call upstream, not a socket command at all),
+  `changeUserPerms`, `resetSession`, `stopWebcam`, and `doPCLogSearch` — which is **server-side here
+  too**, `searchThread` in `server/private-chat.ts`, into the same separate results bucket the
+  reference keeps so a search cannot overwrite the thread.
+* **Eight are not commands.** `chatMsg` is an internal event-bus name for an arriving message;
+  `getMyState` and `userLoggedIn` are the socket transport's own handshake, and this application
+  authenticates at the HTTP layer; `connectToRoom` and `stopConsumer` are mediasoup internals;
+  `demux` is hls.js. Two are **unreachable upstream**: `callScreeen`'s receiving branch is dead in
+  the shipped bundle — `((i = 'callScreeen') ? … )` is an assignment, so the comparison is always
+  truthy — and `pingBack`, which posts `pingPopup`, is defined and bound to nothing.
+* **Two are blocked** on the same MediaMTX host as their neighbours.
+* **Two are the door**, `saveAndCloseSession` and `setSessionState` — name absences over a feature
+  that was genuinely not built until this morning, which is exactly why a table citing markup is not
+  evidence.
+
+**The guard.** Every pinned name must now be MENTIONED in the tracker, with the instrument checked
+first so an empty read cannot pass by having nothing to disagree with. It refuses silence and does
+not claim the answers are right — most of this list is "not a command at all" or "blocked", so a
+test demanding work would be wrong about most of it. A plain substring deliberately: the document
+answers in tables, in prose and inside fenced blocks, and a parser demanding one shape would refuse
+honest writing.
+
+**My first negative control for that guard was a no-op and passed.** I replaced only the second
+column of the `demux` row and left the name in the first. Same shape as the missing trailing comma
+earlier today: a mutation that does not change what the test reads is indistinguishable from a
+vacuous test. Redone against every occurrence, seen red, restored.
+
+`pnpm run gate` exit 0.
+
 ### 2026-09-03 03:00 UTC — the false-gaps table cited buttons, and one of those buttons lied
 
 `852ba3c`. **Runtime impact: no.** Two documents. The reason it is an entry of its own is what the
