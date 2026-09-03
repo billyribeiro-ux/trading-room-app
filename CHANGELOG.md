@@ -45,6 +45,45 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 02:31 UTC — the room gap register swept: eight of ten rows were stale, all one way
+
+`1e98133`. **Runtime impact: no.** No source changed. This is the register, and the reason it is its
+own entry is that a reader building from it would have rebuilt three shipped components.
+
+It was written between 2026-08-16 and pass 3 and had not been re-measured since. Every row put
+against the tree, with the citation that settles it written in:
+
+* **R-1, R-2, R-3** headed *"is not built"* — all three are built and rendered, and R-1's own heading
+  said where it belonged: `TypingIndicatorDots.svelte` is rendered by the two chat panes it names.
+* **R-4's blocker was false.** It read *"the stub is correct; the page, the route, the API and the
+  storage are all absent"*, because *"`currentCaption` is never assigned"* — and the docblock
+  asserting that was the only evidence the blocker stood on. `currentCaption` is assigned by
+  `media-transport.svelte.ts`, fed by `services/media`; the page, route, store and API were built on
+  2026-09-02.
+* **R-5's "Ours: nothing"** named six identifiers as absent everywhere. Five exist. Only `roomV4Link`
+  is absent and it is the one that should be — it belongs to a shell this room deliberately does not
+  build.
+* **R-13's action is done** — *"keep the fix and write the reason at the call site, or restore the
+  entity; do not leave it silent"* — and `soundcloud-autoplay-contract.test.ts` pins the URL **and**
+  the argument. Pinning only the URL would have let the argument be deleted while the divergence
+  stayed.
+* **R-14 was "blocked on persisted room video state".** The blocker was built and the prop followed
+  it, which is the order the row itself insisted on in as many words: *"persisted room video state
+  carrying the start instant, THEN the prop. Not the prop first."* The consequence it named — a
+  member joining ten minutes into a broadcast starting at 0:00 while everyone else is at 10:00 — is
+  gone.
+
+Every one of these is stale **in the safe direction**: more is built than recorded. That is the
+dangerous direction for a tracker, and it is now the fourth document this week to have been so. The
+header carries a ten-row table so the question is answerable without reading eight hundred lines.
+
+**What is actually left in Part A is one owner decision** — whether a closed page should carry the
+chrome (Archives, roster, Get Random User, Open Session) that this room's server-side refusal does
+not — and one standing divergence kept on purpose: R-6's popout, with its per-popout cost written
+down at the call site.
+
+`pnpm run gate` exit 0.
+
 ### 2026-09-03 02:26 UTC — a trap disarmed rather than documented, and R-11's last three parameters
 
 `13d6cd4`. **Runtime impact: yes, narrowly.** One anchor no longer renders in the user-info modal. It
