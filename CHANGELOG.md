@@ -63,8 +63,9 @@ machine secret.
 Measured verification before commit: the controller regression passed 38 assertions across three
 files, its exact `quality` pipeline passed 124 files/1,265 tests plus all 9 Chromium journeys and the
 production build, and the isolated Room permission contract passed both cases. A clean-worktree Room
-gate is run before push so the owner's unrelated untracked conflict copies cannot contaminate its
-source-inventory contracts.
+gate then passed formatting, lint, Svelte diagnostics with 0 errors and 0 warnings, privacy/schema
+gates, all 377 hosted-visible test files with 6,778 passing tests and one intentional skip, and the
+production adapter build. The owner's unrelated untracked conflict copies were not changed.
 
 ### 2026-09-03 19:01 EDT — Gate 3 gained a resumable identity converter and one-way credential bridge
 
