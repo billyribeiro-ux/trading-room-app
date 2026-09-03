@@ -1192,7 +1192,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the MEASURED absence of any upstream receiver are on `reloadSessionConfig` in
       `session-commands.remote.ts`, pointed at rather than repeated.
     */
-    max: 1066,
+    /*
+      1066 -> 1088, 2026-09-03 — `closedPage`, and it is the receiver for a door that until this date
+      could not be shut.
+
+      `rooms.state` is the column `decideRoomEntry` refuses entry on. Nothing in either application
+      could write it after a room was created: the controller's `setState` form action had no form
+      posting to it, and the room's "Save Message and Close Session" wrote a per-user preference with
+      zero readers. A presenter closed the session, was told the message was saved, and the room
+      admitted everybody as before.
+
+      The twenty-two lines are four of code and eighteen of WHY, and the why is the part that cannot
+      be recovered by reading the branch: upstream's subscriber sets `currPage = "closed"` and swaps
+      `app-root`'s whole page, and THIS ROOM HAS NO SUCH SWITCH. Its equivalent is the guest door's
+      own refusal — `+error.svelte`, rendered with the stored close message — so the RELOAD is the
+      page swap, and a reader who deletes the reload as a heavy-handed way to show a dialog removes
+      the only thing that makes the frame mean what upstream's means.
+
+      Not extracted, by this entry's own standard: it shares no collaborator. It calls
+      `#alertThenReload`, the private method three sibling branches already call, and a module
+      holding one such call is a worse file than the chain.
+    */
+    max: 1088,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -6379,8 +6400,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       happens if the save succeeded — because closing a room on a refused save shuts members out
       behind whatever the previous message said.
     */
-    max: 49,
-    why: 'saves the close message, then closes only if the save succeeded'
+    /*
+      49 -> 84, 2026-09-03, and the growth is a REPLACEMENT rather than an addition: the effect that
+      used to run second was `savePreference('sessionOpen', false)`, and it closed nothing.
+
+      `sessionOpen` had zero readers anywhere in `apps/room/src`. The door is `rooms.state` on the
+      controller — the column `decideRoomEntry` refuses entry on — and nothing in either application
+      could write it after a room was created. So this file's own docblock was true of a save that
+      happened and a close that did not: "the close only happens if the save succeeded" described an
+      ordering between one real write and one write into the clicking presenter's own settings blob.
+
+      It calls `closeSession()` now, which writes the column and then publishes `closedPage`.
+
+      Thirty-five lines for one changed call is the ratio this repository asks for when a comment was
+      LOAD-BEARING AND WRONG: the ordering argument had to be rewritten around a second effect that
+      now leaves the browser, the refusal path had to say what a presenter is actually looking at
+      ("The message was saved, but the room could not be closed" — never `Message Saved`), and the
+      dependency that came out with the write it existed for is recorded as removed rather than
+      quietly dropped. A future reader restoring a `savePreference` dep to "keep the pane in sync"
+      reintroduces the defect, and the file now says so.
+    */
+    max: 84,
+    why: 'saves the close message, then CLOSES THE ROOM - the door is rooms.state, not a preference'
   },
   {
     file: 'lib/room/recording-frames.ts',
@@ -6444,7 +6485,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lives once on `reloadSessionConfig` in `session-commands.remote.ts` and is pointed at rather
       than repeated, which is what kept this to seven lines instead of forty.
     */
-    max: 114,
+    /*
+      114 -> 119, 2026-09-03, and every one of the five lines is the note left where a write was
+      DELETED. `session-open` ran `savePreference('sessionOpen', true)` — a key with no reader
+      anywhere in this application — and the reopen it appeared to perform was `openSession()` beside
+      it, which published a reload prompt into a door nothing could open.
+
+      The write is gone and the command now persists `rooms.state` first. What stays here is the
+      sentence saying the key was here, so that the next reader finds a recorded deletion rather than
+      an absence, and the header's own claim — "FOUR OF THESE FIVE SPENT MONTHS ON THE WRONG SIDE OF
+      THAT LINE" — keeps its fifth example.
+    */
+    max: 119,
     why: 'the session acts that send; the four that only write a preference are a table'
   },
   {

@@ -138,7 +138,27 @@ export const DEAD_PREFERENCE_KEYS: readonly string[] = [
     feature that existed on neither side of it.
   */
   'sessionLocked',
-  'sessionLockKick'
+  'sessionLockKick',
+  /*
+    A SEVENTH OF THAT KIND, added 2026-09-03, and it is the oldest of them.
+
+    Session Control's *" Save Message and Close Session "* wrote `sessionOpen: false` and its
+    sibling *" Open Session "* wrote `sessionOpen: true`, both into the clicking presenter's own
+    settings blob. **Measured 2026-09-03: zero readers anywhere in `apps/room/src`** — and unlike
+    every key above it, this one was never even suspected: it is the only one that had TWO writers
+    and so looked, from either side, like a value somebody was maintaining.
+
+    The room's actual door is `rooms.state` on the controller, which `decideRoomEntry` refuses entry
+    on (`room-entry.ts:224`) and which **nothing in either application could write after a room was
+    created**. The controller's own `setState` form action had no form posting to it — one
+    occurrence of the name in the whole app, its own declaration.
+
+    So the enforcement was correct and unreachable for its entire life, at both ends. A presenter
+    closed the session, was told `Message Saved`, and the room admitted everybody as before.
+    `internal/room-state/[code]` is the write; `session-commands.remote.ts`'s `closeSession` and
+    `openSession` are the two commands that use it.
+  */
+  'sessionOpen'
 ];
 
 const DEAD = new Set(DEAD_PREFERENCE_KEYS);

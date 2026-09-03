@@ -630,13 +630,40 @@ describe('savePreference', () => {
       savePreference({ key: 'chatStyle', value: { bold: true, size: 14 } })
     );
     await callRemote(locals(member), () => savePreference({ key: 'chatSplit', value: [40, 60] }));
-    await callRemote(locals(member), () => savePreference({ key: 'sessionOpen', value: null }));
+    /*
+      `null` is a SHAPE and not a deletion, which is what this third write is for: devalue must carry
+      it as itself, and the store must keep the key rather than treating the value as absent.
+
+      The key is synthetic — `nullShaped`, the same synthetic-key convention as `ok` in the case
+      below. It was `sessionOpen` until 2026-09-03, and that is worth the sentence: `sessionOpen` is
+      now on `DEAD_PREFERENCE_KEYS`, so this write is pruned by the command before it ever reaches
+      the blob, and the case failed. It failed HONESTLY — the prune is doing exactly its job — but a
+      test asserting how `null` travels must not be assertable-away by retiring an unrelated key.
+    */
+    await callRemote(locals(member), () => savePreference({ key: 'nullShaped', value: null }));
 
     expect(stored()).toEqual({
       chatStyle: { bold: true, size: 14 },
       chatSplit: [40, 60],
-      sessionOpen: null
+      nullShaped: null
     });
+  });
+
+  it('and a DEAD key never reaches the blob at all', async () => {
+    /*
+      The half the case above stopped covering when it stopped using a dead key, made explicit rather
+      than left implied. `pruneDeadPreferenceKeys` runs on every preference write, so a browser still
+      holding a retired key converges on the next change of any kind — no startup pass, nothing to
+      run, idempotent once clean.
+
+      `sessionOpen` is the example because it is the newest entry and the one with a real cost
+      behind it: it was the room's *"Save Message and Close Session"*, writing a per-user flag that
+      nothing read while `rooms.state` — the column entry is actually refused on — stayed open.
+    */
+    await callRemote(locals(member), () => savePreference({ key: 'chatTextSize', value: 14 }));
+    await callRemote(locals(member), () => savePreference({ key: 'sessionOpen', value: false }));
+
+    expect(stored()).toEqual({ chatTextSize: 14 });
   });
 
   it('refuses an empty key, an over-long one, and a value JSON cannot hold', async () => {

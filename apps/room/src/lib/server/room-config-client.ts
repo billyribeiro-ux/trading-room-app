@@ -34,6 +34,7 @@ import {
   roomOccupancyUrl,
   roomPermissionsUrl,
   roomSettingUrl,
+  roomStateUrl,
   streamIngestUrl,
   streamReadUrl
 } from './control-plane';
@@ -1069,6 +1070,62 @@ export async function writeRoomSetting(
         'content-type': 'application/json'
       },
       body: JSON.stringify({ name, value }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the write failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/**
+ * Opening and closing the session: `POST {control}/internal/room-state/{shortCode}`.
+ *
+ * ## The defect this closes
+ *
+ * `rooms.state` is the column `decideRoomEntry` refuses entry on, and until 2026-09-03 **nothing
+ * could set it after a room was created.** The controller's `setState` form action had no form
+ * posting to it, and the ROOM's "Save Message and Close Session" wrote
+ * `savePreference('sessionOpen', false)` — a key with zero readers anywhere in `apps/room/src`. A
+ * presenter closed the session, was told the message was saved, and the door stayed open.
+ *
+ * Same LEVEL error as the Lock Session buttons: a room-level act modelled as a per-user preference.
+ *
+ * ## A DURABLE write and not a broadcast, for the reason the sound and the restream URL give
+ *
+ * A closed room must still be closed after the last browser goes away, and a member arriving
+ * tomorrow must meet the same door. Publishing `closedPage` over the event channel would change
+ * what the browsers currently in the room believe and persist nothing.
+ *
+ * The broadcast is worth having too, and the room does BOTH: the write is what closes the door, and
+ * the frame is what tells the people already inside. Neither substitutes for the other.
+ */
+export async function writeRoomState(
+  shortCode: string,
+  memberEmail: string,
+  state: 'open' | 'closed'
+): Promise<void> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomStateUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  const url = new URL(base);
+  url.searchParams.set('email', memberEmail);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ state }),
       signal: AbortSignal.timeout(TIMEOUT_MS)
     });
   } catch (cause) {

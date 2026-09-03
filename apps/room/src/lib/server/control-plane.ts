@@ -213,6 +213,21 @@ export function roomSettingUrl(shortCode: string): string | null {
 }
 
 /**
+ * Opening and closing the session: `POST {control}/internal/room-state/{shortCode}`.
+ *
+ * A route of its own rather than `roomSettingUrl` because `state` is a COLUMN on `rooms`, not a
+ * setting: it is what `internal/room-config` projects as `room.state` and what `decideRoomEntry`
+ * refuses entry on. The settings door writes `settings_json` through the generated schema, and
+ * teaching it a second storage shape is how one handler comes to have two rules.
+ *
+ * `isLocked` went the other way on 2026-09-02 for the same reason read forwards — it IS a setting.
+ */
+export function roomStateUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-state/${encodeURIComponent(shortCode)}` : null;
+}
+
+/**
  * `saveCustomPerms`: `POST {control}/internal/room-permissions/{shortCode}`.
  *
  * The second thing this room writes back, and for the same reason as the first: the five permission

@@ -5,7 +5,7 @@ import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { roomState } from '#lib/server/db/schema.js';
 import { error } from '@sveltejs/kit';
 import { publishRosterToRoom, publishToRoom } from '#lib/server/room-events.js';
-import { writeRoomSetting } from '#lib/server/room-config-client.js';
+import { writeRoomSetting, writeRoomState } from '#lib/server/room-config-client.js';
 import { recordSessionEvent } from '#lib/server/session-history.js';
 
 /*
@@ -247,8 +247,69 @@ export const hardReset = command(z.void(), async () => {
 export const openSession = command(z.void(), async () => {
   ensureDatabase();
   const room = presenterRoom();
+  const { locals } = getRequestEvent();
+
+  /*
+    THE DOOR, and it is the half that was missing until 2026-09-03.
+
+    This command published `openSession` and nothing else — a reload prompt to browsers already in
+    the room, which is upstream's own subscriber and which is genuinely useful to a member sitting on
+    the "This room is closed." refusal. But the refusal is `decideRoomEntry` reading `rooms.state`,
+    and NOTHING in either application could write that column after a room was created. So a room
+    that was ever closed could not be reopened, and the frame told people to reload into the same
+    refusal.
+
+    The write goes FIRST, deliberately. The frame tells people to reload, and a reload that arrives
+    before the door is open lands on the refusal again — which reads to a member as the control
+    having failed. Ordering it the other way costs nothing and cannot produce that.
+  */
+  await writeRoomState(room, requireUser(locals).email, 'open');
+
   publishToRoom(room, { channel: 'cmds', data: { cmd: 'openSession' } });
   recordSessionEvent(room, 'Session opened', 'The room was reopened to members.');
+});
+
+/**
+ * `saveAndCloseSession` — the other half of the door, and the defect it closes is the larger one.
+ *
+ * ## What "Save Message and Close Session" did
+ *
+ * `savePreference('sessionOpen', false)` — the clicking presenter's own settings blob. Measured
+ * 2026-09-03: `sessionOpen` had **zero readers anywhere in `apps/room/src`**, and it was not even on
+ * `DEAD_PREFERENCE_KEYS`. Its sibling `session-open` wrote the same dead key and at least also
+ * published a frame.
+ *
+ * So a presenter closed the session, was told `Message Saved`, and the room stayed open — to
+ * everybody, permanently, because `rooms.state` had no writer either. That is the same LEVEL error
+ * as the Lock Session buttons one door over, and the same shape as the Stream Player pane and the
+ * chat-mode radio.
+ *
+ * ## Both halves, and neither substitutes for the other
+ *
+ * The WRITE closes the door: `decideRoomEntry` refuses `roomState !== 'open'` with the presenter's
+ * own close message, which `saveCloseMessage` already stores and `+error.svelte` already renders.
+ * The FRAME tells the people already inside — upstream's `closedPage`, which sets `currPage='closed'`
+ * on every browser in the room.
+ *
+ * A broadcast alone would leave a closed room open to the next arrival; a write alone would leave
+ * everybody already inside sitting in a room that no longer admits anyone.
+ *
+ * ## The order is WRITE then FRAME, and it is the opposite of `openSession`'s reason
+ *
+ * There it is "do not tell people to reload into a door that is still shut". Here it is the same
+ * rule with the sign flipped: the frame sends a member to the refusal, and the refusal must already
+ * be true when they arrive. Both orderings fall out of one principle — the durable state changes
+ * before anything tells anybody it has.
+ */
+export const closeSession = command(z.void(), async () => {
+  ensureDatabase();
+  const room = presenterRoom();
+  const { locals } = getRequestEvent();
+
+  await writeRoomState(room, requireUser(locals).email, 'closed');
+
+  publishToRoom(room, { channel: 'cmds', data: { cmd: 'closedPage' } });
+  recordSessionEvent(room, 'Session closed', 'The room no longer admits members.');
 });
 
 /**

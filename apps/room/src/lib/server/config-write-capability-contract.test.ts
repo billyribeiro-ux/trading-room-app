@@ -69,6 +69,16 @@ const WRITERS = [
   // the test insisted the capability be decided rather than inherited from whichever call it was
   // copied from.
   'writeRoomMute',
+  /*
+    `writeRoomState` — added 2026-09-03, and the only writer here that does not move a SETTING.
+
+    Every other one changes `room_settings.settings_json`, a ban row, or an ingest credential. This
+    one moves `rooms.state`: the column `decideRoomEntry` refuses entry on, which until this date
+    nothing in either application could set after a room was created. It is therefore the highest-
+    consequence write on the list — it is the door — and a capability minted to READ a room's
+    configuration must not reach it.
+  */
+  'writeRoomState',
   'requestStreamIngestKey'
 ];
 
