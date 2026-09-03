@@ -183,7 +183,19 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'openLoginLink',
   'authMode',
   'enableDiscord',
-  'isLocked',
+  /*
+    `isLocked` LEFT THIS LIST on 2026-09-02, and its blocker was a SHAPE rather than evidence.
+
+    The triage said: *"Needs a lock the SERVER owns; `room_state` has no column for it, and a
+    client-side lock is not a lock."* Both halves true, and the conclusion did not follow — the lock
+    is a room SETTING on the CONTROLLER, `room_state` was never where it belonged, and
+    `decideRoomEntry` has refused a locked room at the guest door (`room-entry.ts:221`) since before
+    the room's three Lock Session buttons were written. What was missing was the WRITE.
+
+    Those buttons had been writing `sessionLocked` and `sessionLockKick` into the clicking
+    presenter's own settings blob — both keys with zero readers — and raising the capture's
+    `Session Locked` over a door that never closed.
+  */
   'playChatMessageSoundFor',
   /*
     THE CHANNEL CLUSTER LEFT THIS LIST ON 2026-09-02 — all five, together.

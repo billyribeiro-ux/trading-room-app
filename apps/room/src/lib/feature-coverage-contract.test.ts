@@ -156,7 +156,20 @@ const ABSENT_FROM_OUR_SOURCE: readonly string[] = [
   'getSessionMediaState',
   'getSessionNotes',
   'hardResetSession',
-  'lockSession',
+  /*
+    `lockSession` LEFT THIS LIST on 2026-09-02, built rather than declared absent — and it is the
+    sixth of the session controls that announced a server act and ran a local one.
+
+    Its three buttons wrote `sessionLocked` and `sessionLockKick` into the clicking presenter's own
+    settings blob, both keys with ZERO readers anywhere in `apps/room/src`, and then raised the
+    capture's `Session Locked`. The sender is `session-commands.remote.ts`; there is no receiver
+    because there is nothing to receive — the lock is a room SETTING on the controller, and
+    `decideRoomEntry` has refused a locked room at the guest door since before the buttons existed.
+
+    ONE HALF IS NOT BUILT AND IS NAMED WHERE IT IS SENT: the `{kick: true}` on the middle button.
+    Upstream's server evicts everybody; this deployment has no evict-everyone command, and its
+    realtime hub is process-local. `session-lock-writes.ts` carries the reasoning.
+  */
   'pingPopup',
   'privMsg',
   /*

@@ -96,6 +96,7 @@ import {
 import { removeProfilePicture, uploadProfilePicture } from '../../routes/profile-picture.remote';
 import { savePermissions } from '../../routes/permissions.remote';
 import { editUsername } from '../../routes/username.remote';
+import { lockSession } from '../../routes/session-commands.remote';
 import { sendMessage as sendMessageCommand } from '../../routes/chat-messages.remote';
 import { postAlert as postAlertCommand } from '../../routes/post-alert.remote';
 import { recordTranscript } from '../../routes/session-transcript.remote';
@@ -1006,6 +1007,7 @@ export function createRoom(deps: RoomDeps) {
     commands: {
       presenter: presenterCommand,
       editUsername,
+      lockSession,
       muteChat,
       muteChatIndefinitely,
       unmuteChat,

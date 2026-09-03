@@ -448,7 +448,20 @@ const ROOM_CONSUMED = [
   'altOffTopicChannelName',
   'hasAdminOnlyChannel',
   'extraAdminChannels',
-  'extraRegChannels'
+  'extraRegChannels',
+  /* "Lock Session?" - 112, added 2026-09-02, and it is a LIAR closed rather than a feature added.
+
+     The room's Session Control has a Lock Session tab with three buttons, transcribed from byte
+     2,151,043. All three wrote two keys into the clicking presenter's own settings blob -
+     sessionLocked and sessionLockKick - and raised the capture's "Session Locked". Measured
+     2026-09-02: both keys had ZERO readers anywhere in apps/room/src. The door never closed.
+
+     The setting crosses to EVERY member because that is where the reference's gate runs: isLocked
+     and NOT isPresenter, in the arriving member's own browser (byte 1,148,372). A presenter reads
+     the same value for the reminder it draws on load (byte 2,500,153).
+
+     It is also the second setting the room may WRITE - see ROOM_WRITABLE_SETTINGS. */
+  'isLocked'
 ];
 
 /**
@@ -1057,7 +1070,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 111 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 112 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

@@ -44,17 +44,26 @@ export class RoomSessionControl {
     closeModal: () => void;
     reload: () => Promise<void>;
     savePreference: (key: string, value: boolean) => void;
+    /**
+     * `lockSession` — the room's door, written on the CONTROLLER.
+     *
+     * Injected for the reason every collaborator here is: this class knows which button was pressed
+     * and nothing about how a setting reaches the control plane, and its tests must not need one.
+     */
+    lockSession: (payload: { lock: boolean; kick: boolean }) => Promise<unknown>;
   }) {
     this.#dialogs = options.dialogs;
     this.#closeModal = options.closeModal;
     this.#reload = options.reload;
     this.#savePreference = options.savePreference;
+    this.#lockSession = options.lockSession;
   }
 
   readonly #dialogs: RoomDialogs;
   readonly #closeModal: () => void;
   readonly #reload: () => Promise<void>;
   readonly #savePreference: (key: string, value: boolean) => void;
+  readonly #lockSession: (payload: { lock: boolean; kick: boolean }) => Promise<unknown>;
 
   /** The four collaborators, as one object, so the extracted group takes them without a fifth copy. */
   get #deps(): SessionRoomCommandDeps {
@@ -82,18 +91,31 @@ export class RoomSessionControl {
       has no third parameter. `CloseSessionPane` calls a receiver instead — see `close-message.ts`.
     */
     /*
-      THE LOCK, as a table rather than three branches — see `SESSION_LOCK_WRITES`. It is the one
-      group here that contacts nothing: two preference writes and a captured sentence, with no
-      command, no reload and no modal to close. Keeping it inline made this file grow by four lines
-      every time the room learned a new lock state, which is what pushed it over its ceiling when the
-      hard-reset and open senders landed.
+      THE LOCK, as a table rather than three branches — see `SESSION_LOCK_WRITES`.
+
+      It used to be the one group here that contacted nothing: two preference writes and a captured
+      sentence. That was the defect, not the design — the keys had no readers, so the door never
+      closed. It sends a command now, and the table survives for its original reason: three branches
+      cost four lines apiece and grew this file every time the room learned another lock state.
+
+      THE ALERT MOVED TO AFTER THE AWAIT, and that is the second half of the fix. Raised before it,
+      `Session Locked` appeared whether or not the write landed — which is exactly the failure the
+      command was built to end, reproduced one layer up.
     */
     const lock = SESSION_LOCK_WRITES[action];
     if (lock) {
-      for (const key of Object.keys(lock.preferences)) {
-        this.#savePreference(key, lock.preferences[key]);
-      }
-      this.#dialogs.alert = lock.alert;
+      void this.#lockSession({ lock: lock.lock, kick: lock.kick })
+        .then(() => {
+          this.#dialogs.alert = lock.alert;
+        })
+        .catch((cause: unknown) => {
+          /*
+            SAID, not swallowed. The command answers 502 when the controller refuses the write, and
+            a presenter who is told nothing has no way to tell a locked room from an unlocked one.
+          */
+          console.error('[session-control] the lock did not change', cause);
+          this.#dialogs.alert = 'Could not change the room lock right now.';
+        });
       return true;
     }
 

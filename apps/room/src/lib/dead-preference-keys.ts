@@ -114,7 +114,31 @@ export const DEAD_PREFERENCE_KEYS: readonly string[] = [
     to whoever holds a link, which needs an anonymous media grant nobody has designed. So the buttons
     are disabled with the reason on screen and the key is retired here.
   */
-  'streamingPlayerEnabled'
+  'streamingPlayerEnabled',
+  /*
+    A FIFTH AND SIXTH OF THAT KIND, added 2026-09-02, and the clearest case yet.
+
+    Session Control's Lock Session tab has three buttons — `Lock Session`, `Lock Session & kick
+    users.` and `Unlock Session`, transcribed from bundle byte 2,151,043. All three wrote
+    `sessionLocked` and `sessionLockKick` into the clicking presenter's own settings blob and then
+    raised the capture's own `Session Locked`.
+
+    **Measured 2026-09-02: both keys had ZERO readers anywhere in `apps/room/src`.** A presenter
+    locked the room, was told the room was locked, and the door stayed open to everybody — for as
+    long as the buttons had existed.
+
+    Same LEVEL error as `presenterStyle` and `streamingPlayerEnabled` above: a room-level presenter
+    act modelled as a per-user preference, invisible for the same reason, since the pane shows the
+    value back to the person who set it. The lock is a room SETTING on the controller, and
+    `decideRoomEntry` has refused a locked room at the guest door since before any of this — only the
+    write was missing. `session-commands.remote.ts`'s `lockSession` is it.
+
+    `sessionLockKick` is dead in a second way worth naming: even the reference's own `{kick: true}`
+    is a SERVER behaviour this deployment has no equivalent for, so the key was standing in for a
+    feature that existed on neither side of it.
+  */
+  'sessionLocked',
+  'sessionLockKick'
 ];
 
 const DEAD = new Set(DEAD_PREFERENCE_KEYS);

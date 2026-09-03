@@ -1013,6 +1013,23 @@ export const ROOM_VISIBLE_SETTINGS = [
   'extraAdminChannels',
   'extraRegChannels',
   /*
+    "Lock Session?" - whether regular users may enter at all.
+
+    It crosses to EVERY member and not only to a presenter, which is what the reference does and is
+    what the behaviour needs: its gate is isLocked and NOT isPresenter, evaluated in the arriving
+    member's own browser (bundle byte 1,148,372), and the sentence it raises names the room. A
+    presenter reads the same value for the reminder it draws on load (byte 2,500,153).
+
+    Not credential-shaped: a boolean saying whether a door is shut, which a member standing at the
+    door already learns by being refused. It is in the dont-touch group on the Manage page, as
+    useMediaMTX is, and that group is about what an owner should not casually change rather than
+    about what may cross.
+
+    This is also the SECOND entry on this list the room may write - see ROOM_WRITABLE_SETTINGS, and
+    the three presenter buttons that had been writing two per-user preferences nobody read.
+  */
+  'isLocked',
+  /*
     "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with it.
 
     THREE behaviours behind one checkbox, read from six sites. It forces the display mode to compact
@@ -1254,6 +1271,27 @@ export function roomPresenterConfig(
  */
 export const ROOM_WRITABLE_SETTINGS = [
   'overwriteCashRegisterSound',
+  /*
+    "Lock Session?" — the write half of the room's Lock Session tab, added 2026-09-02.
+
+    The reference puts these three controls in the ROOM, on Session Control's Lock Session tab
+    (byte 2,151,043): `Lock Session`, `Lock Session & kick users.` and `Unlock Session`, each
+    sending the admin command `lockSession` with `{lock}` and, for the middle one, `{kick: true}`
+    (byte 2,165,670). What that command changes is durable per-room state — the very setting the
+    Manage page's own checkbox writes — so it comes back here for exactly the reason
+    `overwriteCashRegisterSound` does rather than being broadcast and forgotten.
+
+    **It arrived because the three buttons were LYING.** They wrote `sessionLocked` and
+    `sessionLockKick` into the clicking presenter's own settings blob and raised the capture's
+    "Session Locked". Measured 2026-09-02: both keys had ZERO readers anywhere in `apps/room/src`.
+    A room-level presenter act modelled as a per-user preference — the same defect the Stream Player
+    pane and the chat-mode radio were each corrected for.
+
+    Presenter-only on both sides, as `restreamToURL` is: the endpoint re-checks that the named member
+    is an owner or a true presenter, and the room's command gates on the connected member's role
+    before it ever calls out.
+  */
+  'isLocked',
   /*
     "Restream URL" — the write half of SC-13, and the reason `isRoomWritableSetting` below had to
     learn about the presenter list.

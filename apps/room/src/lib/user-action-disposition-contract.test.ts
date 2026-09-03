@@ -547,6 +547,7 @@ describe('an inert action really does nothing, executed', () => {
   function make() {
     const dialogs = new RoomDialogs();
     const toasts = new RoomToasts();
+    let locksSent = 0;
     const sent: { subCmd: string; targetUserId: number }[] = [];
     const opened: string[] = [];
 
@@ -566,6 +567,10 @@ describe('an inert action really does nothing, executed', () => {
           Promise.resolve(null)
         ),
         editUsername: () => Promise.resolve(null),
+        lockSession: () => {
+          locksSent += 1;
+          return Promise.resolve({ locked: true });
+        },
         restartAudio: () => Promise.resolve(null),
         unmuteChat: () => Promise.resolve(null),
         forceReload: () => Promise.resolve(null)
@@ -606,7 +611,18 @@ describe('an inert action really does nothing, executed', () => {
       reload: () => Promise.resolve()
     } as never);
 
-    return { actions, dialogs, toasts, sent, opened };
+    return {
+      actions,
+      dialogs,
+      toasts,
+      sent,
+      opened,
+      commands: {
+        get lockSession() {
+          return locksSent;
+        }
+      }
+    };
   }
 
   it('a HANDLED action moves something — the positive control', () => {
@@ -624,8 +640,14 @@ describe('an inert action really does nothing, executed', () => {
       `session-lock` is a good replacement for the same reason it was easy to get wrong: it is
       handled through the `SESSION_LOCK_WRITES` table rather than an `action === '…'` branch, so a
       harness that could not reach a table would fail here first.
+
+      ITS OBSERVABLE MOVED ON 2026-09-02, and the new one is stronger. The action used to write two
+      preferences and raise its alert synchronously; both keys had zero readers, so the "observable
+      effect" this control asserted was a dialog over a door that never closed. It sends a command
+      now, and the alert waits for it — so the effect asserted here is the SEND, which is a thing
+      that leaves the browser.
     */
-    const { actions, dialogs } = make();
+    const { actions, commands } = make();
     actions.handle('session-lock', {
       id: 5,
       nick: 'Bo',
@@ -633,9 +655,7 @@ describe('an inert action really does nothing, executed', () => {
       pic: '',
       status: 'online'
     } as never);
-    expect(dialogs.alert, 'a handled action must produce its observable effect').toBe(
-      'Session Locked'
-    );
+    expect(commands.lockSession, 'a handled action must produce its observable effect').toBe(1);
   });
 
   it('an ALERTED action raises its fixed alert — the second control', () => {

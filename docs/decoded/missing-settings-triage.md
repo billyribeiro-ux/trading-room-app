@@ -9,8 +9,14 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **26** as this is written; thirty-one have been answered by building, one more
+2026-08-28 and is at **20** as of 2026-09-02; thirty-seven have been answered by building, one more
 is answered NOT A GAP, and the CHANGELOG entries for each say what.
+
+**26 -> 20 on 2026-09-02**, and it is one find rather than six: five of the six settings that feed
+`processSessData`'s tab expression, plus `smallerImagePreview`. The instrument could see none of the
+six — they are read off the minifier's own local before the object is `sessData` — so the count it
+reports has always been a floor rather than a total. That is worth carrying: **this number bounds
+what the audit can SEE, not what is left.**
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
 assumed.
@@ -350,7 +356,7 @@ controls were seen red. That is the second inherited blocker in one day to disso
 
 ---
 
-### The channel model — five settings and one function
+### The channel model — BUILT 2026-09-02
 
 **Added 2026-08-31, and they were invisible to this triage until then.** `audit-setting-coverage.mjs`
 counted `sessData.<name>` and these are read in **`processSessData`**, before the object is
@@ -374,37 +380,42 @@ e.extraRegChannels    && e.extraRegChannels.split(",").forEach(r =>
                             globals.chatTabs.push({displayName:r, name:r, type:"r"}))
 ```
 
-**Only `main` is unconditional.** `hasChannelTabs` is now WIRED and is therefore not on the pinned
-list: this room had shipped an Off Topic tab to every room including those whose owners had turned it
-off — a control nobody asked for, which is the mirror of the dead-control rule. `chat-tabs.ts`
-carries the argument and `chat-tabs-contract.test.ts` the five cases, including that **absent means
-true**, because reading absence as false would have removed the tab from every room that never stored
-the setting.
+**Only `main` is unconditional.** All six settings are wired now — `hasChannelTabs` on 2026-08-31,
+the other five on 2026-09-02. `chat-tabs.ts` is that expression reproduced, and
+`chat-tabs-contract.test.ts` has the cases.
 
-The five below are genuinely unbuilt, and they are ONE piece of work rather than five:
+**THE TWO THINGS THIS SECTION SAID COULD NOT BE SETTLED WERE SETTLED BY READING.** It recorded:
 
-| setting | reads | what it does upstream |
-| --- | --- | --- |
-| `altGenChannelName` | 2 | Renames the Main Chat tab. Absent → `"Main Chat"`. The channel NAME stays `main`; only `displayName` changes. |
-| `altOffTopicChannelName` | 2 | The same for Off Topic. Absent → `"Off Topic"`. |
-| `hasAdminOnlyChannel` | 1 | Adds an `adminChat` tab labelled `Admins`, **type `po`**. Captured default is ON (`room-settings-profile.ts:56`), so upstream rooms have a tab this room does not. |
-| `extraAdminChannels` | 2 | Comma-separated. Each becomes `{displayName: r, name: r, type: "p"}` — the typed name IS the channel name, with no sanitisation upstream. |
-| `extraRegChannels` | 2 | The same, **type `r`**. |
+> Two things to settle before building, neither of which the capture answers. Upstream pushes the
+> owner-typed name as BOTH `displayName` and `name`, unsanitised … And `po` versus `p` is undecoded:
+> both are private, and nothing in the capture says what the `o` distinguishes.
 
-**Why this is a model change and not four pushes.** The reference has THREE channel types — `r`,
-`p` and `po` — where this room has one. `BUILT_IN_CHAT_TABS` is a flat list of names and
-`memberChatChannels` resolves an allow-list of strings; there is nowhere for a type to live, and the
-types are what decide who may read and post. Building these means giving a channel a type first, and
-that touches the SSE hub's per-listener `chatChannels`, `chat-log.ts`'s reads and the archive sweep.
+The first half was a question with an answer, and the second was not undecodable at all.
 
-**Two things to settle before building, neither of which the capture answers.** Upstream pushes the
-owner-typed name as BOTH `displayName` and `name`, unsanitised — this room already refuses a badge
-channel whose name collides with a built-in (`chat-tabs.ts`), and the same rule has to apply here or
-an owner can type `main` and land messages in every member's main log. And `po` versus `p` is
-undecoded: both are private, and nothing in the capture says what the `o` distinguishes.
+**`po` is gated at three sites and they agree**: the subscription in `registerForExtraChannels` at
+byte **1,008,074**, and both chat columns' render at **1,437,340** and **2,383,602**, all on
+`isPresenter || user.hasAdminChat`. Reproduced as ONE decision, on the server — upstream's two are
+both in a browser, and the subscribe one is what decides what the server sends.
 
-**Not started, deliberately.** A partial channel model is worse than none: a tab that renders and
-cannot be posted to is the dead scaffolding this repository forbids.
+**`p` is decoded too, and the answer is that nothing reads it.** `type:"p"` occurs **exactly once**
+in the whole 2,891,205-byte bundle — the `extraAdminChannels` push at 1,147,139 — and no comparison
+against it exists anywhere. So a `p` channel behaves as an `r` one in the reference's own client, and
+`extraAdminChannels` is a name describing an intent that client does not enforce. It is carried as a
+value and treated as `r` for visibility: transcribing what the bundle does rather than what its
+setting name implies, which is the call `advancedSearchAlerts` and `h264Enabled` are recorded under.
+
+**The name collision is the one DIVERGENCE, and it is the one place matching would reproduce a
+privilege escalation.** An `extraRegChannels` entry named `adminChat` would be a type-`r` channel —
+ungated, in everyone's list — sharing a name with the type-`po` one, and the name IS the channel:
+`messages.room`, the realtime key, the allow-list entry. Refused against the same reserved set a
+badge channel already took. `main` is the same defect one step milder. Owner-typed names are also
+trimmed, because `"a, b"` upstream yields a channel literally named `" b"`.
+
+**What this section used to end with, kept because the judgement was right:** *"Not started,
+deliberately. A partial channel model is worse than none: a tab that renders and cannot be posted to
+is the dead scaffolding this repository forbids."* Nothing partial shipped — the type reaches the
+server seam, so a tab a member holds is a channel they may post to, and one they may not have does
+not exist for them at all.
 
 ## BLOCKED
 

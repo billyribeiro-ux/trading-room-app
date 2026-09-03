@@ -28,11 +28,17 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, NINETY-ONE by the room application
+  Eleven consumed by this repository's room-login page, NINETY-TWO by the room application
   through `internal/room-config/[code]`, ONE by the room but only for a presenter, and six by the
   WordPress SSO door at `(public)/sso/[code]`. `allowUsersToChangeUsername` is on the first two
   lists, and so now are `showPasswordField`, `usernameInstructions` and `hasRequiredPhoneInLogin`,
-  so the union is 111.
+  so the union is 112.
+
+  111 -> 112 on 2026-09-02: isLocked, and it is a LIAR closed rather than a feature added. The room's
+  Lock Session tab has three buttons that wrote sessionLocked and sessionLockKick into the clicking
+  presenter's own settings blob - both keys with ZERO readers anywhere in apps/room/src - and raised
+  the capture's "Session Locked" over a door that never closed. It is also the SECOND setting the
+  room may write back; decideRoomEntry has enforced it at the guest door all along.
 
   106 -> 111 on 2026-09-02: altGenChannelName, altOffTopicChannelName, hasAdminOnlyChannel,
   extraAdminChannels and extraRegChannels — FIVE names and ONE find. They are the rest of the six
@@ -388,6 +394,7 @@ const EXPECTED_WIRED_SETTINGS = [
     absence as false would take the tab from every room that has never stored the setting.
   */
   'hasChannelTabs',
+  'isLocked',
   'altGenChannelName',
   'altOffTopicChannelName',
   'hasAdminOnlyChannel',

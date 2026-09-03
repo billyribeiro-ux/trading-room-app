@@ -847,7 +847,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       than trusting the paragraph. The added sentence says which two and why, because a number
       restated with no reason is the next one somebody assumes was always that.
     */
-    max: 164,
+    /*
+      164 -> 166, 2026-09-02, the SECOND raise today and for the same reason: the count of
+      `error(<status>, …)` doors this page exists for moved again, 126 -> 127, when `lockSession`
+      gained its 502. `error-page-contract.test.ts` re-derives that number on every run rather than
+      trusting the paragraph, and three restatements in one day is the argument for having the check
+      rather than an argument against the sentence.
+    */
+    max: 166,
     why: 'the page every refusal in this app lands on, including a closed room'
   },
   {
@@ -5748,7 +5755,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       NOT changed here, because rewriting the ceiling model under deadline is how a gate ends up
       weaker than it was. Recorded as the owner's call, with the evidence attached.
     */
-    max: 103,
+    /*
+      103 -> 125, 2026-09-02. Twenty-two lines, and they are the room lock becoming real.
+
+      Three of them are the collaborator and its field; the rest are the `.then()` / `.catch()` and
+      the reason for both. The alert MOVED to after the await, which is the half of the fix that is
+      easy to lose: raised before it, `Session Locked` appeared whether or not the write landed —
+      which is exactly the failure the command was built to end, reproduced one layer up. The catch
+      says so out loud rather than swallowing, because a presenter told nothing has no way to tell a
+      locked room from an unlocked one.
+    */
+    max: 125,
     why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
   },
   {
@@ -5949,7 +5966,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that carries the refusal, so the next reader of this branch is not left wondering where the
       other half of the reference's dialog went.
     */
-    max: 909,
+    /*
+      909 -> 910, 2026-09-02. One line: `lockSession` passed through to `RoomSessionControl`, which
+      is built here out of what this class already holds — see the note at that construction for why
+      it is built rather than injected.
+    */
+    max: 910,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -6389,7 +6411,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       writes two preferences and unlocking writes one. `sessionLockKick` is deliberately not cleared
       on unlock — it configures the NEXT lock.
     */
-    max: 44,
+    /*
+      44 -> 66, 2026-09-02, and every added line is prose about a defect.
+
+      The table stopped being three preference writes and became three commands. `sessionLocked` and
+      `sessionLockKick` had ZERO readers anywhere in `apps/room/src`, so a presenter who locked the
+      room was told it was locked over a door that stayed open — the same LEVEL error as
+      `presenterStyle` and the chat-mode radio, and invisible for the same reason: the pane shows the
+      value back to the person who set it.
+
+      Twenty-two lines to record that is the right price. This file's whole job is to be the place
+      somebody reads before touching the lock, and a table that had been wrong for weeks with no
+      note is how it gets written the same way again.
+    */
+    max: 66,
     why: 'the preference writes behind the lock actions, as data'
   },
   {
@@ -6437,7 +6472,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       in that catalog turned red the moment the button existed and has been deleted, which is the
       declaration that it is done.
     */
-    max: 87,
+    /*
+      87 -> 96, 2026-09-02. One command — `lockSession` — and eight lines saying why it is on this
+      PORT rather than a fifth collaborator on `RoomSessionControl`: that class is built out of what
+      `RoomUserActions` already holds, and its own docblock argues that injecting it would make every
+      caller assemble the same object twice.
+    */
+    max: 96,
     why: 'the wire commands RoomUserActions can send; reference material, not dispatcher flow'
   },
   {

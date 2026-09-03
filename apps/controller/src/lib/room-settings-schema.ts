@@ -14,7 +14,7 @@
 // and ng-show="sess.roomType=='webinar'" reads it at byte 2,652 to reveal the Date row.
 //
 // `wired` is the honest bit: false means the controller can store the value but
-// nothing in the room reads it yet. 111 of 269 are wired today.
+// nothing in the room reads it yet. 112 of 269 are wired today.
 // Flip one to true ONLY when a consumer exists, so the UI can mark the rest
 // instead of pretending they do something.
 
@@ -307,7 +307,7 @@ export const ROOM_SETTINGS: readonly RoomSettingDef[] = [
   { name: "media_fir_rate", section: "settings", type: "text", label: "ScreenShare KeyFrame Rate (i.e. 5, 10, 15)", help: "(Session restart required for changes to take effect)", helpShape: "muted", helpOutside: false, captured: "5", capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "hasYTStreaming", section: "settings", type: "checkbox", label: "Enable FB Live/YouTube Live", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "media_relays", section: "settings", type: "textarea", label: "Repeater List", help: "(Comma separated list op IPs IE: localhost|127.0.0.1,somehostname|10.10.10.10)", helpShape: "muted", helpOutside: false, captured: null, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
-  { name: "isLocked", section: "settings", type: "checkbox", label: "Lock Session?", help: "If session is locked, nobody will be able to log in...", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
+  { name: "isLocked", section: "settings", type: "checkbox", label: "Lock Session?", help: "If session is locked, nobody will be able to log in...", helpShape: "muted", helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: true },
   { name: "chatServerURL", section: "settings", type: "textarea", label: "Talk URL", help: "Used to clusterize the chat server", helpShape: "muted", helpOutside: false, captured: "/talk", capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "force_jpeg_screenshare", section: "settings", type: "checkbox", label: "Force JPG Screens", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
   { name: "force_mp3_audio", section: "settings", type: "checkbox", label: "Force MP3 Audio", help: null, helpShape: null, helpOutside: false, captured: false, capturedIsDisplayOnly: false, group: "dont-touch", wired: false },
