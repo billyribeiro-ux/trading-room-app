@@ -45,6 +45,69 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 02:53 UTC — openLoginLink wired: the one of nineteen unwired settings that was work
+
+`b9e0c6c`. **Runtime impact: yes.** A room whose owner has set "Open link on login?" now opens that
+page once as a member enters. It had been stored and inert.
+
+`gate/audit-setting-coverage.mjs` enumerates the settings the REFERENCE reads in its own browser and
+this room does not. Nineteen, and every one was put against the bundle rather than counted:
+
+* **seven** are the credentials that stay on the controller by design — wiring one is a regression;
+* **four** are blocked on a host or a service that does not exist here;
+* **three** are answered by another mechanism, travelling as a QUESTION instead of a value;
+* **one**, `isNewIndicatorOn`, waits on an owner answer — `isNew` is server-produced in all fourteen
+  of its bundle occurrences, so no capture holds the rule and none can;
+* **three are UNREACHABLE UPSTREAM**, and that class is the find of the sweep:
+  `advancedSearchAlerts` is gated on `ownerdID == "56ba547185ae93560d186ea8"` — a hardcoded account
+  id, so the branch is dead for every room but the vendor's own; `h264Enabled` is read as
+  `this.forceH264 = sessData.h264Enabled || !0`, and the `|| true` means the setting cannot change
+  the value it feeds, so wiring it would give it an effect the reference does not have; and
+  `playChatMessageSoundFor` is a declared refusal;
+* **one** was work.
+
+**The decision this reverses was careful, and half of it was right**, so the reversal is recorded in
+three places rather than taken quietly. `openLoginLink` was DECIDED "NOT A GAP" on 2026-08-28 with a
+contract test asserting it stayed unbuilt:
+
+*"It runs during component initialisation rather than from a click, and the options string is
+precisely the popup shape browsers block without a user gesture."* True, and not a reason to refuse a
+feature an operator configured on purpose. Every popup this room already opens is under the same
+browser policy — the transcript window, the detached chat, the screen popout, the recording preview.
+Refusing on this ground is the *"it would reproduce an upstream defect"* argument, which this
+repository's standing method does not accept as an escape.
+
+*"Because the statement is in BOTH chat components, a member with the extra chat column gets it
+twice."* A real upstream defect, measured correctly — and it shaped the build rather than blocking
+it. **Ours fires once**: the call is in the page's `onMount`, not in a chat component, so the extra
+column cannot double it.
+
+*"Building it 'safely' — as a link the member can click — would be inventing a control the capture
+does not have."* Right, and honoured. There is no link.
+
+**Three divergences, each argued at the module.** `noopener` is added, and it is this room's own
+precedent rather than a decision invented at one call site — `alerts-pane.ts` and
+`RoomSidebar.svelte`'s tip button already make this exact call the same way, the latter with an
+operator-supplied URL; without it the operator's page holds a live `window.opener` back into a
+fintech room, and the reference-facing output is unchanged. The empty check TRIMS, because upstream's
+bare truthiness opens `about:blank` for a textarea holding one newline. And a blocked popup is
+SILENT here while `alerts-pane.detach` raises a dialog for its own — there a member pressed "Detach"
+and is owed an answer; here nobody asked for anything.
+
+Twelve cases, five negative controls seen red: upstream's bare truthiness, the feature string
+normalised, `noopener` dropped, the value taken from the URL instead of the server, and `window`
+reaching into the pure rule. The bundle assertions pin the feature string character for character,
+the truthiness guard around it, and that the reference passes **no** `noopener` there — the negative
+half of the divergence, taken from the capture rather than assumed.
+
+112 → 113 wired. Six documents restating the count were updated, along with the unwired half of each
+sentence beside it (157 → 156), the wired roster in `admin-surface.md`, and the verifier's own union
+note. `openLoginLink` also came OFF `room-entry.ts`'s `UNENFORCED_SETTINGS`, with the deletion
+recorded where it sat: it never belonged to `decideRoomEntry`, because nothing about it decides who
+gets in.
+
+`pnpm run gate` exit 0 in both apps.
+
 ### 2026-09-03 02:31 UTC — the room gap register swept: eight of ten rows were stale, all one way
 
 `1e98133`. **Runtime impact: no.** No source changed. This is the register, and the reason it is its
