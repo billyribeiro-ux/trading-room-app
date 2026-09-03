@@ -1,19 +1,16 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import SpeechRecoOverlay from './components/SpeechRecoOverlay.svelte';
 
 /*
-  The caption overlay's compiled template is `r2e` / `e2e` / `i2e` / `Zwe` / `t2e` / `n2e`, and its
-  const table entries 264-285 resolve every class and icon in it. Both are pinned here: the
-  component is a transcription, and a transcription whose source is not asserted is a guess with a
-  citation stapled to it.
-*/
-const bundle = readFileSync(
-  new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-  'utf8'
-);
+  THE BUNDLE READ THAT SAT HERE IS IN `speech-reco-overlay-capture.test.ts`.
 
+  The compiled template `Zwe` and const entries 264-285 are still asserted — the component IS a
+  transcription, and *"a transcription whose source is not asserted is a guess with a citation
+  stapled to it"* — but `docs/source` is gitignored and this was a MODULE-SCOPE read, so it excluded
+  all nineteen cases here from every checkout without the dumps, CI included. Fifteen of them render
+  this component and assert against its own output; they need nothing that is missing.
+*/
 const caption = {
   timestamp: Date.UTC(2026, 7, 6, 17, 30),
   sender: 'Trendy Jon',
@@ -24,53 +21,6 @@ const earlier = {
   sender: 'Ashley',
   text: 'a premarital zone'
 };
-
-describe('the overlay markup is decoded, not inferred', () => {
-  it('pins the live caption line', () => {
-    // Zwe: div.speech-reco-line > span(sticky) > i + strong, then span.speech-reco-text.
-    expect(bundle).toContain(
-      'd(0,"div",272)(1,"span",273),T(2,"i",274),d(3,"strong",275),v(4),u()(),d(5,"span",276),v(6),u()()'
-    );
-    // Ne("", e.sender, ":") - the colon is appended by the template, not part of the name.
-    expect(bundle).toContain('m(4),Ne("",e.sender,":"),m(2),Ze(e.text)');
-  });
-
-  it('pins the const table entries the markup uses', () => {
-    for (const entry of [
-      '[1,"speech-reco-line"]',
-      '[1,"d-flex","align-items-center","position-sticky","top-0"]',
-      '[1,"fas","fa-closed-captioning","speech-reco-icon","me-1"]',
-      '[1,"speech-reco-sender"]',
-      '[1,"speech-reco-text"]',
-      '[1,"speech-reco-history-line","live-entry"]',
-      '[1,"speech-reco-history-sender"]',
-      '[1,"fas","fa-history"]'
-    ]) {
-      expect(bundle).toContain(entry);
-    }
-    // The three buttons, with their exact titles and aria-labels.
-    expect(bundle).toContain(
-      '["type","button","title","Full Transcript History","aria-label","Full Transcript History",1,"speech-reco-history-btn",3,"click"]'
-    );
-    expect(bundle).toContain(
-      '["type","button","title","Close Speech Recognition Overlay","aria-label","Close",1,"speech-reco-close-btn",3,"click"]'
-    );
-  });
-
-  it('pins the two modifiers as exact complements, and the two button gates', () => {
-    expect(bundle).toContain(
-      'Et("history-mode",e.speechRecoHistoryMode)("single-line",!e.speechRecoHistoryMode)'
-    );
-    expect(bundle).toContain('O(5,e.archivesAvailableTo()?5:-1)');
-    expect(bundle).toContain('O(6,e.hasHistoryAvailable()?6:-1)');
-  });
-
-  it('pins hasSpeechRecognitionEntries, whose two branches differ', () => {
-    expect(bundle).toContain(
-      'return!!e&&(this.speechRecoHistoryMode?i>0:this.showSpeechRecognition&&!!this.currentSpeechReco)'
-    );
-  });
-});
 
 describe('the live caption line', () => {
   const body = render(SpeechRecoOverlay, { props: { current: caption } }).body;

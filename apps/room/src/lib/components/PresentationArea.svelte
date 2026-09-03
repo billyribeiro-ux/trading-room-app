@@ -282,11 +282,11 @@
     /**
      * The file drive, whole — `#lib/room/files.svelte.ts`.
      *
-     * This was fifteen props, and every one of them arrived from the page and left again for
-     * `FilesPane` unread: the only member this component itself touches is `filesHidden`, on the
-     * main tab `li` below. Passing the object rather than its parts is what `RoomSidebar` does
-     * with `roster` and `menus`, and it is why `bind:fileTab` is gone — the pane writes
-     * `files.fileTab` directly, so there is no value to bind back up through here.
+     * This was fifteen props, and every one of them arrived from the page and left again unread.
+     * This component now touches NO member of it: since `ul#mainTabs` became `MainTabStrip` on
+     * 2026-08-28 the object goes whole to the strip, which gates the `#files` tab on
+     * `files.filesHidden`, and to `FilesPane`. Passing the object rather than its parts is what
+     * `RoomSidebar` does with `roster`, and it is why `bind:fileTab` is gone — the pane writes it.
      */
     files: RoomFiles;
     openModal: (name: Exclude<ModalName, null>) => void;

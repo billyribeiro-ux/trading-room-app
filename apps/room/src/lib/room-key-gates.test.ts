@@ -12,14 +12,16 @@ import {
   shouldDisableSelection
 } from './room-key-gates';
 
-const ROOM_FULL = readFileSync(
-  new URL('../../docs/source/components/app-room.full.js', import.meta.url),
-  'utf8'
-);
-const ROOM_COMPILED = readFileSync(
-  new URL('../../docs/source/components/app-room.compiled.js', import.meta.url),
-  'utf8'
-);
+/*
+  THE TWO CAPTURE READS THAT SAT HERE ARE IN `room-key-gates-capture.test.ts`.
+
+  `app-room.full.js` and `app-room.compiled.js` live under `docs/source`, which is gitignored, and
+  they were read at MODULE SCOPE — so `gate/evidence-bound-tests.mjs` excluded all eighteen cases in
+  this file on every checkout without the dumps, CI included. Two of the eighteen needed them. The
+  sixteen that stayed execute the gates or read `+page.svelte`, `window-handlers.ts` and
+  `css/complete-app-styles.css`, and among them is the one that would catch the original defect —
+  `is actually wired into the room, not just exported` — coming back.
+*/
 const APPLIED_CSS = readFileSync(
   new URL('../../css/complete-app-styles.css', import.meta.url),
   'utf8'
@@ -31,7 +33,6 @@ const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'u
   the module is where you check what it does.
 */
 const HANDLERS = readFileSync(new URL('./room/window-handlers.ts', import.meta.url), 'utf8');
-const compact = (source: string) => source.replace(/\s+/g, '');
 
 const CTRL_RIGHT = { code: PUSH_TO_TALK_CODE, key: 'Control' };
 const ON = { pushToTalk: true, micMuted: true };
@@ -138,39 +139,12 @@ describe('disableCopy restricts the audience and never the presenter', () => {
   });
 });
 
-describe('it is the reference’s handlers, bound to the reference’s events', () => {
-  it('matches onKeyDown, onRightClick and onKeyUp', () => {
-    const source = compact(ROOM_FULL);
-    // Push-to-talk, keydown — `:3012-3016`.
-    expect(source).toContain(
-      "this.appService.globals.preferences.pushToTalk&&!e.repeat&&('ControlRight'===e.code||17==e.which)&&this.mediaService.micMuted&&this.toggleMic()"
-    );
-    // disableCopy, keydown — `:3017-3020`.
-    expect(source).toContain(
-      "!this.appService.globals.isPresenter&&this.appService.globals.sessData.disableCopy&&((e.ctrlKey&&['c','u','s'].includes(e.key.toLowerCase()))||'F12'===e.key)&&e.preventDefault()"
-    );
-    // Right-click — `:3022-3026`.
-    expect(source).toContain(
-      'onRightClick(e){!this.appService.globals.isPresenter&&this.appService.globals.sessData.disableCopy&&e.preventDefault();}'
-    );
-    // Push-to-talk, keyup — `:3028-3031`.
-    expect(source).toContain(
-      "onKeyUp(e){this.appService.globals.preferences.pushToTalk&&('ControlRight'===e.code||17==e.which)&&!this.mediaService.micMuted&&this.toggleMic();}"
-    );
-    // `noselect` in ngAfterViewInit — `:2227-2229`.
-    expect(source).toContain(
-      "!this.appService.globals.isPresenter&&this.appService.globals.sessData.disableCopy&&document.body.classList.add('noselect')"
-    );
-  });
-
-  it('binds them to keydown, contextmenu and keyup', () => {
-    // `app-room.compiled.js:1260-1281`.
-    const source = compact(ROOM_COMPILED);
-    expect(source).toContain("('keydown',function(r){returno.onKeyDown(r);}");
-    expect(source).toContain("('contextmenu',function(r){returno.onRightClick(r);}");
-    expect(source).toContain("('keyup',function(r){returno.onKeyUp(r);}");
-  });
-
+describe('the gates are wired into the room, not just exported', () => {
+  /*
+    The two cases that read the reference's own handlers and event bindings are
+    `room-key-gates-capture.test.ts`. What is left in this block is the half that can REGRESS: an
+    export nothing calls is the original defect wearing a test.
+  */
   it('is actually wired into the room, not just exported', () => {
     /*
       The defect being closed: `disableCopy`, `contextmenu` and `noselect` each had ZERO occurrences
