@@ -81,8 +81,7 @@ export const load: PageServerLoad = async (event) => {
   const localUser = requireUser(locals);
   let user = localUser;
   let profileAuthority:
-    | { enabled: false }
-    | { enabled: true; chatTextSize: number; preferences: Readonly<Record<string, unknown>> } = {
+    { enabled: false } | { enabled: true; chatTextSize: number; preferences: Readonly<Record<string, unknown>> } = {
     enabled: false
   };
 
@@ -107,7 +106,10 @@ export const load: PageServerLoad = async (event) => {
 
     const storedTextSize = canonical.data.user.preferences.chatTextSize;
     const chatTextSize =
-      typeof storedTextSize === 'number' && Number.isInteger(storedTextSize) && storedTextSize >= 10 && storedTextSize <= 32
+      typeof storedTextSize === 'number' &&
+      Number.isInteger(storedTextSize) &&
+      storedTextSize >= 10 &&
+      storedTextSize <= 32
         ? storedTextSize
         : 13;
     user = { ...localUser, displayName: canonical.data.user.displayName };

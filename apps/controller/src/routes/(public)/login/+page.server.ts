@@ -182,7 +182,9 @@ export const actions: Actions = {
       }
     }
 
-    await getDb().delete(loginAttempts).where(eq(loginAttempts.identityHash, loginIdentity(email)));
+    await getDb()
+      .delete(loginAttempts)
+      .where(eq(loginAttempts.identityHash, loginIdentity(email)));
     try {
       await createLoginSession(user.id, cookies);
     } catch (cause) {

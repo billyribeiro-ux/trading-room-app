@@ -175,11 +175,7 @@ export function isProfileUpdateRequest(value: unknown): value is ProfileUpdateRe
 }
 
 export function isPreferenceRequest(value: unknown): value is PreferenceRequest {
-  return (
-    isRecord(value) &&
-    hasExactKeys(value, ['key', 'value']) &&
-    typeof value.key === 'string'
-  );
+  return isRecord(value) && hasExactKeys(value, ['key', 'value']) && typeof value.key === 'string';
 }
 
 export function isPreferencesRequest(value: unknown): value is Preferences {
@@ -507,10 +503,7 @@ export function setAccountPreference(
   return call('setAccountPreference', context, request);
 }
 
-export function updateAccountTheme(
-  context: RequestContext,
-  request: Preferences
-): Promise<ApiResult<Preferences>> {
+export function updateAccountTheme(context: RequestContext, request: Preferences): Promise<ApiResult<Preferences>> {
   return call('updateAccountTheme', context, request);
 }
 

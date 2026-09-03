@@ -21,9 +21,7 @@ describe('profile authority cutover policy', () => {
     expect(resolveProfileAuthorityMode(undefined)).toBe('legacy');
     expect(resolveProfileAuthorityMode('')).toBe('legacy');
     expect(resolveProfileAuthorityMode('rust')).toBe('rust');
-    expect(() => resolveProfileAuthorityMode('dual')).toThrow(
-      'PROFILE_AUTHORITY_MODE must be one of: legacy, rust.'
-    );
+    expect(() => resolveProfileAuthorityMode('dual')).toThrow('PROFILE_AUTHORITY_MODE must be one of: legacy, rust.');
     expect(() => resolveProfileAuthorityMode(' rust ')).toThrow();
   });
 
@@ -43,10 +41,7 @@ describe('profile authority cutover policy', () => {
       'legacy identity is not reconciled'
     );
     expect(
-      authorityBindingFailure(
-        { ...mapped, authorityUserId: 'b0000001-0000-4000-8000-000000000001' },
-        bootstrap()
-      )
+      authorityBindingFailure({ ...mapped, authorityUserId: 'b0000001-0000-4000-8000-000000000001' }, bootstrap())
     ).toContain('user id');
     expect(authorityBindingFailure(mapped, { ...bootstrap(), accounts: [] })).toContain('enterprise membership');
     expect(
