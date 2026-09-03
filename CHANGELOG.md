@@ -45,6 +45,63 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 02:11 UTC — R-6's two open actions, and a comment that described upstream in the present tense
+
+`e64a8bf`. **Runtime impact: no.** A divergence recorded, a comment corrected, a contract added, and
+four register rows brought back to what the tree actually holds. No behaviour changed — which is the
+point of the second half of this entry, because a reader of that register would have rebuilt three
+shipped components.
+
+**The popout is the whole room, and that had never been written down.** `CLAUDE.md` requires a
+structural divergence to be recorded at the call site. Upstream's `?dscreen=1` mounts
+`app-detached-screen` — 3,815 bytes that consume a screen and nothing else, rendered *instead of*
+`app-room`. Ours is the whole room wearing `class:detach-screen`, so every popout boots chat, roster,
+alerts, the SSE subscription and the media transport to show one screen. The cost is **per popout,
+not per session**: a presenter detaching three screens holds four full rooms open, four SSE
+connections, four rosters. Recorded rather than narrowed, and the note says why — a second route
+whose only job is to be a smaller copy of a page this app already renders is a thing that then
+drifts, which is the failure met twice here already. Narrowing stays available; it is now a decision
+somebody makes with the cost in front of them, which is what R-6 asked for.
+
+**A comment that described upstream in the present tense, beside the line that actually works.**
+R-6 recorded one dead `postMessage`. Re-measured, there are two, and no
+`window.addEventListener('message', …)` exists anywhere in `apps/room/src` — the only
+`addEventListener('message', …)` is `RoomEventStream`'s on an `EventSource`, a different channel that
+never sees a `postMessage`. `RoomWindowHandlers.beforeUnload` quoted upstream's listener and then
+said *"it is how the opener learns the popout closed"*, with no subject change, which reads as this
+room.
+
+What actually re-attaches is the opener holding the child `Window` and registering `beforeunload`
+**on it** — available because the two are same-origin, and what upstream's own screen popout does.
+`RoomAlertsPane.detach` and `RoomScreens.detach` each hold one, and each is exactly the line somebody
+tidying "the duplicate" deletes: it sits near a `postMessage` that had a paragraph explaining why it
+mattered, while the line that works had no comment at all. The failure would be a detached window
+closing and the pane never coming back — invisible to `svelte-check`, to lint, and to every unit test
+that does not know to look for it.
+
+Both posts are **kept**: transcription, invisible to a member, claiming nothing — the same resolution
+`alerts-pane.ts` reached for `sl=1`. What was wrong was the comment, not the lines.
+`popout-reattach-contract.test.ts` pins both child-window listeners, pins that no module adds a
+`window` message listener, pins that `window.opener?.` stays guarded (`?co=1` is reachable by hand
+here, where the reference's bare dereference would throw), and carries a positive control so the
+sweep cannot pass by the room having no message handling at all. Three negative controls seen red.
+
+**Four register rows disagreed with the tree.** R-1 read *"`app-typing-indicator-dots` is not
+built, and it belongs in the chat panes"* — it is `TypingIndicatorDots.svelte`, 110 lines, rendered
+by both chat panes. R-2 and R-3 the same: `PositionsContainer.svelte` rendered by
+`PresentationArea`, `KickedPage.svelte` rendered by the page.
+
+R-5's *"Ours: nothing"* named six identifiers as absent everywhere. **Five of the six exist** —
+`closedTxt` as `room_state.closed_message`, `closed-container` as the class on `+error.svelte`, plus
+`simUserCount`, `alwaysShowRoster` and `hideAppInfo`. Only `roomV4Link` is absent, and it is the one
+that should be: it belongs to a shell this room deliberately does not build. Its *"Blocks: everything
+a member sees after a session ends"* is answered by the door built forty minutes earlier, and the
+architectural divergence is now stated as a decision with the cost to a member beside it — no
+Archives dropdown, no roster, no `Get Random User`, no `Open Session` button on a closed page,
+because the closed page here is the server's refusal rather than a second client shell.
+
+`pnpm run gate` exit 0. Two ceilings raised, each argued at its entry, both entirely for prose.
+
 ### 2026-09-03 01:58 UTC — the five P-rows re-measured, and one of them had been built
 
 `2f04a74`. **Runtime impact: no.** Reasons, tracker rows and three documented counts. What changed
