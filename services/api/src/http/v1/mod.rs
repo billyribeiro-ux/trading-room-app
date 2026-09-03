@@ -144,6 +144,7 @@ pub fn router() -> Router<Arc<AppState>> {
             post(moderation::mute_personally).delete(moderation::unmute_personally),
         )
         // ---------------------------------------------------------------- account
+        .route("/api/v1/account", get(account::bootstrap))
         .route(
             "/api/v1/account/preferences",
             get(account::preferences).patch(account::set_preference),

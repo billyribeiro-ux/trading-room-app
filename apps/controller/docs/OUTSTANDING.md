@@ -1,7 +1,7 @@
 # Outstanding work
 
 Status: **normative backlog**
-Last measured: 2026-08-07
+Last measured: 2026-09-03
 
 Everything known to be missing, incomplete, or deliberately deferred, with the evidence for each.
 This is the single authority for "what is left"; anything not here is either done or not yet known,
@@ -23,12 +23,12 @@ Rules for this file, so it stays worth reading:
 These are the difference between a working front door and a working product. Nothing in section 2
 or later matters to a customer until these are done.
 
-| #   | What                                                                                                                                                                                             | Evidence                                                                                                                                        | Unblocked by          |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| 1.1 | **The room is not deployed anywhere.** `ROOM_BASE_URL` is unset in production, so `launch/[id]` takes its same-origin fallback and lands on the controller's own guest page instead of the room. | `src/routes/(app)/launch/[id]/+server.ts:32`; `vercel env ls production` shows no `ROOM_BASE_URL`                                               | a host for the room   |
-| 1.2 | **No host for the room.** Its SSE hub is module state in one process, so serverless cannot hold it. Decision recorded: one Hetzner box, Ashburn. Not provisioned.                                | `src/lib/server/room-events.ts` module-scoped `subscribers`; the original does the same — `chat.protradingroom.com` is a persistent Express box | owner provisions it   |
-| 1.3 | **Shared secrets not on the room side.** `ROOM_JWT_SECRET` (handoff) and the config-read HMAC must match on both sides. Set on Vercel; the room has no deployment to set them on.                | `src/lib/server/room-handoff.ts`                                                                                                                | 1.2                   |
-| 1.4 | **Rust API not deployed.** `services/api` has 30 room-runtime routes, written and tested, never deployed, and the room has never called it. Room data still lives in the room's own store.       | `services/api/src/http/v1/`; `docs/CUTOVER-ROOM-TO-API.md`                                                                                      | 1.2, then the cutover |
+| #   | What                                                                                                                                                                                                                                                                                                     | Evidence                                                                                                                                        | Unblocked by                 |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| 1.1 | **The room is not deployed anywhere.** `ROOM_BASE_URL` is unset in production, so `launch/[id]` takes its same-origin fallback and lands on the controller's own guest page instead of the room.                                                                                                         | `src/routes/(app)/launch/[id]/+server.ts:32`; `vercel env ls production` shows no `ROOM_BASE_URL`                                               | a host for the room          |
+| 1.2 | **No host for the room.** Its SSE hub is module state in one process, so serverless cannot hold it. Decision recorded: one Hetzner box, Ashburn. Not provisioned.                                                                                                                                        | `src/lib/server/room-events.ts` module-scoped `subscribers`; the original does the same — `chat.protradingroom.com` is a persistent Express box | owner provisions it          |
+| 1.3 | **Shared secrets not on the room side.** `ROOM_JWT_SECRET` (handoff) and the config-read HMAC must match on both sides. Set on Vercel; the room has no deployment to set them on.                                                                                                                        | `src/lib/server/room-handoff.ts`                                                                                                                | 1.2                          |
+| 1.4 | **Rust API not deployed.** `services/api` has 30 room-runtime routes plus the authenticated account bootstrap, written and tested, never deployed, and the room has never called it. The generated OpenAPI + typed SvelteKit BFF boundary is now present; room data still lives in the room's own store. | `services/api/src/http/v1/`; `services/api/openapi/v1.json`; `src/lib/server/tradingroom-api.ts`; `docs/CUTOVER-ROOM-TO-API.md`                 | staging, then Gate 3 cutover |
 
 ## 1b. Found by testing the live site, 2026-08-07
 
@@ -43,10 +43,24 @@ registration.
 | 1b.4     | **Mail transport BUILT 2026-08-08, and unconfigured.** `src/lib/server/mail.ts` is a Resend adapter behind one `sendMail` seam; email verification is wired end to end on top of it (migration 1, `email-verification.ts`, `/verify-email`, a Resend-the-link action, and a gate on room creation). It sends nothing today because `RESEND_API_KEY` and `MAIL_FROM` are unset, and `verificationEnforced()` is false in that state by design — enforcing a check that cannot be delivered is a lockout. **Blocked on three things only the owner can do: a provider account, a sending domain with DKIM/SPF, and a real mailbox.** The provider is OUR decision, not a match: no browser capture can reach the reference's server-side sender. | `src/lib/server/mail.ts`; `src/lib/server/email-verification.ts`; `.env.example`                                | **HIGH — blocked on the owner**  |
 | 1b.5     | **"Create Room" is hidden behind five clicks on the word "Sessions".** This is FAITHFUL — the reference does exactly this (`ng-show="showNewRoom>=5"`) — but a paying customer who registers and cannot find how to create a room will conclude the product is broken. It happened to the owner on first use.                                                                                                                                                                                                                                                                                                                                                                                                                                  | `evidence-dumps/login-page/login:427` and `:464`                                                                | product decision                 |
 
-## 1c. Two tenant models that do not map to each other — investigated 2026-08-07
+## 1c. Tenant authority decision — resolved in Gate 2 on 2026-09-03
 
-Blocks the Rust cutover (1.4). Not a naming quibble: there is no function anywhere that turns one
-key into the other.
+The required decision is now taken: **Rust `enterprises` is the canonical destination tenant** and
+account owner/admin authority is an explicit `enterprise_memberships` relation, independent of
+per-room roles. Forward migration `0011_enterprise_memberships.sql` refuses ambiguous historic room
+owners instead of inventing authority, backfills only unambiguous owners, enforces one owner per
+enterprise, exposes a user-bounded resolver, and gives the runtime role no direct table access.
+`GET /api/v1/account` reads current database identity plus those explicit memberships; its integration
+tests prove cross-tenant omission, missing/deleted-user rejection, stale-token replacement, and
+secret-field exclusion. The same-origin controller boundary is generated from
+`services/api/openapi/v1.json` and accepts only the exact two `__Host-` session-cookie contracts.
+
+The controller's integer `accounts` tables remain the **legacy live model during migration**, not a
+second destination authority. Gate 3 moves their features one authorized slice at a time and owns
+the production data-key conversion. Until that cutover is deployed, the two stores deliberately
+coexist and production remains closed under the cutover rule.
+
+The table below is retained as the measured pre-decision state that forced the choice:
 
 |           | Controller                             | Rust API                         |
 | --------- | -------------------------------------- | -------------------------------- |
@@ -55,9 +69,10 @@ key into the other.
 | Fields    | `name`, `owner_email`                  | `name`, `slug`, `settings jsonb` |
 | Isolation | application-level (`requireOwnedRoom`) | PostgreSQL RLS on every table    |
 
-`grep -rn enterprise src/` in the controller returns **nothing**. `grep -rn accounts` in
-`services/api/src` returns four hits, all ordinary English inside comments. Today's
-`accounts.id = 1` has no `enterprise_id` and nothing can produce one.
+On 2026-08-07, `grep -rn enterprise src/` in the controller returned **nothing** and `grep -rn
+accounts` in `services/api/src` returned four ordinary-English comment hits. That historical
+measurement explains why a deliberate migration was required; it is no longer a claim about the
+current source tree.
 
 ### Where `enterprises` came from — and where it did NOT
 
@@ -87,7 +102,7 @@ But **only one is ever created**. The same file opens _"Provisioning the first t
 enterprise, one room, one owner."_ Nothing creates a second, which is exactly why it reads as the
 app owner's rather than a customer's.
 
-### The decision this forces
+### The decision this forced
 
 One of these, taken deliberately rather than discovered during the cutover:
 
@@ -98,8 +113,10 @@ One of these, taken deliberately rather than discovered during the cutover:
 3. A mapping table bridges them. Cheapest now and the worst of the three — two sources of truth for
    "who owns this", which is the exact defect class §3 of the seam audit was written about.
 
-Recommendation is 1, precisely because the RLS in `0005`/`0006`/`0008` is real, tested isolation
-that the controller does not have and would otherwise have to be rebuilt.
+Option 1 was selected, precisely because the RLS in `0005`/`0006`/`0008` is real, tested isolation
+that the controller does not have and would otherwise have to be rebuilt. Migration `0011` and the
+account-bootstrap boundary are the first executable step; the legacy-controller data conversion
+remains a Gate 3 deployment operation.
 
 ## 1d. Forensic read of `ptr1.json` — the Manage Room page, 2026-08-07
 

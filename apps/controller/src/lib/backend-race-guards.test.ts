@@ -15,15 +15,13 @@ import { describe, expect, it } from 'vitest';
  * So the hash answers *changed?* and this answers *still correct?* — and it names the defect each
  * guard prevents, at a place a reader lands on when the assertion goes red.
  *
- * ## Why a TypeScript test asserts Rust
+ * ## Why a TypeScript test also asserts Rust
  *
- * Because the Rust suite cannot run in this container and saying so is better than pretending
- * otherwise. `cargo test -p tradingroom-api` pulls `mediasoup-sys`, whose build script pip-installs
- * `invoke` and compiles a C++ worker; it fails here for want of the toolchain and the disk. What
- * DOES run — and was run for these four changes — is `cargo check -p tradingroom-api`,
- * `cargo clippy -p tradingroom-api --lib -- -D warnings` and `cargo fmt --all --check`. None of the
- * three can see a TOCTOU, which is exactly why the semantics were proved against a live PostgreSQL
- * 16 and why the shape is pinned here rather than trusted.
+ * It is a fast cross-language release guard run by the controller gate, not a substitute for the
+ * Rust/PostgreSQL suite. The latter now runs in this workspace and is the semantic authority; this
+ * assertion makes a removed lock or conflict target fail during the controller's own source gate
+ * too. Both are needed because format/check/Clippy cannot see a TOCTOU and a string-only guard
+ * cannot prove database behavior.
  *
  * ## The measurements, so a reader does not have to take the guards on faith
  *
@@ -31,9 +29,11 @@ import { describe, expect, it } from 'vitest';
  * order — against PostgreSQL 16.13, with a second connection racing it:
  *
  * * `poll::answer` — poll closed one second into the transaction: three statements recorded **1**
- *   response, the one-statement CTE recorded **0**. Happy path still 1; a re-vote still replaces
- *   rather than duplicating; an out-of-range choice, a foreign room and an unknown poll each insert
- *   nothing and leave an existing vote untouched.
+ *   response, the validating INSERT recorded **0**. The first rewrite used a sibling DELETE CTE
+ *   and failed the existing re-vote control with 23505 because data-modifying CTEs share a snapshot.
+ *   The current named-constraint upsert passes re-vote and the full 29-case target twice; an
+ *   out-of-range choice, a foreign room and an unknown poll each insert nothing and leave an
+ *   existing vote untouched.
  * * `alert::ask` — alert soft-deleted one second in: two statements wrote **1** question, the
  *   `INSERT … SELECT … FOR SHARE` wrote **0**. A live alert still takes one.
  * * `note::create` — four inserts released at one clock instant: `first@1, tab-1@2, tab-2@2,
@@ -65,15 +65,16 @@ describe('the files this is about are the ones being read', () => {
   });
 });
 
-describe('poll::answer is ONE statement, and it is the one that was proved', () => {
-  it('validates, clears and inserts in a single CTE', () => {
+describe('poll::answer is ONE validating upsert, and it is the one that was proved', () => {
+  it('validates and upserts against the exact tenant/member uniqueness boundary', () => {
     const sql = flat(poll);
     expect(sql).toContain('WITH valid AS ( SELECT 1 FROM polls');
     expect(sql).toContain("AND state = 'active'");
     expect(sql).toContain('$4 >= 0 AND $4 < jsonb_array_length(choices)');
-    expect(sql).toContain('), cleared AS ( DELETE FROM poll_responses');
-    expect(sql).toContain('EXISTS (SELECT 1 FROM valid)');
     expect(sql).toContain('SELECT $1, $2, $3, $4 FROM valid');
+    expect(sql).toContain('ON CONFLICT ON CONSTRAINT poll_responses_tenant_poll_member_unique');
+    expect(sql).toContain('DO UPDATE SET choice_index = EXCLUDED.choice_index');
+    expect(sql).not.toContain('cleared AS ( DELETE FROM poll_responses');
   });
 
   it('takes the row lock, which is what makes the WHERE hold rather than merely narrow', () => {

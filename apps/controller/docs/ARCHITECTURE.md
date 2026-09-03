@@ -18,9 +18,10 @@ The tenancy model below is therefore the production model, not a reconstruction.
 Two parts of ADR 0003 are still ahead, and this document should not be read as
 claiming otherwise:
 
-- The **Rust/Axum API** (`services/api`, 30 room-runtime routes) is written and
-  tested but not deployed, and the room does not call it. Room runtime data stays
-  in the room's own store until that cutover.
+- The **Rust/Axum API** (`services/api`, 30 room-runtime routes plus the authenticated
+  account bootstrap) is written and tested but not deployed, and the room does not call
+  it. Gate 2 has established the generated OpenAPI contract and same-origin SvelteKit BFF
+  boundary; room runtime data stays in the room's own store until the Gate 3 cutover.
 - **mediasoup** is blocked on the OpenSSL 3.0.8 finding in
   `docs/MEDIASOUP-DEPLOYMENT-PLAN.md`. Measured 2026-08-07: that library is vendored
   inside the mediasoup C++ worker and is absent from the Cargo graph entirely, so

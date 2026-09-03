@@ -59,7 +59,7 @@ globally gitignored, not repository evidence.
 
 | File                                                         |   Bytes | SHA-256                                                            |
 | ------------------------------------------------------------ | ------: | ------------------------------------------------------------------ |
-| `evidence-dumps/account-page/file1`                          |   6,156 | `64145eddde2cad155ccc174b2f6460c6a968a8a80291357f5688aef85b84c3ab` |
+| `evidence-dumps/account-page/file1`                          |   6,153 | `112fce566bf6cd9362d0a3055344cc95558db59fcc078fc33cccf9acfcc2f556` |
 | `evidence-dumps/account-page/upload-image-badge-prompt.html` |     625 | `fb4e934f761f15fb2eac26882ce6ebac9b6628f6f3b8ab48b20ad521a6c7c43f` |
 | `evidence-dumps/home-page/file`                              |  28,496 | `935562f231a499feff797afe59672f8bdc4b223d61d652c6f102b6deafd594ab` |
 | `evidence-dumps/login-page/api-docs`                         |  20,622 | `b7dd2b013da5305df0fdb8a8c22111324f60c2cf767486e6c07386d4ae429d49` |

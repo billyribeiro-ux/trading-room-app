@@ -479,7 +479,7 @@ impl Db {
     }
 }
 
-/// The three `SECURITY DEFINER` resolvers exist to break a chicken-and-egg: the tenant id
+/// The `SECURITY DEFINER` resolvers exist to break a chicken-and-egg: the tenant id
 /// itself lives in a tenant-scoped table. They run as the owner with a pinned
 /// `search_path`, so they are called on a plain pooled connection with no GUC set.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -523,6 +523,26 @@ impl Db {
         sqlx::query_as(
             "SELECT enterprise_id, room_id, room_name, room_state, member_id, member_role \
              FROM auth_list_memberships($1)",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(DbError::from)
+    }
+
+    /// Every enterprise this user explicitly administers.
+    ///
+    /// Account authority is not derived from room membership: a room role applies to one room,
+    /// while this resolver returns the canonical owner/admin relationship even when an account has
+    /// no rooms. Like `list_memberships`, it is bounded to the authenticated user before a tenant
+    /// GUC is available.
+    pub async fn list_enterprise_memberships(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<EnterpriseMembership>, DbError> {
+        sqlx::query_as(
+            "SELECT enterprise_id, enterprise_name, enterprise_slug, account_role \
+             FROM auth_list_enterprise_memberships($1)",
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -578,6 +598,15 @@ pub struct Membership {
     pub room_state: String,
     pub member_id: Uuid,
     pub member_role: String,
+}
+
+/// One canonical enterprise owner/admin relationship for account bootstrap.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct EnterpriseMembership {
+    pub enterprise_id: Uuid,
+    pub enterprise_name: String,
+    pub enterprise_slug: String,
+    pub account_role: String,
 }
 
 /// Narrow handle for the three tables that carry no `enterprise_id` and therefore no RLS.

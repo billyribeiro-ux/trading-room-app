@@ -42,14 +42,15 @@ const BASELINE_PUBLIC_TABLES: i64 = 23;
 /// ...and how many of those carry FORCE ROW LEVEL SECURITY.
 const BASELINE_FORCE_RLS: i64 = 20;
 
-/// What the **whole** migration set leaves behind: the baseline plus `room_events` from `0003`
-/// and `saved_polls` from `0007`. Spelled as `BASELINE + n` rather than as a literal so that
+/// What the **whole** migration set leaves behind: the baseline plus `room_events` from `0003`,
+/// `saved_polls` from `0007`, and `enterprise_memberships` from `0011`. Spelled as
+/// `BASELINE + n` rather than as a literal so that
 /// adding a table without adding its RLS policy shows up here as an arithmetic mismatch rather
 /// than as a number somebody updated by hand.
-const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 2;
-/// Both added tables are tenant-scoped, so both are FORCE RLS. The two constants move together;
+const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 3;
+/// All three added tables are tenant-scoped, so all three are FORCE RLS. The two constants move together;
 /// a table added with an `enterprise_id` and no policy makes them disagree, which is the point.
-const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 2;
+const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 3;
 
 async fn public_table_count(pool: &PgPool) -> i64 {
     sqlx::query_scalar(
@@ -761,7 +762,8 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
         .expect("the baseline should apply");
 
     // `migrate::run` applies the whole set, so this is the post-migration shape: the 23
-    // tables the schema artifacts pin, plus `room_events` and `saved_polls`.
+    // tables the schema artifacts pin, plus `room_events`, `saved_polls`, and
+    // `enterprise_memberships`.
     assert_eq!(
         public_table_count(&pool).await,
         MIGRATED_PUBLIC_TABLES,
@@ -858,6 +860,172 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
     );
 
     scratch.finish(pool).await;
+}
+
+#[tokio::test]
+async fn enterprise_memberships_are_explicit_bounded_and_tenant_hardened() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    let enterprise_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Account A', 'account-a') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create account A");
+    let enterprise_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Account B', 'account-b') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create account B");
+    let user_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) \
+         VALUES ('account-a@example.test', md5('account-a@example.test'), 'Owner A') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create owner A");
+    let user_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) \
+         VALUES ('account-b@example.test', md5('account-b@example.test'), 'Owner B') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create owner B");
+
+    sqlx::query(
+        "INSERT INTO enterprise_memberships (enterprise_id, user_id, role) \
+         VALUES ($1, $2, 'owner'), ($3, $4, 'owner')",
+    )
+    .bind(enterprise_a)
+    .bind(user_a)
+    .bind(enterprise_b)
+    .bind(user_b)
+    .execute(&owner)
+    .await
+    .expect("create canonical owners");
+
+    let invalid_role = sqlx::query(
+        "INSERT INTO enterprise_memberships (enterprise_id, user_id, role) \
+         VALUES ($1, $2, 'member')",
+    )
+    .bind(enterprise_a)
+    .bind(user_b)
+    .execute(&owner)
+    .await
+    .expect_err("room roles must not become account roles");
+    assert_eq!(
+        invalid_role
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("23514")
+    );
+
+    let second_owner = sqlx::query(
+        "INSERT INTO enterprise_memberships (enterprise_id, user_id, role) \
+         VALUES ($1, $2, 'owner')",
+    )
+    .bind(enterprise_a)
+    .bind(user_b)
+    .execute(&owner)
+    .await
+    .expect_err("an enterprise must not have two owners");
+    assert_eq!(
+        second_owner
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("23505")
+    );
+
+    let rls: (bool, bool) = sqlx::query_as(
+        "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class \
+         WHERE oid = 'public.enterprise_memberships'::regclass",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("read enterprise membership RLS flags");
+    assert_eq!(rls, (true, true));
+
+    let policy: (Vec<String>, Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT roles::text[], qual, with_check FROM pg_catalog.pg_policies \
+         WHERE schemaname = 'public' AND tablename = 'enterprise_memberships' \
+           AND policyname = 'enterprise_memberships_tenant_isolation'",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("read enterprise membership policy");
+    assert_eq!(policy.0, [migrate::EXPECTED_RUNTIME_ROLE]);
+    for expression in [policy.1, policy.2] {
+        let expression = expression.expect("the tenant policy must constrain reads and writes");
+        assert!(expression.contains("app.enterprise_id"), "{expression}");
+        assert_ne!(expression.trim(), "true", "widened tenant policy");
+        assert_ne!(expression.trim(), "(true)", "widened tenant policy");
+    }
+
+    let function_contract: (bool, Vec<String>, bool, i64) = sqlx::query_as(
+        "SELECT routine.prosecdef, routine.proconfig, \
+                has_function_privilege('tradingroom_app', routine.oid, 'EXECUTE'), \
+                (SELECT count(*) FROM aclexplode(routine.proacl) acl WHERE acl.grantee = 0)::bigint \
+         FROM pg_catalog.pg_proc AS routine \
+         WHERE routine.oid = 'public.auth_list_enterprise_memberships(uuid)'::regprocedure",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("read account resolver contract");
+    assert!(
+        function_contract.0,
+        "account discovery must be SECURITY DEFINER"
+    );
+    assert_eq!(
+        function_contract.1,
+        ["search_path=pg_catalog, public"],
+        "the definer function must pin every resolved relation"
+    );
+    assert!(
+        function_contract.2,
+        "the runtime role must execute the resolver"
+    );
+    assert_eq!(
+        function_contract.3, 0,
+        "PUBLIC must not execute the definer function"
+    );
+
+    let runtime = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&scratch_url(&runtime_url(), &scratch.name))
+        .await
+        .expect("connect to the scratch database as runtime");
+    let resolved: Vec<(Uuid, String, String)> = sqlx::query_as(
+        "SELECT enterprise_id, enterprise_name, account_role \
+         FROM auth_list_enterprise_memberships($1)",
+    )
+    .bind(user_a)
+    .fetch_all(&runtime)
+    .await
+    .expect("resolve only owner A's accounts");
+    assert_eq!(
+        resolved,
+        [(enterprise_a, "Account A".into(), "owner".into())]
+    );
+
+    let direct_read = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM enterprise_memberships")
+        .fetch_one(&runtime)
+        .await
+        .expect_err("the runtime role must not enumerate account authority directly");
+    assert_eq!(
+        direct_read
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("42501")
+    );
+
+    runtime.close().await;
+    scratch.finish(owner).await;
 }
 
 #[tokio::test]

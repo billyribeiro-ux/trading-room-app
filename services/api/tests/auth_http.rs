@@ -281,7 +281,7 @@ async fn cookie_authenticated_mutations_require_the_exact_browser_origin() {
 #[tokio::test]
 async fn non_browser_probe_routes_do_not_require_origin_headers() {
     let harness = Harness::start().await;
-    for path in ["/healthz", "/readyz", "/metrics"] {
+    for path in ["/healthz", "/readyz", "/metrics", "/api/openapi.json"] {
         let response = harness
             .request(&format!(
                 "GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
@@ -326,6 +326,17 @@ async fn a_correct_password_returns_both_cookies() {
     assert!(response.contains("HttpOnly"), "{response}");
     assert!(response.contains("Secure"), "{response}");
     assert!(!response.contains("Domain="), "{response}");
+    let refresh_header = response
+        .lines()
+        .find(|line| {
+            line.to_ascii_lowercase().starts_with("set-cookie:") && line.contains(REFRESH_COOKIE)
+        })
+        .expect("refresh Set-Cookie header");
+    assert!(refresh_header.contains("Path=/;"), "{refresh_header}");
+    assert!(
+        !refresh_header.contains("Path=/api/auth"),
+        "{refresh_header}"
+    );
 
     // Two segments, no header: the access token is the grant format, not a JWT.
     assert_eq!(access.matches('.').count(), 1, "{access}");

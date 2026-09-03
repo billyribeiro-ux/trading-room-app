@@ -99,6 +99,29 @@ pub async fn provision(
     .await?
     .get("id");
 
+    // Account authority is explicit and independent of room roles. Transfer in the same
+    // transaction as the room's canonical `owner_id`, so a rerun with a replacement owner can
+    // never commit two account owners or update only one side of the authority boundary.
+    sqlx::query(
+        "DELETE FROM enterprise_memberships \
+         WHERE enterprise_id = $1 AND role = 'owner' AND user_id <> $2",
+    )
+    .bind(enterprise_id)
+    .bind(owner_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO enterprise_memberships (enterprise_id, user_id, role) \
+         VALUES ($1, $2, 'owner') \
+         ON CONFLICT (enterprise_id, user_id) DO UPDATE \
+           SET role = 'owner', updated_at = now()",
+    )
+    .bind(enterprise_id)
+    .bind(owner_id)
+    .execute(&mut *tx)
+    .await?;
+
     // `uuid_short` is the room's public handle and is unique per enterprise. Derived from the
     // slug so a re-run addresses the same room instead of creating a second one.
     let uuid_short = enterprise_slug.chars().take(12).collect::<String>();
@@ -121,6 +144,18 @@ pub async fn provision(
     .fetch_one(&mut *tx)
     .await?
     .get("id");
+
+    // The room row has one canonical owner. Preserve former owners as members (rather than
+    // deleting their access) but remove stale room-level owner authority during a transfer.
+    sqlx::query(
+        "UPDATE room_members SET role = 'member', updated_at = now() \
+         WHERE enterprise_id = $1 AND room_id = $2 AND role = 'owner' AND user_id <> $3",
+    )
+    .bind(enterprise_id)
+    .bind(room_id)
+    .bind(owner_id)
+    .execute(&mut *tx)
+    .await?;
 
     sqlx::query(
         "INSERT INTO room_members (enterprise_id, room_id, user_id, role, display_name, joined_at) \

@@ -60,6 +60,10 @@ describe('control-plane deployment policy', () => {
     ['/(app)/account/rooms/[id]', 'GET'],
     ['/(app)/launch/[id]', 'GET'],
     ['/(app)/logout', 'POST'],
+    ['/api/auth/login', 'POST'],
+    ['/api/auth/refresh', 'POST'],
+    ['/api/auth/logout', 'POST'],
+    ['/api/v1/account', 'GET'],
     ['/(public)/session/[code]', 'GET'],
     ['/(public)/session/[code]/joined', 'GET'],
     ['/(future)', 'GET']

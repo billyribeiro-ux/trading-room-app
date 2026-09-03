@@ -23,6 +23,11 @@ export const variables = defineEnvVars({
       'PostgreSQL connection string. Required only when CONTROL_PLANE_MODE=postgres. Use the pooled endpoint on a serverless host.',
     schema: optionalText
   },
+  TRADINGROOM_API_URL: {
+    description:
+      'Private origin of the Rust authority service. Browser requests stay same-origin and reach it only through the reviewed SvelteKit proxy endpoints.',
+    schema: optionalUrl
+  },
   SUPERADMIN_EMAILS: {
     description:
       'Comma-separated emails allowed to reach /admin and see every account. Deliberately NOT a password: a superadmin signs in through the ordinary hardened login and this list grants the extra privilege, so the credential and the privilege can be revoked independently. An env var rather than a database column so granting it requires deploy access rather than an INSERT.',

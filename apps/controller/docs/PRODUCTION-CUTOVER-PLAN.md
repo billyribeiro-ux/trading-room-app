@@ -95,7 +95,7 @@ permit real signup, login, account, room, API-key, or payment traffic.
       and `api/fixtures/seed.sql` loaded. 413 passed, 0 failed — 155 API library,
       126 API PostgreSQL integration, 9 release-attestor, 112 media library, 11
       media binary — plus full-workspace Clippy with warnings denied and
-      `pnpm quality` locally with 1233
+      `pnpm quality` locally with 1261
       Vitest tests, 9 Playwright tests in Chromium, and the Vercel production
       build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
@@ -132,11 +132,21 @@ permit real signup, login, account, room, API-key, or payment traffic.
 
 ## Gate 2 — account bootstrap
 
-- [ ] Decide and migrate the account/enterprise membership and owner/admin role model.
-- [ ] Add a read-only authenticated `/api/v1/account` bootstrap endpoint.
-- [ ] Generate OpenAPI and a typed SvelteKit server client.
-- [ ] Preserve same-origin `__Host-` cookie transport through the BFF/proxy.
-- [ ] Add cross-tenant, missing-session, malformed-input, and leakage tests.
+- [x] Decide and migrate the account/enterprise membership and owner/admin role model.
+      `enterprises` is the canonical destination; forward migration `0011` adds explicit
+      owner/admin authority independent of room roles, refuses ambiguous historic ownership,
+      and transfers provisioned ownership atomically. The controller's legacy integer account
+      data is converted slice-by-slice under Gate 3 rather than treated as a second authority.
+- [x] Add a read-only authenticated `/api/v1/account` bootstrap endpoint. It re-reads current
+      database identity and joins explicit enterprise authority to room memberships without an
+      N+1 query path.
+- [x] Generate the scoped account-bootstrap OpenAPI document and a deterministic typed SvelteKit
+      server client; snapshot and generator-check tests refuse contract drift.
+- [x] Preserve same-origin `__Host-` cookie transport through the BFF/proxy. Only the Rust access
+      and refresh cookies cross the server boundary, and every returned attribute is parsed and
+      validated before either cookie is applied.
+- [x] Add cross-tenant, missing/deleted-session, malformed/over-posted input, stale-token identity,
+      cookie-downgrade, and response-field leakage tests in both service and BFF layers.
 - [ ] Deploy staging Rust API and managed PostgreSQL with backups and restore proof.
 
 ## Gate 3 — vertical feature migration

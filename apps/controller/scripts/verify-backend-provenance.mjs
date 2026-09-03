@@ -79,8 +79,8 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   pin below with the measurement beside the hash. Nothing became unsealed; four seals moved from the
   aggregate onto their own lines.
 */
-const EXPECTED_UNTOUCHED_COUNT = 62;
-const EXPECTED_MANIFEST_SHA256 = '7c3e41fc8913b238c9736b01835bf8363915cf281181ad10d2053a437180dd0f';
+const EXPECTED_UNTOUCHED_COUNT = 53;
+const EXPECTED_MANIFEST_SHA256 = '4c554f85848d0c40d56d4de9375a3b6e1672b1fa0b7d67796f380a379ee181ee';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -128,7 +128,22 @@ const LOCALLY_AUTHORED = new Map([
     // `0009` had not run.
     'services/api/migrations/0010_retire_ptr_clone_app.sql',
     'f38b8ee829abb7e0525d4f31ccb389ddafad9e92c309c53a18ddc9969e1e5251'
-  ]
+  ],
+  [
+    // Authored here on 2026-09-03 for cutover Gate 2. CHANGELOG.md records the reviewed
+    // account-authority model, the live PostgreSQL migration proof, and why this is a new
+    // destination authority rather than an imported-room drift.
+    'services/api/migrations/0011_enterprise_memberships.sql',
+    '37f96aad9a4451848bbad3733edfdab52d05b173a0d00f1c20d2a0f6c15592d1'
+  ],
+  [
+    // Rust owns this scoped contract. The committed snapshot is equality-tested against
+    // `openapi::document`, so the generator input cannot silently lag the handlers.
+    'services/api/openapi/v1.json',
+    'b8a6c3cf0320969ca80b2337a162d4e5c3d5ae878651d3002ab820070e9e01f9'
+  ],
+  ['services/api/src/bin/openapi.rs', '41d74030069228e6b42cd1259f22b05c10f58a665ccfec4dce3830082bf3923e'],
+  ['services/api/src/openapi.rs', 'ce5c3e33081a8e05e86add9216e54f8dc1dbb6ef33e6a43ed7a66470e1e49157']
 ]);
 
 /*
@@ -169,6 +184,28 @@ const LOCALLY_AUTHORED = new Map([
   with it — the same rule `LOCALLY_AUTHORED` carries, for the same reason.
 */
 const DIVERGED_FROM_IMPORT = new Map([
+  /*
+    Re-pinned 2026-09-03 as one Gate 2 vertical slice, with the reviewed behavior and measured
+    negative controls in the CHANGELOG entry at that timestamp.
+
+    These nine imported files now implement the canonical enterprise account bootstrap: the seed
+    supplies explicit fixture owners; provisioning transfers account and room ownership in one
+    transaction; the identity query re-reads a non-secret current profile; the database exposes the
+    user-bounded account resolver; the HTTP graph registers and serves the read-only endpoint and
+    scoped OpenAPI document; and the integration tests prove tenant omission, missing/deleted
+    identity rejection, stale-token replacement, leakage exclusion, and atomic owner transfer.
+    New files in the same slice are separated under LOCALLY_AUTHORED above rather than being
+    mislabeled as imports.
+  */
+  ['services/api/fixtures/seed.sql', '2aec9c9e3e5a7d0833142a76ae6f8df74d8e9b845180f0cc667e301f8569c0b6'],
+  ['services/api/src/provision.rs', '55b989398f3c7443ecaca8efb99db1ac1d564b0862594a514dc84c85410d50fb'],
+  ['services/api/tests/provision.rs', '53970226a80c603d0df63a0bcb6ce00814dd3754e167b8a05f531fc3b246e342'],
+  ['services/api/tests/actions.rs', 'ca98a860c8d618710d49463f3c9717251bff1c2ec4d31310809c3776e1d49e2f'],
+  ['services/api/src/db/repo/identity.rs', 'c2e32110e77a9480ff311d787e63b6da3c4a74a7f6c9a7e84ab5f056ed9e20fa'],
+  ['services/api/src/http/mod.rs', '6b9290757ab752310fb6a8e42324cb13b144d6a68c5bb773391057f1083c4aed'],
+  ['services/api/src/http/v1/account.rs', 'a399ce3cc2edeb670f640d08b52edf3beaafdaa7b61c01aabfd92e2acdc511e5'],
+  ['services/api/src/http/v1/mod.rs', 'cfdd65eaeefbc1b4b7bb4cf9413460f99600a27902a3e9026a2d5921b6f37bcc'],
+  ['services/api/src/lib.rs', '5f0e652995ddd924a56b366aa5e5be41048b879ceb2ec43cb2ca0b71070cec4a'],
   /*
     Diverged 2026-08-15 21:40. Three prose claims in `services/README.md` still named
     `ptr_clone_app` as the RUNTIME role, which stopped being true when `0009` provisioned
@@ -262,11 +299,19 @@ const DIVERGED_FROM_IMPORT = new Map([
                          old one kept working, silently. `AND password_hash = $4` leaves the member's
                          own value in place; with nothing else touching the row the upgrade still
                          lands.
+
+    Re-pinned 2026-09-03: the full action target refuted one sentence above while proving the new
+    account boundary. PostgreSQL data-modifying sibling CTEs share a snapshot, so the INSERT in
+    poll::answer still met the row its sibling DELETE targeted and a second vote failed 23505. The
+    schema already has the exact tenant/poll/member unique constraint the comment said it lacked.
+    The statement now validates and uses ON CONFLICT ON CONSTRAINT to update atomically; invalid or
+    closed polls still produce no source row and cannot erase an existing vote. The isolated re-vote
+    control passed, then the complete 29-test target passed twice consecutively.
   */
   ['services/api/src/auth/login.rs', 'f163aba72fee0005306b0da84070e832814a6865f8e375d066a5901a1031874d'],
   ['services/api/src/db/repo/alert.rs', '91955afd31c383c9ea31665c4291c41f57dc6f3c6370d19ec0dbdf7e1bbfe574'],
   ['services/api/src/db/repo/note.rs', 'af6f4ea2685a9fd2d6866ca53cee76be2e8cb43db6259f0acf61472b5c0ab8e2'],
-  ['services/api/src/db/repo/poll.rs', 'e0426a33c79cfaa311b07d8b03d582284a7d4f845289b2872bde050587f733db'],
+  ['services/api/src/db/repo/poll.rs', 'e65832470b7249aceaa4a63c9836022c29db6e6bf339b92ae5dcb17719e98ecd'],
   ['services/api/src/auth/password.rs', 'c6b6ce785e1dd22477e1927819c451554baf90291bacb34366cf83502ccd4bb1'],
   ['services/api/src/auth/refresh.rs', '1dfee4a4f31c85ffe68189482bbf072703e83a9292b487c1e0c751cf94e30eb2'],
   ['services/media/Cargo.toml', 'e386a431215a4ebedb958f35ca2bc52ac760b1910fdb4f83663a3e9110179b7d'],
@@ -342,7 +387,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '607e1df8bfb387b531d6ef7b8efb81088bd4130ed1f40eeda1cd7186a123d13f'
+    '4a4142ea710fd0df67adf96fba30e6684e8262da0cdd087587b1b6bcedc20ce4'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -367,7 +412,7 @@ const DIVERGED_FROM_IMPORT = new Map([
     granted, and cannot be held. `services/compose.yml` pins `postgres:17`, where the check is
     unchanged. Negative control: the version gate removed, the same 22023 back.
   */
-  ['services/api/src/db/mod.rs', '149a07ad65c3bb7668f0b7c99f50ea5d399d6e48775b7002c6a562f6e9318537'],
+  ['services/api/src/db/mod.rs', '0953452d41a2bdd4358f4dd99349e2b2cb0237522593e35b7a20ffdf2d293a7c'],
   /*
     Diverged 2026-08-31 — ONE doc comment, and it named the role the code turns away.
 
@@ -402,7 +447,7 @@ const DIVERGED_FROM_IMPORT = new Map([
     assertions beside it already had; the two `preflight_for_tests` cases keep their literal
     correctly, because that entry point takes ONE name and echoes it back.
   */
-  ['services/api/tests/migrations.rs', '9afb6ebfcd27953bacbdb75ecf68366c35631352b7b5218895ef36f01ad9ee1e'],
+  ['services/api/tests/migrations.rs', 'ab5f7fa1a7f359f4be8e986a2518a65708438b26f34a7a7019eed2809730fe2e'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
@@ -461,7 +506,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/tenancy.rs', 'f2f10d1e8b099d115525485e8b5b18957e0cab542e80f7bfa492a1d8c0d97ccb'],
   [
     'services/api/tests/support/mod.rs',
-    '1f878cd85b80d4450b08d3ec4d24e8edc8cc1a090880e138d2de88fe928f9950'
+    '7e3ca1b689bb01a512806c3c5e0d59cc6dc12b1f1a22db521d32a5330096f942'
     /*
       Re-pinned 2026-08-31: `Scratch::sweep` now excludes the names THIS process created.
       Its safety argument — a live database keeps a backend attached, so its DROP fails — held only
@@ -469,9 +514,25 @@ const DIVERGED_FROM_IMPORT = new Map([
       sibling thread's sweep collected the database out from under it. Adding a third concurrent
       `Scratch::create` to `migration_reappliability.rs` reproduced it on two consecutive runs
       ("It seems to have just been dropped or renamed"), and three runs are green after.
+
+      Re-pinned 2026-09-03: adding two account tests took `actions` from 27 detached Axum servers to
+      29 and crossed macOS's 256-descriptor default. Every completed test had left its listener and
+      three pools alive because dropping JoinHandle detaches. Harness now aborts its server on Drop,
+      caps itself at six concurrent instances, and right-sizes its three sequential-test pools.
+      Red evidence was 7/29 failures (EMFILE, reset, empty status and 503); the target then passed
+      29/29 twice in succession.
     */
   ],
-  ['services/api/tests/auth_http.rs', '79a5b173119977db1ec1eac94a03b86897d40a42c0f25474d5fbd8cadedac98c'],
+  [
+    'services/api/tests/auth_http.rs',
+    'babcc644cc4873b0beb22023416412ad2db4cb75d4bb66d19ffa4ac600b3aecc'
+    /*
+      Re-pinned 2026-09-03 with the Gate 2 cookie boundary. The end-to-end login assertion now
+      isolates the refresh Set-Cookie header and requires Path=/, because RFC 10025 requires that
+      exact path for a __Host- name. Its red run captured Path=/api/auth from the live Axum server;
+      a conformant browser rejects that header rather than accepting a more narrowly scoped cookie.
+    */
+  ],
   ['services/api/tests/realtime.rs', '62c6629bed604164b3f9709220f737da51708c794e1b0062210a18d7ee7d0056'],
   ['services/api/tests/refresh_rotation.rs', '65531ae9d457eacedb87755fd673a6999fa607ea4822e37081d2a553637c49d7'],
   ['services/api/tests/room_api.rs', 'd4c507b29d7dc8335de398ac0c655941ad8321d0c0abe9385986768e57738e67'],

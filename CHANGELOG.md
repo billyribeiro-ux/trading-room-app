@@ -45,6 +45,83 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 18:11 EDT — account authority became explicit, and the Rust boundary reached SvelteKit without crossing the browser
+
+**Runtime impact: yes after deployment; no production deployment is claimed.** This is the first
+repository-built slice of cutover Gate 2. The working applications continue on their existing live
+stores until the documented staging and Gate 3 migrations occur.
+
+`services/api/migrations/0011_enterprise_memberships.sql` is authored here and forward-only. It
+separates enterprise owner/admin authority from room roles, limits the relation to those two roles,
+enforces at most one owner, refuses a backfill when historic rooms disagree about ownership, and
+gives the restricted runtime role no direct table access. The user-bounded SECURITY DEFINER resolver
+has a pinned search path and no PUBLIC execute grant. Provisioning now transfers both account and
+room ownership in one transaction instead of leaving stale owners behind.
+
+The authenticated `GET /api/v1/account` response re-reads the current database user rather than
+trusting mutable access-token fields and returns only explicit account authority plus that caller's
+room memberships. It excludes email, password/email hashes, phone, provider ids, and token values.
+The scoped OpenAPI 3.1 snapshot is generated from Rust, equality-tested, served by the API, and used
+by a deterministic SvelteKit server-client generator.
+
+The controller now exposes same-path BFF routes for login, refresh, logout, and account bootstrap.
+The Rust origin stays private; only the two reviewed `__Host-` cookies are forwarded. Returned
+cookies are accepted only with their exact name, path, TTL, Secure, HttpOnly, and SameSite contract,
+and the entire header set plus response body is validated before the browser cookie jar changes.
+Login/refresh require the complete live pair, logout requires the complete expired pair, and the
+read-only account bootstrap refuses every returned cookie.
+Malformed and over-posted requests, cookie downgrades, undeclared response fields, stale/deleted
+identities, missing sessions, and cross-tenant data have executable negative controls.
+
+The final cookie-contract review found that the refresh cookie used the `__Host-` prefix with
+`Path=/api/auth`. [RFC 10025 §4.1.3.2](https://www.rfc-editor.org/rfc/rfc10025.html#section-4.1.3.2)
+requires `Secure`, no `Domain`, and exactly `Path=/` for that prefix, so
+a conformant browser rejects the old header rather than accepting a scoped refresh cookie. A real
+HTTP login test first failed on the emitted header and three controller boundary tests failed on the
+corrected contract. The service now emits and expires both host-prefixed cookies at `/`; refresh
+remains `HttpOnly` and `SameSite=Strict`, and resource endpoints never authorize from it. Both
+focused suites pass on the corrected contract.
+
+Final measured evidence: the workflow-exact Rust workspace suite passed all 439 tests (314 API and
+125 media), including 15/15 disposable-database migration tests; workspace Clippy passed with every
+target, the `testing` feature, and warnings denied; and the deterministic backend gate passed all
+11 pinned migrations, all 114 media-library tests, and every API test-target compile. The
+controller's exact `pnpm quality` command passed formatting, ESLint, Svelte diagnostics with 0
+errors/0 warnings, every local contract including runtime HTTP, 1,261 Vitest assertions across 122
+files, nine serial Chromium journeys against a dedicated tmpfs-backed PostgreSQL 17 database, and
+both adapter-node and adapter-vercel production builds. The OpenAPI generator check and backend
+provenance seal passed; the latter covers 98 imported and seven locally authored service files.
+
+The first migration and media runs inside the filesystem sandbox failed uniformly with `Operation
+not permitted` on local database/socket access; the controller browser server failed for the same
+reason before executing a case. The identical commands with loopback permission passed, separating
+environment refusals from product failures. The only remaining output is the existing Vite
+large-chunk advisory, the adapter-node `config.kit` deprecation from its dependency, and the
+environment's `NO_COLOR`/`FORCE_COLOR` warning; none failed a configured gate.
+
+The first full API run then found two defects that focused success could not excuse. Adding the two
+account tests took `actions` from 27 to 29 concurrent `Harness` instances and crossed macOS's
+256-descriptor ceiling because each completed test detached its Axum task, listener, and pools.
+Seven cases failed with `EMFILE`, 503, connection reset, or no status line. `Harness` now owns and
+aborts the server task, caps concurrent instances at six, and right-sizes its test-only pools.
+
+Once resource exhaustion stopped hiding the application result, the existing re-vote control failed
+deterministically: `poll::answer`'s data-modifying DELETE CTE and INSERT share one PostgreSQL
+snapshot, so the INSERT collided with the supposedly deleted response and surfaced `already
+exists`. The schema already had the exact tenant/poll/member unique constraint the implementation
+comment said was absent. The query now validates the active poll and uses that named constraint for
+an atomic `ON CONFLICT` update; invalid input still produces no source row and cannot erase a prior
+vote. The isolated red case passed, followed by 29/29 action tests twice consecutively. Both service
+file hashes are re-pinned in the provenance ledger rather than absorbed into its untouched-import
+aggregate.
+
+The controller gate also caught a stale evidence pin already present in `9103db8`: that commit
+added `evidence-dumps/account-page/file1` as a 6,153-byte LF-normalized artifact with SHA-256
+`112fce…`, while both the verifier and reorganization report still asserted the 6,156-byte source
+copy's `64145e…` digest. `git show HEAD:<path>` reproduced `112fce…`, so this was not working-tree
+drift. The two pin sites now describe the bytes actually committed; the evidence file itself is
+unchanged from `9103db8`.
+
 ### 2026-09-03 16:18 UTC — nine more capture reads, 70 more assertions, and three that asserted a bug already fixed
 
 `a0de1d3`. **Runtime impact: no.** Test partitioning and three corrected assertions.

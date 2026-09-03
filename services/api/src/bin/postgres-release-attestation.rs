@@ -54,7 +54,7 @@ const EXPECTED_POLICY_EXPRESSION: &str =
 
    `EXPECTED_POLICY_EXPRESSION` is asserted against `public.room_events` and nothing else. That was
    right for what it was built for — `room_events` is the table the room's realtime durability plan
-   leans on — but it left the tenant boundary of the other twenty-one tables attested only by their
+   leans on — but it left the tenant boundary of the other tenant tables attested only by their
    ROLE, never by their PREDICATE.
 
    Measured against a database built from the shipped chain on 2026-08-28: 25 tables in `public`, 22
@@ -1077,7 +1077,14 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// and a second database could no longer start its chain — the migrate preflight requires that role
 /// to exist before `0001` runs. Removing the role itself is a documented operator step, and
 /// `db::migrate::baseline_role_absence_policy` is what keeps that step from blocking later deploys.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+///
+/// Slot 11 is `0011_enterprise_memberships.sql`. Reviewed 2026-09-03: it separates account
+/// owner/admin authority from per-room roles; permits only `owner` and `admin`; enforces at most
+/// one owner per enterprise; refuses ambiguous historic room ownership; backfills unambiguous
+/// owners; applies ENABLE+FORCE RLS with the reviewed tenant predicate; grants no direct table
+/// access to the runtime role; and exposes only a user-bounded, pinned-search-path SECURITY
+/// DEFINER resolver whose PUBLIC execute privilege is revoked.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 11] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 /// The two human-facing error messages that name that chain's range in PROSE, as named constants
 /// so `the_prose_ranges_track_the_attested_chain` can hold them against
@@ -1088,9 +1095,9 @@ const ATTESTED_MIGRATION_VERSIONS: [i64; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 /// refused release. The embedded-contract message beside it was moved by hand both times;
 /// hand-moving is the convention that failed here, so the test moves the burden.
 const EMBEDDED_MIGRATION_CONTRACT_MESSAGE: &str =
-    "the attestor is pinned to repository migration versions 0001 through 0010";
+    "the attestor is pinned to repository migration versions 0001 through 0011";
 const MIGRATION_LEDGER_MISMATCH_MESSAGE: &str = "the SQLx ledger must contain only successful \
-     repository migrations 0001 through 0010 with exact descriptions and checksums";
+     repository migrations 0001 through 0011 with exact descriptions and checksums";
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -2729,13 +2736,13 @@ mod tests {
                since. It compiled again once the subprojects were vendored, and failed on this.
 
                The values are MEASURED, not invented: PostgreSQL 16.13 with the full chain applied
-               reports 22 tables with row-level security FORCED, 22 policies over them — the 1:1 this
+               reports 23 tables with row-level security FORCED, 23 policies over them — the 1:1 this
                evidence exists to state — and exactly these two distinct `USING` expressions, the
                general tenant predicate and `room_events`' member-scoped one.
             */
             tenant_policies: TenantPolicyEvidence {
-                forced_relations: 22,
-                policies: 22,
+                forced_relations: 23,
+                policies: 23,
                 distinct_using_expressions: vec![
                     r#"((enterprise_id = (current_setting('app.enterprise_id'::text, true))::uuid) AND ((current_setting('app.member_id'::text, true) = ''::text) OR ((sender_member_id)::text = current_setting('app.member_id'::text, true)) OR ((recipient_member_id)::text = current_setting('app.member_id'::text, true))))"#.into(),
                     r#"(enterprise_id = (NULLIF(current_setting('app.enterprise_id'::text, true), ''::text))::uuid)"#.into()
@@ -2780,9 +2787,10 @@ mod tests {
        the migration retargets the ROLE and never inspects the predicate. Nothing downstream read it
        either, because the only predicate assertion in this binary was against `public.room_events`.
 
-       The predicates are the ones measured off a database built from the shipped chain on
-       2026-08-28: 25 tables, 22 with row-level security forced, 22 policies, two distinct `USING`
-       expressions.
+       The predicates were first measured off a database built from the shipped chain on
+       2026-08-28. Migration 0011 adds one table carrying the same general tenant predicate, so the
+       post-0011 shape is 26 tables, 23 with row-level security forced, 23 policies, and still two
+       distinct `USING` expressions.
     */
     fn tenant_policy(table: &str, using: &str) -> TenantPolicyRow {
         TenantPolicyRow {
