@@ -165,7 +165,19 @@ const render = (over: {
         put `chatTabs.length` in the brand, which is not so forgiving — so this harness had been
         rendering a component in a state its own types forbid, and the gate is what said so.
       */
-    chatTabs: ['main', 'off-topic'],
+    /*
+      FULL TABS since 2026-09-02, not names. The strip takes `{name, displayName, type}` — the shape
+      the reference itself pushes — because `altGenChannelName` / `altOffTopicChannelName` let an
+      owner rename the two built-ins, so a label stopped being derivable from a name.
+
+      This harness caught the change loudly rather than silently, which is the note two lines above
+      earning its place a second time: the keyed `{#each}` reported `duplicate key undefined` for
+      two string entries, instead of rendering an empty strip nobody would have looked at.
+    */
+    chatTabs: [
+      { name: 'main', displayName: 'Main Chat', type: 'r' as const },
+      { name: 'off-topic', displayName: 'Off Topic', type: 'r' as const }
+    ],
     onbeginsplit: noop
   });
 

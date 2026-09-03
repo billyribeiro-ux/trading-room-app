@@ -45,6 +45,288 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 01:28 UTC — the session door: nothing in either application could close a room
+
+`16853a2`. **Runtime impact: yes.** Two presenter controls that reported success and changed nothing
+now do what their labels say, and a third path — the members already inside a room being closed —
+exists for the first time.
+
+`rooms.state` is the column `decideRoomEntry` refuses entry on. `attempt.roomState !== 'open'`
+answers with the presenter's own close message, and that enforcement has always been correct.
+**Nothing could ever set it**, measured today at both ends:
+
+* written at CREATION and nowhere else — `provision-room.ts` and the clone action;
+* the controller's `setState` form action had **no form posting to it**. One occurrence of the name
+  in the whole application: its own declaration at `+page.server.ts:1013`;
+* the room's *" Save Message and Close Session "* wrote `savePreference('sessionOpen', false)` — the
+  clicking presenter's own settings blob. `sessionOpen` had **zero readers anywhere in
+  `apps/room/src`** and was not even on `DEAD_PREFERENCE_KEYS`. Its sibling *" Open Session "* wrote
+  the same dead key and at least also published a frame.
+
+So a presenter closed the session, was told `Message Saved`, and the room admitted everybody as
+before — for the entire life of the feature. The same LEVEL error as the Lock Session buttons one
+door over, and the same shape as the Stream Player pane and the chat-mode radio: a room-level act
+modelled as a per-user preference, invisible precisely because the pane shows the value back to the
+person who set it.
+
+**`internal/room-state/[code]` on the controller**, and a route of its own rather than a key on
+`room-setting`. `state` is a COLUMN on `rooms` — it is what `internal/room-config` already projects
+as `room.state` — and the settings door writes `settings_json` through the generated schema.
+Teaching that one handler a second storage shape is how a handler comes to have two rules.
+`isLocked` went the other way on 2026-09-02 for the same reason read forwards: it IS a setting. The
+endpoint takes a `config-write:` capability, names a member, and requires that member be the owner
+or a true presenter of THIS room. The room hides both controls from a member and refuses the action
+for one, and a hidden button is not an authorization check.
+
+**Both commands write before they announce.** `openSession`: do not tell people to reload into a
+door that is still shut. `closeSession` (new): the refusal must already be true when the reload
+arrives. One principle with the sign flipped — the durable state changes before anything tells
+anybody it has — and the contract asserts it **by position**, because a mock could show both calls
+happening and say nothing about which came first.
+
+**A `closedPage` receiver**, for the people already in the room. Upstream's subscriber is one line —
+`subscribe("closedPage", () => this.currPage = "closed")`, byte 2,596,849 — swapping `app-root`'s
+whole page. This room has no `currPage` switch: its equivalent is the guest door's own refusal,
+rendered by `+error.svelte` with the stored close message, so the RELOAD is the page swap. The
+sentence it raises first is OURS and recorded as ours: upstream raises nothing because its swap is
+instant and local, and a browser that reloads with no warning looks like a crash.
+
+`sessionOpen` is on `DEAD_PREFERENCE_KEYS` now, which is what evicts the copies already sitting in
+browsers, and the `savePreference` dependency came out of `close-message.ts` with the write it
+existed for.
+
+**Thirteen negative controls, each run alone and each seen RED** before the tree was restored from a
+scratchpad copy — never `git checkout --`, which reverted an intended rewrite earlier in this
+session. They covered: removing the write from `closeSession`; swapping write/frame order in
+`openSession`; reinstating the dead write on both sides; deleting the receiver; un-naming the dead
+key; silencing the close failure; downgrading the endpoint and the client function to a READ
+capability; writing the wrong state; making the presenter check read a different row than the one
+looked up; and giving the one member-less write route a presenter check it must not have.
+
+**One of those controls silently no-opped on its first attempt** and is worth recording as a method
+failure rather than a footnote. The `sessionOpen` entry is the last element of its array and carries
+no trailing comma, so a mutation written to delete `'sessionOpen',` matched nothing, the file was
+rewritten unchanged, and the test passed — which is indistinguishable from the vacuous test the
+control exists to rule out. Every mutation after it asserts that the file actually changed before
+the test is run.
+
+**`config-read-cannot-write-contract.test.ts` gained a sweep**, and it is the part of this work with
+the longest reach. Every write route must now check that the named member is a presenter of this
+room. It matches the shape rather than a spelling — the local is called `caller`, `member` and
+`membership` across six files, and renaming a local is not a security change — with a backreference
+so that the two halves of the test cannot read different rows. `room-occupancy` is the one exception,
+it is named, and its absence is pinned in both directions.
+
+`pnpm run gate` exit 0 in **both** apps. Three controller documents restating the Vitest count were
+brought from 1188 to 1196, and `room-surface-audit-2026-08-30.md`'s list of recorded session events
+gains *session closed* — before today the room had no command that closed anything.
+
+### 2026-09-03 00:48 UTC — three trackers swept, and every stale row was stale in the same direction
+
+`2f29130`, `ca1909c`, `445b344`. No feature was built here. What was corrected is what a reader would
+have BUILT from — and all three trackers were wrong the same way: they described work that was
+already done, or work that was not work at all.
+
+**`missing-commands-triage.md` — the operator-toolkit five.** The section read *"the five that need a
+decision first, and are outstanding regardless"*, and its headline row read `all still outstanding |
+5`. `NEW-TODO.md` had re-measured four of them on 2026-09-01 and answered NOT WORK; two documents,
+one subject, and the stale one was the summary.
+
+Re-swept independently: `resetAudioBridge`, `resetAudioBridgeOnServer`, `resetAllMediaServers` and
+`resetMediaServer` have **no call site anywhere in the bundle** — every occurrence is the method
+declaration or the command string inside its own body. Building senders would invent controls the
+reference does not render.
+
+**`getMyRepeater` did not belong in that table and never did**, and separating it out is the useful
+half:
+
+```
+byte 1,115,897   on reconnect:  appEventBus.emit("getMyRepeater", {currentStreamServer})
+byte 1,144,067   subscriber  →  sendServerCommand("getMyRepeater", …)
+byte 1,023,916   also after a soft reset, jittered by 3000 * Math.random()
+byte 1,021,388   receiver       case "getMyRepeater": setMyRepeater(i.streamServer)
+byte 1,026,712   setMyRepeater(e) { globals.streamServer = globals.forcedStreamServer || e }
+```
+
+A member's own reconnect exchange, fully live upstream, over the ORDINARY `cmd` transport while the
+other four use `adminCmd` — the same tell this document already applies to `notyping`. Its blocker is
+a **repeater fleet**, not a decision. *"What is missing is REACH, not the commands"* is withdrawn: a
+row's size cannot be reasoned about from what a feature is for.
+
+**And that headline row is now RECOMPUTED**, which it was not. Every other row of that tally is
+derived from the table; this one was prose, which is how it sat wrong for a fortnight in a table where
+nothing else could. Three negative controls seen red.
+
+**`room-component-gap-register.md` — eight of fifteen R-rows were closed.** R-1 through R-6, R-14 and
+R-15, one of them by work done the same day. **R-5 is the one worth naming**: its reason was
+*"unblocked by a close-message store, which is a schema decision"*, and it outlived **two** pieces of
+work — `room_state.closed_message` with `saveCloseMessage`, and `+error.svelte`, which was built on
+09-01 for exactly this case and says so in its own docblock.
+
+R-5 was also the last member of `reference-component-inventory-contract.test.ts`'s `NOT_RENDERED`
+map, **which is now empty**: all fifty reference components this room is answerable for are rendered
+or named. An empty map makes the "no entry outlives the component it excuses" case a vacuous pass, so
+the emptiness is asserted explicitly beside it.
+
+**R-11's two "wired at one end only" halves are answered, and they are not the same case** — the
+register had them as one finding.
+
+| half | answer |
+| --- | --- |
+| `sl=1` on the detach popout URL | **KEPT.** A transcription a member never sees, claiming nothing, inert only because dropping `tok` made it so — so the note belongs beside that one |
+| `?forcedStream=` on the "(test it)" link | **REFUSED.** Honouring it takes a media host from a query parameter, so a link sent to a member could point their camera and microphone at somebody else's SFU. There is also no fleet: `mediaSignallingUrl()` resolves one endpoint from `MEDIA_WS_URL`, server-side |
+
+The second is a **trap rather than a defect today**: its `{#if}` never opens, because
+`targetUser.streamServer` has no producer here. Supply it with a media host and the link starts
+rendering and starts doing nothing. The note is at the anchor, because that is where whoever lands the
+host will be looking — and that is why a 44-line comment was worth the ceiling raise instead of
+extracting the row and moving the note away from its markup.
+
+**R-13 — `app-scplayer`'s undeclared bug-fix, declared.** `app-scplayer.full.js:13-15` builds its
+iframe `src` with `&amp;auto_play=true`: an HTML entity inside a JavaScript template literal, so the
+reference requests a parameter named `amp;auto_play` and its hidden player never starts. This room
+emits `&auto_play=true`.
+
+The row asked for the reason at the call site or the entity restored. **Kept**, because the upstream
+behaviour is UNREACHABLE rather than merely different — the element is `visibility:hidden` below the
+fold with no control to press, so a faithful transcription is a component that can never make a
+sound. `soundcloud-autoplay-contract.test.ts` asserts **both** halves, the URL and the argument,
+because the fix without the reason is exactly the state R-13 objected to.
+
+**Runtime impact: none.** Every change here is a document, a comment or a test.
+
+**Verified:** both gates exit 0 on each of the three commits. Five negative controls seen red across
+the three contracts touched.
+
+
+### 2026-09-03 00:09 UTC — the Lock Session buttons close the door now
+
+`459163b`. Session Control's Lock Session tab has three buttons, transcribed from bundle byte
+**2,151,043**: `Lock Session`, `Lock Session & kick users.` and `Unlock Session`. All three wrote
+`sessionLocked` and `sessionLockKick` into the clicking presenter's own settings blob and raised the
+capture's own "Session Locked".
+
+**Measured 2026-09-02: both keys had ZERO readers anywhere in `apps/room/src`.** A presenter locked
+the room, was told the room was locked, and the door stayed open to everybody — for as long as the
+buttons had existed. Same LEVEL error as the Stream Player pane, the chat-mode radio and
+`presenterStyle`: a room-level presenter act modelled as a per-user preference, invisible for exactly
+the reason those were, because the pane shows the value back to the person who set it.
+
+**The blocker recorded for this was a SHAPE, not evidence.** `missing-settings-triage.md` said:
+*"Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is not a
+lock."* Both halves true and the conclusion did not follow — the lock is a room SETTING on the
+**controller**, `room_state` was never where it belonged, and `decideRoomEntry` has refused a locked
+room at the guest door (`room-entry.ts:221`) since before these buttons were written. Nothing about
+the ENFORCEMENT needed building. Only the write.
+
+**Runtime impact.** Three presenter controls that did nothing at all now change the room. `isLocked`
+is the second setting the room may write back, over the same `internal/room-setting` seam
+`overwriteCashRegisterSound` and `restreamToURL` use — a durable per-room value broadcast over the
+event channel would change every browser's belief and persist nothing.
+
+**The alert moved to AFTER the await**, and that is half the fix: raised before it, "Session Locked"
+appeared whether or not the write landed, which is the same failure one layer up.
+
+**`{kick: true}` is NOT reproduced, and it is named where it is sent rather than dropped.** Upstream's
+middle button sends `{kick: true, lock: true}` (byte 2,165,670) and its SERVER evicts everybody. This
+deployment has no evict-everyone command — `kicks.svelte.ts` kicks one named member — and the
+realtime hub is process-local, so a fan-out from the room would reach one instance's listeners and
+silently miss the rest. Locking without kicking is the strictly safer half: nobody new gets in, and
+the members already inside are exactly the ones a presenter can see and remove one at a time. A
+button that CLAIMED to kick and reached one instance would be a worse lie than the one this replaces.
+
+**The presenter is not locked out of their own room**, and that matches by construction rather than by
+a second check: upstream's gate is `sessData.isLocked && !globals.user.isPresenter` (byte 1,148,372),
+and here a presenter reaches the room through their account while `decideRoomEntry` guards the GUEST
+door. Two different doors, and always were.
+
+**Three negative controls seen red, and one caught a vacuous assertion of my own — the third today.**
+`await vi.waitFor(() => alert === 'Session Locked')` stayed GREEN when the assignment moved back above
+the await, because `waitFor` cannot tell "already set" from "set later". The synchronous
+`expect(dialogs.alert).toBeNull()` beside it is the half with teeth.
+
+`user-action-disposition-contract`'s **positive control** moved with it, and the new observable is
+stronger: it asserted a dialog, which is precisely what the defect produced. It asserts the SEND now
+— a thing that leaves the browser.
+
+**112 of 269 settings wired**, from 111. Seven documents state that count and all seven were
+corrected; the verifier refuses to pass while any of them disagrees.
+
+**Verified:** both gates exit 0. `svelte-check` 1647 files, 0 errors.
+
+**Not verified, and named: no browser was opened.** Nothing drove a real guest at a locked door — the
+enforcement is `decideRoomEntry`, which has its own tests and did not change here.
+
+
+### 2026-09-02 23:40 UTC — the channel model, and two "undecoded" values that were not
+
+`c1c611c`. `processSessData` builds the reference's whole tab strip in ONE expression (pinned bundle,
+bytes 1,146,625-1,147,200) from **six** settings. `hasChannelTabs` crossed alone on 2026-08-31
+because it was a live defect; these are the other five, and they arrive together because a subset of
+the six describes a room the reference cannot be in.
+
+It was a **model change**, which is what `missing-settings-triage.md` said and why it had been left
+unstarted: the reference gives every tab a `type` and has three of them where this room had one.
+
+**TWO THINGS RECORDED AS UNDECIDABLE WERE DECODED BY READING.**
+
+| | recorded | measured 2026-09-02 |
+| --- | --- | --- |
+| **`po`** | *"`po` versus `p` is undecoded: both are private, and nothing in the capture says what the `o` distinguishes"* | three sites say what it is and they agree — the subscription at **1,008,074** and both chat columns' render at **1,437,340** / **2,383,602**, all gating on `isPresenter \|\| user.hasAdminChat` |
+| **`p`** | the same sentence | `type:"p"` occurs **exactly once** in the whole 2,891,205-byte bundle and **no comparison against it exists anywhere**. A `p` channel behaves as an `r` one in the reference's own client, so `extraAdminChannels` is a name describing an intent that client does not enforce |
+
+`p` is carried as a value and treated as `r` for visibility — transcribing what the bundle does
+rather than what its setting name implies, the same call `advancedSearchAlerts` and `h264Enabled` are
+recorded under — and asserted, so the finding cannot be quietly "fixed" into a gate the reference
+does not have.
+
+**The `po` gate is ONE decision here and two in a browser upstream.** Upstream pushes the tab for
+everybody and filters at subscribe and at render, in the client. Both are gates a member steps past
+with a console, and the subscribe one is what decides whether the SERVER sends them the channel's
+messages. Here the tab is never in the list — so `memberChatChannels` never names the channel,
+`isMemberChatChannel` refuses a post to it, and the SSE hub never subscribes them. `hasAdminChat`
+comes off the controller's membership, never off anything the request asserts.
+
+**Runtime impact.** An owner can rename the two built-in tabs, add an admin-only channel, and add
+comma-separated regular and admin channels — five Manage-page settings that stored a value and did
+nothing. A room that has configured none of them is unchanged.
+
+**ONE DIVERGENCE, and it is the one place matching would reproduce a privilege escalation.** Upstream
+pushes an owner-typed name as both `displayName` and `name` with no collision check at all. An
+`extraRegChannels` entry named `adminChat` would be a type-`r` channel — ungated, in everyone's list
+— sharing a name with the type-`po` one, and **the name IS the channel**: `messages.room`, the
+realtime key, the allow-list entry. Refused here, against the same reserved set a badge channel
+already took. Also trimmed, because `"a, b"` upstream yields a channel literally named `" b"`.
+
+**`ChatTab` became `ChatChannelName` in `types.ts`, and that is a correction rather than tidying.**
+Its docblock read *"a chat channel's name, which is also its tab label"*, and the middle clause
+stopped being true the moment an owner could rename the two built-in tabs. `ChatTab` is the OBJECT
+now — `{name, displayName, type}`, the shape the reference itself pushes — and the string took the
+name it always meant.
+
+**Four negative controls seen red:** the `po` gate, the collision refusal, renaming the channel
+instead of the tab, and the trim.
+
+**Nine gates caught the change, and two are worth naming.** `declaration-tag-contract` caught me
+migrating a `{const x = $derived(y)}` **backwards** to `{@const}` — Svelte's own documentation calls
+the latter legacy, and this repository measured that a plain `{const}` compiles to no derived at all,
+so a site migrated that way goes stale silently the moment its state changes. And
+`AlertChatArea.svelte.test.ts` reported `duplicate key undefined` rather than rendering an empty
+strip nobody would have looked at — the note in its own fixture, added 2026-08-30 for exactly this
+failure, earning its place a second time.
+
+**111 of 269 settings are wired**, from 106. Six documents stated that count — `README.md`,
+`OUTSTANDING.md`, `ARCHITECTURE.md`, `admin-surface.md`, `v5.md` and `TODO.md` — and every one was
+corrected. The verifier refuses to pass while any of them disagrees, which is how all six were found
+rather than five.
+
+**Verified:** both gates exit 0. `svelte-check` 1647 files, 0 errors. 55 cases in
+`chat-tabs-contract.test.ts`.
+
+**Not verified, and named: no browser was opened on a room with an admin channel configured.** The
+gate is asserted at the function and through the server seam, not through a rendered strip.
+
+
 ### 2026-09-02 23:01 UTC — "Get my token", and a reason that was true of the reference and false of this room
 
 `d76b1a7`. `INERT_ACTIONS` is down to **three**, and none of the three is unbuilt work: two need a

@@ -4,7 +4,12 @@ import { mergeOlderChatMessages } from '#lib/chat-paging.js';
 import { webinarMessageVisible } from '#lib/chat-mode.js';
 import { isMentionOf } from '#lib/mention.js';
 import { trimChatLog } from '#lib/room-scroller.js';
-import type { ChatTab, MessageActionItem, MessageBadge, MessageReactions } from '#lib/types.js';
+import type {
+  ChatChannelName,
+  MessageActionItem,
+  MessageBadge,
+  MessageReactions
+} from '#lib/types.js';
 
 /** The load values every pipeline reads, taken as a thunk so a navigation reaches them. */
 export interface FeedSession<Alert, Message> {
@@ -403,7 +408,7 @@ export class RoomFeeds<
    * for a result set the server bounded to one page.
    */
   chatMessagesFor(
-    tab: ChatTab,
+    tab: ChatChannelName,
     searchResults: readonly Message[] | null,
     column: 'main' | 'extra'
   ) {

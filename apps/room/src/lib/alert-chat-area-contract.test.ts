@@ -188,8 +188,15 @@ describe('acA-06 — the per-tab unread badge', () => {
   });
 
   it('reads each tab ONCE per render', () => {
-    // Five calls to `unreadFor` per tab per render is what a naive transcription produces.
-    expect(strip).toContain('{const counts = $derived(unreadFor(unread, tab))}');
+    /*
+      Five calls to `unreadFor` per tab per render is what a naive transcription produces.
+
+      `tab.name` since 2026-09-02: the strip takes full `ChatTab` objects now rather than names,
+      because `altGenChannelName` / `altOffTopicChannelName` let an owner rename the two built-ins
+      and a label stopped being derivable from a name. The unread map is still keyed by NAME — it is
+      keyed by `messages.room` — so the read narrows here and nowhere else.
+    */
+    expect(strip).toContain('{const counts = $derived(unreadFor(unread, tab.name))}');
   });
 
   it('states the presenter gate once, at the COUNT and not again at the badge', () => {

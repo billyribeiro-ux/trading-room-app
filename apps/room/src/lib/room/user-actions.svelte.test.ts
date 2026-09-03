@@ -65,6 +65,7 @@ const make = (
   const dialogs = new RoomDialogs();
   const toasts = new RoomToasts();
   const sent: { subCmd: string; targetUserId: number }[] = [];
+  const lockSession = vi.fn(async () => ({ locked: true }));
   const reloadsSent: number[] = [];
   const kicksSent: { targetUserId: number; message: string; ban?: boolean }[] = [];
   const urlsSent: { cmd: string; url: string }[] = [];
@@ -150,6 +151,12 @@ const make = (
           ? Promise.reject(new Error('refused'))
           : (sent.push(payload), Promise.resolve(null)),
       editUsername: () => Promise.resolve(null),
+      /*
+        A SPY, unlike its neighbours, because what is asserted about the lock is that the room SENDS
+        rather than what it records: the defect it replaced wrote two preferences and sent nothing,
+        so "a command went out with this payload" is the whole property.
+      */
+      lockSession,
       /* `debug-log` sends and says nothing — the recorded ids are what its branch is asserted on. */
       requestDebugLog: (targetUserId: number) => (
         debugLogsAsked.push(targetUserId),
@@ -228,6 +235,7 @@ const make = (
 
   return {
     actions,
+    commands: { lockSession },
     dialogs,
     toasts,
     detailAsked,
@@ -511,18 +519,52 @@ describe('mute all non-admins', () => {
 });
 
 describe('the dispatcher', () => {
-  it('locks the session with TWO preferences, not one', () => {
+  it('locks the session by SENDING, and writes no preference at all', async () => {
     /*
-      `session-lock` and `session-lock-kick` are the same control with a different second flag, and
-      writing only the first leaves a locked room that silently stops kicking.
+      THIS CASE ASSERTED THE DEFECT UNTIL 2026-09-02, and it is worth saying what it asserted.
+
+      It read *"locks the session with TWO preferences, not one"*, and its reason was that
+      *"`session-lock` and `session-lock-kick` are the same control with a different second flag, and
+      writing only the first leaves a locked room that silently stops kicking."* Every word of that
+      is true ABOUT THE PREFERENCES, and the preferences were the bug: `sessionLocked` and
+      `sessionLockKick` had zero readers anywhere in `apps/room/src`, so the room was never locked
+      whichever of them was written.
+
+      A test can pin the wrong thing precisely and stay green for weeks. What makes this one's
+      replacement different is that it asserts an act with an effect OUTSIDE this browser.
     */
-    const { actions, saved, dialogs } = make();
+    const { actions, saved, dialogs, commands } = make();
     actions.handle('session-lock-kick', TARGET);
-    expect(saved).toEqual([
-      ['sessionLocked', true],
-      ['sessionLockKick', true]
-    ]);
-    expect(dialogs.alert).toBe('Session Locked');
+
+    expect(commands.lockSession).toHaveBeenCalledWith({ lock: true, kick: true });
+    expect(saved, 'a room lock is not a per-user preference').toEqual([]);
+
+    /*
+      THE ALERT WAITS FOR THE COMMAND, and asserting that takes two steps rather than one.
+
+      The first draft asserted only `await vi.waitFor(() => alert === 'Session Locked')`, and its
+      negative control — moving the assignment back above the `await` — stayed GREEN, because
+      `waitFor` cannot tell "already set" from "set later". Third vacuous assertion caught by its own
+      control today, and the same shape as the other two: a check satisfied by more states than the
+      one it names.
+
+      Synchronously NULL is the half that has teeth. A refused write must not be able to say
+      "Session Locked", which is the failure this whole command replaced.
+    */
+    expect(dialogs.alert, 'the alert must not precede the command').toBeNull();
+    await vi.waitFor(() => expect(dialogs.alert).toBe('Session Locked'));
+  });
+
+  it('unlocks with lock:false, and does NOT clear kick', async () => {
+    /*
+      `{kick}` describes the NEXT lock rather than the current one — the same reason the old
+      preference table did not clear `sessionLockKick` on unlock. Upstream's `unlockSession()` sends
+      `{lock: !1}` with no `kick` field at all; ours sends `false` because the payload is a
+      `strictObject` and an absent field would be a different refusal, not a different meaning.
+    */
+    const { actions, commands } = make();
+    actions.handle('session-unlock', TARGET);
+    expect(commands.lockSession).toHaveBeenCalledWith({ lock: false, kick: false });
   });
 
   it('renaming YOURSELF is validated; renaming somebody else is not', () => {

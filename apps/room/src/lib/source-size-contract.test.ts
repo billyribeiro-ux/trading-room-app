@@ -847,7 +847,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       than trusting the paragraph. The added sentence says which two and why, because a number
       restated with no reason is the next one somebody assumes was always that.
     */
-    max: 164,
+    /*
+      164 -> 166, 2026-09-02, the SECOND raise today and for the same reason: the count of
+      `error(<status>, …)` doors this page exists for moved again, 126 -> 127, when `lockSession`
+      gained its 502. `error-page-contract.test.ts` re-derives that number on every run rather than
+      trusting the paragraph, and three restatements in one day is the argument for having the check
+      rather than an argument against the sentence.
+    */
+    max: 166,
     why: 'the page every refusal in this app lands on, including a closed room'
   },
   {
@@ -1185,7 +1192,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       the MEASURED absence of any upstream receiver are on `reloadSessionConfig` in
       `session-commands.remote.ts`, pointed at rather than repeated.
     */
-    max: 1066,
+    /*
+      1066 -> 1088, 2026-09-03 — `closedPage`, and it is the receiver for a door that until this date
+      could not be shut.
+
+      `rooms.state` is the column `decideRoomEntry` refuses entry on. Nothing in either application
+      could write it after a room was created: the controller's `setState` form action had no form
+      posting to it, and the room's "Save Message and Close Session" wrote a per-user preference with
+      zero readers. A presenter closed the session, was told the message was saved, and the room
+      admitted everybody as before.
+
+      The twenty-two lines are four of code and eighteen of WHY, and the why is the part that cannot
+      be recovered by reading the branch: upstream's subscriber sets `currPage = "closed"` and swaps
+      `app-root`'s whole page, and THIS ROOM HAS NO SUCH SWITCH. Its equivalent is the guest door's
+      own refusal — `+error.svelte`, rendered with the stored close message — so the RELOAD is the
+      page swap, and a reader who deletes the reload as a heavy-handed way to show a dialog removes
+      the only thing that makes the frame mean what upstream's means.
+
+      Not extracted, by this entry's own standard: it shares no collaborator. It calls
+      `#alertThenReload`, the private method three sibling branches already call, and a module
+      holding one such call is a worse file than the chain.
+    */
+    max: 1088,
     why: 'the SSE router - seven channels of transcription, and the one block that did not route has gone'
   },
   {
@@ -1277,7 +1305,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       versions of the reason, because a control that refused for three weeks on a blocker that did
       not exist is the failure mode this file's comments are for.
     */
-    max: 356,
+    /*
+      356 -> 368, 2026-09-02, the THIRD raise on this file today and every one of the twelve lines is
+      prose. `room-component-gap-register.md`'s R-11 recorded `sl=1` on the detach URL as residue and
+      asked for a decision; the decision is KEEP, and the reason had to live beside the `tok` note it
+      depends on — `sl=1` is inert here only because dropping `tok` made it so.
+
+      Twelve lines to record a parameter nobody reads sounds like the wrong trade until you notice
+      that it is the SECOND time this exact question has been asked about this URL. A decision with
+      no reason at its code is a decision somebody re-litigates.
+    */
+    max: 368,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
@@ -2625,7 +2663,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and the note recording that `app-chat` and `app-extra-chat` differ by ONE leading space — which
       is the reason this is still one component and not two.
     */
-    max: 105,
+    /*
+      105 -> 111, 2026-09-02. The strip takes full `ChatTab` objects rather than names.
+
+      `altGenChannelName` and `altOffTopicChannelName` let an owner rename the two built-ins, so a
+      label stopped being derivable from a name and `chatTabLabel`'s two-entry lookup could not have
+      known about it. The reference puts `displayName` on the tab for exactly that reason.
+    */
+    max: 111,
     why: 'the chat channel strip - the captured markup, once, over a list the server decided'
   },
   {
@@ -3413,7 +3458,24 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `onlargepreview` for `SP2-04`. The call site is where a screen's per-screen state is handed to
       its pane, and there is nothing here to extract that is not that.
     */
-    max: 1109,
+    /*
+      1109 -> 1151, 2026-09-02, and all forty-two lines are one comment declaring ONE character.
+
+      `app-scplayer.full.js:13-15` builds its iframe `src` with `&amp;auto_play=true` — an HTML
+      entity inside a JavaScript template literal — so the reference requests a parameter named
+      `amp;auto_play` and its hidden player never starts. This room emits `&auto_play=true`.
+
+      `room-component-gap-register.md`'s R-13 recorded that as *"a deliberate behavioural divergence
+      from the capture that was never declared"* and asked for the reason at the call site or the
+      entity restored. The reason is the forty-two lines: the upstream behaviour is UNREACHABLE
+      rather than merely different (the element is hidden, with no control to press), the feature has
+      a presenter behind it, and the change is one reversible token.
+
+      A silent correction is the thing `~/CLAUDE.md` forbids. This is the price of not having one,
+      and `soundcloud-autoplay-contract.test.ts` asserts BOTH halves — the URL and the argument —
+      because the fix without the reason is exactly the state R-13 objected to.
+    */
+    max: 1151,
     why: 'the room stage - twelve child components, and the largest file after the page itself'
   },
   {
@@ -4214,7 +4276,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `setting-coverage-contract.test.ts`, or the byte evidence, which is in
       `image-preview-latch-contract.test.ts`.
     */
-    max: 6092,
+    /*
+      6092 -> 6136, 2026-09-02, and all forty-four lines are one comment at ONE anchor.
+
+      The `(test it)` link beside a member's Stream Server is transcribed (`dTe`, byte 2,063,494) and
+      upstream it WORKS — `app-root` reads `?forcedStream=` and `setMyRepeater` prefers it. This room
+      reads the parameter nowhere, and the link is not a lying control today only because the `{#if}`
+      around it never opens: `targetUser.streamServer` has no producer here.
+
+      **It becomes a defect the moment a media host lands**, which is a trap rather than a gap, and
+      the note is at the anchor because that is where whoever lands the host will be looking. It also
+      records why the reader must NOT simply be built: a media host from a query parameter is an
+      authority the client asserts, so a link sent to a member would point their camera and microphone
+      at somebody else's SFU.
+
+      A comment that prevents a future security defect is worth more than forty-four lines of the
+      budget this file is over. Extracting the row to buy them back would move the note away from the
+      markup it is about, which is the one thing that would make it useless.
+    */
+    max: 6136,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
@@ -4322,7 +4402,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       whole defect. This file is the connect, so this is where the read belongs; everything else about
       it, including the gate that decides whether to SHOW it, is elsewhere.
     */
-    max: 1018,
+    /*
+      1018 -> 1034, 2026-09-02. The load resolves full TABS and projects the names beside them.
+
+      Sixteen lines, thirteen of them prose. The projection is a separate statement rather than an
+      inline `.map` because `chat-channels.ts` argues that a second computation of this rule is the
+      failure mode, and a caller that narrowed inline would be one — the reason has to sit where the
+      narrowing happens.
+    */
+    max: 1034,
     why: 'the loader, plus `logout`; 3,233 before the remote-function conversions began'
   },
   /*
@@ -5541,7 +5629,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       here rather than in a commit message. The paragraph beside it records the divergence: this
       applies to search results too, which upstream cannot do because its toggle re-requests the log.
     */
-    max: 490,
+    /*
+      490 -> 495, 2026-09-02, and it is the `ChatTab` -> `ChatChannelName` rename reflowing one
+      import. The alias in `types.ts` described itself as "a chat channel's name, which is also its
+      tab label", and the middle clause stopped being true when the two built-in tabs became
+      renameable. `ChatTab` is the OBJECT now; the string took the name it always meant, and a
+      longer identifier pushes a four-name import list past the print width.
+    */
+    max: 495,
     why: 'what each pane renders, and the evidence overlay every pipeline consults'
   },
   {
@@ -5726,7 +5821,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       NOT changed here, because rewriting the ceiling model under deadline is how a gate ends up
       weaker than it was. Recorded as the owner's call, with the evidence attached.
     */
-    max: 103,
+    /*
+      103 -> 125, 2026-09-02. Twenty-two lines, and they are the room lock becoming real.
+
+      Three of them are the collaborator and its field; the rest are the `.then()` / `.catch()` and
+      the reason for both. The alert MOVED to after the await, which is the half of the fix that is
+      easy to lose: raised before it, `Session Locked` appeared whether or not the write landed —
+      which is exactly the failure the command was built to end, reproduced one layer up. The catch
+      says so out loud rather than swallowing, because a presenter told nothing has no way to tell a
+      locked room from an unlocked one.
+    */
+    max: 125,
     why: 'what a presenter does to the SESSION - lock, open, reset, close; eleven names, four collaborators'
   },
   {
@@ -5927,7 +6032,12 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       that carries the refusal, so the next reader of this branch is not left wondering where the
       other half of the reference's dialog went.
     */
-    max: 909,
+    /*
+      909 -> 910, 2026-09-02. One line: `lockSession` passed through to `RoomSessionControl`, which
+      is built here out of what this class already holds — see the note at that construction for why
+      it is built rather than injected.
+    */
+    max: 910,
     /*
       780 -> 803, 2026-08-29, and the +23 is a DELEGATION rather than a feature.
 
@@ -6290,8 +6400,28 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       happens if the save succeeded — because closing a room on a refused save shuts members out
       behind whatever the previous message said.
     */
-    max: 49,
-    why: 'saves the close message, then closes only if the save succeeded'
+    /*
+      49 -> 84, 2026-09-03, and the growth is a REPLACEMENT rather than an addition: the effect that
+      used to run second was `savePreference('sessionOpen', false)`, and it closed nothing.
+
+      `sessionOpen` had zero readers anywhere in `apps/room/src`. The door is `rooms.state` on the
+      controller — the column `decideRoomEntry` refuses entry on — and nothing in either application
+      could write it after a room was created. So this file's own docblock was true of a save that
+      happened and a close that did not: "the close only happens if the save succeeded" described an
+      ordering between one real write and one write into the clicking presenter's own settings blob.
+
+      It calls `closeSession()` now, which writes the column and then publishes `closedPage`.
+
+      Thirty-five lines for one changed call is the ratio this repository asks for when a comment was
+      LOAD-BEARING AND WRONG: the ordering argument had to be rewritten around a second effect that
+      now leaves the browser, the refusal path had to say what a presenter is actually looking at
+      ("The message was saved, but the room could not be closed" — never `Message Saved`), and the
+      dependency that came out with the write it existed for is recorded as removed rather than
+      quietly dropped. A future reader restoring a `savePreference` dep to "keep the pane in sync"
+      reintroduces the defect, and the file now says so.
+    */
+    max: 84,
+    why: 'saves the close message, then CLOSES THE ROOM - the door is rooms.state, not a preference'
   },
   {
     file: 'lib/room/recording-frames.ts',
@@ -6355,7 +6485,18 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       lives once on `reloadSessionConfig` in `session-commands.remote.ts` and is pointed at rather
       than repeated, which is what kept this to seven lines instead of forty.
     */
-    max: 114,
+    /*
+      114 -> 119, 2026-09-03, and every one of the five lines is the note left where a write was
+      DELETED. `session-open` ran `savePreference('sessionOpen', true)` — a key with no reader
+      anywhere in this application — and the reopen it appeared to perform was `openSession()` beside
+      it, which published a reload prompt into a door nothing could open.
+
+      The write is gone and the command now persists `rooms.state` first. What stays here is the
+      sentence saying the key was here, so that the next reader finds a recorded deletion rather than
+      an absence, and the header's own claim — "FOUR OF THESE FIVE SPENT MONTHS ON THE WRONG SIDE OF
+      THAT LINE" — keeps its fifth example.
+    */
+    max: 119,
     why: 'the session acts that send; the four that only write a preference are a table'
   },
   {
@@ -6367,7 +6508,20 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       writes two preferences and unlocking writes one. `sessionLockKick` is deliberately not cleared
       on unlock — it configures the NEXT lock.
     */
-    max: 44,
+    /*
+      44 -> 66, 2026-09-02, and every added line is prose about a defect.
+
+      The table stopped being three preference writes and became three commands. `sessionLocked` and
+      `sessionLockKick` had ZERO readers anywhere in `apps/room/src`, so a presenter who locked the
+      room was told it was locked over a door that stayed open — the same LEVEL error as
+      `presenterStyle` and the chat-mode radio, and invisible for the same reason: the pane shows the
+      value back to the person who set it.
+
+      Twenty-two lines to record that is the right price. This file's whole job is to be the place
+      somebody reads before touching the lock, and a table that had been wrong for weeks with no
+      note is how it gets written the same way again.
+    */
+    max: 66,
     why: 'the preference writes behind the lock actions, as data'
   },
   {
@@ -6415,7 +6569,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       in that catalog turned red the moment the button existed and has been deleted, which is the
       declaration that it is done.
     */
-    max: 87,
+    /*
+      87 -> 96, 2026-09-02. One command — `lockSession` — and eight lines saying why it is on this
+      PORT rather than a fifth collaborator on `RoomSessionControl`: that class is built out of what
+      `RoomUserActions` already holds, and its own docblock argues that injecting it would make every
+      caller assemble the same object twice.
+    */
+    max: 96,
     why: 'the wire commands RoomUserActions can send; reference material, not dispatcher flow'
   },
   {
@@ -7261,7 +7421,15 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       precedent. It also has to establish that the binding is on the SCROLLER and not on a message,
       which the component's input list settles and nothing else does.
     */
-    max: 1587,
+    /*
+      1587 -> 1595, 2026-09-02. The `chatTabs` prop takes `ChatTab[]` and the reason for it.
+
+      Eight lines, seven of them the comment: a label is no longer derivable from a channel name,
+      because an owner can rename the two built-in tabs. The type travels with the tab and is unread
+      here deliberately — the strip is not where a channel's audience is decided, and saying so at
+      the prop is what stops somebody adding a gate beside a gate.
+    */
+    max: 1595,
     why: 'the alerts/chat column - the largest component after ModalHost, and the next extraction target'
   },
   {
@@ -7570,7 +7738,14 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       file must match. A pointer to the other component would be a comment that goes stale the day
       the two columns diverge, which is the thing this pane's own header spends its first page on.
     */
-    max: 802,
+    /*
+      802 -> 810, 2026-09-02. The same eight lines as `AlertChatArea` above, and they are the same
+      eight on purpose: both columns take the identical `chatTabs` prop, and the note explaining why
+      a label is no longer derivable from a channel name has to be at both props or at neither. The
+      strip is one component precisely so the two cannot drift; the PROP is where each column states
+      what it takes.
+    */
+    max: 810,
     why: 'the second chat column; thirteen of its props are message chrome passed through'
   },
   {

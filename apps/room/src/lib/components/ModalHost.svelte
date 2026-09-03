@@ -2549,6 +2549,50 @@
                       <th scope="row">Stream Server:</th>
                       <td>
                         {targetUser.streamServer ?? 'n/a'}
+                        <!--
+                          ── A TRAP SET FOR WHOEVER LANDS THE MEDIA HOST, recorded 2026-09-02 ────
+
+                          `dTe` at bundle byte 2,063,494 — `v(1,"(test it)")` with
+                          `my("href","",e.locHref,"&forcedStream=",e.user.data.streamServer)` — is
+                          transcribed here, and upstream it WORKS: `app-root` reads `?forcedStream=`
+                          into `globals.forcedStreamServer`, and `setMyRepeater` at byte 1,026,712
+                          prefers it over whatever the server assigns.
+
+                          THIS ROOM READS THE PARAMETER NOWHERE, so the link is wired at one end
+                          only. It is not a lying control TODAY only because the `{#if}` around it
+                          never opens: `targetUser.streamServer` has no producer here — see
+                          `server/user-detail.ts`, where it is one of three cells left reading `n/a`
+                          rather than filled with something unfalsifiable, blocked on a
+                          `STREAM_SERVER_MTX` host.
+
+                          **It becomes a defect the moment that host lands.** Supply `streamServer`
+                          and this anchor starts rendering, a presenter clicks "(test it)" to
+                          diagnose a member's stream server, and the room reloads having tested
+                          nothing.
+
+                          ## And the reader must NOT simply be built, which is the part worth the
+                          ## note rather than a TODO row
+
+                          Two independent reasons, and the first is a refusal:
+
+                          * **A media host from a query parameter is an authority the client
+                            asserts.** A link with `?forcedStream=evil.example` sent to a member
+                            would point their browser's publish at somebody else's SFU — camera and
+                            microphone, in a multi-tenant fintech room. `CLAUDE.md` names this class
+                            by itself: every authority decision is made on the server from data the
+                            server owns. `mediaSignallingUrl()` resolves one endpoint from
+                            `MEDIA_WS_URL`, server-side, and that is the shape to keep.
+                          * **There is no fleet to select from.** Upstream `forcedStreamServer`
+                            overrides an ASSIGNMENT — `getMyRepeater` asks the server which repeater
+                            to use after a reconnect and the answer comes out of a pool. This
+                            deployment has one media plane and no assignment step, which is the same
+                            blocker `docs/decoded/missing-commands-triage.md` now records for
+                            `getMyRepeater` itself.
+
+                          So the honest end state, when `streamServer` is supplied, is a diagnostic
+                          VALUE with no "(test it)" affordance — or one that reaches a server-side
+                          allow-list of hosts the operator owns. Not this anchor.
+                        -->
                         {#if targetUser.streamServer}
                           <a
                             href="{resolve('/')}?forcedStream={encodeURIComponent(

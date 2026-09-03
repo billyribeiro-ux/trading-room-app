@@ -79,14 +79,7 @@ const VENDOR = new Set([
  * fails the "accounted for" case below, which is the point: an entry here is a decision, not a
  * parking space.
  */
-const NOT_RENDERED: Record<string, string> = {
-  'app-closed-session-page':
-    'The page a member sees once the presenter closes the session. This room has no closed-session ' +
-    'page at all: the reference stores its text server-side (`closedTxt`) and that store is not in ' +
-    'the capture, so the page would render an empty document. The REFUSAL is recorded at ' +
-    '`server/closed-message.ts` and the composer that would write it is built. Unblocked by a ' +
-    'close-message store, which is a schema decision rather than a transcription.'
-};
+const NOT_RENDERED: Record<string, string> = {};
 
 /** Every component selector the reference declares. */
 const declared = [...BUNDLE.matchAll(/selectors:\[\["([a-z0-9-]+)"\]\]/g)].map((m) => m[1]);
@@ -156,7 +149,28 @@ const BUILT_AS: Record<string, string> = {
 
     `session_transcripts` and `session-transcript.remote.ts` are that store; this is the page.
   */
-  'app-session-transcript': 'routes/session-transcript/+page.svelte'
+  'app-session-transcript': 'routes/session-transcript/+page.svelte',
+  /*
+    BUILT AS `+error.svelte` — and it emptied `NOT_RENDERED` on 2026-09-02, which is why this entry
+    carries the longest note in the map.
+
+    It was the last member of that map, on this reason: *"This room has no closed-session page at
+    all: the reference stores its text server-side (`closedTxt`) and that store is not in the
+    capture, so the page would render an empty document … Unblocked by a close-message store, which
+    is a schema decision rather than a transcription."*
+
+    The schema decision was TAKEN. `room_state.closed_message` holds the presenter's sentence,
+    `saveCloseMessage` writes it, `closedRoomMessage()` reads it with a fallback that keeps "never
+    set" distinguishable from "cleared", and `session/+page.server.ts:257` delivers it as
+    `error(403, closedRoomMessage(shortCode))`. `+error.svelte` is the page that renders it — built
+    on 2026-09-01 for exactly this reason, and its own docblock names this case as the one that
+    prompted it. The blocker was closed by two separate pieces of work, and the entry outlived both.
+
+    ONE DIVERGENCE, recorded at that page rather than here: the reference's own `closed-container`
+    (byte 2,573,542) is deliberately not reproduced — it matches no rule in the 444,793-byte captured
+    sheet, and its `innerHTML` is a stored-XSS surface for a string a presenter types.
+  */
+  'app-closed-session-page': 'routes/+error.svelte'
 };
 
 describe('the reference component inventory, read from the bundle rather than from our files', () => {
@@ -203,6 +217,28 @@ describe('the reference component inventory, read from the bundle rather than fr
         200
       );
     }
+  });
+
+  it('NOT_RENDERED is EMPTY, and that is asserted rather than merely true', () => {
+    /*
+      Every one of the fifty reference components this room is answerable for is now RENDERED or
+      named in `BUILT_AS`. The map below iterates nothing, which makes the next case a vacuous pass —
+      so the emptiness is stated here instead, where it is a claim rather than an absence.
+
+      The last entry was `app-closed-session-page`, and it is worth naming because it outlived its
+      blocker by two pieces of work: the reason said *"unblocked by a close-message store, which is a
+      schema decision"*, and `room_state.closed_message` plus `+error.svelte` had both landed.
+
+      **An entry added here later is not a regression** — it is a reference surface somebody has
+      found that this room does not build, which is exactly what this file exists to surface. What
+      would be a regression is this line being deleted to make room for one without a reason beside
+      it, so it fails loudly rather than the map quietly growing.
+    */
+    expect(
+      Object.keys(NOT_RENDERED),
+      'a NOT_RENDERED entry is a reference surface this room does not build — add it WITH its reason ' +
+        'and what unblocks it, and update this assertion deliberately'
+    ).toEqual([]);
   });
 
   it('keeps NOT_RENDERED honest — no entry outlives the component it excuses', () => {

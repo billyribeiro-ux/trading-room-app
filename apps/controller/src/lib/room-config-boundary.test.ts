@@ -261,6 +261,31 @@ describe('the allow-list itself', () => {
         stored the setting.
       */
       hasChannelTabs: 'chat-tabs.ts `chatTabsForMember` — whether the room has an Off Topic channel',
+      /*
+        The room both READS and WRITES this one, which is why it needs an entry here as well as on
+        the write list: `decideRoomEntry` enforces it at the guest door, and Session Control's three
+        buttons change it. They had been writing two per-user preferences nobody read.
+      */
+      isLocked: 'room-entry.ts `decideRoomEntry` — refuses a locked room, and the room writes it back',
+      /*
+        THE OTHER FIVE OF THAT SAME EXPRESSION, added 2026-09-02, and they all reach one function.
+
+        `chatTabsForMember` is the reference's `processSessData` tab builder reproduced, so every one
+        of these has its consumer in the same place — which is the point of the list being one
+        function rather than six pushes. The reference gives every tab a TYPE and has three of them
+        where this room had one, and `hasAdminOnlyChannel`'s `po` is the only type it gates.
+
+        The two comma lists are the only owner-TYPED text among them, and they are the reason the
+        room refuses a name colliding with a reserved channel where upstream does not: an
+        `extraRegChannels` entry named `adminChat` would alias the private channel with an ungated
+        one.
+      */
+      altGenChannelName: 'chat-tabs.ts `chatTabsForMember` — renames the Main Chat TAB',
+      altOffTopicChannelName: 'chat-tabs.ts `chatTabsForMember` — renames the Off Topic TAB',
+      hasAdminOnlyChannel:
+        'chat-tabs.ts `chatTabsForMember` — adds the `adminChat` tab, gated on presenter or hasAdminChat',
+      extraAdminChannels: 'chat-tabs.ts `chatTabsForMember` — comma-split, type `p`',
+      extraRegChannels: 'chat-tabs.ts `chatTabsForMember` — comma-split, type `r`',
       enableBadges: 'RoomMessage `visibleBadges` — the owner master switch on chat badges',
       showBadgesToPresentersOnly: 'RoomMessage `visibleBadges` — narrows badges to presenters',
       disableStarYears: 'RoomMessage — the membership-star gate',
@@ -633,9 +658,22 @@ describe('what the room may WRITE back', () => {
     restated rather than relaxed.
   */
   it('permits exactly the settings on the write list', () => {
-    expect([...ROOM_WRITABLE_SETTINGS]).toEqual(['overwriteCashRegisterSound', 'restreamToURL']);
+    /*
+      THREE since 2026-09-02, and the third arrived as a defect closed.
+
+      `isLocked` — the room's Lock Session tab. Its three buttons wrote two per-user preferences with
+      ZERO readers anywhere in `apps/room/src` and raised the capture's "Session Locked" over a door
+      that never closed. The lock is a room setting here and `decideRoomEntry` already refused a
+      locked room at the guest door; only the write was missing.
+
+      Asserted as an exact list rather than a `contains`, so a fourth entry has to be argued at this
+      line as well as at the allow-list. A write list that grows quietly is the one thing this file
+      exists to prevent.
+    */
+    expect([...ROOM_WRITABLE_SETTINGS]).toEqual(['overwriteCashRegisterSound', 'isLocked', 'restreamToURL']);
     expect(isRoomWritableSetting('overwriteCashRegisterSound')).toBe(true);
     expect(isRoomWritableSetting('restreamToURL')).toBe(true);
+    expect(isRoomWritableSetting('isLocked')).toBe(true);
   });
 
   it('refuses a setting the room may READ but not write', () => {

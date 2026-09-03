@@ -133,7 +133,24 @@ describe('every internal route verifies the credential its job needs', () => {
     the write capability alone, which is exactly what this list is here to assert: a token minted to
     READ a room's configuration cannot move a stored number.
   */
-  const WRITES = ['room-ban', 'room-mute', 'room-occupancy', 'room-permissions', 'room-setting', 'stream-ingest'];
+  /*
+    `room-state` joined 2026-09-03, and it is the first WRITE that is not a SETTING.
+
+    Its siblings all move `room_settings.settings_json` through the generated schema, or a ban row.
+    This one moves `rooms.state` — the COLUMN `decideRoomEntry` refuses entry on — so it is the door
+    itself rather than a preference about the door. That is why it is a route of its own and not a
+    key on `room-setting`, and it is a WRITE for the plainest possible reason: a token minted to READ
+    a room's configuration must not be able to close, or reopen, that room to everybody in it.
+  */
+  const WRITES = [
+    'room-ban',
+    'room-mute',
+    'room-occupancy',
+    'room-permissions',
+    'room-setting',
+    'room-state',
+    'stream-ingest'
+  ];
   /*
     `room-notes-auth` joined 2026-08-29. It POSTs a candidate the controller compares against
     `needPasswordForUserNotes` and answers two booleans; nothing on the controller changes, which is
@@ -199,6 +216,56 @@ describe('every internal route verifies the credential its job needs', () => {
     const source = await sourceOf(route);
     expect(source).toContain('verifyConfigReadToken');
     expect(source).not.toContain('verifyConfigWriteToken(');
+  });
+
+  /*
+    THE SECOND HALF OF A WRITE ROUTE, and it did not exist as a sweep until 2026-09-03.
+
+    The capability above answers "may this caller reach the door at all". It says nothing about WHO
+    the caller is acting as, and the two are separate locks on purpose: the shared secret is held by
+    the room PROCESS, so every member's request arrives carrying it. Authority is the second lock.
+
+    Written as a sweep rather than as a per-endpoint block because of what it is guarding against —
+    a NEW write route landing with the token check copied and the member check forgotten. That is
+    exactly how `room-state` could have arrived: it was written the same day this sweep was, and the
+    room hides its two buttons from a member, which is not an authorization check.
+
+    The presenter test is asserted as the EXPRESSION and not as a message. `stream-ingest` answers
+    `Forbidden.` where the others answer `Presenters only.`, deliberately and by its own docblock —
+    a participant asking about a room's ingest credential learns nothing from the refusal — and a
+    sweep that pinned the sentence would have forced that endpoint to leak the distinction or be
+    excluded from the sweep entirely.
+
+    The row is matched with a regular expression because the LOCAL is named three different ways
+    across these six files (`caller`, `member`, `membership`), and renaming a local is not a
+    security change. What is pinned is the shape that cannot be weakened without showing up here:
+    the owner counts (`role === 0`), a true presenter counts (`isRoomPresenter`), and both read the
+    SAME row — the one the endpoint just looked up for this room, never a claim from the request.
+  */
+  const PRESENTER_TEST = /(\w+)\.roomUser\.role === 0 \|\| isRoomPresenter\(\1\.roomUser\)/;
+  const NO_MEMBER_NAMED = ['room-occupancy'];
+  it.each(WRITES.filter((route) => !NO_MEMBER_NAMED.includes(route)))(
+    '%s also checks that the named member is a presenter of THIS room',
+    async (route) => {
+      const source = await sourceOf(route);
+      expect(source).toMatch(PRESENTER_TEST);
+      expect(source).toContain('account.status !== ACCOUNT_ACTIVE');
+    }
+  );
+
+  it('and the one write with no member behind it says so', async () => {
+    /*
+      `room-occupancy` is the exception the list above carries, and it is asserted rather than
+      assumed: the room process reports its own subscriber count, nobody pressed anything, and
+      requiring a member would mean inventing an actor. What it must NOT have is a half-gate — a
+      membership lookup whose result is never used — so the absence is pinned both ways.
+
+      The suspended-account refusal still applies. A suspended room stops serving, reads and writes
+      alike, and that is not about who is asking.
+    */
+    const source = await sourceOf('room-occupancy');
+    expect(source).not.toContain('isRoomPresenter');
+    expect(source).toContain('account.status !== ACCOUNT_ACTIVE');
   });
 
   it('names every internal route that takes a credential', async () => {

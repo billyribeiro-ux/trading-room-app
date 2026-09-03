@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { chatTabLabel } from '#lib/chat-tabs.js';
+  import type { ChatTab } from '#lib/chat-tabs.js';
   import { unreadFor, type ChatTabUnreadCounts } from '#lib/room/chat-tab-unread.js';
 
   /**
@@ -32,7 +32,15 @@
    * over a space; recorded here so nobody re-derives the difference and forks the file for it.
    */
   let {
-    /** The names, in the order the server decided. Built-ins first, then the badge channels. */
+    /**
+     * The tabs, in the order the server decided — built-ins, then the owner's lists, then badges.
+     *
+     * FULL TABS since 2026-09-02, not names, and the label came WITH them rather than being looked
+     * up. `chatTabLabel` was a two-entry table mapping `main` -> `Main Chat`; `altGenChannelName`
+     * and `altOffTopicChannelName` let an owner rename both, so the label stopped being derivable
+     * from the name and a lookup here could not have known. The reference puts `displayName` on the
+     * tab for exactly this reason.
+     */
     tabs,
     /** Which one is open. `$bindable` because both call sites own the value on a state class. */
     active = $bindable<string>(),
@@ -47,7 +55,7 @@
      */
     unread = {}
   }: {
-    tabs: readonly string[];
+    tabs: readonly ChatTab[];
     active: string;
     onselect?: (tab: string) => void;
     unread?: ChatTabUnreadCounts;
@@ -65,8 +73,8 @@
 -->
 {#if tabs.length > 0}
   <ul role="tablist" class="nav nav-tabs flex-wrap flex-grow-1 justify-content-center chatTabs">
-    {#each tabs as tab (tab)}
-      {const counts = $derived(unreadFor(unread, tab))}
+    {#each tabs as tab (tab.name)}
+      {const counts = $derived(unreadFor(unread, tab.name))}
       <li class="nav-item">
         <!-- svelte-ignore a11y_interactive_supports_focus -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -74,14 +82,12 @@
         <a
           data-bs-toggle="tab"
           role="tab"
-          class={['nav-link', { active: active === tab }]}
+          class={['nav-link', { active: active === tab.name }]}
           onclick={() => {
-            active = tab;
-            onselect?.(tab);
+            active = tab.name;
+            onselect?.(tab.name);
           }}
-          >{chatTabLabel(
-            tab
-          )}<!--
+          >{tab.displayName}<!--
             `O(3, unreadMsgs[name] || unreadMentions[name] ? 3 : -1)` inside `z_e`, byte 1,421,206 —
             the pill appears only when there is something in it, so a quiet channel's tab is the bare
             label the strip has always drawn.

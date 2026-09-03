@@ -410,6 +410,28 @@ export class RoomEventStream<Entry> {
           this.#alertThenReload('The session is now open, click here to reload the page and enter');
           return;
         }
+        /*
+          `closedPage` — the presenter closed the session while people were in it.
+
+          Upstream's subscriber is one line: `subscribe("closedPage", () => this.currPage = "closed")`
+          (byte 2,596,849), which swaps `app-root`'s whole page for `app-closed-session-page`. This
+          room has no `currPage` switch — its equivalent is the guest door's own refusal, which
+          `+error.svelte` renders with the presenter's close message from `room_state`.
+
+          So the RELOAD is the page swap: `decideRoomEntry` now reads `rooms.state === 'closed'` and
+          answers with that message. Getting there through the same door every arrival uses is what
+          keeps one sentence in one place rather than a second closed-page component that would have
+          to be told what the first one says.
+
+          `#alertThenReload` rather than a silent reload, and the sentence is OURS: upstream raises
+          nothing here because its page swap is instant and local. A browser that reloads with no
+          warning while somebody is reading looks like a crash, and there is no captured string to
+          reproduce instead — so this one is written, and recorded as written.
+        */
+        if (command?.cmd === 'closedPage') {
+          this.#alertThenReload('The presenter has closed this session.');
+          return;
+        }
 
         /*
           The room's recording state, for EVERYONE in it. Verbatim:

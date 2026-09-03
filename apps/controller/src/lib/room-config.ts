@@ -985,6 +985,51 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'hasChannelTabs',
   /*
+    THE OTHER FIVE SETTINGS OF THE SAME EXPRESSION, crossed 2026-09-02.
+
+    hasChannelTabs above crossed alone on 2026-08-31 and it is one of SIX that feed one function in
+    the reference's own room client. These are the rest, and they cross together because a subset
+    describes a room the reference cannot be: a renamed Main Chat tab with no admin channel, or an
+    admin channel with no way to name the extra ones beside it.
+
+    Each is read as sessData dotted onto its name in the room bundle, which is the test this list
+    applies: per-room policy the room must READ and can never decide.
+
+    None is credential-shaped. The two comma lists are owner-typed text and are the only ones that
+    could carry anything surprising; the room trims, bounds and refuses them against its reserved
+    channel names before any of them becomes a channel, which upstream does not do at all.
+
+    Alt Gen Channel Name and Alt OffTopic Channel Name rename a TAB and never the channel behind it.
+    Getting that backwards would move every message in a room into a channel named after a label.
+
+    Admin Only Channel adds the adminChat tab, and its type is the one the reference gates: only a
+    presenter or a member the controller marks with hasAdminChat may see it or subscribe to it. The
+    room decides that on the SERVER from the membership, where upstream decides it twice in a
+    browser.
+  */
+  'altGenChannelName',
+  'altOffTopicChannelName',
+  'hasAdminOnlyChannel',
+  'extraAdminChannels',
+  'extraRegChannels',
+  /*
+    "Lock Session?" - whether regular users may enter at all.
+
+    It crosses to EVERY member and not only to a presenter, which is what the reference does and is
+    what the behaviour needs: its gate is isLocked and NOT isPresenter, evaluated in the arriving
+    member's own browser (bundle byte 1,148,372), and the sentence it raises names the room. A
+    presenter reads the same value for the reminder it draws on load (byte 2,500,153).
+
+    Not credential-shaped: a boolean saying whether a door is shut, which a member standing at the
+    door already learns by being refused. It is in the dont-touch group on the Manage page, as
+    useMediaMTX is, and that group is about what an owner should not casually change rather than
+    about what may cross.
+
+    This is also the SECOND entry on this list the room may write - see ROOM_WRITABLE_SETTINGS, and
+    the three presenter buttons that had been writing two per-user preferences nobody read.
+  */
+  'isLocked',
+  /*
     "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with it.
 
     THREE behaviours behind one checkbox, read from six sites. It forces the display mode to compact
@@ -1139,8 +1184,11 @@ const ROOM_VISIBLE = new Set<string>(ROOM_VISIBLE_SETTINGS);
  * `ROOM_VISIBLE_SETTINGS` is delivered to every member. `apps/room`'s `+page.server.ts` returns it
  * as `sessData` from the page load, and SvelteKit serialises a load's return into the SSR payload —
  * so a name added there is a name in the HTML of every viewer's page, participants and muted
- * members included. That is correct for the ninety settings on it, every one of which decides
- * something the viewer's own browser has to draw.
+ * members included. That is correct for the ninety-odd settings on it, every one of which decides
+ * something the viewer's own browser has to draw. (A COUNT IN PROSE, deliberately approximate: the
+ * exact one is `verify-room-settings-schema.mjs`'s, re-derived on every run, and a second exact
+ * number here would be a second thing to keep in step. It read "ninety" until 2026-09-02, when five
+ * channel settings crossed at once.)
  *
  * `restreamToURL` is not one of those. It decides where the ROOM republishes its stream, only a
  * presenter can set it, and only a presenter's pane displays it.
@@ -1223,6 +1271,27 @@ export function roomPresenterConfig(
  */
 export const ROOM_WRITABLE_SETTINGS = [
   'overwriteCashRegisterSound',
+  /*
+    "Lock Session?" — the write half of the room's Lock Session tab, added 2026-09-02.
+
+    The reference puts these three controls in the ROOM, on Session Control's Lock Session tab
+    (byte 2,151,043): `Lock Session`, `Lock Session & kick users.` and `Unlock Session`, each
+    sending the admin command `lockSession` with `{lock}` and, for the middle one, `{kick: true}`
+    (byte 2,165,670). What that command changes is durable per-room state — the very setting the
+    Manage page's own checkbox writes — so it comes back here for exactly the reason
+    `overwriteCashRegisterSound` does rather than being broadcast and forgotten.
+
+    **It arrived because the three buttons were LYING.** They wrote `sessionLocked` and
+    `sessionLockKick` into the clicking presenter's own settings blob and raised the capture's
+    "Session Locked". Measured 2026-09-02: both keys had ZERO readers anywhere in `apps/room/src`.
+    A room-level presenter act modelled as a per-user preference — the same defect the Stream Player
+    pane and the chat-mode radio were each corrected for.
+
+    Presenter-only on both sides, as `restreamToURL` is: the endpoint re-checks that the named member
+    is an owner or a true presenter, and the room's command gates on the connected member's role
+    before it ever calls out.
+  */
+  'isLocked',
   /*
     "Restream URL" — the write half of SC-13, and the reason `isRoomWritableSetting` below had to
     learn about the presenter list.

@@ -114,7 +114,51 @@ export const DEAD_PREFERENCE_KEYS: readonly string[] = [
     to whoever holds a link, which needs an anonymous media grant nobody has designed. So the buttons
     are disabled with the reason on screen and the key is retired here.
   */
-  'streamingPlayerEnabled'
+  'streamingPlayerEnabled',
+  /*
+    A FIFTH AND SIXTH OF THAT KIND, added 2026-09-02, and the clearest case yet.
+
+    Session Control's Lock Session tab has three buttons — `Lock Session`, `Lock Session & kick
+    users.` and `Unlock Session`, transcribed from bundle byte 2,151,043. All three wrote
+    `sessionLocked` and `sessionLockKick` into the clicking presenter's own settings blob and then
+    raised the capture's own `Session Locked`.
+
+    **Measured 2026-09-02: both keys had ZERO readers anywhere in `apps/room/src`.** A presenter
+    locked the room, was told the room was locked, and the door stayed open to everybody — for as
+    long as the buttons had existed.
+
+    Same LEVEL error as `presenterStyle` and `streamingPlayerEnabled` above: a room-level presenter
+    act modelled as a per-user preference, invisible for the same reason, since the pane shows the
+    value back to the person who set it. The lock is a room SETTING on the controller, and
+    `decideRoomEntry` has refused a locked room at the guest door since before any of this — only the
+    write was missing. `session-commands.remote.ts`'s `lockSession` is it.
+
+    `sessionLockKick` is dead in a second way worth naming: even the reference's own `{kick: true}`
+    is a SERVER behaviour this deployment has no equivalent for, so the key was standing in for a
+    feature that existed on neither side of it.
+  */
+  'sessionLocked',
+  'sessionLockKick',
+  /*
+    A SEVENTH OF THAT KIND, added 2026-09-03, and it is the oldest of them.
+
+    Session Control's *" Save Message and Close Session "* wrote `sessionOpen: false` and its
+    sibling *" Open Session "* wrote `sessionOpen: true`, both into the clicking presenter's own
+    settings blob. **Measured 2026-09-03: zero readers anywhere in `apps/room/src`** — and unlike
+    every key above it, this one was never even suspected: it is the only one that had TWO writers
+    and so looked, from either side, like a value somebody was maintaining.
+
+    The room's actual door is `rooms.state` on the controller, which `decideRoomEntry` refuses entry
+    on (`room-entry.ts:224`) and which **nothing in either application could write after a room was
+    created**. The controller's own `setState` form action had no form posting to it — one
+    occurrence of the name in the whole app, its own declaration.
+
+    So the enforcement was correct and unreachable for its entire life, at both ends. A presenter
+    closed the session, was told `Message Saved`, and the room admitted everybody as before.
+    `internal/room-state/[code]` is the write; `session-commands.remote.ts`'s `closeSession` and
+    `openSession` are the two commands that use it.
+  */
+  'sessionOpen'
 ];
 
 const DEAD = new Set(DEAD_PREFERENCE_KEYS);

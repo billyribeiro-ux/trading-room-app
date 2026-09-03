@@ -9,8 +9,14 @@ names is not a backlog. Each name is a question. This document is where the answ
 `apps/room/gate/audit-setting-coverage.mjs` verifies the pinned v4 bundle against its committed
 SHA-256, then asks it which of the 269 settings in `room-settings-schema.ts` the reference's own
 room client reads as `sessData.<name>` while this room marks them `wired: false`. It opened at 58 on
-2026-08-28 and is at **26** as this is written; thirty-one have been answered by building, one more
+2026-08-28 and is at **20** as of 2026-09-02; thirty-seven have been answered by building, one more
 is answered NOT A GAP, and the CHANGELOG entries for each say what.
+
+**26 -> 20 on 2026-09-02**, and it is one find rather than six: five of the six settings that feed
+`processSessData`'s tab expression, plus `smallerImagePreview`. The instrument could see none of the
+six — they are read off the minifier's own local before the object is `sessData` — so the count it
+reports has always been a floor rather than a total. That is worth carrying: **this number bounds
+what the audit can SEE, not what is left.**
 
 Every byte offset below is against that pinned bundle. **Every one was read**, not searched for and
 assumed.
@@ -350,7 +356,7 @@ controls were seen red. That is the second inherited blocker in one day to disso
 
 ---
 
-### The channel model — five settings and one function
+### The channel model — BUILT 2026-09-02
 
 **Added 2026-08-31, and they were invisible to this triage until then.** `audit-setting-coverage.mjs`
 counted `sessData.<name>` and these are read in **`processSessData`**, before the object is
@@ -374,37 +380,42 @@ e.extraRegChannels    && e.extraRegChannels.split(",").forEach(r =>
                             globals.chatTabs.push({displayName:r, name:r, type:"r"}))
 ```
 
-**Only `main` is unconditional.** `hasChannelTabs` is now WIRED and is therefore not on the pinned
-list: this room had shipped an Off Topic tab to every room including those whose owners had turned it
-off — a control nobody asked for, which is the mirror of the dead-control rule. `chat-tabs.ts`
-carries the argument and `chat-tabs-contract.test.ts` the five cases, including that **absent means
-true**, because reading absence as false would have removed the tab from every room that never stored
-the setting.
+**Only `main` is unconditional.** All six settings are wired now — `hasChannelTabs` on 2026-08-31,
+the other five on 2026-09-02. `chat-tabs.ts` is that expression reproduced, and
+`chat-tabs-contract.test.ts` has the cases.
 
-The five below are genuinely unbuilt, and they are ONE piece of work rather than five:
+**THE TWO THINGS THIS SECTION SAID COULD NOT BE SETTLED WERE SETTLED BY READING.** It recorded:
 
-| setting | reads | what it does upstream |
-| --- | --- | --- |
-| `altGenChannelName` | 2 | Renames the Main Chat tab. Absent → `"Main Chat"`. The channel NAME stays `main`; only `displayName` changes. |
-| `altOffTopicChannelName` | 2 | The same for Off Topic. Absent → `"Off Topic"`. |
-| `hasAdminOnlyChannel` | 1 | Adds an `adminChat` tab labelled `Admins`, **type `po`**. Captured default is ON (`room-settings-profile.ts:56`), so upstream rooms have a tab this room does not. |
-| `extraAdminChannels` | 2 | Comma-separated. Each becomes `{displayName: r, name: r, type: "p"}` — the typed name IS the channel name, with no sanitisation upstream. |
-| `extraRegChannels` | 2 | The same, **type `r`**. |
+> Two things to settle before building, neither of which the capture answers. Upstream pushes the
+> owner-typed name as BOTH `displayName` and `name`, unsanitised … And `po` versus `p` is undecoded:
+> both are private, and nothing in the capture says what the `o` distinguishes.
 
-**Why this is a model change and not four pushes.** The reference has THREE channel types — `r`,
-`p` and `po` — where this room has one. `BUILT_IN_CHAT_TABS` is a flat list of names and
-`memberChatChannels` resolves an allow-list of strings; there is nowhere for a type to live, and the
-types are what decide who may read and post. Building these means giving a channel a type first, and
-that touches the SSE hub's per-listener `chatChannels`, `chat-log.ts`'s reads and the archive sweep.
+The first half was a question with an answer, and the second was not undecodable at all.
 
-**Two things to settle before building, neither of which the capture answers.** Upstream pushes the
-owner-typed name as BOTH `displayName` and `name`, unsanitised — this room already refuses a badge
-channel whose name collides with a built-in (`chat-tabs.ts`), and the same rule has to apply here or
-an owner can type `main` and land messages in every member's main log. And `po` versus `p` is
-undecoded: both are private, and nothing in the capture says what the `o` distinguishes.
+**`po` is gated at three sites and they agree**: the subscription in `registerForExtraChannels` at
+byte **1,008,074**, and both chat columns' render at **1,437,340** and **2,383,602**, all on
+`isPresenter || user.hasAdminChat`. Reproduced as ONE decision, on the server — upstream's two are
+both in a browser, and the subscribe one is what decides what the server sends.
 
-**Not started, deliberately.** A partial channel model is worse than none: a tab that renders and
-cannot be posted to is the dead scaffolding this repository forbids.
+**`p` is decoded too, and the answer is that nothing reads it.** `type:"p"` occurs **exactly once**
+in the whole 2,891,205-byte bundle — the `extraAdminChannels` push at 1,147,139 — and no comparison
+against it exists anywhere. So a `p` channel behaves as an `r` one in the reference's own client, and
+`extraAdminChannels` is a name describing an intent that client does not enforce. It is carried as a
+value and treated as `r` for visibility: transcribing what the bundle does rather than what its
+setting name implies, which is the call `advancedSearchAlerts` and `h264Enabled` are recorded under.
+
+**The name collision is the one DIVERGENCE, and it is the one place matching would reproduce a
+privilege escalation.** An `extraRegChannels` entry named `adminChat` would be a type-`r` channel —
+ungated, in everyone's list — sharing a name with the type-`po` one, and the name IS the channel:
+`messages.room`, the realtime key, the allow-list entry. Refused against the same reserved set a
+badge channel already took. `main` is the same defect one step milder. Owner-typed names are also
+trimmed, because `"a, b"` upstream yields a channel literally named `" b"`.
+
+**What this section used to end with, kept because the judgement was right:** *"Not started,
+deliberately. A partial channel model is worse than none: a tab that renders and cannot be posted to
+is the dead scaffolding this repository forbids."* Nothing partial shipped — the type reaches the
+server seam, so a tab a member holds is a channel they may post to, and one they may not have does
+not exist for them at all.
 
 ## BLOCKED
 
@@ -413,11 +424,26 @@ cannot be posted to is the dead scaffolding this repository forbids.
 | `isNewIndicatorOn` | **Its data.** The gate is `isNewIndicatorOn && isPresenter && <row>.isNew` at four sites (bytes 1,344,564 / 1,382,617 / 2,034,811 / 2,060,925), and `isNew` is not computed in the browser at all: it arrives on the login payload from the reference's own server — `globals.user.isNew = B.data.isNew` (995,175), `isNew: s.isNew || !1` (1,157,344) — so the rule deciding who counts as new is unknowable from the capture. Measured 2026-08-28: `isNew` occurs ZERO times in `apps/room/src/lib/server` and zero times on the controller. Crossing the setting would put a gate on a value nothing supplies, which is what `enableBadges` was held out of the boundary to avoid. Unblocked by one answer from the owner about what makes a member new, or by a capture of that login response. |
 | `linkedRoomAlerts` | **The server-side fan-out, which is not in the capture.** The setting's own help text is *"Comma separated list of Room IDs of the rooms to PUSH our alerts to"* — the pushing is the reference's SERVER. What the client contributes is one composer row (`WTe`, byte 2,119,618) whose checkbox is `dontCrossPost`, sent on the `alertMsg` and `alertMsgLater` payloads. **Measured 2026-08-28: `crossPost` occurs ZERO times in the bundle**, so the browser never does the fan-out and never reads the flag back. Building the checkbox alone would ship a control whose only effect is sending a field nothing reads — the thing this repository refuses by name. Unblocked by cross-posting existing at all, which is its own feature and needs an owner decision about what "linked room" means across two databases. |
 | `recsInRoom` | The Recordings tab it gates. `presAreaTabs-recordings` is an iframe onto a server archive page, and there are zero recordings or archive tables in either database. `TODO.md` carries the blocker. Wire the setting WITH the tab, never before it. |
-| `isLocked` | Byte 1,148,353 — refuses a non-presenter at connect with a named dialog, and byte 2,500,128 offers the presenter an unlock confirm. Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is not a lock. |
 | `backupClusterID` | Media infrastructure — a second MediaMTX cluster. Same blocker as every other `STREAM_SERVER_MTX` row. |
 | `recordChat` | Only ever read inside the `videoOnlyMode` recording-bot branch (bytes 1,497,779 and 2,498,823), and this room does not model the `r` query parameter. The same honest gap `files-gates.ts` already records for `hideFiles`. |
 | `authMode` | Login-page state on the controller side, not a room read. `e.authMode` is a component field. |
 | `description` | The login page's room blurb — the controller's surface, and already documented there. |
+
+---
+
+**`isLocked` LEFT THIS TABLE ON 2026-09-02, and its blocker was a SHAPE rather than evidence.** It
+read: *"Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is
+not a lock."* Both halves are true and the conclusion did not follow. The lock is a room SETTING on
+the **controller**, `room_state` was never where it belonged, and `decideRoomEntry` has refused a
+locked room at the guest door (`room-entry.ts:221`) since before the room's three Lock Session
+buttons were written.
+
+What was missing was the WRITE — and worse than missing. Those three buttons wrote `sessionLocked`
+and `sessionLockKick` into the clicking presenter's own settings blob, **both keys with zero readers
+anywhere in `apps/room/src`**, and raised the capture's own "Session Locked" over a door that never
+closed. `isLocked` is the second setting the room may write back; `session-commands.remote.ts`'s
+`lockSession` is the command, and `{kick: true}` is the one half not reproduced, named where it is
+sent.
 
 ---
 

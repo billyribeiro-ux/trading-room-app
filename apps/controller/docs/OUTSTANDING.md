@@ -541,9 +541,9 @@ not theatre.
 3. The 18 `dont-touch` settings (cluster IDs, `useV3`/`useV5`, media relays, MediaMTX) are
    untouched.
 
-**Honest limit:** 106 of 269 settings have a consumer in the room today (measured 2026-08-30;
+**Honest limit:** 112 of 269 settings have a consumer in the room today (measured 2026-09-02;
 this line read **33** for months while the real count tripled underneath it, and it is now checked by
-`scripts/verify-room-settings-schema.mjs`). The remaining 163 are stored and inert until a
+`scripts/verify-room-settings-schema.mjs`). The remaining 157 are stored and inert until a
 consumer lands. "Enabled" in this seed does not mean "working", and the module says so.
 
 ## 1i. The entry/auth layer, built from §1g — 2026-08-08

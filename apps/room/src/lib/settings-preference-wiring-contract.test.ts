@@ -429,8 +429,8 @@ describe('the wire has no silent break points', () => {
     */
     // All three moved to the composition root in S7; the asymmetry they encode is unchanged.
     expect(rootCode).toContain('const alertsFollow = new RoomScrollFollow();');
-    expect(rootCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>({');
-    expect(rootCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>({');
+    expect(rootCode).toContain('const chatFollow = new RoomScrollFollow<ChatChannelName>({');
+    expect(rootCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatChannelName>({');
 
     const overrideTakers = rootCode.match(
       /alwaysScrollToBottom: \(\) => prefs.alwaysScrollToBottom/g

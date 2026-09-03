@@ -16,12 +16,25 @@ export type MainTab =
   | 'dayTradeAlerts';
 export type FileTab = 'files' | 'images' | 'sounds';
 /**
- * A chat channel's name, which is also its tab label and its `messages.room` value.
+ * A chat channel's NAME, and its `messages.room` value.
  *
- * IT WAS A CLOSED UNION of `'main' | 'off-topic'` until 2026-08-28, with `CHAT_TABS` and `isChatTab`
- * beside it, and `chatTabsWithBadges` is what ended that: an owner can configure extra channels
- * whose names come out of JSON at runtime, so the set is per ROOM and per MEMBER and cannot be a
- * type. `#lib/chat-tabs.ts` holds the two built-ins and the parser.
+ * ## Renamed from `ChatTab` on 2026-09-02, and the old name had become a false statement
+ *
+ * This docblock read *"a chat channel's name, which is also its tab label and its `messages.room`
+ * value"*. The middle clause stopped being true when `altGenChannelName` and
+ * `altOffTopicChannelName` were built: an owner renames the two built-in TABS while the channels
+ * stay `main` and `off-topic`, so a label and a name are now two values and `ChatTab` was the wrong
+ * word for either of them alone.
+ *
+ * `ChatTab` is the OBJECT now — `{name, displayName, type}` in `#lib/chat-tabs.ts`, which is the
+ * shape the reference itself pushes. This is the string that identifies one, and it is called what
+ * it is. Two different things sharing one name is the thing this repository refuses everywhere else.
+ *
+ * ## IT WAS A CLOSED UNION of `'main' | 'off-topic'` until 2026-08-28
+ *
+ * `CHAT_TABS` and `isChatTab` sat beside it, and `chatTabsWithBadges` ended that: an owner can
+ * configure extra channels whose names come out of JSON at runtime, so the set is per ROOM and per
+ * MEMBER and cannot be a type. `#lib/chat-tabs.ts` holds the built-ins and the parser.
  *
  * WHAT THE UNION ACTUALLY BOUGHT, so that nothing is mourned that was not there: a typo in a
  * comparison became a compile error. It never protected against a member naming a channel they may
@@ -29,7 +42,7 @@ export type FileTab = 'files' | 'images' | 'sounds';
  * every caller asks `memberChatChannels` and refuses anything not on the answer. The client's own
  * list arrives with the page as `data.chatTabs`, already decided.
  */
-export type ChatTab = string;
+export type ChatChannelName = string;
 export type SettingsTab = 'app' | 'alerts' | 'chat' | 'presenter';
 export type AlertTab = 'text' | 'url' | 'media';
 

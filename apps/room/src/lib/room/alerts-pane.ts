@@ -220,6 +220,19 @@ export class RoomAlertsPane<Row extends ExportableRow> {
    * new window already has, so putting a credential in a URL here would add an exposure the
    * original needed and this one does not.
    *
+   * `sl=1` IS carried and nothing reads it, and that is deliberate rather than an oversight —
+   * recorded 2026-09-02, because `room-component-gap-register.md`'s R-11 named it as residue and
+   * asked for a decision. Upstream `sl=1` sets `skeepLogin` and drives `doSessionLoginWithToken(tok)`
+   * — it exists to make the popout log itself in with the token beside it. Dropping `tok` is what
+   * makes it inert here, so the two go together and the note belongs beside that one.
+   *
+   * It is KEPT rather than removed for a reason that is not sentiment: the popout URL is a
+   * transcription, a member never sees it, and it claims nothing. Removing a transcribed parameter
+   * because this deployment happens not to need it is the direction that makes the next diff against
+   * the capture harder to read, and it buys nothing — unlike the `(test it)` link in `ModalHost`,
+   * which is the same "wired at one end only" shape and IS a control somebody clicks. The two
+   * halves of R-11 are not the same case, and the register had them as one.
+   *
    * The other half is in the room component, and matters as much: detaching HIDES the chat and
    * alerts in this window and offers a control to bring them back -
    * `subscribe("detachChat", () => { this.hideChatAlerts = !0; this.reopenAlertsChatBtn = !0 })`.

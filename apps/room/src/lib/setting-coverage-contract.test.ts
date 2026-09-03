@@ -146,7 +146,7 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * radio had been writing `'g'`/`'p'`/`'d'` into. `chat-display-mode-contract.test.ts`.
  *
  * `chatTabsWithBadges` left before it, and it is the only row so far that changed a TYPE: this room
- * had two hard-coded chat channels and a closed `ChatTab` union over them. An owner can configure
+ * had two hard-coded chat channels and a closed `ChatChannelName` union over them. An owner can configure
  * more, behind badges, so the set is per room and per member — and the reference decides it in the
  * BROWSER, which is why every read and write path here asks the server instead, and why the chat and
  * typing fan-outs became audience-aware. `chat-tabs-contract.test.ts`.
@@ -183,34 +183,57 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'openLoginLink',
   'authMode',
   'enableDiscord',
-  'isLocked',
+  /*
+    `isLocked` LEFT THIS LIST on 2026-09-02, and its blocker was a SHAPE rather than evidence.
+
+    The triage said: *"Needs a lock the SERVER owns; `room_state` has no column for it, and a
+    client-side lock is not a lock."* Both halves true, and the conclusion did not follow — the lock
+    is a room SETTING on the CONTROLLER, `room_state` was never where it belonged, and
+    `decideRoomEntry` has refused a locked room at the guest door (`room-entry.ts:221`) since before
+    the room's three Lock Session buttons were written. What was missing was the WRITE.
+
+    Those buttons had been writing `sessionLocked` and `sessionLockKick` into the clicking
+    presenter's own settings blob — both keys with zero readers — and raising the capture's
+    `Session Locked` over a door that never closed.
+  */
   'playChatMessageSoundFor',
   /*
-    THE CHANNEL CLUSTER — five names, one function, added 2026-08-31.
+    THE CHANNEL CLUSTER LEFT THIS LIST ON 2026-09-02 — all five, together.
 
-    They were invisible to this list until then, and not because nobody looked: `referenceReads`
-    counted `sessData.<name>` and these are read in `processSessData`, BEFORE the object is
-    `sessData`, off the minifier's own local. Six settings, zero hits, for as long as the instrument
-    has existed. The sixth is `hasChannelTabs`, which is now WIRED and therefore not on this list —
-    this room had been shipping an Off Topic tab to rooms whose owners had turned it off.
+    They were added on 08-31 and were invisible to this list before then, and not because nobody
+    looked: `referenceReads` counts `sessData.<name>` and these are read in `processSessData`,
+    BEFORE the object is `sessData`, off the minifier's own local. Six settings, zero hits, for as
+    long as the instrument had existed.
 
-    The reference builds its whole strip in that one function, and its channel model is WIDER than
-    this room's in a way that decides what building these costs:
+    `hasChannelTabs` was the first of the six to go, on 08-31, because it was a live defect — this
+    room had been shipping an Off Topic tab to rooms whose owners had turned it off. The other five
+    are `altGenChannelName`, `altOffTopicChannelName`, `hasAdminOnlyChannel`, `extraAdminChannels`
+    and `extraRegChannels`, and they left together because a subset of the six describes a room the
+    reference cannot be in.
 
-      main          always            type "r"    renamable by altGenChannelName
-      offTopic      hasChannelTabs    type "r"    renamable by altOffTopicChannelName   <- wired
-      adminChat     hasAdminOnlyChannel  type "po"
+    The row that sat here said they were *"not four more pushes onto a list; they are a channel-model
+    change"*, and that was right: the reference gives every tab a TYPE and has three where this room
+    had one.
+
+      main          always               type "r"    renamable by altGenChannelName
+      off-topic     hasChannelTabs       type "r"    renamable by altOffTopicChannelName
+      adminChat     hasAdminOnlyChannel  type "po"   presenter or hasAdminChat, decided on the SERVER
       extraAdminChannels   comma-split   type "p"
       extraRegChannels     comma-split   type "r"
 
-    THREE types where this room has one. So these are not four more pushes onto a list; they are a
-    channel-model change, and `docs/decoded/missing-settings-triage.md` is where each is dispositioned.
+    Two things the triage recorded as undecoded turned out to be decodable by reading:
+
+      `po`  gated at THREE sites — the subscription at 1,008,074 and both columns' render at
+            1,437,340 and 2,383,602 — all on `isPresenter || user.hasAdminChat`.
+      `p`   `type:"p"` occurs ONCE in the whole bundle and nothing compares against it, so a `p`
+            channel is an `r` one in the reference's own client.
+
+    `chat-tabs.ts` carries both findings and `chat-tabs-contract.test.ts` the thirteen cases,
+    including the one divergence: an owner-typed name colliding with a reserved channel is REFUSED,
+    because upstream's unchecked push would let `extraRegChannels: adminChat` alias the private
+    channel with an ungated one.
   */
-  'altGenChannelName',
-  'altOffTopicChannelName',
   'description',
-  'extraAdminChannels',
-  'extraRegChannels',
   'needPasswordForUserNotes',
   'obsStreamKey',
   'recordChat',
@@ -219,7 +242,6 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'backupClusterID',
   'banIPList',
   'h264Enabled',
-  'hasAdminOnlyChannel',
   'linkedRoomAlerts',
   'modAdminLoginList',
   'twillioApiSID'

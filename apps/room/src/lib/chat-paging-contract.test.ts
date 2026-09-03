@@ -229,7 +229,7 @@ describe('and nothing became unreachable', () => {
     */
     expect(feedsModule).toContain(
       `chatMessagesFor(
-    tab: ChatTab,
+    tab: ChatChannelName,
     searchResults: readonly Message[] | null,
     column: 'main' | 'extra'
   ) {`
@@ -255,7 +255,7 @@ describe('and nothing became unreachable', () => {
     */
     const from = feedsModule.indexOf(
       `chatMessagesFor(
-    tab: ChatTab,
+    tab: ChatChannelName,
     searchResults: readonly Message[] | null,
     column: 'main' | 'extra'
   ) {`

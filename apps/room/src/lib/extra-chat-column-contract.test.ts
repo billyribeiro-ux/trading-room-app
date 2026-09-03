@@ -250,7 +250,7 @@ describe('the component', () => {
   it('defaults to the off-topic channel', () => {
     // `this.channel = 'offTopic'`.
     expect(paneCode).toContain("tab = $bindable('off-topic')");
-    expect(chatClass).toContain("#extraTab = $state<ChatTab>('off-topic');");
+    expect(chatClass).toContain("#extraTab = $state<ChatChannelName>('off-topic');");
   });
 
   it('has its own composer id, which is what the mention router keys on', () => {
@@ -357,7 +357,7 @@ describe('both columns share one pipeline, and that is the point', () => {
     */
     expect(feedsModule).toContain(
       `chatMessagesFor(
-    tab: ChatTab,
+    tab: ChatChannelName,
     searchResults: readonly Message[] | null,
     column: 'main' | 'extra'
   ) {`
@@ -403,7 +403,7 @@ describe('both columns share one pipeline, and that is the point', () => {
       that way, a message typed in the off-topic column would have landed in main.
     */
     expect(composerModule).toContain(
-      'async sendBody(body: string, bodyHtml?: string, room: ChatTab = this.#chat.tab) {'
+      'async sendBody(body: string, bodyHtml?: string, room: ChatChannelName = this.#chat.tab) {'
     );
     // `room` rides on the command's argument now, not on a hand-built `FormData`.
     expect(composerModule).toContain(
@@ -676,8 +676,8 @@ describe('the second column follows its own messages', () => {
       others jump to.
     */
     expect(rootCode).toContain('const alertsFollow = new RoomScrollFollow(');
-    expect(rootCode).toContain('const chatFollow = new RoomScrollFollow<ChatTab>(');
-    expect(rootCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatTab>(');
+    expect(rootCode).toContain('const chatFollow = new RoomScrollFollow<ChatChannelName>(');
+    expect(rootCode).toContain('const extraChatFollow = new RoomScrollFollow<ChatChannelName>(');
     expect(rootCode.match(/new RoomScrollFollow/g) ?? []).toHaveLength(3);
     // And nowhere else: a fourth built on the page would be a second answer for one column.
     expect(pageCode, 'the scroll-follow instances left the page in S7').not.toContain(

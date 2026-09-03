@@ -103,7 +103,12 @@ export function handleSessionRoomCommand(action: string, deps: SessionRoomComman
   // The frame reaches people who are NOT in the room yet — a member sitting on the "This room is
   // closed." refusal, whose reload re-runs the door check that now says yes. See `openSession`.
   if (action === 'session-open') {
-    deps.savePreference('sessionOpen', true);
+    /*
+      `savePreference('sessionOpen', true)` was HERE and is gone, 2026-09-03. The key had zero readers
+      anywhere in `apps/room/src` and is on `DEAD_PREFERENCE_KEYS` now; the door is `rooms.state` on
+      the controller, and `openSession` writes it. Its twin on the close side was the larger half of
+      the same defect — see `close-message.ts`.
+    */
     deps.closeModal();
     void openSession().catch(() => (deps.dialogs.alert = 'Command failed.'));
     return true;

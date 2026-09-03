@@ -26,7 +26,8 @@ import { hashEmail, publicSessionHandle } from '#lib/server/connection.js';
 // `MAX_CHAT_LOG_PAGE`, `isChatChannel` and `loadChatPage` left with the paging queries for
 // `log-pages.remote.ts`. What stays is the FIRST page, which the loader still sends with the room.
 import { loadNewestChatPages } from '#lib/server/chat-log.js';
-import { memberChatChannels } from '#lib/server/chat-channels.js';
+import { chatChannelNames } from '#lib/chat-tabs.js';
+import { memberChatTabs } from '#lib/server/chat-channels.js';
 import { loadAlertPage, loadQuestionsForAlerts } from '#lib/server/alert-log.js';
 // `isChatMode` left with `changeChatMode` for `chat-mode.remote.ts`, where it is `z.enum(CHAT_MODES)`.
 import { parseReactions } from '#lib/server/reactions.js';
@@ -368,11 +369,18 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
     payload — SSR HTML included — with the client filtering them for display, which is not a filter,
     it is a leak with a rendering step after it. `#lib/chat-tabs.ts` has the rule; this is the read.
   */
-  const chatChannels = await memberChatChannels(request, requireRoomShortCode(locals), {
+  const chatTabs = await memberChatTabs(request, requireRoomShortCode(locals), {
     email: requireUser(locals).email,
     role: requireUser(locals).role
   });
 
+  /*
+    THE NAMES, derived rather than resolved a second time.
+
+    `chatChannelNames` is a projection of the same answer — `chat-channels.ts` records why a second
+    computation of this rule is the failure mode, and a second RESOLUTION of it is exactly that.
+  */
+  const chatChannels = chatChannelNames(chatTabs);
   const messageRows = loadNewestChatPages(requireRoomShortCode(locals), chatChannels);
 
   /*
@@ -628,8 +636,16 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         )
         .orderBy(desc(chatMutes.expiresAt))
         .get()?.expiresAt ?? null,
-    /** The tab strip, in the order it is drawn — resolved above. `#lib/chat-tabs.ts` has the rest. */
-    chatTabs: chatChannels,
+    /**
+     * The tab strip, in the order it is drawn — resolved above. `#lib/chat-tabs.ts` has the rest.
+     *
+     * FULL TABS since 2026-09-02, not names. A tab now carries the LABEL it is drawn with, because
+     * `altGenChannelName` and `altOffTopicChannelName` let an owner rename the two built-ins — so
+     * the label is no longer derivable from the name by a lookup, and `chatTabLabel`'s table could
+     * not have known about it. The `type` travels with it for the same reason the name does: it is
+     * the server's answer, and nothing on the page recomputes either.
+     */
+    chatTabs,
     alertQuestions: questionRows,
     files: db
       .select()

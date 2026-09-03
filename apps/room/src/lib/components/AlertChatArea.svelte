@@ -44,6 +44,7 @@
   import GiphyPicker from '#lib/components/GiphyPicker.svelte';
   import ChatSearchBar from '#lib/components/ChatSearchBar.svelte';
   import ChatTabStrip from '#lib/components/ChatTabStrip.svelte';
+  import type { ChatTab } from '#lib/chat-tabs.js';
   import RoomMessage from '#lib/components/RoomMessage.svelte';
   import TypingIndicatorDots from '#lib/components/TypingIndicatorDots.svelte';
   import { presenterColorsFor, type PresenterColorMap } from '#lib/presenter-colors.js';
@@ -67,7 +68,7 @@
   import type { RoomScrollFollow } from '#lib/room/scroll-follow.js';
   import type { RoomSplit } from '#lib/room/split.svelte.js';
   import type {
-    ChatTab,
+    ChatChannelName,
     FollowChatStyle,
     MessageAction,
     MessageActionEvent,
@@ -95,7 +96,14 @@
      * room AND per member; it arrives with the page as `data.chatTabs`. Both columns get the same
      * one — an entitlement does not depend on which column a member is looking at.
      */
-    chatTabs: readonly string[];
+    /*
+      FULL TABS since 2026-09-02, not names. A tab carries the label it is drawn with, because
+      `altGenChannelName` / `altOffTopicChannelName` let an owner rename the two built-ins — so the
+      label stopped being derivable from the name. It carries its TYPE too, unread here and passed
+      through, because the strip is not where a channel's audience is decided: `chat-channels.ts`
+      already refused a member the tab they may not have.
+    */
+    chatTabs: readonly ChatTab[];
     /**
      * The display mode for each of this component's TWO logs, resolved on the page.
      *
@@ -254,7 +262,7 @@
      */
     feedScroll: RoomFeedScroll;
     alertsFollow: RoomScrollFollow;
-    chatFollow: RoomScrollFollow<ChatTab>;
+    chatFollow: RoomScrollFollow<ChatChannelName>;
     viewerId: number;
 
     onopenmodal: (name: Exclude<ModalName, null>) => void;

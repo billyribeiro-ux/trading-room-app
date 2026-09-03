@@ -37,6 +37,15 @@ export interface UserActionCommands extends ChatMuteCommands {
     targetUserId: number;
   }) => Promise<unknown>;
   editUsername: (payload: { userId: number; username: string }) => Promise<unknown>;
+  /**
+   * `lockSession` — the room's door, written on the CONTROLLER as a room setting.
+   *
+   * On this port rather than a fifth collaborator on `RoomSessionControl` because that class is
+   * built out of what `RoomUserActions` already holds, and its own docblock argues that injecting it
+   * would make every caller assemble the same object twice. One more command on the port that
+   * already carries `forceReload` and `editUsername` is the shape that already exists.
+   */
+  lockSession: (payload: { lock: boolean; kick: boolean }) => Promise<unknown>;
   /** A presenter's url to every OTHER browser — the receiver excludes the sender. */
   sessionSendUrl: (payload: {
     cmd: 'sendSalesImageToChat' | 'sendUsersToURL';

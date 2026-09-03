@@ -162,7 +162,8 @@ export class RoomUserActions<User extends RosterRowForTarget> {
       dialogs: options.dialogs,
       closeModal: options.closeModal,
       reload: options.reload,
-      savePreference: (key, value) => options.savePreference(key, value)
+      savePreference: (key, value) => options.savePreference(key, value),
+      lockSession: (payload) => options.commands.lockSession(payload)
     });
     this.#toasts = options.toasts;
     this.#commands = options.commands;

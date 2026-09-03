@@ -5,7 +5,7 @@ import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { roomState } from '#lib/server/db/schema.js';
 import { error } from '@sveltejs/kit';
 import { publishRosterToRoom, publishToRoom } from '#lib/server/room-events.js';
-import { writeRoomSetting } from '#lib/server/room-config-client.js';
+import { writeRoomSetting, writeRoomState } from '#lib/server/room-config-client.js';
 import { recordSessionEvent } from '#lib/server/session-history.js';
 
 /*
@@ -247,8 +247,69 @@ export const hardReset = command(z.void(), async () => {
 export const openSession = command(z.void(), async () => {
   ensureDatabase();
   const room = presenterRoom();
+  const { locals } = getRequestEvent();
+
+  /*
+    THE DOOR, and it is the half that was missing until 2026-09-03.
+
+    This command published `openSession` and nothing else — a reload prompt to browsers already in
+    the room, which is upstream's own subscriber and which is genuinely useful to a member sitting on
+    the "This room is closed." refusal. But the refusal is `decideRoomEntry` reading `rooms.state`,
+    and NOTHING in either application could write that column after a room was created. So a room
+    that was ever closed could not be reopened, and the frame told people to reload into the same
+    refusal.
+
+    The write goes FIRST, deliberately. The frame tells people to reload, and a reload that arrives
+    before the door is open lands on the refusal again — which reads to a member as the control
+    having failed. Ordering it the other way costs nothing and cannot produce that.
+  */
+  await writeRoomState(room, requireUser(locals).email, 'open');
+
   publishToRoom(room, { channel: 'cmds', data: { cmd: 'openSession' } });
   recordSessionEvent(room, 'Session opened', 'The room was reopened to members.');
+});
+
+/**
+ * `saveAndCloseSession` — the other half of the door, and the defect it closes is the larger one.
+ *
+ * ## What "Save Message and Close Session" did
+ *
+ * `savePreference('sessionOpen', false)` — the clicking presenter's own settings blob. Measured
+ * 2026-09-03: `sessionOpen` had **zero readers anywhere in `apps/room/src`**, and it was not even on
+ * `DEAD_PREFERENCE_KEYS`. Its sibling `session-open` wrote the same dead key and at least also
+ * published a frame.
+ *
+ * So a presenter closed the session, was told `Message Saved`, and the room stayed open — to
+ * everybody, permanently, because `rooms.state` had no writer either. That is the same LEVEL error
+ * as the Lock Session buttons one door over, and the same shape as the Stream Player pane and the
+ * chat-mode radio.
+ *
+ * ## Both halves, and neither substitutes for the other
+ *
+ * The WRITE closes the door: `decideRoomEntry` refuses `roomState !== 'open'` with the presenter's
+ * own close message, which `saveCloseMessage` already stores and `+error.svelte` already renders.
+ * The FRAME tells the people already inside — upstream's `closedPage`, which sets `currPage='closed'`
+ * on every browser in the room.
+ *
+ * A broadcast alone would leave a closed room open to the next arrival; a write alone would leave
+ * everybody already inside sitting in a room that no longer admits anyone.
+ *
+ * ## The order is WRITE then FRAME, and it is the opposite of `openSession`'s reason
+ *
+ * There it is "do not tell people to reload into a door that is still shut". Here it is the same
+ * rule with the sign flipped: the frame sends a member to the refusal, and the refusal must already
+ * be true when they arrive. Both orderings fall out of one principle — the durable state changes
+ * before anything tells anybody it has.
+ */
+export const closeSession = command(z.void(), async () => {
+  ensureDatabase();
+  const room = presenterRoom();
+  const { locals } = getRequestEvent();
+
+  await writeRoomState(room, requireUser(locals).email, 'closed');
+
+  publishToRoom(room, { channel: 'cmds', data: { cmd: 'closedPage' } });
+  recordSessionEvent(room, 'Session closed', 'The room no longer admits members.');
 });
 
 /**
@@ -399,5 +460,108 @@ export const setRestreamUrl = command(
       'Restream URL saved',
       url ? 'The room now has a restream destination.' : 'The restream destination was cleared.'
     );
+  }
+);
+
+/**
+ * `lockSession` — the Lock Session tab's three buttons, and the door they had never closed.
+ *
+ * ## What was there, and why it was a liar rather than a gap
+ *
+ * All three buttons ran through `SESSION_LOCK_WRITES`, a table of PREFERENCE writes:
+ * `session-lock` wrote `{sessionLocked: true, sessionLockKick: false}`, `session-lock-kick` the same
+ * with `kick: true`, `session-unlock` `{sessionLocked: false}` — each into the clicking presenter's
+ * own settings blob — and then raised the capture's own `Session Locked`.
+ *
+ * **Measured 2026-09-02: both keys had ZERO readers anywhere in `apps/room/src`.** A presenter
+ * locked the room, was told the room was locked, and the door stayed open to everybody. That is the
+ * same defect the Stream Player pane (`SC-04`) and the chat-mode radio were each corrected for: a
+ * ROOM-level presenter act modelled as a per-user preference, which is invisible precisely because
+ * the pane then shows the value back to the person who set it.
+ *
+ * ## Where the lock actually lives, which is not new
+ *
+ * `isLocked` is a room setting on the controller, and `decideRoomEntry` has refused a locked room at
+ * the guest door since before this was written (`room-entry.ts:221`). Nothing about the ENFORCEMENT
+ * needed building — only the write. So this is a `writeRoomSetting`, the same seam
+ * `overwriteCashRegisterSound` and `restreamToURL` use, for the reason their docblocks give: a
+ * durable per-room value broadcast over the event channel would change every browser's belief and
+ * persist nothing, so the first reload would put the old state back.
+ *
+ * ## `{kick: true}` IS NOT REPRODUCED, and that is stated rather than quietly dropped
+ *
+ * Upstream's middle button sends `sendServerAdminCommand("lockSession", {kick: true, lock: true})`
+ * (byte 2,165,670) and its SERVER does the eviction. This deployment has no evict-everyone command:
+ * `kicks.svelte.ts` kicks one named member, and the room's realtime hub is process-local, so a
+ * fan-out from here would reach one instance's listeners and silently miss the rest.
+ *
+ * The button therefore locks the door and says so, and the kick is `TODO.md`'s to carry. Locking
+ * without kicking is the strictly safer half: nobody new gets in, and the members already inside are
+ * exactly the ones the presenter can see and remove individually. Shipping a button that CLAIMS to
+ * kick and reaches one instance would be a worse lie than the one this replaces.
+ *
+ * ## The presenter is not locked out of their own room
+ *
+ * The reference's own gate is `sessData.isLocked && !globals.user.isPresenter` (byte 1,148,372) —
+ * the lock stops REGULAR users. Ours matches by construction rather than by a second check: a
+ * presenter reaches the room through their account (`/launch/[id]`), and `decideRoomEntry` guards
+ * the GUEST door at `/session/[code]`. The two are different doors and always were.
+ */
+export const lockSession = command(
+  z.strictObject({
+    lock: z.boolean(),
+    /*
+      The reference's `{kick}`, accepted and NOT acted on — which is the opposite of what this
+      repository usually does with a field nothing reads.
+
+      `scheduleAlertLater` refuses six such fields with `strictObject` precisely so a presenter
+      cannot come to believe an alert was texted. This one is different in the way that matters: the
+      button that sends it is a REAL control the reference draws, its label says what it does, and
+      dropping the field would leave the room unable to tell the two buttons apart at all. So it
+      crosses, is recorded in the session history, and its unbuilt half is named on screen and here
+      rather than implied by a payload nobody reads.
+    */
+    kick: z.boolean()
+  }),
+  async ({ lock, kick }) => {
+    ensureDatabase();
+    const room = presenterRoom();
+    const { locals } = getRequestEvent();
+
+    try {
+      /*
+        `'true'` / `'false'` as STRINGS, and that is the endpoint's contract rather than a shortcut.
+
+        `internal/room-setting` refuses a body whose `value` is not a string — one rule for every
+        setting, so its parser never has to decide what a bare `123` or `null` means for a field it
+        has not looked up yet. The coercion happens where the TYPE is known: `saveSetting` reads the
+        schema and, for a `checkbox`, stores `value === true || value === 'true' || value === 'on'`.
+
+        `'false'` and not `''`: that same function maps an empty string to `null`, which reads as a
+        room that never had the setting. An owner who unlocked and a room that was never locked are
+        the same to every consumer today, and they are not the same fact.
+      */
+      await writeRoomSetting(room, requireUser(locals).email, 'isLocked', lock ? 'true' : 'false');
+    } catch (cause) {
+      /*
+        Loud, for the reason the two writes above give, and more so: a presenter told "Session
+        Locked" over a door that is still open is the exact failure this command was built to end,
+        and a swallowed error would reproduce it with extra steps.
+      */
+      console.error('[lockSession] the controller refused the write', cause);
+      error(502, 'Could not change the room lock right now.');
+    }
+
+    recordSessionEvent(
+      room,
+      lock ? 'Session locked' : 'Session unlocked',
+      lock
+        ? kick
+          ? 'Regular users can no longer enter. Members already in the room were NOT removed.'
+          : 'Regular users can no longer enter.'
+        : 'Regular users can enter again.'
+    );
+
+    return { locked: lock };
   }
 );

@@ -28,11 +28,24 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, EIGHTY-SIX by the room application
+  Eleven consumed by this repository's room-login page, NINETY-TWO by the room application
   through `internal/room-config/[code]`, ONE by the room but only for a presenter, and six by the
   WordPress SSO door at `(public)/sso/[code]`. `allowUsersToChangeUsername` is on the first two
   lists, and so now are `showPasswordField`, `usernameInstructions` and `hasRequiredPhoneInLogin`,
-  so the union is 106.
+  so the union is 112.
+
+  111 -> 112 on 2026-09-02: isLocked, and it is a LIAR closed rather than a feature added. The room's
+  Lock Session tab has three buttons that wrote sessionLocked and sessionLockKick into the clicking
+  presenter's own settings blob - both keys with ZERO readers anywhere in apps/room/src - and raised
+  the capture's "Session Locked" over a door that never closed. It is also the SECOND setting the
+  room may write back; decideRoomEntry has enforced it at the guest door all along.
+
+  106 -> 111 on 2026-09-02: altGenChannelName, altOffTopicChannelName, hasAdminOnlyChannel,
+  extraAdminChannels and extraRegChannels — FIVE names and ONE find. They are the rest of the six
+  settings that feed `processSessData`'s tab expression; `hasChannelTabs` crossed alone on 08-31
+  because it was the one that was a live defect. A subset of the six describes a room the reference
+  cannot be in, and building them was a channel-MODEL change rather than five more pushes: the
+  reference gives every tab a type and has three where this room had one.
 
   105 -> 106 on 2026-09-02: smallerImagePreview, the last row of the settings enumeration that was
   answered NOT A GAP rather than built. The premise was re-measured and was wrong — the pair it
@@ -381,6 +394,12 @@ const EXPECTED_WIRED_SETTINGS = [
     absence as false would take the tab from every room that has never stored the setting.
   */
   'hasChannelTabs',
+  'isLocked',
+  'altGenChannelName',
+  'altOffTopicChannelName',
+  'hasAdminOnlyChannel',
+  'extraAdminChannels',
+  'extraRegChannels',
   'hasDayTradeAlerts',
   /*
     Added 2026-08-15 with the Alert Filter. Not a boolean gate like its neighbours: a STRING

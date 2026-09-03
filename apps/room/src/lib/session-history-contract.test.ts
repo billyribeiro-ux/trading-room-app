@@ -57,6 +57,17 @@ const ROOM = 'session-history-a';
 const OTHER_ROOM = 'session-history-b';
 
 const controller = { settings: {} as Record<string, unknown> };
+/*
+  `stateWrites` is the controller's `rooms.state` column standing in for itself.
+
+  It is here rather than left as a bare `vi.fn()` because of what `openSession` and `closeSession`
+  became on 2026-09-03: both now write the column `decideRoomEntry` refuses entry on BEFORE they
+  record anything, so a history row saying "Session closed" is only as true as the write above it.
+  Recording the calls lets the two cases below assert the row and the door together, which is the
+  pairing the defect broke — the room told a presenter the session had closed for months while
+  nothing anywhere could shut it.
+*/
+const stateWrites: Array<{ shortCode: string; email: string; state: string }> = [];
 vi.mock('#lib/server/room-config-client.js', () => ({
   RoomConfigUnavailable: class RoomConfigUnavailable extends Error {},
   readRoomConfig: async (_request: unknown, shortCode: string) => ({
@@ -64,12 +75,15 @@ vi.mock('#lib/server/room-config-client.js', () => ({
     settings: controller.settings,
     locked: [],
     member: null
-  })
+  }),
+  writeRoomState: async (shortCode: string, email: string, state: string) => {
+    stateWrites.push({ shortCode, email, state });
+  }
 }));
 
 const { getSessionHistory } = await import('../routes/session-history.remote');
 const { changeChatMode } = await import('../routes/chat-mode.remote');
-const { softReset, hardReset, openSession, saveCloseMessage } =
+const { softReset, hardReset, openSession, closeSession, saveCloseMessage } =
   await import('../routes/session-commands.remote');
 
 function account(email: string, role: string): User {
@@ -106,6 +120,7 @@ beforeAll(() => {
 beforeEach(() => {
   db.delete(sessionHistory).run();
   controller.settings = {};
+  stateWrites.length = 0;
 });
 
 describe('the log itself', () => {
@@ -160,9 +175,27 @@ describe('what gets recorded', () => {
     expect(values()[1]).toContain('Soft reset');
   });
 
-  it('a session reopening', async () => {
+  it('a session reopening, and the DOOR it opened', async () => {
+    /*
+      Both halves in one case, because separating them is how the defect lived: `openSession`
+      published a reload prompt and recorded a row, and the column a returning member is refused on
+      stayed exactly where it was. A row that says "Session opened" over a room that is still shut is
+      worse than no row.
+    */
     await as(presenter, ROOM, () => openSession());
     expect(names()).toEqual(['Session opened']);
+    expect(stateWrites).toEqual([{ shortCode: ROOM, email: presenter.email, state: 'open' }]);
+  });
+
+  it('a session closing, and the DOOR it shut', async () => {
+    /*
+      The larger half. "Save Message and Close Session" wrote `savePreference('sessionOpen', false)`
+      — a key with zero readers — and told the presenter the message was saved. This asserts the act
+      the button now performs: `rooms.state` moves to `closed`, in this presenter's own room.
+    */
+    await as(presenter, ROOM, () => closeSession());
+    expect(names()).toEqual(['Session closed']);
+    expect(stateWrites).toEqual([{ shortCode: ROOM, email: presenter.email, state: 'closed' }]);
   });
 
   it('a close message saved AND cleared, without copying the text', async () => {
@@ -195,11 +228,19 @@ describe('what gets recorded', () => {
     });
     await expect(as(member, ROOM, () => softReset())).rejects.toMatchObject({ status: 403 });
     await expect(as(member, ROOM, () => openSession())).rejects.toMatchObject({ status: 403 });
+    /*
+      `closeSession` is the one worth naming twice: a member who could reach it could shut the room
+      on everybody. Its refusal must leave BOTH the log and the door untouched, so the state writes
+      are asserted empty beside the history.
+    */
+    await expect(as(member, ROOM, () => closeSession())).rejects.toMatchObject({ status: 403 });
     expect(readSessionHistory(ROOM)).toEqual([]);
+    expect(stateWrites).toEqual([]);
   });
 
   it('and it lands in the acting presenter s OWN room', async () => {
     await as(presenter, OTHER_ROOM, () => openSession());
+    expect(stateWrites).toEqual([{ shortCode: OTHER_ROOM, email: presenter.email, state: 'open' }]);
     expect(readSessionHistory(ROOM)).toEqual([]);
     expect(readSessionHistory(OTHER_ROOM).map((entry) => entry.eventName)).toEqual([
       'Session opened'

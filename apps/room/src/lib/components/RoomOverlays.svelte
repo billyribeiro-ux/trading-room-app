@@ -846,8 +846,7 @@
   {chatMode}
   closedMessage={data.closedMessage ?? ''}
   onChatModeChange={(mode) => void changeChatMode(mode)}
-  onSaveCloseMessage={(message, then) =>
-    void saveCloseMessageThen(message, then, { dialogs, savePreference: prefs.save })}
+  onSaveCloseMessage={(message, then) => void saveCloseMessageThen(message, then, { dialogs })}
   canUseRTE={composer.canUseRTE}
   rteDraft={composer.rteDraft}
   rteIsEditing={composer.rteIsEditing}

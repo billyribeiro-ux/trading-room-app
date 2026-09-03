@@ -34,6 +34,7 @@ import {
   roomOccupancyUrl,
   roomPermissionsUrl,
   roomSettingUrl,
+  roomStateUrl,
   streamIngestUrl,
   streamReadUrl
 } from './control-plane';
@@ -589,6 +590,40 @@ export interface RoomSessionSettings {
    */
   hasChannelTabs?: boolean;
   /**
+   * ── The other five settings of `processSessData`'s tab expression, crossed 2026-09-02 ─────────
+   *
+   * `hasChannelTabs` above was the first of six and crossed alone on 2026-08-31. These are the rest,
+   * and they cross for the same reason it did: every one is `sessData.<name>` in the reference's own
+   * room client (bundle bytes 1,146,625-1,147,200), so each is per-room policy the room must READ
+   * and can never decide.
+   *
+   * They arrive together because they are one expression. Crossing a subset would give a room a
+   * renamed Main Chat tab with no admin channel, or an admin channel with no way to name the extra
+   * ones beside it — states the reference cannot be in.
+   *
+   * **None of them is credential-shaped and none of them is a decision.** `extraAdminChannels` and
+   * `extraRegChannels` are owner-typed text and are the only two that could carry anything
+   * surprising; `chat-tabs.ts` trims, bounds and refuses them against `RESERVED_CHANNEL_NAMES`
+   * before they become a channel name, which upstream does not.
+   *
+   * "Alt Gen Channel Name" — renames the Main Chat TAB. The channel stays `main`.
+   */
+  altGenChannelName?: string;
+  /** "Alt OffTopic Channel Name" — the same for Off Topic. The channel stays `off-topic`. */
+  altOffTopicChannelName?: string;
+  /**
+   * "Admin Only Channel" — adds the `adminChat` tab, type `po`.
+   *
+   * Absent means FALSE here, unlike `hasChannelTabs` above, and `chatTabsForMember`'s docblock
+   * argues the asymmetry: defaulting a PRIVATE channel into existence is the direction a member
+   * cannot undo.
+   */
+  hasAdminOnlyChannel?: boolean;
+  /** "Extra Admin Channels" — comma-separated; each becomes a type-`p` channel. */
+  extraAdminChannels?: string;
+  /** "Extra Reg Channels" — the same, as type `r`. */
+  extraRegChannels?: string;
+  /**
    * "Alt chat render" — the owner forcing the COMPACT log on every member, and hiding avatars with
    * it.
    *
@@ -1035,6 +1070,62 @@ export async function writeRoomSetting(
         'content-type': 'application/json'
       },
       body: JSON.stringify({ name, value }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the write failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/**
+ * Opening and closing the session: `POST {control}/internal/room-state/{shortCode}`.
+ *
+ * ## The defect this closes
+ *
+ * `rooms.state` is the column `decideRoomEntry` refuses entry on, and until 2026-09-03 **nothing
+ * could set it after a room was created.** The controller's `setState` form action had no form
+ * posting to it, and the ROOM's "Save Message and Close Session" wrote
+ * `savePreference('sessionOpen', false)` — a key with zero readers anywhere in `apps/room/src`. A
+ * presenter closed the session, was told the message was saved, and the door stayed open.
+ *
+ * Same LEVEL error as the Lock Session buttons: a room-level act modelled as a per-user preference.
+ *
+ * ## A DURABLE write and not a broadcast, for the reason the sound and the restream URL give
+ *
+ * A closed room must still be closed after the last browser goes away, and a member arriving
+ * tomorrow must meet the same door. Publishing `closedPage` over the event channel would change
+ * what the browsers currently in the room believe and persist nothing.
+ *
+ * The broadcast is worth having too, and the room does BOTH: the write is what closes the door, and
+ * the frame is what tells the people already inside. Neither substitutes for the other.
+ */
+export async function writeRoomState(
+  shortCode: string,
+  memberEmail: string,
+  state: 'open' | 'closed'
+): Promise<void> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+
+  const base = roomStateUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  const url = new URL(base);
+  url.searchParams.set('email', memberEmail);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ state }),
       signal: AbortSignal.timeout(TIMEOUT_MS)
     });
   } catch (cause) {
