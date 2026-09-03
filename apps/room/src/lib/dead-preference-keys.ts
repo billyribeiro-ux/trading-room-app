@@ -158,7 +158,27 @@ export const DEAD_PREFERENCE_KEYS: readonly string[] = [
     `internal/room-state/[code]` is the write; `session-commands.remote.ts`'s `closeSession` and
     `openSession` are the two commands that use it.
   */
-  'sessionOpen'
+  'sessionOpen',
+  /*
+    `sessionTokensRevoked` — the fourth of this family and the only one that was never upstream's
+    name at all. Retired 2026-09-03.
+
+    Session Control's *"Hard Reset and Revoke Tokens"* wrote it into the clicking presenter's own
+    settings blob, and `hardReset`'s docblock asserted *"it is read by the next page load either
+    way"*. It had **zero readers anywhere in `apps/room/src`** — the only other occurrence in the
+    application is a comment in `user-settings.remote.ts` using it as an example of a long key name.
+
+    Its three siblings above were per-user stand-ins for room-level acts the reference performs on a
+    server. This one stood in for an ARGUMENT: upstream sends one command,
+    `sendServerAdminCommand("hardResetSession", {revoke})`, and the two menu entries differ only in
+    that boolean. Writing a preference instead meant the two controls did the same thing, and
+    `sessionTokensRevoked` occurs ZERO times in the 2,891,205-byte bundle — this room invented the
+    name for a value that was never meant to be stored anywhere.
+
+    The flag travels now. Listed here because a browser that ever pressed that button is still
+    carrying the key, and naming it is what evicts the copy.
+  */
+  'sessionTokensRevoked'
 ];
 
 const DEAD = new Set(DEAD_PREFERENCE_KEYS);
@@ -189,10 +209,18 @@ export function isDeadPreferenceKey(key: string): boolean {
 /**
  * The BROWSER half of a preference write: mirror the value, and evict the dead keys on the way past.
  *
- * The same nineteen keys are in `localStorage` too, and the server's prune cannot reach them —
- * `savePreference` writes both stores, so the old element-id fallback left a copy in each. Removed
- * here on the next preference change of any kind, which is the same converge-on-use rule the server
- * side uses: no startup pass, nothing to run, and idempotent once clean.
+ * EVERY key on this list can be in `localStorage` too, and the server's prune cannot reach them —
+ * `savePreference` writes both stores, so anything that ever reached the blob left a copy in each.
+ * Removed here on the next preference change of any kind, which is the same converge-on-use rule
+ * the server side uses: no startup pass, nothing to run, and idempotent once clean.
+ *
+ * **"The same nineteen keys" until 2026-09-03, and that was a count going stale under a loop that
+ * never counted.** Nineteen is the ELEMENT-ID group the header above describes — the original
+ * reason this list exists — and the list has since taken keys that arrived by other routes
+ * entirely: four session flags that were room-level acts, or an argument, written as per-user
+ * preferences. The loop below has always walked the whole list, so the prose was describing a
+ * subset of what the code does. It says "every key" now, which is a sentence a growing list cannot
+ * falsify.
  *
  * `JSON.stringify` here and NOT on the wire. The remote command takes the value itself now
  * (`z.json()` in `user-settings.remote.ts`); this store only holds strings, so it is the one place

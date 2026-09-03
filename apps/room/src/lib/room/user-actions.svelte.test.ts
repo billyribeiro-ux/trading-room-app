@@ -215,7 +215,6 @@ const make = (
     isPresenter: () => options.isPresenter ?? false,
     talking: () => options.talking ?? [],
     rosterUsers: () => [],
-    savePreference: (key, value) => saved.push([key, value]),
     openModal: (name) => opened.push(name),
     closeModal: () => (modalClosed += 1),
     closeUserMenu: () => {},
@@ -537,6 +536,24 @@ describe('the dispatcher', () => {
     actions.handle('session-lock-kick', TARGET);
 
     expect(commands.lockSession).toHaveBeenCalledWith({ lock: true, kick: true });
+
+    /*
+      `saved` IS NOW STRUCTURALLY EMPTY, and that is the assertion getting stronger rather than
+      weaker — recorded because a reader meeting an array nothing can push to will otherwise delete
+      it as dead.
+
+      It stayed empty here by BEHAVIOUR until 2026-09-03: the harness supplied a `savePreference` and
+      this case proved the lock did not reach for it. On that day the last of `RoomSessionControl`'s
+      preference writes went — `sessionTokensRevoked`, the fourth key of that family — and the whole
+      conduit went with it: the dep, the option, the field, the pass-through and the argument at the
+      composition root. Four files had been holding a function so a fifth could not call it.
+
+      So a room-level act can no longer be written as a per-user preference by this class AT ALL, and
+      the compiler is what says so. The array is kept, empty and asserted, because it is the record
+      of what this case is for: the same defect took `sessionLocked`, `sessionLockKick`, `sessionOpen`
+      and `sessionTokensRevoked`, and if a fifth ever arrives it will arrive as a new collaborator on
+      this harness — which is the moment this line stops being free.
+    */
     expect(saved, 'a room lock is not a per-user preference').toEqual([]);
 
     /*

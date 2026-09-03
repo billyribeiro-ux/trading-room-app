@@ -131,7 +131,6 @@ export class RoomUserActions<User extends RosterRowForTarget> {
     /** `media.talking` — who has a microphone open, which is what "mute all" acts on. */
     talking: () => readonly TalkingEntry[];
     rosterUsers: () => readonly RosterAuthority[];
-    savePreference: (key: string, value: boolean) => void;
     openModal: (name: Exclude<ModalName, null>) => void;
     closeModal: () => void;
     closeUserMenu: () => void;
@@ -162,7 +161,6 @@ export class RoomUserActions<User extends RosterRowForTarget> {
       dialogs: options.dialogs,
       closeModal: options.closeModal,
       reload: options.reload,
-      savePreference: (key, value) => options.savePreference(key, value),
       lockSession: (payload) => options.commands.lockSession(payload)
     });
     this.#toasts = options.toasts;

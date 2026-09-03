@@ -35,7 +35,17 @@ export interface SessionRoomCommandDeps {
   dialogs: RoomDialogs;
   closeModal: () => void;
   reload: () => Promise<void>;
-  savePreference: (key: string, value: boolean) => void;
+  /*
+    `savePreference` WAS HERE and is gone, 2026-09-03, with the second of the two writes it existed
+    for. Both were room-level acts written into the clicking presenter's own settings blob —
+    `sessionOpen` on the open control, `sessionTokensRevoked` on the hard reset — and both keys had
+    zero readers anywhere in `apps/room/src`.
+
+    An injected collaborator nothing calls is what this repository refuses one level up, and the
+    whole conduit went with it: the option on `RoomSessionControl`, its field, the pass-through in
+    `RoomUserActions`, and the argument at the composition root. Four files held a function so that
+    a fifth could not call it.
+  */
 }
 
 export function handleSessionRoomCommand(action: string, deps: SessionRoomCommandDeps): boolean {
@@ -88,13 +98,24 @@ export function handleSessionRoomCommand(action: string, deps: SessionRoomComman
     return true;
   }
 
-  // IT NOW BROADCASTS. The preference write stays; why, and what was actually missing, is on
-  // `hardReset` in `session-commands.remote.ts`.
+  /*
+    IT NOW BROADCASTS, AND THE TWO MENU ENTRIES NOW DIFFER.
+
+    `savePreference('sessionTokensRevoked', …)` was HERE and is gone, 2026-09-03. The key had zero
+    readers anywhere in `apps/room/src` and is not even upstream's name — zero occurrences in the
+    bundle. It was this room's own invention standing in for the flag on a server command, so *"Hard
+    Reset and Revoke Tokens"* did exactly what *"Hard Reset"* did.
+
+    Upstream has one command and two callers, bytes 2,169,105 and 2,169,459:
+    `sendServerAdminCommand("hardResetSession", {revoke: !1})` and `{revoke: !0}`. The flag travels
+    now, and what it does behind the seam is argued on `hardReset` in `session-commands.remote.ts`.
+  */
   if (action === 'session-hard-reset' || action === 'session-hard-reset-revoke') {
     deps.dialogs.confirm('Are you sure you want to reset the room?', () => {
       deps.closeModal();
-      deps.savePreference('sessionTokensRevoked', action === 'session-hard-reset-revoke');
-      void hardReset().catch(() => (deps.dialogs.alert = 'Command failed.'));
+      void hardReset({ revoke: action === 'session-hard-reset-revoke' }).catch(
+        () => (deps.dialogs.alert = 'Command failed.')
+      );
       void deps.reload();
     });
     return true;
