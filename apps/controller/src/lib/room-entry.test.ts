@@ -223,6 +223,34 @@ describe('what this module does NOT enforce', () => {
     }
   });
 
+  it('and the two multi-login rows POINT at the thing that already enforces them', () => {
+    /*
+      Added 2026-09-03, with the correction it guards.
+
+      Both rows carried the reason *"a live per-room presence count. The room owns connections, not
+      the controller"* — a missing capability. It is not missing: `createSessionFor` deletes every
+      prior session for the account in one transaction, on every entry to every room, which is
+      STRICTER than either checkbox asks for. The reasons now say so.
+
+      A prose correction with nothing holding it goes stale exactly the way the sentence it replaced
+      did, and the sentence it replaced is the reason this repository re-measures rather than
+      inherits. What holds it is the POINTER: the reason must name the function, so a reader who
+      doubts it can go and read the enforcement, and a rewrite that drops the name fails here.
+      `apps/room/src/lib/session-limit-contract.test.ts` owns the behaviour itself — eight cases,
+      including that a presenter gets no exemption and that the account is never left with no
+      session at all.
+    */
+    const multiLogin = UNENFORCED_SETTINGS.filter((entry) => entry.name.startsWith('disalow'));
+    expect(multiLogin.map((entry) => entry.name)).toEqual(['disalowMultiLogins', 'disalowSporadicMultiLogins']);
+    expect(multiLogin[0].needs).toContain('createSessionFor');
+    // The sibling points at the sibling rather than repeating the argument.
+    expect(multiLogin[1].needs).toContain('sibling');
+    for (const entry of multiLogin) {
+      // The half that would make this a lie: a reason claiming a presence count is still needed.
+      expect(entry.needs).not.toContain('presence count');
+    }
+  });
+
   it('every unenforced name is a real setting, so the list cannot rot', () => {
     for (const entry of UNENFORCED_SETTINGS) {
       expect(ROOM_SETTING_BY_NAME.has(entry.name), entry.name).toBe(true);

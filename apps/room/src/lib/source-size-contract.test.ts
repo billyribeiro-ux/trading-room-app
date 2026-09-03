@@ -795,7 +795,22 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `media-transport.svelte.ts`, fed by `services/media`. It is the third comment corrected today
       that claimed a feature was missing and was the only evidence a tracker row stood on.
     */
-    max: 1925,
+    /*
+      1925 -> 1944, 2026-09-03, for the presenter-in-an-iframe break-out. NINETEEN lines, of which
+      the code is seven: the import, and the `onMount` call with its two deps.
+
+      The twelve are the paragraph saying `isPresenter` here is the SERVER's answer. Upstream decodes
+      the URL token in the browser and trusts its `perms` claim, and a reader who "simplifies" this
+      call to read the token — which is right there in this room's own entry flow — reintroduces the
+      2026-08-07 privilege escalation on a control that navigates somebody's top frame. That is the
+      single most expensive thing anybody could get wrong about these seven lines, so it is written
+      where they are, and the rest of the argument is in `iframe-breakout.ts`.
+
+      Not extracted further, by this entry's own standard: the rule, the target URL and all three
+      divergences ALREADY left — the module is 145 lines to this call's seven. What is here is the
+      wiring, which is what the composition root is for.
+    */
+    max: 1944,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   /*
@@ -1336,7 +1351,23 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `beginSplit` deliberately did NOT come with it: it has two consumers (`RoomShell` and
       `AlertChatArea`), so the page stays its owner. A shared handler is not a window handler.
     */
-    max: 234,
+    /*
+      234 -> 252, 2026-09-03, and all eighteen lines are one corrected paragraph.
+
+      `beforeUnload`'s docblock quoted upstream's `window.addEventListener("message", …)` and then
+      said *"it is how the opener learns the popout closed"* — present tense, no subject change. Read
+      here, that describes THIS room, and it is false: there is no `window` message listener anywhere
+      in `apps/room/src`. What actually re-attaches is the opener holding the child `Window` and
+      registering `beforeunload` on it, in `alerts-pane.ts` and `screens.svelte.ts`.
+
+      The cost of leaving it was a reader deleting the RIGHT line. The two sit close together and one
+      of them reads like a duplicate of the other; the one that works has no comment beside it and
+      the one that reaches nobody had a paragraph explaining why it mattered.
+
+      The post itself is kept — transcription, invisible to a member, claiming nothing — and
+      `popout-reattach-contract.test.ts` now pins both halves so the pairing survives the next tidy.
+    */
+    max: 252,
     why: 'the window listeners - bindings stay on the element, bodies and citations move here'
   },
   {
@@ -5327,7 +5358,26 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       and points at the file that proves it. That is this entry's own rule — *moving an explanation to
       the code it explains is the extraction itself* — applied to a decode rather than to markup.
     */
-    max: 535,
+    /*
+      535 -> 557, 2026-09-03. Twenty-two lines, no code, and they are a divergence this repository's
+      own rules had required to be written down since the popout was built.
+
+      `room-component-gap-register.md`'s R-6 asked for it in as many words — *"Action: record it, or
+      narrow the popout"*. Upstream's `?dscreen=1` mounts `app-detached-screen`, 3,815 bytes that
+      consume a screen and nothing else, rendered INSTEAD OF `app-room`. Ours is the whole room
+      wearing `class:detach-screen`, so every popout boots chat, roster, alerts, the SSE subscription
+      and the media transport to show one screen — per popout, not per session.
+
+      RECORDED rather than narrowed, and the note says why: a second route whose only job is to be a
+      smaller copy of a page this app already renders is a thing that then drifts, which is the
+      failure met twice here already. Narrowing stays available and is now a decision somebody makes
+      with the cost in front of them.
+
+      If this climbs, the question is whether the popout gained BEHAVIOUR — in which case narrowing
+      has become cheaper than the note — rather than whether the note can be shortened. It cannot;
+      it is the thing R-6 asked for.
+    */
+    max: 557,
     why: 'the screen viewer; the transport keeps the list, this keeps the three ids that point into it'
   },
   {
@@ -6445,6 +6495,40 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 254,
     why: 'the recording and media-reset frames - setRecPreview, stopRecMsg, softResetDone'
+  },
+  {
+    file: 'lib/room/iframe-breakout.ts',
+    /*
+      THE PRESENTER-IN-AN-IFRAME BREAK-OUT, built 2026-09-03 and capped in the same commit, at the
+      size it actually landed.
+
+      146 lines carrying about 25 of code. That ratio is the point of the module rather than an
+      accident of it: the CODE is three tiny functions — a boolean, a URL, and a `try` around one
+      comparison — and every one of them is a line somebody could "simplify" into a defect.
+
+      What the prose buys, in the order a reader meets it:
+
+        the AUTHORITY   upstream reads `decodeToken(a).perms == "a"` in the browser. Transcribing
+                        that is the 2026-08-07 privilege escalation, on a control that navigates a
+                        top frame. This is the one divergence in the file that is not negotiable
+        the URL         upstream concatenates `"&kt=1"`, which is correct only because it is reached
+                        with a token in the query. This room strips the token on entry, so the same
+                        four characters would glue a parameter to the path
+        the CATCH       transcribed INCLUDING what it swallows. `window.self !== window.top` answers
+                        without throwing and would cover the cross-origin case upstream stays silent
+                        in — and "it would reproduce an upstream defect" is not a reason to diverge
+
+      A fourth paragraph records something the module does NOT do: `apps/room` sets no
+      `X-Frame-Options` and no `frame-ancestors`, so this room can be framed today. That is what
+      makes this module reachable rather than dead, and whether it SHOULD be frameable is an owner's
+      product question that a size ceiling is not the place to settle either.
+
+      If this climbs, the question is whether a second embedding behaviour arrived — in which case
+      the file is about embedding and the name is wrong — or whether the rule grew a collaborator,
+      which would mean it had stopped being pure.
+    */
+    max: 146,
+    why: 'a presenter inside somebody s iframe is offered the way out; the authority is the server s'
   },
   {
     file: 'lib/room/for-all-broadcasts.ts',

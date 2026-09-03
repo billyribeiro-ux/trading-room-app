@@ -45,6 +45,185 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 02:11 UTC — R-6's two open actions, and a comment that described upstream in the present tense
+
+`e64a8bf`. **Runtime impact: no.** A divergence recorded, a comment corrected, a contract added, and
+four register rows brought back to what the tree actually holds. No behaviour changed — which is the
+point of the second half of this entry, because a reader of that register would have rebuilt three
+shipped components.
+
+**The popout is the whole room, and that had never been written down.** `CLAUDE.md` requires a
+structural divergence to be recorded at the call site. Upstream's `?dscreen=1` mounts
+`app-detached-screen` — 3,815 bytes that consume a screen and nothing else, rendered *instead of*
+`app-room`. Ours is the whole room wearing `class:detach-screen`, so every popout boots chat, roster,
+alerts, the SSE subscription and the media transport to show one screen. The cost is **per popout,
+not per session**: a presenter detaching three screens holds four full rooms open, four SSE
+connections, four rosters. Recorded rather than narrowed, and the note says why — a second route
+whose only job is to be a smaller copy of a page this app already renders is a thing that then
+drifts, which is the failure met twice here already. Narrowing stays available; it is now a decision
+somebody makes with the cost in front of them, which is what R-6 asked for.
+
+**A comment that described upstream in the present tense, beside the line that actually works.**
+R-6 recorded one dead `postMessage`. Re-measured, there are two, and no
+`window.addEventListener('message', …)` exists anywhere in `apps/room/src` — the only
+`addEventListener('message', …)` is `RoomEventStream`'s on an `EventSource`, a different channel that
+never sees a `postMessage`. `RoomWindowHandlers.beforeUnload` quoted upstream's listener and then
+said *"it is how the opener learns the popout closed"*, with no subject change, which reads as this
+room.
+
+What actually re-attaches is the opener holding the child `Window` and registering `beforeunload`
+**on it** — available because the two are same-origin, and what upstream's own screen popout does.
+`RoomAlertsPane.detach` and `RoomScreens.detach` each hold one, and each is exactly the line somebody
+tidying "the duplicate" deletes: it sits near a `postMessage` that had a paragraph explaining why it
+mattered, while the line that works had no comment at all. The failure would be a detached window
+closing and the pane never coming back — invisible to `svelte-check`, to lint, and to every unit test
+that does not know to look for it.
+
+Both posts are **kept**: transcription, invisible to a member, claiming nothing — the same resolution
+`alerts-pane.ts` reached for `sl=1`. What was wrong was the comment, not the lines.
+`popout-reattach-contract.test.ts` pins both child-window listeners, pins that no module adds a
+`window` message listener, pins that `window.opener?.` stays guarded (`?co=1` is reachable by hand
+here, where the reference's bare dereference would throw), and carries a positive control so the
+sweep cannot pass by the room having no message handling at all. Three negative controls seen red.
+
+**Four register rows disagreed with the tree.** R-1 read *"`app-typing-indicator-dots` is not
+built, and it belongs in the chat panes"* — it is `TypingIndicatorDots.svelte`, 110 lines, rendered
+by both chat panes. R-2 and R-3 the same: `PositionsContainer.svelte` rendered by
+`PresentationArea`, `KickedPage.svelte` rendered by the page.
+
+R-5's *"Ours: nothing"* named six identifiers as absent everywhere. **Five of the six exist** —
+`closedTxt` as `room_state.closed_message`, `closed-container` as the class on `+error.svelte`, plus
+`simUserCount`, `alwaysShowRoster` and `hideAppInfo`. Only `roomV4Link` is absent, and it is the one
+that should be: it belongs to a shell this room deliberately does not build. Its *"Blocks: everything
+a member sees after a session ends"* is answered by the door built forty minutes earlier, and the
+architectural divergence is now stated as a decision with the cost to a member beside it — no
+Archives dropdown, no roster, no `Get Random User`, no `Open Session` button on a closed page,
+because the closed page here is the server's refusal rather than a second client shell.
+
+`pnpm run gate` exit 0. Two ceilings raised, each argued at its entry, both entirely for prose.
+
+### 2026-09-03 01:58 UTC — the five P-rows re-measured, and one of them had been built
+
+`2f04a74`. **Runtime impact: no.** Reasons, tracker rows and three documented counts. What changed
+is what a reader would BUILD from.
+
+`todo-next.md` calls itself the authority for the manage-side P-items, so they were put against the
+tree rather than inherited:
+
+**P-2 is built, and stricter than the row asks for.** It reads *"extend `disalowMultiLogins` to be
+account-scoped and device-class-aware; enforce server-side"*. `createSessionFor` deletes every prior
+session for the account inside one transaction, newest-wins, and every entry to every room runs
+through it (`session/+page.server.ts:449`). Account-scoped and server-side is the row; **global
+rather than per-room** is more than the row. `session-limit-contract.test.ts` has covered it in
+eight cases for weeks — including that a presenter gets no exemption, and that the account is never
+left with no session even for an instant.
+
+**P-1 is blocked, on something larger than its recorded reason.** The row said the server ordering
+needs `POST_ROUTE_API_DOCUMENTATION.md`; that file is in no corpus this repository holds, looked for
+and absent. The decisive blocker is that **there is no mobile client** — `mobile-app/` holds one
+file, `PROMPT.md`. The controller's FCM half IS built (`server/fcm.ts`, and the admin actions refuse
+rather than answer "nothing to do" when the service account is unset), and both mobile internal
+routes ship. What does not exist is anything that pushes an ALERT: `post-alert.remote.ts:45` already
+records `dontPush` as having no consumer, and the server refuses the field rather than accept one
+nothing reads. Registration tokens come only from an app on a phone, so wiring the fan-out now would
+build a subsystem whose only observable behaviour is a log line.
+
+**P-3** is unchanged and both its gaps are evidence-absent. **P-4** (a drawing tool, "no evidence in
+any corpus") and **P-5** (Spotify, where the reference has SoundCloud) are ADDITIONS rather than
+divergences — there is nothing to match, and building either from the row would be inventing
+product. Both are recorded as the owner's to specify or choose.
+
+**The correction P-2 forced.** `room-entry.ts`'s `UNENFORCED_SETTINGS` gave `disalowMultiLogins` and
+`disalowSporadicMultiLogins` the reason *"a live per-room presence count. The room owns connections,
+not the controller"* — a missing capability. It is not missing, and the truth is the opposite shape:
+nothing blocks these, and honouring the checkbox would mean **relaxing** a control the room already
+applies unconditionally, on an operator's say-so, for a setting with no third state meaning
+"stricter than the default". Both reasons say that now. Both stay on the list, because the list
+exists so that nobody can believe a gate exists when it does not — an operator who ticks the box
+still gets no per-ROOM count out of it, and one who leaves it clear does not get multi-login back.
+
+A prose correction with nothing holding it goes stale exactly the way the sentence it replaced did,
+and that sentence is the reason this repository re-measures rather than inherits. What holds this
+one is a POINTER: the reason must name `createSessionFor`, so a reader who doubts it can go and read
+the enforcement. A rewrite that drops the name, or restores "presence count", fails — run as a
+negative control and seen red.
+
+`pnpm run gate` exit 0 in both apps. The controller's documented Vitest count moved 1196 → 1197
+across the three documents that state it.
+
+### 2026-09-03 01:48 UTC — a presenter inside somebody's iframe, and eleven of thirteen already built
+
+`7831887`. **Runtime impact: yes**, for one control — a presenter who opened the room inside an
+embed is now offered the way out of it. The rest of this entry is measurement, and it is the larger
+half.
+
+`docs/reference/room-component-gap-register.md`'s R-12 lists thirteen `app-root` subscriptions and
+three init behaviours as *"all absent from `apps/room/src`"*. Re-measured file by file rather than
+inherited: **eleven of the thirteen are built.** `usersDoMsgDelete`'s string is at
+`message-delete.ts:173` — the same function's other branch, which is exactly why the NAME was absent
+and the behaviour was not, and why a name search is not a measurement. The register's separate claim
+that *"`deleteAlertPW` has no occurrence in `apps/room/src`, so in our room a password-protected
+alert deletion is not password-protected"* was true when written and is false now: eleven files, and
+the gate is `internal/room-alert-delete-auth` with the credential staying on the controller.
+
+**Two more were settled by reading, not building.**
+
+`getSessionState` is an internal event-bus name and not a server frame — emitted when a
+`getMyState`/`getRoomState` frame assigns `globals.roomState`, and again after `getMyRepeater`. Both
+subscribers read whole (bytes 1,162,077 and 2,595,730). Every reference-facing output has a
+counterpart here arrived at differently: the closed branch is `disconnectAll` plus a page swap,
+which is `closedPage` → the server door twenty minutes earlier in this changelog; `chatMode` is
+`changeChatMode`; the media init is `media-transport`; and `currPage 'login' → 'chat'` has no
+counterpart at all, because this room's entry is a server route rather than a page inside the shell.
+
+`doSessionAuthFail` is built, as `sessionRevoked`. Its four emitters are socket-authenticate
+failures (993,162 / 993,292 / 993,379, and a code-4500 disconnect at 997,931); this room
+authenticates the SSE request by cookie and tears the stream down **in the same tick** as the frame.
+That is also why upstream's once-only latch is not transcribed — it exists because a socket can fail
+repeatedly, and here the connection ends with the message. `loginErrorMsg` and `loginErrorURL` are
+both honoured, on the server, from settings the server owns rather than shipped to every browser.
+
+The theme fallback — `Invalid theme "X" found, falling back to lightTheme` — is **not a divergence**.
+Upstream's theme is a free-form preference key checked against `chatStyle`'s keys at read time, so a
+bad stored value is reachable there. Here it is a `user_settings.theme` column with two values,
+written only by `saveTheme` (a `z.enum` that refuses everything else) and read from the ROW rather
+than the preferences blob, so `savePreference('theme', …)` cannot reach it either. Building the
+fallback would mean writing a branch nothing can enter.
+
+**What survived as work** is `lib/room/iframe-breakout.ts`, called once from the page's `onMount`. A
+presenter cannot present from inside an embed — screen share, the device picker and the webcam
+prompt all need a top-level document — so the reference offers a break-out rather than failing later
+with a permissions error nobody can act on. Three divergences, each argued at the module:
+
+* **the authority is the SERVER's.** Upstream reads `decodeToken(a).perms == "a"` — the browser
+  decoding the token out of its own address bar and believing it. That is the 2026-08-07 privilege
+  escalation by name, on a control that navigates a top frame, and it is not transcribed for any
+  reason.
+* **`kt=1` is appended with `URL.searchParams`.** Upstream concatenates `"&kt=1"`, which is correct
+  only because it is reached with a token in the query; this room strips the token on entry, so the
+  same four characters would glue a parameter to a query-less path. `kt` has **exactly one
+  occurrence in the 2,891,205-byte bundle and it is that write** — nothing reads it — so the
+  reference-facing output is that the parameter is present, and that count is pinned rather than
+  remembered.
+* **the swallowing `catch` is transcribed, cross-origin silence included.** `window.self !==
+  window.top` answers without throwing and would cover the case upstream stays silent in, and "it
+  would reproduce an upstream defect" has never been a reason to diverge here.
+
+**Measured and deliberately not decided:** `apps/room` sets no `X-Frame-Options` and no
+`frame-ancestors` anywhere — `hooks.server.ts` sets one security header and it is `Referrer-Policy`.
+That is what makes this control reachable rather than dead code. Whether the room *should* be
+frameable is an owner's product question, because closing it breaks every operator embedding the
+room today, so it is recorded at the module rather than taken.
+
+Five negative controls, each run alone and seen red. A capture-bound test file was written and then
+**deleted**, and the reason is kept in the merged file rather than quietly dropped: it claimed that
+reading the bundle made it evidence-bound and excluded on CI, which is false —
+`docs/source-v4-2026-08-15/` is committed, five files under `git ls-files`, and the gitignored root
+the discovery matches is `docs/source`, a different path. `evidence-partition.test.ts` stayed at 42
+throughout, which is what settled it.
+
+Full room suite 6,352 passed, 1 skipped; `pnpm run gate` exit 0. The controller was not touched.
+
 ### 2026-09-03 01:28 UTC — the session door: nothing in either application could close a room
 
 `16853a2`. **Runtime impact: yes.** Two presenter controls that reported success and changed nothing

@@ -209,11 +209,29 @@ export class RoomWindowHandlers {
            window.opener.postMessage('windowClosing', window.location.origin);
          }))
 
-    (`app-room.full.js:1903-1907`.) It is how the opener learns the popout closed: the room that
-    detached the chat listens for exactly this message and calls `reatachChat` —
+    (`app-room.full.js:1903-1907`.) UPSTREAM it is how the opener learns the popout closed: the room
+    that detached the chat listens for exactly this message and calls `reatachChat` —
     `window.addEventListener("message", o => "windowClosing" === o.data && emit("reatachChat"))`
-    (`:1692-1693`, transcribed in `detachAlerts` above). Without it, closing the detached window
-    leaves the opener believing the pair still lives elsewhere, and the column never comes back.
+    (`:1692-1693`, transcribed in `detachAlerts` above).
+
+    ## IN THIS ROOM IT REACHES NOBODY, and the paragraph above used to imply otherwise
+
+    Measured 2026-09-03: there is no `window.addEventListener('message', …)` anywhere in
+    `apps/room/src`. The only `addEventListener('message', …)` is `RoomEventStream`'s handler on an
+    `EventSource`, which is a different channel and never sees a `postMessage`.
+
+    **The re-attach is built, by the other mechanism.** `RoomAlertsPane.detach` and
+    `RoomScreens.detach` both keep the child `Window` and register `beforeunload` ON IT — the
+    opener listening to the child directly, which is available because the two are same-origin and
+    which is also what upstream's screen popout does (`s.onbeforeunload = () => emit(
+    "reatachScreenShare", i.pres._id)`). Those two listeners are the load-bearing half; delete one
+    believing this post does the work and the column never comes back.
+
+    So this line is TRANSCRIPTION with no consumer here, kept for the reason the `sl=1` note in
+    `alerts-pane.ts` gives at length: the popout is a transcription, a member never sees this, it
+    claims nothing, and removing a transcribed emission because this deployment happens not to need
+    it makes the next diff against the capture harder to read. What was wrong was the comment
+    claiming an effect, not the line.
 
     Gated on the MODE, not on `hidePresentation`: a room whose owner set `isChatOnlyRoom` is not a
     popout and has no opener to notify. `chatOnlyMode` is the `co=1` that `detachAlerts` sets, so

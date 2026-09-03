@@ -123,7 +123,13 @@ status table below carries an explicit `NOT AUDITED` count rather than implying 
 
 ---
 
-## R-1 — `app-typing-indicator-dots` is not built, and it belongs in the chat panes
+## R-1 — `app-typing-indicator-dots` — **BUILT**; the heading below is what it said before
+
+> **Re-measured 2026-09-03.** The heading read *"is not built, and it belongs in the chat panes"*.
+> It is `lib/components/TypingIndicatorDots.svelte`, 110 lines, rendered by `AlertChatArea.svelte`
+> and `ExtraChatPane.svelte` — the two chat panes the heading names. The reference reading below is
+> unchanged and is what it was built from; only the verdict was stale.
+
 
 **Reference, read whole** (`app-typing-indicator-dots.full.js`, 1,231 B — 4 decls):
 
@@ -154,7 +160,12 @@ arrived with the captured stylesheet; the feature did not.
 **Blocks:** the "someone is typing" affordance in both chat columns. **Needs:** a wire signal for
 typing — the transport half is not established here and must not be invented.
 
-## R-2 — `app-positions-container` is not built
+## R-2 — `app-positions-container` — **BUILT**
+
+> **Re-measured 2026-09-03.** `lib/components/PositionsContainer.svelte`, 74 lines, rendered by
+> `PresentationArea.svelte`, with `positions-iframe.ts` and `positions-iframe-contract.test.ts`
+> beside it. The reference reading below is unchanged.
+
 
 **Reference, read whole** (`app-positions-container.full.js`, 2,531 B — 3 decls):
 
@@ -174,7 +185,11 @@ div.positionOverlay.animated.fadeIn > iframe[src]
 **Note for whoever builds it:** it embeds a THIRD-PARTY URL from room settings in an iframe with the
 sanitiser bypassed. That is a security decision to take deliberately, not to copy.
 
-## R-3 — `app-kicked-page` is not built
+## R-3 — `app-kicked-page` — **BUILT**
+
+> **Re-measured 2026-09-03.** `lib/components/KickedPage.svelte`, 114 lines, rendered from
+> `routes/+page.svelte`. The reference reading below is unchanged.
+
 
 **Reference, read whole** (`app-kicked-page.full.js`, 822 B — 4 decls):
 
@@ -340,15 +355,41 @@ overflow-y: auto` box. Everything else on the page is chrome around it.
   sanitiser-bypassed, overridden wholesale by `sessData.altBenzingaLinkURL` when non-empty.
   **It puts the session token in a third-party URL** — a security decision to take deliberately.
 
-**Ours:** nothing. `closedTxt`, `closed-container`, `roomV4Link`, `simUserCount`, `alwaysShowRoster`
-and `hideAppInfo` have **no occurrence anywhere in `apps/room/src`**. `archivesAvailableTo()` IS
-built and pinned (`lib/roster-gates.ts:54`, bundle-pinned in `roster-gates.test.ts:52-57`), so the
-gate exists even though the page that also uses it does not. The `sessionClosed` hits in
-`lib/media/session.ts` and `lib/media/signalling.ts` are a mediasoup error string and unrelated —
-`roster-gates.test.ts:733` already says so in as many words.
+**Ours — RE-MEASURED 2026-09-03, and the paragraph that stood here was materially false.** It read
+*"nothing. `closedTxt`, `closed-container`, `roomV4Link`, `simUserCount`, `alwaysShowRoster` and
+`hideAppInfo` have no occurrence anywhere in `apps/room/src`"*. Five of those six exist:
 
-**Blocks:** everything a member sees after a session ends. Today they would see the live room.
-**Needs:** `sessData.currentState` and `sessData.closedTxt` on the wire — see R-11.
+| identifier | ours |
+|---|---|
+| `closedTxt` | `room_state.closed_message`, written by `saveCloseMessage` and read by `server/closed-room-message.ts` |
+| `closed-container` | `routes/+error.svelte` — the same class name, on the page that actually answers a closed room |
+| `simUserCount` | `room/roster.svelte.ts`, `RoomNavbar.svelte`, delivered by `room-config-client.ts` |
+| `alwaysShowRoster` | `room/gates.ts`, `RoomNavbar.svelte`, `+page.svelte`; `always-show-roster-contract.test.ts` |
+| `hideAppInfo` | `RoomSidebar.svelte` |
+| `roomV4Link` | **absent**, and it is the one that should be: it is the "Try v3" link whose label and URL disagree, and it belongs to a shell this room deliberately does not build |
+
+`archivesAvailableTo()` is built and pinned (`lib/roster-gates.ts:54`, bundle-pinned in
+`roster-gates.test.ts:52-57`). The `sessionClosed` hits in `lib/media/session.ts` and
+`lib/media/signalling.ts` are a mediasoup error string and unrelated — `roster-gates.test.ts:733`
+already says so in as many words.
+
+**Blocks: nothing, as of 2026-09-03.** The line here read *"everything a member sees after a session
+ends. Today they would see the live room"*, and the second half was the true and important part —
+not because the refusal was missing, but because **nothing could ever set the column it refuses
+on.** `decideRoomEntry` has always answered `roomState !== 'open'` with the presenter's own close
+message; `rooms.state` was written at room creation and nowhere else, the controller's `setState`
+form action had no form posting to it, and the room's "Save Message and Close Session" wrote a
+per-user preference with zero readers. That door is built — `internal/room-state/[code]`,
+`closeSession`/`openSession`, and a `closedPage` frame for the people already inside.
+
+**The structural divergence stands and is deliberate.** A closed room here is answered by the SERVER,
+through the same door every arrival uses, rendered by `+error.svelte` with the stored message —
+rather than by a second client shell that mounts nine modals of its own. That keeps one sentence in
+one place; a second closed-page component would have to be told what the first one says. What this
+room therefore does not offer a member on a closed page is the chrome: the Archives dropdown, the
+roster, `Get Random User`, and the `Open Session` button, all of which live in the LIVE room here.
+
+**Needs, for the shell itself:** an owner decision that the chrome is wanted after a session ends.
 
 ## R-6 — `app-detached-screen`: ours diverges structurally, and the divergence is undeclared
 
@@ -397,7 +438,12 @@ popout; the reference's boots a consumer and nothing else.
 
 That is arguably the better shape for a SvelteKit app — one route, one component tree — but it is a
 **structural divergence with a per-popout cost** and `CLAUDE.md` requires those to be recorded at the
-call site. They are not. **Action: record it, or narrow the popout.**
+call site. **DONE 2026-09-03** — `RoomScreens.detach` in `lib/room/screens.svelte.ts` now carries it,
+with the cost stated as it actually falls (per popout, not per session: a presenter detaching three
+screens holds four full rooms open, four SSE connections, four rosters) and the reason narrowing was
+NOT taken — a second route whose only job is to be a smaller copy of a page this app already renders
+is a thing that then drifts, which is the failure this repository has met twice already. Narrowing
+stays available; it is now a decision made on evidence rather than an omission nobody noticed.
 
 **One dead emission of ours:** `closeScreenPopout()` (`:633-644`) posts
 `{cmd:'screeenStopped', presID}` and then calls `popout.close()` on the next line. **No
@@ -410,6 +456,24 @@ unreachable one above. The `close()` on the next line is what actually does the 
 *(Corrected during pass 3. This row first read "nothing listens for a `message` event", which a
 reader checking it would have found contradicted by `:6979` and reasonably concluded the row was
 wrong. The claim is about `window`/`postMessage`, and it now says so.)*
+
+**Re-measured 2026-09-03, and the finding is larger than one dead emission.** There is no
+`window.addEventListener('message', …)` anywhere in `apps/room/src`, so BOTH transcribed posts reach
+nobody here — `screeenStopped` above, and `windowClosing` from `RoomWindowHandlers.beforeUnload`.
+`window-handlers.ts`'s docblock described upstream's listener in a way that read as though this room
+had one, which made the load-bearing half look like a duplicate.
+
+**What actually re-attaches** is the opener registering `beforeunload` ON THE CHILD `Window` —
+same-origin, and what upstream's own screen popout does (`s.onbeforeunload = () => emit(
+"reatachScreenShare", i.pres._id)`). `RoomAlertsPane.detach` and `RoomScreens.detach` each hold one,
+and each is a line somebody tidying "the duplicate" would remove while leaving the post that does
+nothing. `popout-reattach-contract.test.ts` pins both listeners, pins that no module adds a `window`
+message listener, and carries a positive control so the sweep cannot pass by the room having no
+message handling at all. Three negative controls seen red.
+
+Both posts are KEPT. They are transcription, a member never sees them, and they claim nothing — the
+same resolution `alerts-pane.ts` reached for `sl=1`. What was wrong was a comment claiming an
+effect, not the lines.
 
 ---
 
@@ -463,28 +527,55 @@ reachable — it is the parent work item, not a seventh row.
 `<audio autoplay="autoplay" hidden="true" id="webcam">` after it (`:352`) — a page-level audio sink
 outliving every page.
 
-**Subscriptions, with their exact strings** (all bootbox, all absent from `apps/room/src`):
+**Subscriptions, with their exact strings** (all bootbox). The parenthetical here read *"all absent
+from `apps/room/src`"* until **2026-09-03**, when the row was re-measured file by file rather than
+inherited: **eleven of the thirteen are built.** The `Ours` column below is that measurement, and the
+two that were genuinely open are settled underneath it.
 
-| event | effect |
-|---|---|
-| `getSessionState` | `currentState=='closed'` → `currPage='closed'`; `=='open' && currPage=='login'` → `'chat'`, emit `appDataReady`, `loadSessionLogs()` |
-| `doSessionAuthFail` | once-only latch; `sessData.loginErrorMsg` or `Sorry, your session has expired or is invalid, please log in again`; then `loginErrorURL` redirect; `disconnectAll()` |
-| `hardReset` | `The room is being reset by an administrator. Click OK to continue...` → reload |
-| `kickPage` | `kickedMsg = payload`, `currPage='kicked'` |
-| `closedPage` | `currPage='closed'` |
-| `openSession` | `The session is now open, click here to reload the page and enter` → reload |
-| `forceReload` | `You need to reload this page to continue` → reload |
-| `permsChangeReload` | `An admin has changed your room permissions, you need to reload this page to continue` → `{apiROOT}/sessions/v2/reAuthSessionTok?sessionID=…&tok=…&r=1` |
-| `doMsgDelete` | `shiftDelete` skips the confirm; else `Are you sure you want to delete this message by {n}. text: {txt}` |
-| `usersDoMsgDelete` | `Are you sure you want to delete your message: {txt}` |
-| `doAlertDelete` | `Are you sure you want to delete this alert by {n}. text: {txt}` → `deleteAlertMessage()` |
-| `doQAAlertDelete` | same string, `deleteQAAlert({qaMsgID, msgIndex})` |
-| `debugLogResp` | shows `#debug-log-modal`, sets `#debugLogModalTxt` to the lines joined by `\n` |
+| event | effect | ours, measured 2026-09-03 |
+|---|---|---|
+| `getSessionState` | `currentState=='closed'` → `currPage='closed'`; `=='open' && currPage=='login'` → `'chat'`, emit `appDataReady`, `loadSessionLogs()` | **not a divergence** — see below |
+| `doSessionAuthFail` | once-only latch; `sessData.loginErrorMsg` or `Sorry, your session has expired or is invalid, please log in again`; then `loginErrorURL` redirect; `disconnectAll()` | **built** — see below |
+| `hardReset` | `The room is being reset by an administrator. Click OK to continue...` → reload | `events.svelte.ts` |
+| `kickPage` | `kickedMsg = payload`, `currPage='kicked'` | `private-commands.ts`, `KickedPage.svelte` |
+| `closedPage` | `currPage='closed'` | `events.svelte.ts`, built 2026-09-03 with the door itself |
+| `openSession` | `The session is now open, click here to reload the page and enter` → reload | `events.svelte.ts` |
+| `forceReload` | `You need to reload this page to continue` → reload | `private-commands.ts`, `addressed-channel.ts` |
+| `permsChangeReload` | `An admin has changed your room permissions, you need to reload this page to continue` → `{apiROOT}/sessions/v2/reAuthSessionTok?sessionID=…&tok=…&r=1` | `dialogs.svelte.ts`, `user-actions.svelte.ts`; the `reAuthSessionTok` redirect stays REFUSED — that route is confirmed absent from the bundle |
+| `doMsgDelete` | `shiftDelete` skips the confirm; else `Are you sure you want to delete this message by {n}. text: {txt}` | `message-delete.ts:172` |
+| `usersDoMsgDelete` | `Are you sure you want to delete your message: {txt}` | `message-delete.ts:173` — the same function's other branch, which is why the NAME is absent and the behaviour is not |
+| `doAlertDelete` | `Are you sure you want to delete this alert by {n}. text: {txt}` → `deleteAlertMessage()` | `message-delete.ts:119`; `deleteAlertPW` reaches ELEVEN files, so the claim below that it has no occurrence is stale too |
+| `doQAAlertDelete` | same string, `deleteQAAlert({qaMsgID, msgIndex})` | `message-delete.ts` |
+| `debugLogResp` | shows `#debug-log-modal`, sets `#debugLogModalTxt` to the lines joined by `\n` | `debug-log.svelte.ts`, `debug-log.remote.ts` |
+
+**`getSessionState` — NOT A DIVERGENCE, and the whole family reads as one.** It is an internal
+event-bus name, not a server frame: emitted when a `getMyState`/`getRoomState` frame assigns
+`globals.roomState` (byte 1,013,755) and again after `getMyRepeater` (1,021,461). Two subscribers,
+both read whole. `handleSessionState()` (1,162,077) branches on `roomState.status == 'closed'` →
+`disconnectAll()` + `closeRoom`, else emits `chatMode` and initialises the media handlers.
+`app-root`'s (2,595,730) is the SPA page switch. Every reference-facing output has a counterpart
+here arrived at differently: the closed branch is `closedPage` → the server door, `chatMode` is
+`changeChatMode`, the media init is `media-transport`, and `currPage 'login' → 'chat'` has no
+counterpart because this room's entry is a server route rather than a page inside the shell.
+
+**`doSessionAuthFail` — BUILT, as `sessionRevoked`.** Its four emitters are all socket-authenticate
+failures (993,162 / 993,292 / 993,379, and a disconnect with code 4500 at 997,931); this room
+authenticates the SSE request by cookie, and `sess/[room]/events/+server.ts` sends
+`{cmd:'sessionRevoked', reason, message}` and tears the stream down **in the same tick**. That is
+also why the once-only latch is not transcribed: upstream latches the alert because its socket can
+fail repeatedly, and here the connection ends with the frame. `loginErrorMsg` and `loginErrorURL`
+are both `wired: true` and honoured — at the door (`room-entry.ts:212-213`), at SSO, and on the
+reload the revoked member is sent through, which means the redirect is decided by the server from
+settings it owns rather than shipped to every browser.
 
 **`deleteAlertMessage()`** is a gate, not a wrapper: when `sessData.deleteAlertPW` is set it prompts
 `Please enter the password to delete this alert:` and compares `trim()` against it, alerting
-`Wrong password!` on a mismatch. **`deleteAlertPW` has no occurrence in `apps/room/src`** — so in our
-room a password-protected alert deletion is not password-protected.
+`Wrong password!` on a mismatch. The sentence that stood here — *"`deleteAlertPW` has no occurrence
+in `apps/room/src`, so in our room a password-protected alert deletion is not password-protected"* —
+was **true when written and is false now**, re-measured 2026-09-03: the name reaches eleven files,
+and the gate is `internal/room-alert-delete-auth/[code]` on the controller with
+`alert-delete-auth.remote.ts` and `server/alert-delete-access.ts` here. The credential STAYS on the
+controller and the question travels, which is the same shape as `room-notes-auth` beside it.
 
 **Three more init behaviours with no counterpart here:**
 
@@ -496,9 +587,33 @@ room a password-protected alert deletion is not password-protected.
 - the admin-in-iframe check — perms `'a'` and `window.location !== window.parent.location` →
   confirm `You seem to be a presenter and be running inside an iframe, click OK to load the page in
   regular mode so that you can present` → `window.parent.location = window.location + '&kt=1'`.
-  This is what `kt` is for, and both halves are absent here.
+  **BUILT 2026-09-03** as `lib/room/iframe-breakout.ts`, called once from the page's `onMount`. It
+  was the one row in the whole of R-12 that survived the re-measurement as genuinely absent.
+
+  Three divergences, each argued at the module: the authority is the SERVER's `isPresenter` and not
+  a token this browser decoded (upstream's `decodeToken(a).perms` is client-asserted authority, which
+  is the 2026-08-07 escalation by name); `kt=1` is appended with `URL.searchParams` because this room
+  strips the token from the address bar on entry, so upstream's concatenation would glue a parameter
+  to a query-less path; and the swallowing `catch` around the parent read IS transcribed, cross-origin
+  silence included, because reproducing an upstream defect is not a reason to diverge.
+
+  **`kt` has exactly one occurrence in the 2,891,205-byte bundle and it is that write — nothing reads
+  it**, which is what the sentence above ("this is what `kt` is for") could not have known. That
+  measurement is pinned in `iframe-breakout-capture.test.ts` so a later reader cannot conclude the
+  value was dropped from something upstream depended on.
+
+  One thing the module measures and deliberately does NOT decide: `apps/room` sets no
+  `X-Frame-Options` and no `frame-ancestors` anywhere, so this room can be framed today. That is what
+  makes the control reachable rather than dead code — and whether the room SHOULD be frameable is an
+  owner's product question, because closing it would break every operator embedding the room.
 - `ngAfterViewInit` validates the saved theme against `globals.chatStyle`'s own keys and falls back
-  to `lightTheme` with `Invalid theme "X" found, falling back to lightTheme`.
+  to `lightTheme` with `Invalid theme "X" found, falling back to lightTheme`. **NOT A DIVERGENCE**,
+  re-measured 2026-09-03: upstream's theme is a free-form preference key checked against
+  `chatStyle`'s keys at READ time, so a bad stored value is reachable there. Here it is a
+  `user_settings.theme` column with two values, written only by `saveTheme` (a `z.enum` that refuses
+  everything else) and by `ensureSettings` (`'light'`), and read from the ROW rather than from the
+  preferences blob — so `savePreference('theme', …)` cannot reach it either. The fallback would be a
+  branch nothing can enter.
 
 `playChatMessageSoundFor` also lands here (`:73-84`): `app-root` splits the comma list, hashes each
 address and pushes it into `globals.playChatMessageSoundFor`. Our `+page.svelte:7469-7473` already

@@ -289,14 +289,34 @@ export const UNENFORCED_SETTINGS: ReadonlyArray<{ name: string; needs: string }>
     name: 'allowedPerms',
     needs: 'The same claim source. Permissions here are the identity provider\u2019s, not the five per-room ones.'
   },
+  /*
+    THESE TWO ARE NOT BLOCKED, and the reason recorded here until 2026-09-03 said they were.
+
+    It read *"a live per-room presence count. The room owns connections, not the controller"* — which
+    described a missing capability. Re-measured: the room enforces something STRICTER than either
+    checkbox asks for, unconditionally and for every arrival. `createSessionFor` (`server/auth.ts`)
+    deletes every prior session for the account inside one transaction, newest-wins, and every entry
+    to every room runs through it (`session/+page.server.ts:449`). One account, one live session,
+    globally — not per room, and not only when an owner ticks a box.
+
+    So what stops these being "enforced" is the opposite of a gap: honouring the checkbox would mean
+    RELAXING a security control on an operator's say-so, and the setting has no third state that
+    means "stricter than the default". `NEW-TODO.md` Part 1 chose that divergence deliberately —
+    `server/live-access.ts` carries the argument and closes the other half of it on the open stream.
+
+    Left on this list rather than removed, because the list's job is to make it impossible to believe
+    a gate exists when it does not: an operator who ticks `disalowMultiLogins` still gets no
+    per-ROOM count out of it, and one who leaves it clear does not get multi-login back.
+  */
   {
     name: 'disalowMultiLogins',
     needs:
-      'A live per-room presence count. The room owns connections, not the controller, so this belongs on the room side of the seam.'
+      'Nothing, and that is the finding. The room already enforces one live session per ACCOUNT in createSessionFor, which is stricter than this per-room checkbox; honouring the setting would mean relaxing that on an operator\u2019s say-so. Recorded as a deliberate divergence at server/live-access.ts.'
   },
   {
     name: 'disalowSporadicMultiLogins',
-    needs: 'Reconnect timing within a short window, which only the room observes because it holds the socket.'
+    needs:
+      'The same finding as its sibling above. Reconnect timing within a short window is what this asks the room to observe, and a reconnect cannot present as a second login here: the previous session is already gone by the time the new one exists.'
   },
   {
     name: 'openLoginLink',

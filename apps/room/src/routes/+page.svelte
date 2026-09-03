@@ -35,6 +35,7 @@
     import { createRoomRefresh } from '#lib/room/refresh.svelte.js';
   import { promoteLegacySplitSizes } from '#lib/room/split-legacy-migration.js';
   import { applyRoomDefaults } from '#lib/room/room-defaults.js';
+  import { offerIframeBreakout } from '#lib/room/iframe-breakout.js';
   import {
     chatStyleAfterThemeSwitch,
     defaultChatStyleForTheme,
@@ -1038,6 +1039,25 @@
       { sessData: data.sessData ?? {}, loaded: prefs.loaded },
       { setTheme: (next) => modals.setTheme(next), savePreference: (key, value) => prefs.save(key, value) }
     );
+
+    /*
+      A PRESENTER INSIDE SOMEBODY'S IFRAME is offered the way out, once, here.
+
+      `onMount` for the reason every other entry in this block is: it reads `window.parent`, which
+      does not exist during SSR, and the confirm it may raise is a thing that happens rather than a
+      value anything renders from.
+
+      `isPresenter` is the SERVER's answer. Upstream decodes the URL token in the browser and
+      believes its `perms` claim; `iframe-breakout.ts` records at length why that half is not
+      transcribed, along with the two smaller divergences and the framing-policy question this
+      module measures but deliberately does not decide.
+    */
+    offerIframeBreakout(isPresenter, {
+      confirm: (message, onconfirm) => dialogs.confirm(message, onconfirm),
+      navigateTop: (target) => {
+        window.parent.location.href = target;
+      }
+    });
 
     // `loadChatMode()` and `loadAlertsMode()`, once on mount. The module holds the whole rule and
     // says why it is a seed rather than a derivation.
