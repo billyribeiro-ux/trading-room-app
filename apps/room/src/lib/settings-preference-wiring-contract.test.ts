@@ -30,10 +30,6 @@ import { DEAD_PREFERENCE_KEYS, pruneDeadPreferenceKeys } from './dead-preference
   been cut.
 */
 
-const SETTINGS = readFileSync(
-  new URL('../../docs/source/components/app-user-settings-modal.full.js', import.meta.url),
-  'utf8'
-);
 /*
   THE 36 CONSTRUCTIONS MOVED TO `create-room.svelte.ts` on 2026-08-17 (Phase 5, S7).
 
@@ -47,8 +43,6 @@ const SETTINGS = readFileSync(
 const ROOT = readFileSync(new URL('./room/create-room.svelte.ts', import.meta.url), 'utf8');
 const rootCode = ROOT.replace(/\/\*[\s\S]*?\*\//g, '');
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-// The recording sounds are played by the SSE dispatch, which moved in Phase 5 slice 5.
-const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
 /*
   The write path moved to `RoomPrefs` in Phase 5 slice 3, so the assignment each wire ends in is
   read from the class that now performs it. The modal half and the page half are unchanged and are
@@ -73,7 +67,7 @@ const prefsCode = stripComments(PREFS);
  * The four wires repaired on 2026-08-14. Each already had BOTH ends built — a rendered checkbox and
  * a live consumer — and no middle.
  */
-const WIRES = [
+export const WIRES = [
   {
     id: 'app-recording-start-sound',
     preference: 'recordingStartSound',
@@ -172,35 +166,24 @@ const WIRES = [
   }
 ] as const;
 
-describe.each(WIRES)(
-  '$id is wired all the way through',
-  ({ id, preference, handler, assignment }) => {
-    it('the preference name is the one the reference persists, not one inferred from the id', () => {
-      const from = SETTINGS.indexOf(`${handler}() {`);
-      expect(from, `${handler} must exist in the decoded settings modal`).toBeGreaterThan(-1);
-      const body = SETTINGS.slice(from, SETTINGS.indexOf('\n    }', from));
-      expect(body).toContain(`'${preference}'`);
-      expect(body).toContain('setPreference');
-    });
+describe.each(WIRES)('$id is wired all the way through', ({ id, preference, assignment }) => {
+  it('the modal renders the checkbox', () => {
+    expect(modalCode).toContain(`id="${id}"`);
+    expect(modalCode).toContain(`settingChecks['${id}']`);
+  });
 
-    it('the modal renders the checkbox', () => {
-      expect(modalCode).toContain(`id="${id}"`);
-      expect(modalCode).toContain(`settingChecks['${id}']`);
-    });
-
-    it('the modal translates the element id to that preference name', () => {
-      /*
+  it('the modal translates the element id to that preference name', () => {
+    /*
       Without this row the value is still persisted, under the element id, by the `?? input.id`
       fallback — which is exactly why "it saves fine" was never evidence that it worked.
     */
-      expect(modalCode).toContain(`'${id}': '${preference}'`);
-    });
+    expect(modalCode).toContain(`'${id}': '${preference}'`);
+  });
 
-    it('the write path moves the preference into the state its consumer reads', () => {
-      expect(prefsCode).toContain(assignment);
-    });
-  }
-);
+  it('the write path moves the preference into the state its consumer reads', () => {
+    expect(prefsCode).toContain(assignment);
+  });
+});
 
 describe('the wire has no silent break points', () => {
   it('there is no element-id fallback: an unmapped checkbox persists NOTHING', () => {
@@ -247,10 +230,37 @@ describe('the wire has no silent break points', () => {
     const reaching = MODAL.split('onchange={updateSettingCheck}').length - 1;
     const table = /const preferenceKeyByInputId[\s\S]*?\n {4}\};/.exec(modalCode)?.[0] ?? '';
     const mapped = (table.match(/': '/g) ?? []).length;
+    /*
+      THE EARLY RETURNS ARE COUNTED NOW, not assumed to be one.
 
-    expect(reaching).toBe(26);
-    expect(mapped).toBe(23);
-    expect(reaching - 1 - mapped).toBe(2);
+      The old assertion hardcoded `reaching - 1 - mapped`, and that `1` was `app-donot-disturb`. There
+      are THREE: its `settings-` twin, and `small-image-preview`, whose USM-18 branch negates the
+      preference rather than the rendered state and so cannot go through the table. Counting them
+      makes the arithmetic say what it means — every checkbox either returns early or is mapped —
+      instead of carrying a constant that a fourth branch would silently falsify.
+    */
+    const handler =
+      /function updateSettingCheck[\s\S]*?const preferenceKeyByInputId/.exec(modalCode)?.[0] ?? '';
+    const earlyReturns = (handler.match(/input\.id === '[a-z0-9-]+'/g) ?? []).length;
+
+    /*
+      TWENTY-NINE OCCURRENCES, TWENTY-EIGHT CHECKBOXES, and the difference is the finding.
+
+      One of the 29 is not a checkbox at all: `ModalHost` passes `updateSettingCheck` down to
+      `ReactionPrefsPane` as a PROP, so a raw occurrence count mixes controls with a hand-off. The
+      old arithmetic could not see that because it ran against a smaller modal; the pane was
+      extracted afterwards, and the number quietly began measuring two different things.
+
+      Counted apart now. A second extraction moves the pass-through count, not the checkbox count,
+      and the two say which happened.
+    */
+    const passThroughs = (
+      modalCode.match(/<[A-Z][A-Za-z]*[^>]*onchange=\{updateSettingCheck\}/g) ?? []
+    ).length;
+    expect(reaching).toBe(29);
+    expect(passThroughs).toBe(1);
+    expect(mapped).toBe(28);
+    expect(earlyReturns).toBe(3);
     /*
       DERIVED PER KIND since 2026-08-30, because the flat length had already drifted twice.
 
@@ -266,12 +276,45 @@ describe('the wire has no silent break points', () => {
     */
     const elementIds = DEAD_PREFERENCE_KEYS.filter((key) => key.includes('-'));
     const inventedNames = DEAD_PREFERENCE_KEYS.filter((key) => !key.includes('-'));
-    expect(elementIds).toHaveLength(reaching - 1 - 6);
+
+    /*
+      NINETEEN, AS A FIXED HISTORICAL NUMBER, and the derivation it replaces was wrong twice over.
+
+      It read `reaching - 1 - 6` — the modal's live checkbox count minus one early return minus the
+      six ids mapped before this work. That only ever held while `reaching` was 26. It is 29 now, so
+      the formula asked for 22 against a list of 19.
+
+      The derivation could not have been right in principle either. This group is the set of ids the
+      `?? input.id` fallback ONCE wrote as junk, and that fallback is GONE: the set cannot grow when
+      a checkbox is added, and the file's own prose already says it does not shrink when one is
+      wired — *"the junk it wrote under its element id before that is still in people's blobs"*. A
+      closed historical set derived from a live count is a number that goes wrong the next time
+      somebody adds a checkbox, which is exactly what happened.
+    */
+    expect(elementIds).toHaveLength(19);
+
+    /*
+      EIGHT, and the four that arrived are the reason this assertion could not object.
+
+      It listed four names and had been correct. `sessionLocked` and `sessionLockKick` (2026-09-02),
+      `sessionOpen` and `sessionTokensRevoked` (2026-09-03) then joined the dead list — four
+      room-level acts, or in the last case a command ARGUMENT, that had been written into the
+      clicking presenter's own settings blob under keys nothing read.
+
+      **This file could not fail on any of them.** It read the decoded settings modal at module
+      scope, so `gate/evidence-bound-tests.mjs` excluded the whole suite on every checkout without
+      the captures — including CI. Split on 2026-09-03: the one assertion that needs the capture is
+      in `settings-preference-capture-contract.test.ts`, and these run everywhere.
+    */
     expect(inventedNames).toEqual([
       'alertDisplayMode',
       'chatDisplayMode',
       'presenterStyle',
-      'streamingPlayerEnabled'
+      'streamingPlayerEnabled',
+      'sessionLocked',
+      'sessionLockKick',
+      'sessionOpen',
+      'sessionTokensRevoked'
     ]);
   });
 
@@ -286,7 +329,12 @@ describe('the wire has no silent break points', () => {
     */
     expect(DEAD_PREFERENCE_KEYS).not.toContain('pm-window-layout');
     expect(DEAD_PREFERENCE_KEYS).toContain('app-disable-video');
-    expect(DEAD_PREFERENCE_KEYS).toHaveLength(23);
+    /*
+      27, from 23. Four session keys were retired into this list across 2026-09-02 and 2026-09-03
+      while this suite was excluded from every run — see the invented-name group above for why it
+      could not say so.
+    */
+    expect(DEAD_PREFERENCE_KEYS).toHaveLength(27);
 
     /*
       The server half moved to `user-settings.remote.ts` with `savePreference`. Re-pointed at the
@@ -325,10 +373,21 @@ describe('the wire has no silent break points', () => {
       picker on a different handler entirely. That was the check being wrong, not the app — the
       failure this repository's rules put ahead of reporting anything.
     */
+    /*
+      `[A-Za-z0-9_-]`, not `[a-z-]`, and the pass-through is dropped before the check.
+
+      The narrow class was written when every id here was kebab-case letters. It still is — but the
+      segment that ends in `<ReactionPrefsPane … onchange={updateSettingCheck}` has no id before it
+      at all, because that occurrence is a PROP. The old expression reported `undefined` for it, and
+      this file could not say so: it read a capture at module scope, so the whole suite was excluded
+      from every run without the dumps. The instrument had been wrong since the pane was extracted.
+    */
     const ids = MODAL.split('onchange={updateSettingCheck}')
       .slice(0, -1)
-      .map((before) => [...before.matchAll(/id="([a-z-]+)"/g)].pop()?.[1]);
+      .filter((before) => !/<[A-Z][A-Za-z]*[^>]*$/.test(before))
+      .map((before) => [...before.matchAll(/id="([A-Za-z0-9_-]+)"/g)].pop()?.[1]);
     expect(ids, 'every checkbox on the handler must resolve to an id').not.toContain(undefined);
+    expect(ids, 'and the pass-through is not counted as one').toHaveLength(28);
     for (const name of ids) {
       if (!name || name === 'settings-app-donot-disturb') continue;
       const mapped = modalCode.includes(`'${name}': '`);
@@ -497,15 +556,34 @@ describe('the wire has no silent break points', () => {
     expect(
       stripComments(readFileSync(new URL('./room/recording.ts', import.meta.url), 'utf8'))
     ).toContain('!this.#prefs.doSpeechReco');
-    // Both recording sounds are played by the SSE dispatch, which is the stream's now.
-    const eventsCode = stripComments(EVENTS);
-    // Matched across the line break prettier puts in, because the wrap is formatting and the
-    // wiring is what this asserts.
-    expect(eventsCode).toMatch(
-      /&& this\.#prefs\.recordingStartSound\)\s+playSoundEffect\('recordingStart'\)/
+    /*
+      BOTH RECORDING SOUNDS ARE A TABLE NOW, and this assertion asked for the shape it replaced.
+
+      It matched `&& this.#prefs.recordingStartSound) playSoundEffect('recordingStart')` in
+      `events.svelte.ts` — four inline branches. Those three receivers were extracted to
+      `recording-frames.ts` and their pairing lifted into `ROOM_RECORDING_COMMANDS`
+      (`recording-commands.ts`), which is a better shape for a reason the table's own header gives:
+      `resumeRec` pairs the START sound with the STOP preference, upstream's quirk, and *"in a table
+      the `resumeRec` row visibly disagrees with its neighbours; in four separate blocks it is one
+      word in the middle of the fourth."*
+
+      The assertion went stale at that extraction and **could not fail**, because this file read a
+      capture at module scope and was excluded from every run without the dumps. Asserted against
+      the table now, including the quirk — which is the stronger claim: the old regex would have
+      passed a table that paired every row with its own sound and silently lost the divergence.
+    */
+    const commandsCode = stripComments(
+      readFileSync(new URL('./room/recording-commands.ts', import.meta.url), 'utf8')
     );
-    expect(eventsCode).toMatch(
-      /&& this\.#prefs\.recordingStopSound\)\s+playSoundEffect\('recordingStop'\)/
+    expect(commandsCode).toContain(
+      "startRec: { sound: 'recordingStart', preference: 'recordingStartSound' }"
+    );
+    expect(commandsCode).toContain(
+      "stopRec: { sound: 'recordingStop', preference: 'recordingStopSound' }"
+    );
+    /* The quirk, pinned: start sound, STOP preference. */
+    expect(commandsCode).toContain(
+      "resumeRec: { sound: 'recordingStart', preference: 'recordingStopSound' }"
     );
   });
 });
