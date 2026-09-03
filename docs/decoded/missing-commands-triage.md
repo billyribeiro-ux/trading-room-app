@@ -390,6 +390,56 @@ answers are right.
 `feature-coverage-contract.test.ts`. Both are NAME absences over a feature that was genuinely not
 built until 2026-09-03 — which is exactly why a table that cites markup is not evidence.
 
+### The six presentation-area TABS, answered the same day and for the same reason
+
+`feature-coverage-contract.test.ts` pins six of the reference's eight `presAreaTabs-*` names as
+absent from our source, and the same guard now applies to them. All six are NAME absences: every one
+of those tabs is rendered here.
+
+**What the names actually are.** `presAreaTabs-<name>` is the CLASS the reference puts on each tab
+anchor, and in two cases also an ID. `MainTabStrip.svelte` renders them as `mainTab` values on a
+`#mainTabs .mainTabset` list — the reference's own container id and class — and the `MainTab` union
+in `lib/types.ts` names each one against its `presAreaTabs-` key:
+
+| reference | ours |
+| --- | --- |
+| `presAreaTabs-files` | `mainTab === 'files'`, gated on `hideFiles` |
+| `presAreaTabs-streams` | `mainTab === 'streams'` |
+| `presAreaTabs-swingAlerts` | `mainTab === 'swingAlerts'`, present only with `hasSwingTradeAlerts` |
+| `presAreaTabs-dayTradeAlerts` | `mainTab === 'dayTradeAlerts'`, present only with `hasDayTradeAlerts`. The tab KEY is `dayTradeAlerts` (byte 1,918,012) and the visible label is the shorter `Day Trades` (byte 1,918,110), which is why the two do not match |
+| `presAreaTabs-videoplayer` | `mainTab === 'videoplayer'` |
+| `presAreaTabs-recordings` | **not rendered** — see the last paragraph of this section |
+
+**Only ONE of the eight names carries styling, and we carry that one.** Measured in the reference's
+own `styles.ee2a710065b60389.css`: `presAreaTabs-notes` appears five times and
+`presAreaTabs-screens` once. Nothing else. The notes rules are
+
+```css
+.mainTabset #presAreaTabs-notes.active,
+.mainTabset .nav-item.show #presAreaTabs-notes { background-color: var(--notes-tabs-bg) }
+.mainTabset .presAreaTabs-notes.active,
+.mainTabset .nav-item.show .presAreaTabs-notes { border-color: …; border-bottom: transparent;
+  padding-bottom: 15px; margin-bottom: -1px; border-radius: 3px 3px 0 0;
+  background-color: var(--notes-tabs-bg) }
+.presAreaTabs-notes.active { position: relative; z-index: 10 }
+```
+
+and `MainTabStrip.svelte` is the one tab that carries `class="nav-link presAreaTabs-notes"` for
+exactly that reason, with the three rules consolidated into `app.css`'s
+`#mainTabs > li > a.presAreaTabs-notes.active`. The other six anchors carry no such class because no
+rule anywhere would select it, which is this repository's *"no `.flipped` class with no CSS"* rule
+applied honestly rather than by adding seven decorative hooks.
+
+**The single `screens` occurrence is not a tab rule at all**: `#presAreaTabs-screens-panel .btn-link
+{ color: var(--note-tabs-color) }` targets a link inside the PANEL, and this room renders no
+`.btn-link` in `PresentationArea.svelte`. A rule with no subject here, and giving the panel an id to
+satisfy it would be inventing the element the rule wants.
+
+**`recordings` is the one that is not a name absence.** There is no recordings tab, deliberately —
+nothing produces a recording, no recordings table exists in either database, and
+`main-tab-strip-gates.svelte.test.ts` enforces the tab's absence rather than leaving it to drift.
+`NEW-TODO.md` carries it as blocked on an archive service.
+
 ## Method, so this can be re-run and challenged
 
 1. `audit-feature-coverage.mjs` enumerates the reference's identifiers and diffs them against `src/`.

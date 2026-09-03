@@ -323,6 +323,21 @@ describe('the reference wire vocabulary', () => {
 
     const silent = ABSENT_FROM_OUR_SOURCE.filter((command) => !triage.includes(command));
     expect(silent, 'every absent command needs an answer in its own tracker').toEqual([]);
+
+    /*
+      THE TABS TOO, and they were four-sixths silent when this was written.
+
+      Asserted in the same case rather than a second one, because it is one property — a pinned
+      absence with no answer — and splitting it would invite the next list to be added without the
+      guard, which is the whole failure being closed here.
+
+      The tab names are matched with their `presAreaTabs-` prefix. Bare `files` and `streams` occur
+      in ordinary prose throughout that document, so an unqualified search reported them answered
+      when nothing had been written about them at all — a false green that would have left this
+      guard looking like it worked.
+    */
+    const silentTabs = ABSENT_TABS.filter((tab) => !triage.includes(`presAreaTabs-${tab}`));
+    expect(silentTabs, 'every absent tab needs an answer in its own tracker').toEqual([]);
   });
 
   it('names exactly the presentation-area tabs our source does not mention', () => {
