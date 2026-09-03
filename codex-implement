@@ -261,7 +261,7 @@ Measured on the final working tree:
 | Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,184 tests, production build            |
 | Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
 | Controller `pnpm quality`         | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, production build                   |
-| Controller Vitest                 | 124 files / 1,265 tests; documented totals independently verified at four sites                                                                 |
+| Controller Vitest                 | 126 files / 1,280 tests; documented totals independently verified at four sites                                                                 |
 | Controller Playwright             | 9/9 Chromium journeys against the adapter-node production artifact                                                                              |
 | Controller PostgreSQL integration | 9 files / 59 tests against disposable provisioned PostgreSQL                                                                                    |
 | Rust non-database gate            | format/check green; 114/114 media tests; every API test target compiled with `testing`                                                          |
