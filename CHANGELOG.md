@@ -45,6 +45,65 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 00:09 UTC — the Lock Session buttons close the door now
+
+`459163b`. Session Control's Lock Session tab has three buttons, transcribed from bundle byte
+**2,151,043**: `Lock Session`, `Lock Session & kick users.` and `Unlock Session`. All three wrote
+`sessionLocked` and `sessionLockKick` into the clicking presenter's own settings blob and raised the
+capture's own "Session Locked".
+
+**Measured 2026-09-02: both keys had ZERO readers anywhere in `apps/room/src`.** A presenter locked
+the room, was told the room was locked, and the door stayed open to everybody — for as long as the
+buttons had existed. Same LEVEL error as the Stream Player pane, the chat-mode radio and
+`presenterStyle`: a room-level presenter act modelled as a per-user preference, invisible for exactly
+the reason those were, because the pane shows the value back to the person who set it.
+
+**The blocker recorded for this was a SHAPE, not evidence.** `missing-settings-triage.md` said:
+*"Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is not a
+lock."* Both halves true and the conclusion did not follow — the lock is a room SETTING on the
+**controller**, `room_state` was never where it belonged, and `decideRoomEntry` has refused a locked
+room at the guest door (`room-entry.ts:221`) since before these buttons were written. Nothing about
+the ENFORCEMENT needed building. Only the write.
+
+**Runtime impact.** Three presenter controls that did nothing at all now change the room. `isLocked`
+is the second setting the room may write back, over the same `internal/room-setting` seam
+`overwriteCashRegisterSound` and `restreamToURL` use — a durable per-room value broadcast over the
+event channel would change every browser's belief and persist nothing.
+
+**The alert moved to AFTER the await**, and that is half the fix: raised before it, "Session Locked"
+appeared whether or not the write landed, which is the same failure one layer up.
+
+**`{kick: true}` is NOT reproduced, and it is named where it is sent rather than dropped.** Upstream's
+middle button sends `{kick: true, lock: true}` (byte 2,165,670) and its SERVER evicts everybody. This
+deployment has no evict-everyone command — `kicks.svelte.ts` kicks one named member — and the
+realtime hub is process-local, so a fan-out from the room would reach one instance's listeners and
+silently miss the rest. Locking without kicking is the strictly safer half: nobody new gets in, and
+the members already inside are exactly the ones a presenter can see and remove one at a time. A
+button that CLAIMED to kick and reached one instance would be a worse lie than the one this replaces.
+
+**The presenter is not locked out of their own room**, and that matches by construction rather than by
+a second check: upstream's gate is `sessData.isLocked && !globals.user.isPresenter` (byte 1,148,372),
+and here a presenter reaches the room through their account while `decideRoomEntry` guards the GUEST
+door. Two different doors, and always were.
+
+**Three negative controls seen red, and one caught a vacuous assertion of my own — the third today.**
+`await vi.waitFor(() => alert === 'Session Locked')` stayed GREEN when the assignment moved back above
+the await, because `waitFor` cannot tell "already set" from "set later". The synchronous
+`expect(dialogs.alert).toBeNull()` beside it is the half with teeth.
+
+`user-action-disposition-contract`'s **positive control** moved with it, and the new observable is
+stronger: it asserted a dialog, which is precisely what the defect produced. It asserts the SEND now
+— a thing that leaves the browser.
+
+**112 of 269 settings wired**, from 111. Seven documents state that count and all seven were
+corrected; the verifier refuses to pass while any of them disagrees.
+
+**Verified:** both gates exit 0. `svelte-check` 1647 files, 0 errors.
+
+**Not verified, and named: no browser was opened.** Nothing drove a real guest at a locked door — the
+enforcement is `decideRoomEntry`, which has its own tests and did not change here.
+
+
 ### 2026-09-02 23:40 UTC — the channel model, and two "undecoded" values that were not
 
 `c1c611c`. `processSessData` builds the reference's whole tab strip in ONE expression (pinned bundle,
