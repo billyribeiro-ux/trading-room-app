@@ -1284,7 +1284,17 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       versions of the reason, because a control that refused for three weeks on a blocker that did
       not exist is the failure mode this file's comments are for.
     */
-    max: 356,
+    /*
+      356 -> 368, 2026-09-02, the THIRD raise on this file today and every one of the twelve lines is
+      prose. `room-component-gap-register.md`'s R-11 recorded `sl=1` on the detach URL as residue and
+      asked for a decision; the decision is KEEP, and the reason had to live beside the `tok` note it
+      depends on — `sl=1` is inert here only because dropping `tok` made it so.
+
+      Twelve lines to record a parameter nobody reads sounds like the wrong trade until you notice
+      that it is the SECOND time this exact question has been asked about this URL. A decision with
+      no reason at its code is a decision somebody re-litigates.
+    */
+    max: 368,
     why: 'the alerts pane actions - eight functions, and only the detach receiver crosses back'
   },
   {
@@ -4228,7 +4238,25 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `setting-coverage-contract.test.ts`, or the byte evidence, which is in
       `image-preview-latch-contract.test.ts`.
     */
-    max: 6092,
+    /*
+      6092 -> 6136, 2026-09-02, and all forty-four lines are one comment at ONE anchor.
+
+      The `(test it)` link beside a member's Stream Server is transcribed (`dTe`, byte 2,063,494) and
+      upstream it WORKS — `app-root` reads `?forcedStream=` and `setMyRepeater` prefers it. This room
+      reads the parameter nowhere, and the link is not a lying control today only because the `{#if}`
+      around it never opens: `targetUser.streamServer` has no producer here.
+
+      **It becomes a defect the moment a media host lands**, which is a trap rather than a gap, and
+      the note is at the anchor because that is where whoever lands the host will be looking. It also
+      records why the reader must NOT simply be built: a media host from a query parameter is an
+      authority the client asserts, so a link sent to a member would point their camera and microphone
+      at somebody else's SFU.
+
+      A comment that prevents a future security defect is worth more than forty-four lines of the
+      budget this file is over. Extracting the row to buy them back would move the note away from the
+      markup it is about, which is the one thing that would make it useless.
+    */
+    max: 6136,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
