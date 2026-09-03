@@ -45,6 +45,63 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 11:44 UTC — "Hard Reset and Revoke Tokens" did exactly what "Hard Reset" did
+
+`8ea026c`. **Runtime impact: yes.** Two menu entries that were one control now differ, and the one
+that says it revokes sessions revokes them.
+
+**Not found by a gate.** Found by doing what `CLAUDE.md`'s *"Before saying done"* section asks —
+re-read the diff and check that every comment claiming something still matches the next line.
+
+`hardReset`'s docblock said: *"The preference write STAYS. It is what makes the reset survive a
+client that was not connected to hear the frame, and **it is read by the next page load either
+way**."* `sessionTokensRevoked` had **zero readers anywhere in `apps/room/src`** — its only other
+occurrence in the application is a comment using it as an example of a long key name. That sentence
+was the only evidence the write stood on: the second false docblock this week, after R-4's blocker,
+which collapsed the same way.
+
+**And it is not upstream's name.** Zero occurrences in the 2,891,205-byte bundle — this room invented
+a key for a value that was never meant to be stored. Upstream has one command and two callers, bytes
+2,169,105 and 2,169,459, differing only in `{revoke: !1}` versus `{revoke: !0}`. This room sent
+neither, so the two entries were **one control wearing two labels**, and the distinction a presenter
+chose was dropped on the floor.
+
+**What revoke does now is a decision**, because the reference's server is not in the capture. The
+flag is transcribed exactly; the act behind it is bounded twice, each bound recorded at the command.
+Scoped by `roomShortCode`, so a member of two rooms keeps the other and this stays a room act rather
+than an account one. And the CALLER is spared — a presenter who signs themselves out with a button on
+their own toolbar is a self-inflicted denial no operator wants. The delete goes **before** the frame,
+for the reason `closeSession` gives one door over: a client that reloads while its session row still
+exists walks straight back in.
+
+**A sentence that would have lied to a member.** `live-access.ts`'s minute-poll is the backstop for a
+client that ignores the frame, and its `session-ended` message said *"this account signed in
+somewhere else. Only one device can be signed in at a time."* Its own rule docblock has always listed
+two causes; a presenter revoke makes three. The rule cannot tell them apart and is not made to — all
+three are "the session row is gone" — so the sentence covers its causes now instead of asserting
+one, keeping the newest-wins explanation as one case rather than the case.
+
+**A dead conduit, four files deep.** With both writes gone, `savePreference` was an injected
+collaborator nothing called — what this repository refuses one level up, in `close-message.ts`'s own
+words. The whole chain went: the dep, the option and field on `RoomSessionControl`, the pass-through
+in `RoomUserActions`, and the argument at the composition root. **Four files held a function so that
+a fifth could not call it.** `session-control.ts`'s dependency-surface argument — its entire
+justification for existing separately — said "they need FOUR things"; it says three, because the
+surface got smaller and the argument points the same way.
+
+In `user-actions.svelte.test.ts` the `saved` array is now structurally empty rather than empty by
+behaviour, and that is recorded at the assertion so a reader does not delete it as dead: it is the
+record of a defect that has now taken four keys — `sessionLocked`, `sessionLockKick`, `sessionOpen`
+and `sessionTokensRevoked`.
+
+Nine cases, five negative controls seen red. **Two mistakes of my own, both recorded**: `git checkout
+--` during a control reverted an uncommitted entry along with the mutation — the exact failure this
+session's method already warns about — and a ceiling raise first landed on the WRONG entry, because
+`max: 119,` is not unique in a ten-thousand-line file. The second was caught by re-reading the diff,
+which showed one ceiling changed and named it.
+
+`pnpm run gate` exit 0.
+
 ### 2026-09-03 11:20 UTC — the six tabs beside the forty-five commands, and a false green they almost gave
 
 `365b6dd`. **Runtime impact: no.** A document section and one more assertion.
