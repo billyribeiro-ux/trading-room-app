@@ -45,6 +45,84 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 00:48 UTC — three trackers swept, and every stale row was stale in the same direction
+
+`2f29130`, `ca1909c`, `445b344`. No feature was built here. What was corrected is what a reader would
+have BUILT from — and all three trackers were wrong the same way: they described work that was
+already done, or work that was not work at all.
+
+**`missing-commands-triage.md` — the operator-toolkit five.** The section read *"the five that need a
+decision first, and are outstanding regardless"*, and its headline row read `all still outstanding |
+5`. `NEW-TODO.md` had re-measured four of them on 2026-09-01 and answered NOT WORK; two documents,
+one subject, and the stale one was the summary.
+
+Re-swept independently: `resetAudioBridge`, `resetAudioBridgeOnServer`, `resetAllMediaServers` and
+`resetMediaServer` have **no call site anywhere in the bundle** — every occurrence is the method
+declaration or the command string inside its own body. Building senders would invent controls the
+reference does not render.
+
+**`getMyRepeater` did not belong in that table and never did**, and separating it out is the useful
+half:
+
+```
+byte 1,115,897   on reconnect:  appEventBus.emit("getMyRepeater", {currentStreamServer})
+byte 1,144,067   subscriber  →  sendServerCommand("getMyRepeater", …)
+byte 1,023,916   also after a soft reset, jittered by 3000 * Math.random()
+byte 1,021,388   receiver       case "getMyRepeater": setMyRepeater(i.streamServer)
+byte 1,026,712   setMyRepeater(e) { globals.streamServer = globals.forcedStreamServer || e }
+```
+
+A member's own reconnect exchange, fully live upstream, over the ORDINARY `cmd` transport while the
+other four use `adminCmd` — the same tell this document already applies to `notyping`. Its blocker is
+a **repeater fleet**, not a decision. *"What is missing is REACH, not the commands"* is withdrawn: a
+row's size cannot be reasoned about from what a feature is for.
+
+**And that headline row is now RECOMPUTED**, which it was not. Every other row of that tally is
+derived from the table; this one was prose, which is how it sat wrong for a fortnight in a table where
+nothing else could. Three negative controls seen red.
+
+**`room-component-gap-register.md` — eight of fifteen R-rows were closed.** R-1 through R-6, R-14 and
+R-15, one of them by work done the same day. **R-5 is the one worth naming**: its reason was
+*"unblocked by a close-message store, which is a schema decision"*, and it outlived **two** pieces of
+work — `room_state.closed_message` with `saveCloseMessage`, and `+error.svelte`, which was built on
+09-01 for exactly this case and says so in its own docblock.
+
+R-5 was also the last member of `reference-component-inventory-contract.test.ts`'s `NOT_RENDERED`
+map, **which is now empty**: all fifty reference components this room is answerable for are rendered
+or named. An empty map makes the "no entry outlives the component it excuses" case a vacuous pass, so
+the emptiness is asserted explicitly beside it.
+
+**R-11's two "wired at one end only" halves are answered, and they are not the same case** — the
+register had them as one finding.
+
+| half | answer |
+| --- | --- |
+| `sl=1` on the detach popout URL | **KEPT.** A transcription a member never sees, claiming nothing, inert only because dropping `tok` made it so — so the note belongs beside that one |
+| `?forcedStream=` on the "(test it)" link | **REFUSED.** Honouring it takes a media host from a query parameter, so a link sent to a member could point their camera and microphone at somebody else's SFU. There is also no fleet: `mediaSignallingUrl()` resolves one endpoint from `MEDIA_WS_URL`, server-side |
+
+The second is a **trap rather than a defect today**: its `{#if}` never opens, because
+`targetUser.streamServer` has no producer here. Supply it with a media host and the link starts
+rendering and starts doing nothing. The note is at the anchor, because that is where whoever lands the
+host will be looking — and that is why a 44-line comment was worth the ceiling raise instead of
+extracting the row and moving the note away from its markup.
+
+**R-13 — `app-scplayer`'s undeclared bug-fix, declared.** `app-scplayer.full.js:13-15` builds its
+iframe `src` with `&amp;auto_play=true`: an HTML entity inside a JavaScript template literal, so the
+reference requests a parameter named `amp;auto_play` and its hidden player never starts. This room
+emits `&auto_play=true`.
+
+The row asked for the reason at the call site or the entity restored. **Kept**, because the upstream
+behaviour is UNREACHABLE rather than merely different — the element is `visibility:hidden` below the
+fold with no control to press, so a faithful transcription is a component that can never make a
+sound. `soundcloud-autoplay-contract.test.ts` asserts **both** halves, the URL and the argument,
+because the fix without the reason is exactly the state R-13 objected to.
+
+**Runtime impact: none.** Every change here is a document, a comment or a test.
+
+**Verified:** both gates exit 0 on each of the three commits. Five negative controls seen red across
+the three contracts touched.
+
+
 ### 2026-09-03 00:09 UTC — the Lock Session buttons close the door now
 
 `459163b`. Session Control's Lock Session tab has three buttons, transcribed from bundle byte
