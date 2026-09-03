@@ -198,7 +198,7 @@ Measured on the final working tree:
 
 | Boundary                          | Result                                                                                                                                          |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 403 Vitest files / 7,174 tests, production build            |
+| Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,184 tests, production build            |
 | Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
 | Controller `pnpm quality`         | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, production build                   |
 | Controller Vitest                 | 121 files / 1,233 tests; documented totals independently verified at four sites                                                                 |
