@@ -45,6 +45,80 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 16:02 UTC — seven capture reads were hiding 154 assertions from CI, and four of them had drifted
+
+`375ff13`. **Runtime impact: no.** Test partitioning, four corrected assertions and one corrected
+docblock. Nothing the site serves changed.
+
+The same shape as the two splits below it, applied to every remaining file where it paid. Each of
+these seven read a gitignored capture at MODULE SCOPE for a handful of its cases;
+`gate/evidence-bound-tests.mjs` excludes by FILE, so one such line took the whole suite out of every
+checkout without the dumps — this container, and CI.
+
+| file | cases needing NO capture |
+| --- | --- |
+| `files-pane-contract.test.ts` | 62 of 70 |
+| `ngb-tooltip.test.ts` | 20 of 23 |
+| `note-carousel.test.ts` | 18 of 22 |
+| `room-key-gates.test.ts` | 16 of 18 |
+| `speech-reco-overlay-render.test.ts` | 15 of 19 |
+| `note-version-history.test.ts` | 13 of 17 |
+| `chat-badge-supply-contract.test.ts` | 11 of 13 |
+
+Among the 154 now running: the twelve `files-pane.remote.ts` authority cases, which pin one room out
+of another room's files on a multi-tenant fintech application, and `keys members by md5(email), never
+by address` — the assertion that member email addresses do not cross into the room.
+
+**Four assertions were measurably wrong the moment they could execute:**
+
+* the declaration tag asserted `{const alertSoundButton = $derived(alertSoundButtonFor(` on ONE
+  line. Prettier wrapped it across two. Matched with whitespace collapsed now, which is the only
+  form of it a formatter cannot break;
+* `expect(server).toContain('export const actions: Actions = {')` — `+page.server.ts` exports a load
+  and nothing else since every mutation became a remote command, and its own first line says so.
+  Re-stated as the stronger claim it can now make: not "this write is not among the form actions"
+  but "there are no form actions for it to be among";
+* the Files tab gate read `PresentationArea.svelte` for a `<li>` that moved to `MainTabStrip.svelte`
+  on 2026-08-28. Re-pointed — and the docblock in `PresentationArea` still saying the gate was read
+  "on the main tab `li` below" was corrected with it, **inside the same five lines**, because
+  `source-size-contract` ceilings only go DOWN and the first draft of that correction pushed the
+  file five lines over its own;
+* `feeds all four gates the component already had` sliced `+page.svelte` for four gates, two of
+  which moved into `buildMessageChrome` in `room-message-chrome.ts` and are read off `sessData`
+  there. It CALLS the builder now: a returned object cannot claim a member it does not have, which
+  is what a text match would go on doing one move later.
+
+Each of the four had its negative control seen RED and green again. The tooltip control pointed the
+APPLIED sheet at a copy with the rules renamed, so the SHA-256-pinned `css/complete-app-styles.css`
+was never touched.
+
+**The capture halves are ANCHORS, not transcriptions,** and that is the method worth reusing. Six of
+the eight in `files-pane-capture.test.ts` were a single line inside a much larger case —
+`gates the Files tab AND the pane on hideFiles` is fifty lines about our two elements, our config
+client, our prop hand-off and our stylesheet ordering, opening with one
+`expect(bundle).toContain("z('hidden', o.hideFiles)")`. That line is not the case's subject; it is
+its anchor. Each sibling case is named for what it anchors and each seam in the free file names the
+sibling.
+
+**The instrument was wrong twice and both are recorded, because a confident wrong answer looks
+exactly like a finding.** It first reported `screen-tab-bar-contract` and `const-table-parser` as
+8-free-of-8 — capture reads consumed through a second const or a helper function, which it did not
+follow. Rebuilt to take the transitive closure of tainted module-scope declarations, it drops
+`screen-volume-contract` from 9 free to 6 and `chat-alerts-gates-contract` from 12 to 1. **It is a
+candidate list.** Every split here was confirmed by reading, and `chat-alerts-gates-contract` was
+rejected on that read.
+
+One assertion of mine also failed for matching its own documentation — the sixth time this
+repository has recorded that shape. `assert 'BUNDLE' not in s` matched the paragraph I had just
+written to explain where `BUNDLE` went. Comments stripped; comments still written.
+
+The room suite goes **6,518 → 6,672 passing, 358 → 364 files**. The excluded count is unchanged at
+42: each split moves one file out of the set and one in.
+
+`pnpm run gate` exit 0 in `apps/room`. `svelte-check` caught the one thing `vitest` could not —
+`chatStyle: 'default'` is not a `FollowChatStyle` — which is the argument for running the gate
+rather than the tests.
+
 ### 2026-09-03 12:23 UTC — a capture nothing asserted against was hiding fifty-seven assertions, four of them wrong
 
 `1a53536` and `253efda`. **Runtime impact: no.** Test partitioning and four corrected assertions.
