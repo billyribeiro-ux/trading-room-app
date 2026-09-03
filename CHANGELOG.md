@@ -45,6 +45,82 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 01:28 UTC — the session door: nothing in either application could close a room
+
+`16853a2`. **Runtime impact: yes.** Two presenter controls that reported success and changed nothing
+now do what their labels say, and a third path — the members already inside a room being closed —
+exists for the first time.
+
+`rooms.state` is the column `decideRoomEntry` refuses entry on. `attempt.roomState !== 'open'`
+answers with the presenter's own close message, and that enforcement has always been correct.
+**Nothing could ever set it**, measured today at both ends:
+
+* written at CREATION and nowhere else — `provision-room.ts` and the clone action;
+* the controller's `setState` form action had **no form posting to it**. One occurrence of the name
+  in the whole application: its own declaration at `+page.server.ts:1013`;
+* the room's *" Save Message and Close Session "* wrote `savePreference('sessionOpen', false)` — the
+  clicking presenter's own settings blob. `sessionOpen` had **zero readers anywhere in
+  `apps/room/src`** and was not even on `DEAD_PREFERENCE_KEYS`. Its sibling *" Open Session "* wrote
+  the same dead key and at least also published a frame.
+
+So a presenter closed the session, was told `Message Saved`, and the room admitted everybody as
+before — for the entire life of the feature. The same LEVEL error as the Lock Session buttons one
+door over, and the same shape as the Stream Player pane and the chat-mode radio: a room-level act
+modelled as a per-user preference, invisible precisely because the pane shows the value back to the
+person who set it.
+
+**`internal/room-state/[code]` on the controller**, and a route of its own rather than a key on
+`room-setting`. `state` is a COLUMN on `rooms` — it is what `internal/room-config` already projects
+as `room.state` — and the settings door writes `settings_json` through the generated schema.
+Teaching that one handler a second storage shape is how a handler comes to have two rules.
+`isLocked` went the other way on 2026-09-02 for the same reason read forwards: it IS a setting. The
+endpoint takes a `config-write:` capability, names a member, and requires that member be the owner
+or a true presenter of THIS room. The room hides both controls from a member and refuses the action
+for one, and a hidden button is not an authorization check.
+
+**Both commands write before they announce.** `openSession`: do not tell people to reload into a
+door that is still shut. `closeSession` (new): the refusal must already be true when the reload
+arrives. One principle with the sign flipped — the durable state changes before anything tells
+anybody it has — and the contract asserts it **by position**, because a mock could show both calls
+happening and say nothing about which came first.
+
+**A `closedPage` receiver**, for the people already in the room. Upstream's subscriber is one line —
+`subscribe("closedPage", () => this.currPage = "closed")`, byte 2,596,849 — swapping `app-root`'s
+whole page. This room has no `currPage` switch: its equivalent is the guest door's own refusal,
+rendered by `+error.svelte` with the stored close message, so the RELOAD is the page swap. The
+sentence it raises first is OURS and recorded as ours: upstream raises nothing because its swap is
+instant and local, and a browser that reloads with no warning looks like a crash.
+
+`sessionOpen` is on `DEAD_PREFERENCE_KEYS` now, which is what evicts the copies already sitting in
+browsers, and the `savePreference` dependency came out of `close-message.ts` with the write it
+existed for.
+
+**Thirteen negative controls, each run alone and each seen RED** before the tree was restored from a
+scratchpad copy — never `git checkout --`, which reverted an intended rewrite earlier in this
+session. They covered: removing the write from `closeSession`; swapping write/frame order in
+`openSession`; reinstating the dead write on both sides; deleting the receiver; un-naming the dead
+key; silencing the close failure; downgrading the endpoint and the client function to a READ
+capability; writing the wrong state; making the presenter check read a different row than the one
+looked up; and giving the one member-less write route a presenter check it must not have.
+
+**One of those controls silently no-opped on its first attempt** and is worth recording as a method
+failure rather than a footnote. The `sessionOpen` entry is the last element of its array and carries
+no trailing comma, so a mutation written to delete `'sessionOpen',` matched nothing, the file was
+rewritten unchanged, and the test passed — which is indistinguishable from the vacuous test the
+control exists to rule out. Every mutation after it asserts that the file actually changed before
+the test is run.
+
+**`config-read-cannot-write-contract.test.ts` gained a sweep**, and it is the part of this work with
+the longest reach. Every write route must now check that the named member is a presenter of this
+room. It matches the shape rather than a spelling — the local is called `caller`, `member` and
+`membership` across six files, and renaming a local is not a security change — with a backreference
+so that the two halves of the test cannot read different rows. `room-occupancy` is the one exception,
+it is named, and its absence is pinned in both directions.
+
+`pnpm run gate` exit 0 in **both** apps. Three controller documents restating the Vitest count were
+brought from 1188 to 1196, and `room-surface-audit-2026-08-30.md`'s list of recorded session events
+gains *session closed* — before today the room had no command that closed anything.
+
 ### 2026-09-03 00:48 UTC — three trackers swept, and every stale row was stale in the same direction
 
 `2f29130`, `ca1909c`, `445b344`. No feature was built here. What was corrected is what a reader would
