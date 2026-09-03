@@ -4308,24 +4308,37 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       `image-preview-latch-contract.test.ts`.
     */
     /*
-      6092 -> 6136, 2026-09-02, and all forty-four lines are one comment at ONE anchor.
+      6092 -> 6136 on 2026-09-02, and 6136 -> 6125 on 2026-09-03. Both halves of the ratchet, on one
+      anchor, one day apart — which is why they are kept together rather than the first being edited
+      away.
 
-      The `(test it)` link beside a member's Stream Server is transcribed (`dTe`, byte 2,063,494) and
-      upstream it WORKS — `app-root` reads `?forcedStream=` and `setMyRepeater` prefers it. This room
-      reads the parameter nowhere, and the link is not a lying control today only because the `{#if}`
-      around it never opens: `targetUser.streamServer` has no producer here.
+      The RAISE bought forty-four lines of comment beside the `(test it)` link. That link is
+      transcribed (`dTe`, byte 2,063,494) and upstream it WORKS — `app-root` reads `?forcedStream=`
+      and `setMyRepeater` prefers it over the server's assignment. This room reads the parameter
+      nowhere, and the link was not a lying control on that day only because the `{#if}` around it
+      never opened: `targetUser.streamServer` has no producer here.
 
-      **It becomes a defect the moment a media host lands**, which is a trap rather than a gap, and
-      the note is at the anchor because that is where whoever lands the host will be looking. It also
-      records why the reader must NOT simply be built: a media host from a query parameter is an
-      authority the client asserts, so a link sent to a member would point their camera and microphone
-      at somebody else's SFU.
+      The note said **it becomes a defect the moment a media host lands** — and it was right, which
+      is what made a note the wrong instrument. Whoever lands `STREAM_SERVER_MTX` is editing
+      `user-detail.ts` and the MTX wiring; they have no reason to open this component, and supplying
+      the value from over there arms the trap without anyone reading the paragraph warning about it.
 
-      A comment that prevents a future security defect is worth more than forty-four lines of the
-      budget this file is over. Extracting the row to buy them back would move the note away from the
-      markup it is about, which is the one thing that would make it useless.
+      The LOWER is what that costs: the anchor is gone (the note had already named its own honest end
+      state — *"a diagnostic VALUE with no '(test it)' affordance"*), and the argument moved to
+      `forced-stream-refusal-contract.test.ts`, which sweeps every shipped file for the parameter,
+      asserts the modal builds no such URL, and asserts this cell still renders the value. What is
+      left here is the pointer and the divergence, which do belong at the markup.
+
+      This is the ratchet's second half working as its header describes: extract, then lower to what
+      the file now measures. The thing extracted was an argument, and it went somewhere it could be
+      ENFORCED rather than read.
     */
-    max: 6136,
+    /*
+      6125 -> 6124, and the one line is the `$app/paths` import going with the anchor that used it.
+      `eslint` found it, not this file — which is the division of labour working: the ratchet says how
+      big, the linter says what is dead, and neither is asked to be the other.
+    */
+    max: 6124,
     /*
       5980 -> 5995, 2026-08-29. The notes tab's password panel is now GATED — `{#if !canManageNotes}`,
       upstream's own `pTe` branch — plus the prop and two notes recording why only half of upstream's
