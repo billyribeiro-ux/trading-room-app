@@ -74,11 +74,18 @@ describe('alerts toolbar: two states, two controls', () => {
     expect(paneActions).toContain('toggleToolbar()');
 
     // The magnifier (title="Search") must call the search-only toggle…
-    const magnifier = paneMarkup.slice(paneMarkup.indexOf('title="Search"'));
+    const magnifier = paneMarkup.slice(
+      paneMarkup.lastIndexOf('<li', paneMarkup.indexOf('title="Search"'))
+    );
     expect(magnifier.slice(0, 300)).toContain('ontogglealertssearch');
 
     // …and the gear must expand the toolbar, NOT open the alert-filter modal.
-    const gear = paneMarkup.slice(paneMarkup.indexOf('nav-link dropdown-toggle p-0'));
+    const gearAnchor = paneMarkup.indexOf('nav-link dropdown-toggle p-0');
+    expect(
+      gearAnchor,
+      'the gear marker must exist for this guard to test anything'
+    ).toBeGreaterThan(-1);
+    const gear = paneMarkup.slice(paneMarkup.lastIndexOf('<li', gearAnchor));
     expect(gear.slice(0, 300)).toContain('ontogglealertstoolbar');
     expect(gear.slice(0, 300)).not.toContain("onopenmodal('alert-filter')");
 
@@ -133,7 +140,7 @@ describe('alerts toolbar: what each state renders', () => {
     const tail = paneMarkup.slice(paneMarkup.indexOf('id="addon-chat-clear"'));
     const gate = tail.indexOf('{#if alerts.toolbarExtended}');
     const save = tail.indexOf('id="addon-chat-save"');
-    const presenterGate = tail.indexOf('{#if isPresenter}');
+    const presenterGate = tail.indexOf('{#if isPresenter && !isLimitedPresenter}');
     const archive = tail.indexOf('id="addon-chat-messages-archive"');
 
     expect(gate).toBeGreaterThan(-1);

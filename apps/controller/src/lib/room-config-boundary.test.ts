@@ -341,6 +341,7 @@ describe('the allow-list itself', () => {
       showArchivesToUsers: 'archivesAvailableTo()',
       showArchivesToSpecificPresenters: 'archivesAvailableTo()',
       hideRecs: 'O(6) inside the Archives menu — Recording',
+      recsInRoom: 'MainTabStrip and RecordingArchivePane — enables the authorized recording catalog',
       hideChatLog: 'O(11)/O(12) inside the Archives menu',
       userUploads: 'canPostImages in the composer',
       /*
@@ -642,6 +643,9 @@ describe('the allow-list itself', () => {
       */
       recordingReminder:
         '+page.svelte — the owner term of the recording-reminder banner, ANDed with the local runtime flag and the recording state',
+      recordChat: 'recording upload boundary — snapshots chat and alerts from the authoritative recording window',
+      isNewIndicatorOn:
+        'RoomMessage, RoomSidebar and user detail — presenter-only rendering of controller-derived new-member state',
       /*
         USM-18, added 2026-09-02. The room DEFAULT for a per-member preference, and the only entry on
         this list whose visible effect is a class with no rule in any stylesheet — transcribed rather

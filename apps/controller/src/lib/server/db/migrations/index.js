@@ -12,6 +12,10 @@ import { sql as userRowReferenceFields } from './0010-user-row-reference-fields.
 import { sql as recordedMaxCapacity } from './0011-recorded-max-capacity.js';
 import { sql as streamIngestKeys } from './0012-stream-ingest-keys.js';
 import { sql as badgeDarkThemeBadgeId } from './0013-badge-dark-theme-badge-id.js';
+import { sql as alertDeliveryLedger } from './0014-alert-delivery-ledger.js';
+import { sql as discordOauth } from './0015-discord-oauth.js';
+import { sql as alertDispatchLinks } from './0016-alert-dispatch-links.js';
+import { sql as alertCrossPostSuppression } from './0017-alert-cross-post-suppression.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -131,6 +135,26 @@ export const MIGRATIONS = [
     version: 13,
     name: 'badge_dark_theme_badge_id',
     sql: badgeDarkThemeBadgeId
+  },
+  {
+    version: 14,
+    name: 'alert_delivery_ledger',
+    sql: alertDeliveryLedger
+  },
+  {
+    version: 15,
+    name: 'discord_oauth',
+    sql: discordOauth
+  },
+  {
+    version: 16,
+    name: 'alert_dispatch_links',
+    sql: alertDispatchLinks
+  },
+  {
+    version: 17,
+    name: 'alert_cross_post_suppression',
+    sql: alertCrossPostSuppression
   }
 ];
 

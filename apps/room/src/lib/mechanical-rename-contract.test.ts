@@ -249,6 +249,7 @@ describe('the strings that were corrupted are back to what the capture says', ()
   */
   const navbar = readFileSync('src/lib/components/RoomNavbar.svelte', 'utf8');
   const recording = readFileSync('src/lib/room/recording.ts', 'utf8');
+  const recordingArchive = readFileSync('src/lib/recording-archive-client.ts', 'utf8');
 
   it('the recording reminder reads as English', () => {
     expect(navbar).toContain('<span>You are not recording!</span>');
@@ -286,7 +287,11 @@ describe('the strings that were corrupted are back to what the capture says', ()
       `room-recording-2026` as the recording name in seven assertions.
     */
     expect(recording).toContain('`room-recording-${stamp}.${extension}`');
-    expect(recording).toContain('`room-recording-${new Date().toISOString()}`');
-    expect(recording, 'the corrupted filename must not come back').not.toContain('room-media.');
+    expect(recordingArchive).toContain(
+      '`room-recording-${new Date(this.#startedAt).toISOString()}`'
+    );
+    for (const source of [recording, recordingArchive]) {
+      expect(source, 'the corrupted filename must not come back').not.toContain('room-media.');
+    }
   });
 });

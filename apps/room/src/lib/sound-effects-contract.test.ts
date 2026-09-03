@@ -81,23 +81,23 @@ describe('the sound on an incoming chat message', () => {
     expect(block).toContain('!this.#prefs.doNotDisturbOn && this.#prefs.chatSoundOn');
   });
 
-  it('plays `pling` for a FOLLOWED user and `followed` for everyone else', () => {
+  it('delegates the three-way selection and plays the selected sound once', () => {
     /*
       The naming is the reference's and it is genuinely confusing: the sound file called `followed`
       is what the ROOM-WIDE ding uses, while an explicitly followed user gets `pling`. Swapping
       them is the obvious mistake and nothing else would catch it.
     */
-    expect(block).toContain("playSoundEffect('pling')");
-    expect(block).toContain("playSoundEffect('followed')");
-    expect(block.indexOf("playSoundEffect('pling')")).toBeLessThan(
-      block.indexOf("playSoundEffect('followed')")
-    );
+    expect(block).toContain('const sound = arrivalSoundFor({');
+    expect(block).toContain('if (sound) playSoundEffect(sound);');
   });
 
-  it('lets a followed user outrank the room-wide setting', () => {
-    // `followStyle?.playSound` is checked FIRST and short-circuits, so a followed user is heard
-    // even when the room has the ding switched off.
-    expect(block).toMatch(/followStyle\?\.playSound[\s\S]*else if[\s\S]*dingOnNewMessage/);
+  it('passes every authority input to the pure selector', () => {
+    expect(block).toContain('followedSenderPlaysSound:');
+    expect(block).toContain('?.followChatStyle?.playSound === true');
+    expect(block).toContain(
+      'dingOnNewMessage: this.#session().sessData?.dingOnNewMessage === true'
+    );
+    expect(block).toContain('chatSoundForEmailHashes: this.#session().chatSoundForEmailHashes');
   });
 
   it('never fires for your own message', () => {

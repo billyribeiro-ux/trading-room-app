@@ -54,6 +54,7 @@
   let openRowMenu = $state<number | null>(null);
   let openSubmenu = $state<string | null>(null);
   let permissionsFor = $state<number | null>(null);
+  let integrationRevealOpen = $state(false);
   let dontTouchShown = $state(false);
   /**
    * `showAdServer` — the second disclosure inside the DON'T TOUCH block.
@@ -639,6 +640,14 @@
     if (result.type === 'success') toast.success('Changes have been saved.');
   };
 
+  const revealIntegrationCredentials: SubmitFunction = () => async ({ result, update }) => {
+    await update({ reset: false });
+    if (result.type === 'success') {
+      integrationRevealOpen = false;
+      toast.success('Integration credentials revealed for this response.');
+    }
+  };
+
   /** close the inline row form once its save has landed */
   const rowFormDone =
     (close: () => void): SubmitFunction =>
@@ -662,6 +671,16 @@
     openMenu = id;
     openRowMenu = null;
     openSubmenu = null;
+  }
+
+  function focusOnMount(node: HTMLInputElement) {
+    node.focus();
+  }
+
+  function openIntegrationReveal(event?: KeyboardEvent) {
+    if (event && event.key !== 'Enter' && event.key !== ' ') return;
+    event?.preventDefault();
+    integrationRevealOpen = true;
   }
 
   function toggleMenu(id: string) {
@@ -2847,13 +2866,35 @@ Please click this link to attend: ______ unique link will be here_____
                        one in the DON'T TOUCH block below. -->
                   <p></p>
 
-                  <!-- a plain <span>, not an editable: the reference builds this
-                       from the room id and it is not a stored setting -->
+                  <!-- Permanent integration credentials are absent from the initial SSR payload.
+                       The owner must reauthenticate, and the server audits success and refusal. -->
                   <p class="form-control-static">
                     <label class="col-sm-2 control-label" for="mg-shortcode">Wordpress shortcode:</label>
-                    <span id="mg-shortcode">{data.wordpressShortcode}</span>
+                    {#if form?.credentialBundle?.wordpressShortcode}
+                      <span id="mg-shortcode">{form.credentialBundle.wordpressShortcode}</span>
+                    {:else}
+                      <span
+                        id="mg-shortcode"
+                        role="button"
+                        tabindex="0"
+                        onclick={() => openIntegrationReveal()}
+                        onkeydown={openIntegrationReveal}
+                      >
+                        Hidden — reauthenticate to reveal
+                      </span>
+                    {/if}
                   </p>
-
+                  {#if form?.credentialBundle?.appPairUrl}
+                    <p class="form-control-static">
+                      <label class="col-sm-2 control-label" for="pairURLLink">App pair sample:</label>
+                      <input
+                        id="pairURLLink"
+                        class="form-control"
+                        readonly
+                        value={form.credentialBundle.appPairUrl}
+                      />
+                    </p>
+                  {/if}
                   {#each settingsBeforeApiSecret as def (def.name)}
                     {const help = $derived(settingHelp(def))}
                     <p class="form-control-static">
@@ -3286,4 +3327,51 @@ Please click this link to attend: ______ unique link will be here_____
     permissionKeys={data.permissionKeys}
     onclose={() => (permissionsFor = null)}
   />
+{/if}
+
+{#if integrationRevealOpen}
+  <div class="modal in" role="dialog" aria-modal="true" aria-labelledby="integration-reveal-title">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button
+            type="button"
+            class="close"
+            aria-label="Close"
+            onclick={() => (integrationRevealOpen = false)}
+          ><span aria-hidden="true">&times;</span></button>
+          <h4 class="modal-title" id="integration-reveal-title">Reveal integration credentials</h4>
+        </div>
+        <form
+          method="POST"
+          action="?/revealIntegrationCredentials"
+          use:enhance={revealIntegrationCredentials}
+        >
+          <div class="modal-body">
+            <p>Confirm your current password. The reveal attempt is recorded in the admin audit log.</p>
+            {#if form?.message}
+              <p class="mg-error" role="alert">{form.message}</p>
+            {/if}
+            <label for="integration-password">Current password</label>
+            <input
+              id="integration-password"
+              name="password"
+              class="form-control"
+              type="password"
+              autocomplete="current-password"
+              required
+              use:focusOnMount
+            />
+          </div>
+          <div class="modal-footer text-right">
+            <button class="btn btn-default" type="button" onclick={() => (integrationRevealOpen = false)}>
+              Cancel
+            </button>
+            <button class="btn btn-warning" type="submit">Reveal</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop"></div>
 {/if}

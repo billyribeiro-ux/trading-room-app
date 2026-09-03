@@ -51,21 +51,24 @@ describe('Swap Primary and Backup Media Servers — two blockers, either alone i
     );
   });
 
-  it('its GATE is a second media cluster, which this deployment does not have', () => {
+  it('its gate is now backed by an automatic primary-to-backup resolver', () => {
     /*
       `O(36, e.appService.globals.sessData.backupClusterID ? 36 : -1)` — the button renders only when
-      the room names a BACKUP cluster. `backupClusterID` is a controller setting and is `wired: false`:
-      nothing writes it, so the gate is false for every room this repository can produce.
-
-      `TODO.md` row AD measured the media plane end to end on MediaMTX v1.20.1 and closed it — for ONE
-      cluster. A swap needs a second, and an operator to run it.
+      the room names a BACKUP cluster. The deployment now consumes that value server-side and
+      automatically selects it after a failed configured primary health check.
     */
     expect(BUNDLE).toContain('O(36,e.appService.globals.sessData.backupClusterID?36:-1)');
     const at = SCHEMA.indexOf('{ name: "backupClusterID"');
     expect(at, 'the backupClusterID entry must be findable').toBeGreaterThan(-1);
     const close = SCHEMA.indexOf('}', at);
     expect(close, 'its entry must be closed').toBeGreaterThan(at);
-    expect(SCHEMA.slice(at, close)).toContain('wired: false');
+    expect(SCHEMA.slice(at, close)).toContain('wired: true');
+    const resolver = readFileSync(
+      new URL('../../../controller/src/lib/server/media-cluster.ts', import.meta.url),
+      'utf8'
+    );
+    expect(resolver).toContain('usedBackup: true');
+    expect(resolver).toContain('primary health check failed');
   });
 
   it('and its ACTION is behind one of the seven credentials', () => {

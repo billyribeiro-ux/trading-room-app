@@ -17,7 +17,7 @@
   import { ROOM_PERMISSION_KEYS, type RoomPermissionKey } from '#lib/permission-keys.js';
   import { rtmpIngestUrl, whipIngestUrl, type StreamIngestKey } from '#lib/stream-ingest.js';
   import { invalidateAll } from '$app/navigation';
-  import { onMount, untrack } from 'svelte';
+  import { onMount, untrack, type Snippet } from 'svelte';
   import type { CaptureSettings } from '#lib/capture-settings.js';
   import type {
     AlertTab,
@@ -49,6 +49,7 @@
   import type { MessageBadge } from '#lib/types.js';
   import AlertQaModal from './AlertQaModal.svelte';
   import AlertSendReportModal from './AlertSendReportModal.svelte';
+  import DiscordSettingsPane from './DiscordSettingsPane.svelte';
   import BootboxDialog from './BootboxDialog.svelte';
   import ConnectivityModal from './ConnectivityModal.svelte';
   import UserNotesPane from './UserNotesPane.svelte';
@@ -59,6 +60,7 @@
   import Modal from './Modal.svelte';
   import PollPanel from './PollPanel.svelte';
   import PostAlertModal from './PostAlertModal.svelte';
+  import PublicPlayerPane from './PublicPlayerPane.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
   import { chatModeConfirmPrompt, type ChatMode } from '#lib/chat-mode.js';
   import { refusalMessage, refusalOrTransportMessage } from '#lib/refusal-message.js';
@@ -95,6 +97,8 @@
 
   interface Props {
     name: ModalName;
+    /** Overlay-owned recording preview, rendered here to retain the captured root-host order. */
+    recordingPreview: Snippet;
     /**
      * The ICE servers THIS deployment minted, from `/api/media/grant` via `+page.svelte`.
      *
@@ -108,6 +112,12 @@
     stickyNonTradeAlert?: boolean;
     /** `sessData.hasAlertScheduler`, forwarded to the composer — see `PostAlertModal`'s own prop. */
     schedulerAvailable?: boolean;
+    /** A validated linked-room list exists, so the per-alert suppression has an effect. */
+    crossPostAvailable?: boolean;
+    /** Room policy controlling presenter-only NEW membership markers. */
+    showNewIndicator?: boolean;
+    /** Presenter-only room policy enabling the Discord identity integration. */
+    discordEnabled?: boolean;
     /**
      * The room's configured Alert Labels, forwarded to the composer's picker (`PAM-01`).
      *
@@ -669,11 +679,15 @@
 
   let {
     name,
+    recordingPreview,
     mediaIceServers = [],
     settingsTab,
     alertTab,
     stickyNonTradeAlert = false,
     schedulerAvailable = false,
+    crossPostAvailable = false,
+    showNewIndicator = false,
+    discordEnabled = false,
     alertLabels = [],
     theme,
     roomSplitDir,
@@ -2294,7 +2308,7 @@
                         {#if isPresenter && targetUser.isTrial}<span
                             class="badge bg-danger trial-badge">Trial</span
                           >{/if}
-                        {#if isPresenter && targetUser.isNew}<span
+                        {#if showNewIndicator && isPresenter && targetUser.isNew}<span
                             class="badge bg-warning new-badge">New</span
                           >{/if}
                         <!--
@@ -3140,6 +3154,23 @@
               event.preventDefault();
               onSettingsTab('presenter');
             }}>Presenter Settings</a
+          >
+        </li>
+      {/if}
+      {#if isPresenter && discordEnabled}
+        <li class="nav-item">
+          <a
+            id="discord-settings-tab"
+            data-bs-toggle="tab"
+            href="#discord-settings"
+            role="tab"
+            aria-controls="discord-settings"
+            aria-selected={settingsTab === 'discord'}
+            class={settingsTab === 'discord' ? 'nav-link active' : 'nav-link'}
+            onclick={(event) => {
+              event.preventDefault();
+              onSettingsTab('discord');
+            }}>Discord</a
           >
         </li>
       {/if}
@@ -4058,6 +4089,10 @@
         {/if}
       </div>
 
+      {#if isPresenter && discordEnabled}
+        <DiscordSettingsPane active={settingsTab === 'discord'} />
+      {/if}
+
       <!-- USM-14, the pane half: `O(292, isPresenter && !isLimitedPresenter ? 292 : -1)`. -->
       {#if isPresenter && !isLimitedPresenter}
         <div
@@ -4444,6 +4479,7 @@
     onpastepost={onPastePostAlert}
     {stickyNonTradeAlert}
     {schedulerAvailable}
+    {crossPostAvailable}
     {alertLabels}
   />
 </app-post-alert-modal>
@@ -4744,73 +4780,10 @@
             {/each}
           </ul>
           <div id="streaming-settings-tabContent" class="tab-content">
-            <div
-              id="stream-player"
-              role="tabpanel"
-              aria-labelledby="stream-player-tab"
-              class={[
-                'tab-pane fade',
-                {
-                  show: streamingControlTab === 'stream-player',
-                  active: streamingControlTab === 'stream-player'
-                }
-              ]}
-            >
-              <p>
-                The stream player tool allows you to create a link you can share with others to
-                watch your stream. This is useful if you want to share your stream with others who
-                are not logged in to the trading room. They will just see the screenshare sections
-                (no chat/notes/files/etc)
-              </p>
-              <p>
-                Stream Player enabled:
-                <span style:color="red">false</span>
-              </p>
-              <!--
-                ── THESE TWO BUTTONS ARE INERT, AND SAYING SO IS THE FIX ────────────────────────────
-
-                They used to flip a local `streamPlayerEnabled` and write
-                `onPreferenceChange('streamingPlayerEnabled', true | false)` — a key in THIS
-                presenter's own settings blob, read by nothing anywhere in the repository. A
-                room-level presenter act modelled as a per-user preference, which is the same defect
-                `chat-mode.ts` and `presenter-colors.ts` each record; the label went green and
-                nothing else in the world changed.
-
-                Wiring them was measured and REFUSED rather than attempted, because what the
-                reference does cannot be reproduced from anything held here:
-
-                  getPlayerLink() { let i = yield invokeAdminCmd("streamStatus");
-                                    this.streamingPlayerEnabled = i.rc.enablePlayer;
-                                    this.streamingLinkPlayer = i.rc.playerURL }   (byte 2,170,505)
-
-                `playerURL` arrives FROM THE SERVER. The client composes nothing, and that server is
-                not in the capture. So the feature is a public, unauthenticated page that renders one
-                room's screenshares to whoever holds a link — which needs an anonymous media grant,
-                and minting one is an authorization decision this repository's own standard forbids
-                inventing: every authority decision is made on the server from data the server owns,
-                and there is no such data here yet.
-
-                Disabled with the reason on screen, rather than removed: the reference draws this
-                pane, and a presenter who has been told the tool is unavailable is better served than
-                one who cannot find where it went. The blocker is recorded in `TODO.md` and against
-                `SC-04` / `SC-05` in the surface audit. `streamingPlayerEnabled` joins
-                `dead-preference-keys.ts` so the copies already written are pruned.
-              -->
-              <div class="mt-4">
-                <button class="btn btn-outline-primary btn-sm m-1" disabled>
-                  <i class="fas fa-desktop"></i> Enable Stream Player
-                </button>
-                <button class="btn btn-outline-danger btn-sm m-1" disabled>
-                  <i class="fas fa-stop"></i> Disable Stream Player
-                </button>
-              </div>
-              <div class="alert alert-info m-2">
-                The stream player is not available in this deployment: it needs a public playback
-                page, and there is no server here that issues one. The buttons above are shown
-                because the tool exists upstream, and are disabled because pressing them would
-                change nothing.
-              </div>
-            </div>
+            <PublicPlayerPane
+              active={streamingControlTab === 'stream-player'}
+              oncopied={() => onUserAction('copied-to-clipboard', targetUser)}
+            />
             <div
               id="obs-streaming"
               role="tabpanel"
@@ -5347,6 +5320,7 @@
     <div class="ui-resizable-handle ui-resizable-nw" style="z-index: 90;"></div>
   </div>
 </app-screenshare-preview>
+{@render recordingPreview()}
 <app-followed-users-modal>
   <Modal
     id="followedUsersModal"
@@ -5491,7 +5465,7 @@
   <!--
     Rebuilt against the BUNDLE, not the DOM capture.
 
-    The previous version reproduced `app-room/complete.clean.html:155555` exactly - and that
+    The previous version reproduced byte 155,555 of `app-room/complete.clean.html` exactly - and that
     capture only ever rendered the empty state, so every branch the component gates behind state
     was missing: the selected-trader label, the check marks, "Unselect All", the loading spinner,
     the results list, and the Clear button. All of them are in

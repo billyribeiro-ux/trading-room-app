@@ -79,7 +79,10 @@ const WRITERS = [
     configuration must not reach it.
   */
   'writeRoomState',
-  'requestStreamIngestKey'
+  'requestStreamIngestKey',
+  'requestAlertDelivery',
+  'requestDiscordAuthorization',
+  'unlinkDiscord'
 ];
 
 /*
@@ -136,7 +139,10 @@ const READERS = [
     credential-shaped settings a guess at a time; `room-credential-prompt.ts` on the controller
     carries the argument, and what IS shared is the constant-time comparison rather than the door.
   */
-  'checkAlertDeletePasswordRemotely'
+  'checkAlertDeletePasswordRemotely',
+  'requestAlertDeliveryReport',
+  'requestPublicStreamReadToken',
+  'requestDiscordStatus'
 ];
 
 describe('the capability minted for each controller call', () => {
@@ -152,8 +158,8 @@ describe('the capability minted for each controller call', () => {
 
   it.each(WRITERS)('%s mints a WRITE capability', (name) => {
     const body = bodyOf(name);
-    expect(body).toContain('configWriteToken(secret, shortCode)');
-    expect(body).not.toContain('configReadToken(secret, shortCode)');
+    expect(body).toMatch(/configWriteToken\(secret, (?:input\.)?shortCode\)/);
+    expect(body).not.toMatch(/configReadToken\(secret, (?:input\.)?shortCode\)/);
   });
 
   it.each(READERS)('%s mints a READ capability', (name) => {

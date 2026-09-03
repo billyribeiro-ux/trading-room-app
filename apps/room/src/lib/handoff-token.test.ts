@@ -1,6 +1,10 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { CLOCK_SKEW_SECONDS, verifyHandoffToken } from './server/handoff-token';
+import {
+  authorityEmailForHandoff,
+  CLOCK_SKEW_SECONDS,
+  verifyHandoffToken
+} from './server/handoff-token';
 
 /**
  * The room's entire trust decision about who is allowed in.
@@ -90,6 +94,16 @@ describe('a token the controller actually minted', () => {
     const result = verifyHandoffToken(SECRET, mint(guestPayload), NOW);
     expect(result.ok && result.claims.type).toBe('guest');
     expect(result.ok && result.claims.id).toBe('');
+  });
+});
+
+describe('handoff membership authority', () => {
+  it('allows only an authenticated site token to select a membership by email', () => {
+    const site = verifyHandoffToken(SECRET, mint(sitePayload), NOW);
+    const guest = verifyHandoffToken(SECRET, mint(guestPayload), NOW);
+    expect(site.ok && authorityEmailForHandoff(site.claims)).toBe('ada@example.com');
+    expect(guest.ok && authorityEmailForHandoff(guest.claims)).toBe('');
+    expect(authorityEmailForHandoff(null)).toBe('');
   });
 });
 

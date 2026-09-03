@@ -215,7 +215,8 @@ export function createSessionFor(
   cookies: Cookies,
   userId: number,
   remember: boolean,
-  roomShortCode: string | null = null
+  roomShortCode: string | null = null,
+  isFreeTrial = false
 ): string {
   const now = new Date();
   const sessionId = randomUUID();
@@ -235,7 +236,14 @@ export function createSessionFor(
     transaction.delete(sessions).where(eq(sessions.userId, userId)).run();
     transaction
       .insert(sessions)
-      .values({ id: sessionId, userId, roomShortCode, createdAt: now, lastSeenAt: now })
+      .values({
+        id: sessionId,
+        userId,
+        roomShortCode,
+        isFreeTrial,
+        createdAt: now,
+        lastSeenAt: now
+      })
       .run();
     /*
       `users.last_login_at` — the durable half, and it is IN this transaction rather than after it.

@@ -42,4 +42,7 @@ export interface UserDetail {
   readonly ip: string | null;
   /** `privData.uaStr` — the `User-Agent` on that same request, bounded at the boundary, or null. */
   readonly userAgent: string | null;
+  readonly appVersion?: string | null;
+  readonly streamServer?: string | null;
+  readonly serverId?: string | null;
 }

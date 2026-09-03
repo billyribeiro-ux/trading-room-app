@@ -36,7 +36,7 @@ describe('the login flow all renders in the controller shell', () => {
 
   it('keeps them there with a query string, which is how a reset link actually arrives', () => {
     // `resolveChrome` takes a pathname, so this documents the caller's contract as much as the
-    // function's: the layout passes `page.url.pathname`, which never includes the query.
+    // function's: the layout server passes `url.pathname`, which never includes the query.
     expect(resolveChrome('/reset-password')).toBe('controller');
   });
 });

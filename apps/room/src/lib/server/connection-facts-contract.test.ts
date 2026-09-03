@@ -202,36 +202,29 @@ describe('what the server observed about a live connection', () => {
   });
 });
 
-describe('the three System-tab cells that are still not built', () => {
-  it('has no producer for appVersion, streamServer or serverId', () => {
-    /*
-      Stated as source, because there is nothing to call. Each is declared on `ModalTargetUser` and
-      rendered by `ModalHost`, and each is left reading `n/a` for a measured reason recorded at
-      `server/user-detail.ts`:
-
-        `appVersion`    only the CLIENT knows its build, and a member whose browser is misbehaving
-                        can report any string — which is the case the cell exists for.
-        `streamServer`  the media plane, blocked on a `STREAM_SERVER_MTX` host.
-        `serverId`      the same blocker.
-
-      This goes red if one of them starts being filled. That is the point: the next engineer to wire
-      one has to come here and say where the value came from, rather than the cell quietly beginning
-      to show something nobody reviewed.
-    */
+describe('the five System-tab connection facts', () => {
+  it('sources every fact from server-owned connection or deployment state', () => {
     const detail = readFileSync(
       fileURLToPath(new URL('./user-detail.ts', import.meta.url)),
       'utf8'
     );
-
     for (const field of ['appVersion', 'streamServer', 'serverId']) {
-      expect(
-        detail.includes(`${field}:`),
-        `${field} acquired a producer in user-detail.ts; say where the value comes from here`
-      ).toBe(false);
+      expect(detail, `${field} must be projected by user-detail.ts`).toContain(`${field}:`);
     }
-
-    /* The vacuity floor: the two that ARE produced must be in that file, or the loop proves nothing. */
     expect(detail).toContain('ip:');
     expect(detail).toContain('userAgent:');
+
+    const endpoint = readFileSync(
+      fileURLToPath(
+        new URL(
+          '../../../../controller/src/routes/internal/room-config/[code]/+server.ts',
+          import.meta.url
+        )
+      ),
+      'utf8'
+    );
+    expect(endpoint).toContain('deployment:');
+    expect(endpoint).toContain('resolveMediaCluster(allSettings)');
+    expect(endpoint).toContain('reportedVersion');
   });
 });

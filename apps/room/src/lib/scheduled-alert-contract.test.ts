@@ -11,7 +11,13 @@ import {
   nextSendOn
 } from '#lib/scheduled-alert.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
-import { alerts, scheduledAlerts, users, type User } from '#lib/server/db/schema.js';
+import {
+  alertDeliveryJobs,
+  alerts,
+  scheduledAlerts,
+  users,
+  type User
+} from '#lib/server/db/schema.js';
 import { resetRateLimits } from '#lib/server/rate-limit.js';
 import { callRemote, expectSchemaRefusal } from '#lib/server/remote-command-harness.js';
 
@@ -287,7 +293,7 @@ describe('scheduling', () => {
     expect(row?.senderId).toBe(presenter.id);
   });
 
-  it('REFUSES the six fields whose downstream this deployment does not have', async () => {
+  it('REFUSES the five fields whose downstream this deployment does not have', async () => {
     /*
       `z.strictObject`, so accepting a flag nothing reads is impossible rather than merely avoided.
 
@@ -303,8 +309,7 @@ describe('scheduling', () => {
       sendEmail: true,
       sendTweet: true,
       sendLaterAsNick: 'someone else',
-      sendLaterAsEmail: 'someone-else@example.com',
-      dontCrossPost: true
+      sendLaterAsEmail: 'someone-else@example.com'
     };
     for (const [field, value] of Object.entries(refused)) {
       await expectSchemaRefusal(
@@ -320,6 +325,16 @@ describe('scheduling', () => {
         )
       );
     }
+  });
+
+  it('persists per-alert linked-room suppression until the scheduled occurrence fires', async () => {
+    const sendOn = Date.now() + 1000;
+    const { id } = await schedule(presenter, { sendOn, dontCrossPost: true });
+    expect(
+      db.select().from(scheduledAlerts).where(eq(scheduledAlerts.id, id)).get()?.dontCrossPost
+    ).toBe(true);
+    sweepScheduledAlerts(new Date(sendOn));
+    expect(db.select().from(alertDeliveryJobs).get()?.dontCrossPost).toBe(true);
   });
 
   it('refuses a date that is not in the future, on the SERVER', async () => {

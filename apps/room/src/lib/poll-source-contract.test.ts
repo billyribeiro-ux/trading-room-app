@@ -32,7 +32,7 @@ describe('Poll compiled-source contract', () => {
       modalHost.indexOf('<app-poll-modal')
     );
     expect(modalHost.indexOf('<app-poll-modal')).toBeLessThan(
-      modalHost.indexOf('<app-chat-logs-modal>')
+      modalHost.indexOf('<LogArchiveModals')
     );
   });
 
@@ -40,7 +40,9 @@ describe('Poll compiled-source contract', () => {
     expect(pollComponent).toContain('class="btn btn-link pull-right btn-default"');
     expect(pollComponent).toContain('class="fa fa-minus-circle"');
     expect(pollComponent).toContain('class="poll-panel-btn poll-panel-btn-close"');
-    expect(pollComponent).toContain('class="ui-resizable-handle ui-resizable-se ui-icon');
+    expect(pollComponent).toContain('{#each RESIZE_HANDLES as direction (direction)}');
+    expect(pollComponent).toContain('class="ui-resizable-handle ui-resizable-{direction}{extra}"');
+    expect(pollComponent).toContain('ui-icon-gripsmall-diagonal-se');
   });
 
   it('drives the minimized and active Alert-header indicators exactly from Poll state', () => {

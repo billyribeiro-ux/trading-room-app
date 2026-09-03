@@ -14,8 +14,9 @@ import { describe, expect, it } from 'vitest';
   the other door: "a guest is not an owner and must not inherit an owner's authority just because
   both arrive on the same URL."
 
-  So `verifyEntry` looks a membership up ONLY for a verified email, and `roomRoleFor(null)` is
-  `member`.
+  So `verifyEntry` looks a membership up ONLY for a verified controller-account (`site`) token.
+  A signed `guest` token still carries a self-declared email and must resolve through
+  `roomRoleFor(null)` as `member`.
 */
 
 const SERVER = readFileSync(new URL('../routes/session/+page.server.ts', import.meta.url), 'utf8');
@@ -30,18 +31,20 @@ const pageCode = stripComments(PAGE);
 const clientCode = stripComments(CLIENT);
 
 describe('a self-declared identity carries no authority', () => {
-  it('a membership is looked up ONLY for a verified email', () => {
+  it('a membership is looked up ONLY for an authenticated controller-account token', () => {
     /*
-      The single most important line in this file. `claims` exists only when a signed handoff
-      verified; without one the membership is null and `roomRoleFor` answers `member`.
+      A signed guest token proves admission, not account ownership. The helper returns an email
+      only for a `site` token, and the membership remains null for a guest or no token.
     */
-    expect(serverCode).toContain('membership = claims ? roomConfig.member : null;');
+    expect(serverCode).toContain('const authorityEmail = authorityEmailForHandoff(claims);');
+    expect(serverCode).toContain('readRoomConfig(request, shortCode, authorityEmail)');
+    expect(serverCode).toContain('membership = authorityEmail ? roomConfig.member : null;');
   });
 
   it('and the role is derived from that membership, never from the form', () => {
     expect(serverCode).toContain('const role = roomRoleFor(membership);');
-    // The token TYPE must never decide a role — that was the 2026-08-07 escalation.
-    expect(serverCode).not.toContain("claims.type === 'site'");
+    // The token TYPE decides whether a lookup is licensed, never the role itself.
+    expect(serverCode).not.toMatch(/role\s*=\s*[^;]*claims\.type/);
     expect(serverCode).not.toMatch(/role\s*=\s*[^;]*form\.get/);
   });
 
@@ -129,7 +132,10 @@ describe('the entry decision lives in one place', () => {
   });
 
   it('a refusal honours the room’s own error page', () => {
-    expect(serverCode).toContain('if (decision.redirectTo) redirect(303, decision.redirectTo);');
+    expect(serverCode).toContain(
+      'if (decision.redirectTo) redirectToConfiguredLocation(decision.redirectTo);'
+    );
+    expect(serverCode).toContain("from '#lib/server/control-plane.js'");
   });
 });
 
@@ -203,6 +209,13 @@ describe('the login form controls decoded from the v4 bundle', () => {
     */
     expect(serverCode).toContain("form.get('remember') === 'on'");
     expect(serverCode).not.toContain('createSessionFor(cookies, account.id, false');
+  });
+
+  it('persists the controller decision that this entry used the free-trial password', () => {
+    expect(serverCode).toContain('decision.asFreeTrial');
+    expect(serverCode).toMatch(
+      /createSessionFor\([\s\S]*?shortCode \?\? null,[\s\S]*?decision\.asFreeTrial[\s\S]*?\)/
+    );
   });
 
   it('has both session-login-link controls, with the reference texts', () => {

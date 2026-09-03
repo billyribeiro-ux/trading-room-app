@@ -1,0 +1,71 @@
+body {
+  margin: 0;
+  background: #080b10;
+  color: #f5f7fa;
+  font-family: system-ui, sans-serif;
+}
+
+main {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: #111722;
+}
+
+header div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+header span,
+time {
+  color: #aeb8c8;
+  font-size: 0.85rem;
+}
+
+nav {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+}
+
+button {
+  border: 1px solid #53627a;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  padding: 0.5rem 0.8rem;
+}
+
+button.active {
+  background: #1f6feb;
+  border-color: #1f6feb;
+}
+
+video {
+  width: 100%;
+  height: 100%;
+  max-height: calc(100vh - 8rem);
+  background: #000;
+}
+
+.empty {
+  place-self: center;
+  text-align: center;
+  max-width: 35rem;
+  padding: 2rem;
+}
+
+@media (max-width: 40rem) {
+  header {
+    flex-direction: column;
+  }
+}

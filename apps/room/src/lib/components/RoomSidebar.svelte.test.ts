@@ -94,6 +94,8 @@ const render = (options: {
     hideAvatars?: boolean;
     /** RS-03's first term — the owner's switch for the membership star. */
     disableStarYears?: boolean;
+    /** RS-04's room-level gate for the presenter-only membership-age marker. */
+    isNewIndicatorOn?: boolean;
   };
   /*
     The two handlers a REDUCED roster row must keep. Optional, and defaulted to no-ops, so every
@@ -618,7 +620,11 @@ describe('RS-04 and RS-03 — the two roster badges this rail was the only surfa
   */
   it('draws the New badge to a PRESENTER only', () => {
     const people = [entry({ id: 1, displayName: 'Newcomer', isNew: true })];
-    const seen = render({ isPresenter: true, people });
+    const seen = render({
+      isPresenter: true,
+      people,
+      session: { rosterVisibleToViewers: true, isNewIndicatorOn: true }
+    });
     expect(seen.querySelectorAll('.room-roster-container'), 'positive control').toHaveLength(1);
     expect(seen.querySelector('.new-badge')?.textContent?.trim()).toBe('New');
     expect(seen.querySelector('.new-badge')?.className).toBe('badge bg-warning new-badge');
@@ -633,7 +639,7 @@ describe('RS-04 and RS-03 — the two roster badges this rail was the only surfa
     const seen = render({
       isPresenter: false,
       people,
-      session: { rosterVisibleToViewers: true }
+      session: { rosterVisibleToViewers: true, isNewIndicatorOn: true }
     });
     expect(seen.querySelectorAll('.room-roster-container'), 'positive control').toHaveLength(1);
     expect(seen.querySelector('.new-badge')).toBeNull();

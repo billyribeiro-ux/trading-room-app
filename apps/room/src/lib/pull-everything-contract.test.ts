@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
@@ -7,7 +8,9 @@ import { describe, expect, it } from 'vitest';
   evaluates them - the same technique as const-table-parser.test.ts - which means every assertion
   below is pinned to the bytes the owner actually pastes.
 
-  The input is the ARCHIVED bundle, docs/source/main.d6d3c112b59b7d0d.js, because that is the one
+  The input is the pinned v4 bundle, docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js, because it is
+  the newest complete reference artifact held by this repository and the one used by the current
+  101-surface audit. It is also an artifact where
   artifact where absence means absence: Angular compiles every branch, icon and handler into it and
   serves the same bytes to a member, a presenter and a logged-out browser. Nothing here reads a DOM
   capture, and the test process has no `document` at all - which is itself the proof that the
@@ -16,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 
 const script = readFileSync(new URL('../../scripts/pull-everything.js', import.meta.url), 'utf8');
 const bundle = readFileSync(
-  new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
+  new URL('../../docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js', import.meta.url),
   'utf8'
 );
 
@@ -72,6 +75,40 @@ type Report = {
   components: Component[];
   notes: string[];
 };
+
+type ExtractedComponent = {
+  selector: string;
+  start: number;
+  end: number;
+  bytes: number;
+  sha256: string;
+  readableBytes: number;
+  readableSha256: string;
+  readableRenderPreludeBytes: number;
+  readableRenderPreludeSha256: string | null;
+  fullReadableBytes: number;
+  fullReadableSha256: string;
+  styleCharacters: number;
+  styleSha256: string | null;
+  sourceFile: string;
+  renderHelpersFile: string | null;
+  fullSourceFile: string;
+  styleFile: string | null;
+};
+
+type ExtractionManifest = {
+  bundle: { path: string; bytes: number; sha256: string };
+  componentCount: number;
+  components: ExtractedComponent[];
+};
+
+function digest(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function extracted(relativePath: string): string {
+  return readFileSync(new URL(`../../${relativePath}`, import.meta.url), 'utf8');
+}
 
 const liftedSource = PURE.map(lift).join('\n');
 const core = new Function(`${liftedSource}\nreturn {${PURE.join(',')}};`)() as {
@@ -136,6 +173,57 @@ describe('pull-everything: discovery', () => {
 });
 
 describe('pull-everything: decoding', () => {
+  it('pins every artifact in the separate v4 component corpus to its manifest and raw bundle span', () => {
+    const manifest = JSON.parse(
+      extracted('docs/source-v4-2026-08-15/components/manifest.json')
+    ) as ExtractionManifest;
+    expect(manifest.bundle).toEqual({
+      path: 'docs/source-v4-2026-08-15/main.d1d09071be31f1ba.js',
+      bytes: bundle.length,
+      sha256: digest(bundle)
+    });
+    expect(manifest.componentCount).toBe(51);
+    expect(manifest.components).toHaveLength(manifest.componentCount);
+
+    for (const artifact of manifest.components) {
+      const raw = bundle.slice(artifact.start, artifact.end);
+      expect(raw.length, `${artifact.selector} raw bytes`).toBe(artifact.bytes);
+      expect(digest(raw), `${artifact.selector} raw digest`).toBe(artifact.sha256);
+
+      const readable = extracted(artifact.sourceFile);
+      expect(readable.length, `${artifact.selector} readable bytes`).toBe(artifact.readableBytes);
+      expect(digest(readable), `${artifact.selector} readable digest`).toBe(
+        artifact.readableSha256
+      );
+
+      const full = extracted(artifact.fullSourceFile);
+      expect(full.length, `${artifact.selector} full bytes`).toBe(artifact.fullReadableBytes);
+      expect(digest(full), `${artifact.selector} full digest`).toBe(artifact.fullReadableSha256);
+
+      if (artifact.renderHelpersFile) {
+        const helpers = extracted(artifact.renderHelpersFile);
+        expect(helpers.length, `${artifact.selector} helper bytes`).toBe(
+          artifact.readableRenderPreludeBytes
+        );
+        expect(digest(helpers), `${artifact.selector} helper digest`).toBe(
+          artifact.readableRenderPreludeSha256
+        );
+      } else {
+        expect(artifact.readableRenderPreludeBytes).toBe(0);
+        expect(artifact.readableRenderPreludeSha256).toBeNull();
+      }
+
+      if (artifact.styleFile) {
+        const css = extracted(artifact.styleFile).trimEnd();
+        expect(css.length, `${artifact.selector} CSS bytes`).toBe(artifact.styleCharacters);
+        expect(digest(css), `${artifact.selector} CSS digest`).toBe(artifact.styleSha256);
+      } else {
+        expect(artifact.styleCharacters).toBe(0);
+        expect(artifact.styleSha256).toBeNull();
+      }
+    }
+  });
+
   it("decodes app-room's table - the apostrophe case JSON.parse could not", () => {
     const room = component('app-room');
     expect(room.consts).toContain(`"Don't Disturb"`);
@@ -170,7 +258,8 @@ describe('pull-everything: decoding', () => {
 
   it('extracts scoped CSS byte-for-byte, through the `[_ngcontent-%COMP%]` brackets', () => {
     // A naive depth counter would trip on the brackets inside the CSS strings, so this is compared
-    // against the artifact the offline extractor wrote from the same bundle.
+    // against the archived extraction. These three components' CSS is unchanged in v4; the
+    // cross-version equality assertion prevents that premise from going stale silently.
     for (const selector of ['app-screenshare-view', 'app-presentationarea', 'app-room']) {
       const archived = readFileSync(
         new URL(`../../docs/source/components/${selector}.component.css`, import.meta.url),

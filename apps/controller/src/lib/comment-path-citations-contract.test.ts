@@ -19,8 +19,7 @@ import { describe, expect, it } from 'vitest';
  *   `evidence-dumps/manage-app-2026-08-31/app.min.js`, and the OFFSET was right all along —
  *   `formatStripeAmount` is at exactly 183,815 there, measured with `indexOf` on the file's bytes.
  * - `room-config-boundary.test.ts` credited the seam probe's finding to
- *   `scripts/room-config-seam-e2e.mjs`, the instrument it had before it became
- *   `apps/room/e2e/room-config-seam.spec.ts` — whose own docblock records that the script is absent.
+ *   `scripts/room-config-seam-e2e.mjs`; that governed script is present again.
  * - `api-docs.ts` carried `Regenerate: node scripts/extract-api-docs.mjs`, an instruction naming a
  *   generator no commit has ever added under any path.
  * - `editable-display.test.ts` said "Reproduce with" against a capture output never committed.
@@ -55,14 +54,6 @@ const BASES = ['', '../../', '../room/', 'node_modules/svelte/', 'node_modules/@
  */
 const UNOPENABLE: Readonly<Record<string, string>> = {
   /*
-    The room's scripts directory was EVICTED on 2026-08-15 at the owner's instruction and is ignored
-    whole at `.gitignore:176`; `apps/room/docs/UNPUBLISHED-SCRIPTS.md` is the register of what was in
-    it. This citation is not a pointer at all — the surrounding case is ABOUT the file's name, as a
-    hand-written source whose name contains a word its own rule would otherwise flag.
-  */
-  'apps/room/scripts/audit-behavior-coverage.mjs': 'the evicted room scripts directory',
-
-  /*
     A capture OUTPUT, never committed. `git log --all` finds no commit adding it under any path. The
     block around it records how a count was obtained, which is worth more than a step nobody here can
     repeat — and `evidence-dumps/` holds the decoded artifacts that WERE reviewed and tracked.
@@ -75,13 +66,7 @@ const UNOPENABLE: Readonly<Record<string, string>> = {
     is not an eviction like the room's. The generated HTML beside it is the artifact; regenerating it
     needs the generator restored or rewritten.
   */
-  'scripts/extract-api-docs.mjs': 'a generator that has never been in this repository',
-
-  /*
-    The seam probe's ORIGINAL instrument, kept in the sentence that says the probe replaced it. The
-    probe itself is `apps/room/e2e/room-config-seam.spec.ts` now, and the corrected citation names it.
-  */
-  'scripts/room-config-seam-e2e.mjs': 'the instrument the seam probe replaced'
+  'scripts/extract-api-docs.mjs': 'a generator that has never been in this repository'
 };
 
 const commentsIn = (path: string, source: string): string[] => {

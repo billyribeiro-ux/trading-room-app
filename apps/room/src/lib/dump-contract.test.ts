@@ -189,6 +189,8 @@ describe('part 1 capture contract', () => {
 
   it('ports the deployed picker’s search, skin and frequently-used constants verbatim', () => {
     const picker = text(new URL('../lib/components/EmojiPicker.svelte', import.meta.url));
+    const search = text(new URL('../lib/emoji-search.ts', import.meta.url));
+    const frequent = text(new URL('../lib/emoji-frequently.ts', import.meta.url));
     const bundle = text(new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url));
 
     // Each constant is asserted against the bundle it was read from, so a re-extraction
@@ -198,11 +200,11 @@ describe('part 1 capture contract', () => {
     expect(bundle).toContain('emojiSize=24');
     expect(bundle).toContain('totalFrequentLines=4');
     expect(bundle).toContain('NAMESPACE="emoji-mart"');
-    expect(picker).toContain('const MAX_RESULTS = 75');
+    expect(search).toContain('export const MAX_RESULTS = 75');
     expect(picker).toContain('const PER_LINE = 9');
     expect(picker).toContain('const EMOJI_SIZE = 24');
     expect(picker).toContain('const TOTAL_FREQUENT_LINES = 4');
-    expect(picker).toContain("const NAMESPACE = 'emoji-mart'");
+    expect(frequent).toContain("export const NAMESPACE = 'emoji-mart'");
 
     // getSpritePosition() divides by sheetColumns - 1 on BOTH axes.
     expect(bundle).toContain(
@@ -212,8 +214,8 @@ describe('part 1 capture contract', () => {
 
     // buildSearch() splits everything except emoticons, and search() keeps two terms.
     expect(bundle).toContain('l(e,!0),l(i,!0),l(o,!0),l(s,!0),l(r,!1)');
-    expect(picker).toContain('add(entry.emoticons, false)');
-    expect(picker).toContain('terms = [terms[0], terms[1]]');
+    expect(search).toContain('add(entry.emoticons, false)');
+    expect(search).toContain('terms = [terms[0], terms[1]]');
 
     // The DEFAULTS row is what the dump captured as Frequently Used.
     const recent = EMOJI_DUMP_DATA.categories.find((category) => category.name === 'Recent');
@@ -348,9 +350,21 @@ describe('part 1 capture contract', () => {
   it('renders every root host in the evidence order without dropping closed components', () => {
     const modalHostSource = text(new URL('components/ModalHost.svelte', import.meta.url));
     const pageSource = text(new URL('../routes/+page.svelte', import.meta.url));
-    const modalHosts = [...modalHostSource.matchAll(/^<(app-[a-z0-9-]+)/gm)].map(
+    const expandedModalHost = modalHostSource
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<LogArchiveModals[\s\S]*?\/>/, '<app-chat-logs-modal>\n<app-alert-logs-modal>')
+      .replace(/<ReplyModal[\s\S]*?\/>/, '<app-reply-modal>')
+      .replace(/<AlertQaModal[\s\S]*?\/>/, '<app-alert-qa-modal>')
+      .replace(/\{@render recordingPreview\(\)\}/, '<app-rec-preview>')
+      .replace(/<AlertSendReportModal[\s\S]*?\/>/, '<app-alert-send-report-modal>')
+      .replace(/<ConnectivityModal[\s\S]*?\/>/, '<app-webrtc-troubleshooter>');
+    const modalHosts = [...expandedModalHost.matchAll(/^<(app-[a-z0-9-]+)/gm)].map(
       (match) => match[1]
     );
+    const overlays = text(new URL('components/RoomOverlays.svelte', import.meta.url));
+    expect(overlays).toContain('<RecordingPreviewCard {media} {prefs} {isPresenter} />');
+    expect(overlays).toContain('{recordingPreview}');
 
     expect([
       ...modalHosts,
@@ -473,7 +487,9 @@ describe('part 1 capture contract', () => {
     expect(compiledRoom).toContain('(this.showSidebar = !1)');
     expect(compiledRoom).toContain('toggleSideBar()');
     expect(compiledRoom).toContain('this.showSidebar = !this.showSidebar');
-    expect(pageSource).toContain('let sidebarOpen = $state(false);');
+    expect(pageSource).toContain(
+      'let sidebarOpen = $state(data.sessData?.alwaysShowRoster === true);'
+    );
     /*
       The wrapper stopped being a ternary at `f9e1890`, which bound a SECOND class to the same
       element — `KAe = (t, n) => ({'push-wrapper': t, 'mt-0': n})` (`app-room.full.js:5`, applied at
@@ -510,7 +526,11 @@ describe('part 1 capture contract', () => {
       neither can drift alone — a string retyped inside the component would pass a page-only check
       while the room showed something the capture does not.
     */
-    expect(NAVBAR).toContain('<a>{noSpeakerText}</a>');
+    const talkingIndicator = text(
+      new URL('components/NavbarTalkingIndicator.svelte', import.meta.url)
+    );
+    expect(NAVBAR).toContain('<NavbarTalkingIndicator');
+    expect(talkingIndicator).toContain('<a>{noSpeakerText}</a>');
     expect(cleanRoom).toContain(
       '<li class="nav-item talkingIndicator animated fadeIn"><a> ( No one is speaking )</a></li>'
     );

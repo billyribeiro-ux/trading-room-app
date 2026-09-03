@@ -249,6 +249,8 @@ describe('page load contract', () => {
       'isFT',
       // Whether the controller knows this person as a member of this room at all.
       'isMember',
+      // Controller-derived membership age; never asserted by the browser.
+      'isNew',
       // Role 1 WITH `nonPresenter` - the reference's "Admin", which is not a presenter.
       'isNonPresenterAdmin',
       // `r.isP` - four gates read the presenter flag off the entry, not off `role`.

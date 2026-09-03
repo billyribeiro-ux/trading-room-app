@@ -14,7 +14,7 @@ import { defineConfig, devices } from '@playwright/test';
  * ## Why the server is started HERE rather than by hand
  *
  * The owner's standing instruction is that nothing runs on local ports for this project — it is
- * deployed, more than one agent works in the repository, and a stray dev server means the next
+ * deployed, more than one agent works in the repository, and a stray local server means the next
  * person measures somebody else's code. `webServer` below makes the server the harness's property:
  * Playwright starts it, waits for it, and **tears it down when the run ends**, so there is nothing
  * left to forget about.
@@ -27,14 +27,22 @@ import { defineConfig, devices } from '@playwright/test';
  * the precise failure the standing instruction exists to prevent. Failing loudly on a busy port is
  * the safer answer.
  */
-const PORT = 5173;
+/*
+ * Do not default to Vite's 5173: this repository can be verified while another project has its
+ * development server open. A caller can still allocate a dedicated CI port explicitly, and
+ * `reuseExistingServer: false` below continues to fail closed if that selected port is occupied.
+ */
+const PORT = Number(process.env.CONTROLLER_E2E_PORT ?? '5183');
+if (!Number.isInteger(PORT) || PORT < 1024 || PORT > 65_535) {
+  throw new Error('CONTROLLER_E2E_PORT must be an integer between 1024 and 65535.');
+}
 
 export default defineConfig({
   testDir: 'e2e',
   // A journey that registers an account and clicks through it is not a unit test.
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  // Serial. These share one database and one dev server; parallel workers would race on both.
+  // Serial. These share one database and one owned server; parallel workers would race on both.
   workers: 1,
   fullyParallel: false,
   /**
@@ -70,18 +78,37 @@ export default defineConfig({
   reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
+    extraHTTPHeaders: {
+      'x-forwarded-proto': 'http',
+      'x-forwarded-host': `127.0.0.1:${PORT}`
+    },
     // Kept only for a failure, so a green run leaves no artefacts behind.
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure'
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npx vite dev',
+    command: 'ADAPTER=node npx vite build && node --env-file-if-exists=.env build',
     url: `http://127.0.0.1:${PORT}/login`,
     reuseExistingServer: false,
     // A cold Vite start plus the first SSR compile; the default 60s is tight on a first run.
     timeout: 120_000,
     stdout: 'pipe',
-    stderr: 'pipe'
+    stderr: 'pipe',
+    /*
+     * The browser suite exercises the controller's own account/session UI, not Google's external
+     * challenge or the separately deployed room. Explicit blanks override a developer's `.env`;
+     * otherwise reCAPTCHA blocks automated registration and ROOM_BASE_URL sends the guest-session
+     * hydration test to an unrelated process. Production still uses its deployed values.
+     */
+    env: {
+      PUBLIC_RECAPTCHA_SITE_KEY: '',
+      RECAPTCHA_SECRET_KEY: '',
+      ROOM_BASE_URL: '',
+      PORT: String(PORT),
+      HOST: '127.0.0.1',
+      PROTOCOL_HEADER: 'x-forwarded-proto',
+      HOST_HEADER: 'x-forwarded-host'
+    }
   }
 });

@@ -881,8 +881,8 @@ for reference behaviour.
 
 ### E.5 — The honest gap that is not a diff: `wired`
 
-Our schema carries a `wired` flag meaning "something actually consumes this value". **113 of 269 are
-wired. 156 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
+Our schema carries a `wired` flag meaning "something actually consumes this value". **120 of 269 are
+wired. 149 are not.** The unwired are stored and rendered faithfully, and today they do nothing.
 
 **This section said "58 wired, 211 not" until 2026-08-29**, and listed those 58 by name. The count
 had nearly doubled underneath it. Both the number and the roster below are now regenerated from
@@ -891,18 +891,18 @@ checked against on every run — and that verifier now fails if this paragraph d
 105th wired setting cannot land without this text moving. It worked: `restreamToURL` was the 104th,
 on 2026-08-30, and this paragraph moved because the verifier refused the commit until it did.
 
-Wired (106), alphabetically:
+Wired (120), alphabetically:
 
 `alertLabels`, `alertSoundOff`, `alertsChatOnBottom`, `alertsOverlayOnScreenshare`,
 `allowUsersToChangeUsername`, `allowedMemberships`, `allowedPerms`, `allowedProducts`,
 `altBenzingaLinkURL`, `altBenzingaLogoURL`, `altChatRender`, `altGenChannelName`,
 `altOffTopicChannelName`, `alwaysShowRoster`, `autoRecord`,
-`autoSwitchToOfftopics`, `beepOnUserJoin`, `blinkingRec`, `chatDisabledForTrials`,
-`chatTabsWithBadges`, `claimNickName`, `copyTrades`, `customCSS`, `customEnterDisclosure`,
+`autoSwitchToOfftopics`, `backupClusterID`, `beepOnUserJoin`, `blinkingRec`, `chatDisabledForTrials`,
+`chatTabsWithBadges`, `claimNickName`, `clusterID`, `copyTrades`, `customCSS`, `customEnterDisclosure`,
 `customFaviconURL`, `customMobileAppAndroidUrl`, `customMobileAppEnabled`,
 `customMobileAppIOSUrl`, `customPlayerURL`, `darkThemeAsDefault`, `dingOnNewMessage`,
 `disableCopy`, `disableEditingUsername`, `disablePMForTrials`, `disableStarYears`,
-`dontShowRecInfoToUsers`, `dontStopRecOnMicMute`, `enableBadges`, `enableEditAlerts`,
+`dontShowRecInfoToUsers`, `dontStopRecOnMicMute`, `enableBadges`, `enableDiscord`, `enableEditAlerts`,
 `enableEditMessage`, `enablePrivateMessageHistory`, `enableQAReactions`, `enableRTE`,
 `enableReactions`, `extraAdminChannels`, `extraRegChannels`, `freeTrialsGetApp`,
 `hasAdminOnlyChannel`, `hasAlertScheduler`, `hasBenzingaNews`,
@@ -910,10 +910,10 @@ Wired (106), alphabetically:
 `hasSwingTradeAlerts`, `hasTypingIndicator`, `hideAppInfo`, `hideAvatars`, `hideChatAlerts`,
 `hideChatLog`, `hideFiles`, `hideMobileCredentials`, `hideNotes`, `hidePoweredBy`, `hideRecs`,
 `hideWebcamForRoom`, `hideWelcomeTo`, `individualVolumeControls`, `isChatOnlyRoom`, `isLocked`,
-`loginErrorMsg`, `loginErrorURL`, `modAlertFilterList`, `modMessage`, `name`, `nickFilter`,
+`isNewIndicatorOn`, `linkedRoomAlerts`, `loginErrorMsg`, `loginErrorURL`, `modAlertFilterList`, `modMessage`, `name`, `nickFilter`,
 `onlyPresentersVisibleToViewers`, `openLoginLink`, `overlayUserIdOnScreenshare`, `overwriteCashRegisterSound`,
 `positionsIframe`, `positionsIframeUrl`, `presenterMsgsOnTheRight`, `ptrMobileAppEnabled`,
-`recordingReminder`, `restreamToURL`, `rosterCountVisibleToViewers`, `rosterVisibleToViewers`,
+`recordChat`, `recordingReminder`, `recsInRoom`, `restreamToURL`, `rosterCountVisibleToViewers`, `rosterVisibleToViewers`,
 `showArchivesToSpecificPresenters`, `showArchivesToUsers`, `showBadgesToPresentersOnly`,
 `showOnlyUsernames`, `showPasswordField`, `simUserCount`, `simplifiedEditor`,
 `smallerImagePreview`, `ssoJWTSecret`,
@@ -921,7 +921,7 @@ Wired (106), alphabetically:
 `tokenExpiresIn`, `useMediaMTX`, `userJoinAndLeavePopup`, `userPM`, `userToPresenterPM`,
 `userUploads`, `usernameInstructions`, `usersCanDeleteOwnMsgs`, `usersPublicReply`, `webinarPW`.
 
-The 156 unwired include every recording destination (`saveRecsToS3` and the four S3 fields,
+The 149 unwired include every external recording destination (`saveRecsToS3` and the four S3 fields,
 `saveRecsToVimeo` and the four Vimeo fields), most of the streaming fields (`obsBroadcastRoom`,
 `obsStreamKey`, `restreamToURLKey`, `hasYTStreaming` — `restreamToURL` beside them was wired on
 2026-08-30 and is the one exception), every SMS field

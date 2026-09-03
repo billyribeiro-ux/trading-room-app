@@ -120,7 +120,7 @@ it is. The flag is what separates working from looking-like-it-works. It flips t
 `true` only when a real consumer exists, and the UI marks unwired settings so nobody
 — including the owner — believes a toggle does something it doesn't.
 
-Current state: **113 of 269 wired; 156 unwired** — measured 2026-09-03, and checked on
+Current state: **120 of 269 wired; 149 unwired** — measured 2026-09-03, and checked on
 every run by `scripts/verify-room-settings-schema.mjs`, which fails if this sentence and the schema
 disagree. The wired names are encoded explicitly in the generator rather than recovered from a
 previous generated file.

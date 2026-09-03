@@ -1,0 +1,230 @@
+# Repository completion plan and implementation evidence
+
+**Execution date:** 2026-09-03
+**Scope:** `TODO.md`, `NEW-TODO.md`, `todo-next.md`, controller, room, Rust services, evidence gates, database migrations, production builds, and browser journeys.
+**Outcome:** every repository-buildable gap identified by the hard audit is implemented. Remaining work requires external vendor state, licensed staging software, physical acceptance hardware, production credentials/resources, or an owner decision; none is honestly satisfiable by writing more code in this checkout.
+
+## Completion standard
+
+A row closes only when every applicable link exists:
+
+`authoritative configuration/data -> server policy -> persistence -> API/transport -> Svelte UI -> runtime behavior -> executable verification`
+
+A control that only renders, a schema key with no consumer, a test that only matches comments, or a provider-shaped placeholder does not count. Security-bearing facts are derived or signed server-side. Failures at authorization and controller boundaries fail closed.
+
+## Completed execution plan
+
+| Phase | Deliverable                                                                                 | Status   | Primary proof                                                              |
+| ----- | ------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------- |
+| 0     | Establish reproducible evidence, live inventories, and green baselines                      | COMPLETE | `todo-next.md`; room/controller evidence, privacy, schema, and count gates |
+| 1     | Close identity, trial, membership, moderation, and permission-refresh seams                 | COMPLETE | room session/auth routes and access-control contracts                      |
+| 2     | Build durable alert delivery, linked-room fan-out, suppression, retries, and reports        | COMPLETE | room outbox + controller dispatch/attempt/link ledgers                     |
+| 3     | Build the recording archive from browser capture through authorized playback                | COMPLETE | recording catalog/log schema, upload/media routes, archive UI              |
+| 4     | Finish Discord, media failover, recording-chat snapshots, new-member state, and diagnostics | COMPLETE | controller internal APIs, room consumers, setting census                   |
+| 5     | Build the anonymous public player as a revocable least-privilege capability                 | COMPLETE | hashed grant store, token exchange, screenshare-only player                |
+| 6     | Make WordPress/app-pair outputs functional without ambient secret disclosure                | COMPLETE | password-reauthenticated one-response reveal                               |
+| 7     | Reconcile TODOs, evidence, source ceilings, stale contracts, and release documentation      | COMPLETE | all repository gates and builds green                                      |
+| 8     | Execute production/vendor/human acceptance                                                  | EXTERNAL | precise unblockers are listed below                                        |
+
+## Former audit findings, side by side with the implementation
+
+### A1 — trusted free-trial identity and guest authority: COMPLETE
+
+The deployed two-application path now has one login form in the room. The room sends the submitted credentials to the controller's authoritative entry decision and persists `decision.asFreeTrial` on the server session. Every later request and realtime roster frame reads the session-owned value, so trial chat, PM, badge, random-selection, and app-delivery gates receive the same fact.
+
+The final audit also found and closed a privilege-escalation edge: a signed `guest` token carried a self-declared email and could previously trigger a membership lookup. `authorityEmailForHandoff` now licenses membership lookup only for an authenticated `site` handoff; guest and absent handoffs resolve with no membership authority.
+
+Evidence:
+
+- `apps/controller/src/lib/room-entry.ts`
+- `apps/controller/src/routes/internal/room-entry/[code]/+server.ts`
+- `apps/room/src/routes/session/+page.server.ts`
+- `apps/room/src/lib/server/handoff-token.ts`
+- `apps/room/src/lib/server/auth.ts`
+- `apps/room/src/lib/server/connection.ts`
+- `apps/room/src/lib/handoff-token.test.ts`
+- `apps/room/src/lib/session-login-contract.test.ts`
+- `apps/room/src/lib/session-limit-contract.test.ts`
+
+### A2 — alert delivery and reporting: COMPLETE for the supported FCM channel
+
+Alert creation and scheduling now transactionally enqueue delivery work. The room owns a durable SQLite outbox with stale-claim recovery, bounded retry timing, and stable idempotency keys. The controller owns PostgreSQL dispatch, recipient-attempt, and cross-room-link ledgers. The worker applies member eligibility and `freeTrialsGetApp`, sends through FCM, records terminal outcomes/timestamps/reasons, and prunes registrations only on provider-confirmed dead-token classifications.
+
+The send boundary now re-reads and enforces every repository-held authority fact before talking to FCM: the room-wide `diasableFCMAlerts` kill switch, current membership/invite state, pause/unsubscribe state, `alerterAppFcmUserOff`, free-trial and case-by-case app policy, marketplace subscription state/current paid period, and `mobileAppExpireNotificationsDays` as the final login-age backstop. Marketplace states other than `active` or `trialing` fail closed. A missing login timestamp also fails closed while decay is enabled. This closes the paired-phone cancellation leak without deleting registrations; only FCM's provider-confirmed `UNREGISTERED` result licenses pruning.
+
+Presenter reports query real persisted attempts; they support recipient/status filtering, linked-room identity, timestamps, reasons, registration counts, and pruned-token counts. The UI no longer fabricates an empty report.
+
+`linkedRoomAlerts` is limited to same-account targets, excludes the source room, deduplicates, caps fan-out at 20, creates idempotently linked dispatches, and aggregates their results into the source report. `dontCrossPost` is validated, stored in immediate and scheduled alerts, retained across outbox retries, included in the controller's immutable idempotency input, and suppresses linked fan-out.
+
+The supported external channel is FCM push. SMS, email, and social-provider flags that have no configured, governed sender are rejected rather than accepted and silently discarded. Provider credentials are not sent to the browser.
+
+Evidence:
+
+- `apps/room/src/lib/server/alert-delivery-outbox.ts`
+- `apps/room/src/routes/post-alert.remote.ts`
+- `apps/room/src/routes/scheduled-alerts.remote.ts`
+- `apps/room/src/routes/alert-delivery.remote.ts`
+- `apps/room/src/lib/components/AlertSendReportModal.svelte`
+- `apps/room/src/lib/components/AlertDeliveryReportBody.svelte`
+- `apps/controller/src/lib/server/alert-delivery.ts`
+- `apps/controller/src/routes/internal/alert-delivery/[code]/+server.ts`
+- `apps/controller/src/lib/server/db/migrations/0014-alert-delivery-ledger.js`
+- `apps/controller/src/lib/server/db/migrations/0016-alert-dispatch-links.js`
+- `apps/controller/src/lib/server/db/migrations/0017-alert-cross-post-suppression.js`
+- `apps/room/src/lib/server/alert-delivery-outbox.test.ts`
+- `apps/controller/src/lib/server/alert-delivery.test.ts`
+- `apps/controller/src/lib/server/alert-delivery-contract.test.ts`
+- `apps/controller/src/lib/server/alert-delivery.test.ts`
+
+### A3 — recordings/archive product: COMPLETE
+
+The first-party browser recorder now finalizes and uploads its media automatically. Uploads stream to a temporary file, enforce authentication/authorization and size/type limits, compute SHA-256 during ingestion, and publish by atomic rename only after success. The archive has a durable catalog plus immutable log snapshots for chat, alerts, and transcript context.
+
+Authorized members can page the room archive, play/download with HTTP range requests, and download the captured transcript. Presenters can delete catalog and media atomically at the product boundary. `recsInRoom` gates the room tab and the archive entitlement is enforced again on list and media routes; UI hiding is never the authority.
+
+Evidence:
+
+- `apps/room/src/lib/server/db/schema.ts` (`recordings`, recording log entries)
+- `apps/room/src/lib/server/recording-storage.ts`
+- `apps/room/src/lib/server/recording-access.ts`
+- `apps/room/src/routes/recordings/upload/+server.ts`
+- `apps/room/src/routes/recordings/[id]/media/+server.ts`
+- `apps/room/src/routes/recordings.remote.ts`
+- `apps/room/src/lib/room/recording.ts`
+- `apps/room/src/lib/components/RecordingTab.svelte`
+- `apps/room/src/lib/components/RecordingArchivePane.svelte`
+- `apps/room/src/lib/server/recording-storage.test.ts`
+
+### A4 — Discord integration: COMPLETE; provider registration is deployment input
+
+Presenter-only status, connect, and unlink operations are implemented across the room and controller. OAuth state is random, single-use, hashed at rest, expires after ten minutes, and is consumed before the code exchange can be replayed. The callback stores only the Discord identity id/name; provider access tokens are not retained. An unconfigured deployment reports that state instead of exposing a dead link.
+
+Evidence:
+
+- `apps/room/src/lib/components/DiscordSettingsPane.svelte`
+- `apps/room/src/routes/discord.remote.ts`
+- `apps/controller/src/routes/internal/discord/[code]/+server.ts`
+- `apps/controller/src/routes/(public)/discord/callback/+server.ts`
+- `apps/controller/src/lib/server/db/migrations/0015-discord-oauth.js`
+
+### A5 — `askQuestion` mute enforcement: COMPLETE
+
+Questions use the same authoritative `refuseIfChatMuted` policy as public and private chat. The server, not the disabled state of a composer, enforces temporary and permanent mute outcomes.
+
+Evidence: `apps/room/src/routes/alert-questions.remote.ts` and `apps/room/src/lib/chat-alerts-gates-contract.test.ts`.
+
+### A6 — immediate permission refresh: COMPLETE
+
+After the controller commits a permission change, the room publishes one addressed `forceReload` command to the target user. The client reloads its server-derived session/config state. No success command is published if the controller write fails, so downgrades cannot be acknowledged before authority changes.
+
+Evidence: `apps/room/src/routes/permissions.remote.ts`, `apps/room/src/routes/sess/[room]/events/+server.ts`, and `apps/room/src/lib/permission-refresh-contract.test.ts`.
+
+### A7 — public anonymous stream player: COMPLETE
+
+A presenter can enable, inspect, copy, and revoke a public-player grant. The raw grant is returned once; only its SHA-256 digest is stored. Grants are room-scoped, expiring, and revocable. The public route exchanges a valid grant for a five-minute read-only media token and sends `private, no-store`. The player contains screenshare HLS only—no chat, notes, files, roster, private messages, or publishing credential.
+
+Evidence:
+
+- `apps/room/src/lib/components/PublicPlayerPane.svelte`
+- `apps/room/src/routes/public-player.remote.ts`
+- `apps/room/src/routes/player/[room]/+page.server.ts`
+- `apps/room/src/routes/player/[room]/+page.svelte`
+- `apps/controller/src/routes/internal/public-stream-read/[code]/+server.ts`
+- `apps/room/src/lib/stream-player-blocked-contract.test.ts`
+
+### A8 — WordPress shortcode and app-pair sample: COMPLETE
+
+The manage page is masked by default. Only the room owner can request a reveal, the current password is reverified server-side, accepted and rejected attempts are audited without the secret value, and the functional shortcode/app-pair sample exists only in that action response. The ordinary page load never serializes either secret.
+
+Evidence: `apps/controller/src/routes/(app)/account/rooms/[id]/[[tab]]/+page.server.ts`, its `+page.svelte`, and `apps/controller/src/lib/app-pair-contract.test.ts`.
+
+### A9 — settings that lacked consumers: COMPLETE or deliberately non-client
+
+The live schema census is 269 settings: 120 read by the room and 149 not read there. The 149 are not 149 gaps. The reference reads only 12 of them in its browser: seven are credentials deliberately withheld, one is derived, two are upstream dead/defective gates, and two belong to the controller login surface.
+
+Former repository-buildable rows are closed:
+
+| Setting            | End-to-end consumer                                                           |
+| ------------------ | ----------------------------------------------------------------------------- |
+| `isNewIndicatorOn` | server-derived membership age (`<= 30 days`), presenter-only badge visibility |
+| `linkedRoomAlerts` | authorized same-account alert dispatch/link ledger and aggregate report       |
+| `backupClusterID`  | health-aware primary/backup selection for ingest and playback                 |
+| `recordChat`       | immutable chat/alert/transcript snapshots attached to recordings              |
+| `recsInRoom`       | archive tab plus list/media authorization                                     |
+| `enableDiscord`    | OAuth status/connect/unlink path                                              |
+
+Evidence: `apps/controller/src/lib/room-settings-schema.ts`, `apps/controller/src/lib/room-config.ts`, `apps/controller/scripts/verify-room-settings-schema.mjs`, `apps/room/gate/audit-setting-coverage.mjs`, and `docs/decoded/missing-settings-triage.md`.
+
+### A10 — user-info system facts: COMPLETE
+
+The diagnostic surface receives server-derived deployment version, room server identity, and selected stream-cluster identity alongside authoritative IP and user agent. Another member cannot submit or overwrite those fields.
+
+Evidence: `apps/room/src/lib/server/connection.ts`, `apps/room/src/lib/server/user-detail.ts`, `apps/room/src/lib/server/connection-facts-contract.test.ts`, and the controller room-config/stream endpoints.
+
+### A11 — Benzinga: COMPLETE in the chosen product scope
+
+Sidebar and navbar integrations exist. The tracker retains two measured parity divergences: the unavailable upstream default URL inputs and the absent upstream fallback image. A configured `altBenzingaLogoURL` is functional; inventing an unlicensed fallback asset is not repository completion.
+
+### A12 — v5 parity: EXTERNAL, not a code gap
+
+The public `/v5` pathname is not the v5 build selector; `/v3`, `/v4`, `/v5`, and `/v6` all return 404 while `/` serves the selected build. Only a vendor-cleared account whose room is actually assigned v5 can reveal the loaded bundle. No implementation inferred from a pathname can truthfully close this row.
+
+## Additional hardening completed during execution
+
+- Permission and membership facts remain server-authoritative; raw linked-room ids and credential settings do not cross the browser boundary.
+- External redirects use one SvelteKit 3-compatible validation helper and reject unsafe/non-HTTP(S) destinations.
+- `MEDIA_CLUSTER_HOSTS_JSON` maps configured cluster ids to validated endpoints; primary health failure selects only the configured backup.
+- Controller E2E uses a configurable dedicated port (`CONTROLLER_E2E_PORT`, default 5183), so it never kills or reuses another project's Vite server on 5173.
+- Controller evidence is accepted under `apps/controller/evidence-dumps/account-page/`, hashed by the evidence verifier, and covered by the privacy boundary.
+- Four accidental Finder-style duplicate files were quarantined, not destroyed, at `/private/tmp/trading-room-app-duplicate-components-20260903/`.
+- Player CSS was extracted into `apps/room/src/routes/player/[room]/player.css`; every audited Svelte surface remains within its ratcheted source ceiling.
+- The v4 extractor produced a separate 51-component / 194-artifact corpus under `apps/room/docs/source-v4-2026-08-15/components/`, and `pull-everything-contract.test.ts` now discovers and decodes the pinned v4 bundle rather than the archived predecessor. The original extraction remains untouched.
+- The room inventory is 101/101 audited surfaces and 41,950/41,950 measured lines. “Audited” includes explicit measured refusals and external blockers; it does not falsely mean byte-for-byte upstream equality.
+
+## Database and configuration changes
+
+Controller migrations are forward-only and registered through version 17:
+
+1. `0014-alert-delivery-ledger.js` — dispatches and per-recipient attempts.
+2. `0015-discord-oauth.js` — linked identity and expiring single-use OAuth state.
+3. `0016-alert-dispatch-links.js` — source/target dispatch relationships.
+4. `0017-alert-cross-post-suppression.js` — immutable `dontCrossPost` dispatch input.
+
+The room's SQLite startup migration path upgrades existing installations in place for the alert outbox, scheduled-alert suppression, recording catalog/logs, public-player grants, and trial-bearing sessions. New deployment configuration includes Discord OAuth values, `MEDIA_CLUSTER_HOSTS_JSON`, and the existing controller/room/media signing secrets. Missing security-critical configuration fails closed or presents an explicit unconfigured state.
+
+## Verification evidence
+
+Measured on the final working tree:
+
+| Boundary                          | Result                                                                                                                                          |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 403 Vitest files / 7,174 tests, production build            |
+| Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
+| Controller `pnpm quality`         | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, production build                   |
+| Controller Vitest                 | 121 files / 1,233 tests; documented totals independently verified at four sites                                                                 |
+| Controller Playwright             | 9/9 Chromium journeys against the adapter-node production artifact                                                                              |
+| Controller PostgreSQL integration | 9 files / 59 tests against disposable provisioned PostgreSQL                                                                                    |
+| Rust non-database gate            | format/check green; 114/114 media tests; every API test target compiled with `testing`                                                          |
+| JavaScript advisories             | `pnpm audit --audit-level high`: no known vulnerabilities                                                                                       |
+| Rust advisories                   | policy green: one exact reviewed lockfile advisory proved unreachable from the build graph; six exact reviewed mediasoup informational warnings |
+| Svelte 5 review                   | modified components checked with the official Svelte autofixer; no reported issues; both apps have zero Svelte diagnostics                      |
+| Versions                          | Svelte 5.57.0, SvelteKit 3.0.0-next.25, Vite 8.2.2, TypeScript 6.0.3                                                                            |
+
+Build output retains advisory-only warnings for known initial-value captures, large client chunks, adapter dependency discovery, and adapter API deprecation. They do not fail `svelte-check`, tests, or builds and are not represented as functional completion failures.
+
+## Remaining external acceptance and owner actions
+
+These are not silently called “done”:
+
+1. **v5 reference capture:** obtain a vendor-cleared account assigned v5, capture the actual loaded network bundle, sanitize it, hash it, and run a new delta audit.
+2. **WooCommerce staging:** execute `integrations/wordpress/STAGING-TEST.md` section 6 with licensed Memberships and Subscriptions, including cancellation and cached-page entry denial.
+3. **High-DPI human acceptance:** run `apps/room/docs/MEASURE-SHARE-QUALITY.md` on a physical high-DPI source and record text-legibility acceptance.
+4. **Brand attribution:** owner chooses whether login and room use `ProTradingRoom.com`, `TradingRoomApp`, or the existing split.
+5. **Public history disposition:** owner/security chooses to leave the 78 historically published scripts, make the repository private, or rewrite/purge history. Current ignored scripts also need an explicit governance decision.
+6. **Production data/topology:** owner selects managed PostgreSQL placement, app/media isolation topology, and the final clone-era database/role naming cutover; operators then provision, migrate, observe, and execute rollback drills.
+7. **Provider rollout:** production owners supply Discord/FCM/media endpoints and secrets, apply migrations, connect their billing/webhook feed to the stored marketplace subscription facts, and run provider-backed smoke transactions. Repository tests use governed fakes/local infrastructure and do not claim a production send, billing event, or OAuth consent occurred.
+8. **Legacy push cleanup:** operators unsubscribe members who already lapsed in the legacy production system and choose its interim push-expiry value. This repository has no authority or credentials to mutate that external deployment.
+
+## Release decision
+
+Repository implementation is complete for the audited `TODO.md` and `NEW-TODO.md` scope. Release to production remains conditional on the external acceptance and owner/operator actions above. No production deployment, live provider transaction, vendor-v5 observation, licensed WooCommerce exercise, or physical high-DPI judgment is claimed by this ledger.

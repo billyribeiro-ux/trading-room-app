@@ -20,7 +20,9 @@ import type { MessageBadge } from '#lib/types.js';
  */
 import { createHmac } from 'node:crypto';
 import { ROOM_JWT_SECRET } from '$app/env/private';
+import { version as roomAppVersion } from '$app/env';
 import {
+  alertDeliveryUrl,
   controlPlaneOrigin,
   mobilePinUrl,
   mobileRestoreUrl,
@@ -36,7 +38,9 @@ import {
   roomSettingUrl,
   roomStateUrl,
   streamIngestUrl,
-  streamReadUrl
+  streamReadUrl,
+  publicStreamReadUrl,
+  discordIntegrationUrl
 } from './control-plane';
 /*
   The ingest-key shape lives in the PURE `#lib/stream-ingest.js` so the panel can name it too — a
@@ -54,6 +58,8 @@ export type { StreamIngestKey } from '#lib/stream-ingest.js';
  * off — a newly created room has no settings row at all.
  */
 export interface RoomSessionSettings {
+  /** Presenter-only derived bit; linked target room ids never cross the controller boundary. */
+  hasLinkedRoomAlerts?: boolean;
   /**
    * The room's rich-text blurb, and the ONE value that picks the login page's layout.
    *
@@ -130,6 +136,8 @@ export interface RoomSessionSettings {
   showArchivesToUsers?: boolean;
   showArchivesToSpecificPresenters?: string[] | null;
   hideRecs?: boolean;
+  /** Shows the authenticated recording archive tab when the viewer may access archives. */
+  recsInRoom?: boolean;
   hideChatLog?: boolean;
   userUploads?: boolean;
   /* Mobile App Info. */
@@ -180,11 +188,14 @@ export interface RoomSessionSettings {
    * chat/alerts column at `O(1, e.hideChatAlerts ? -1 : 1)`
    * (`app-room.render-helpers.js:1650`) and the extra chat column at `:1652-1660`.
    *
-   * `recordChat` is deliberately absent beside it: it appears only inside the `videoOnlyMode`
-   * writer, and `videoOnlyMode` is the `r` query parameter this room does not model — the same
-   * honest gap recorded for {@link hideFiles}.
+   * `recordChat` is a separate policy below: it snapshots chat and alerts into completed recording
+   * archives, regardless of whether the live room column is visible.
    */
   hideChatAlerts?: boolean;
+  /** Server-authoritative switch for immutable alert/chat snapshots attached to recordings. */
+  recordChat?: boolean;
+  /** Presenter-only membership-age badges, supplied by the controller. */
+  isNewIndicatorOn?: boolean;
   /**
    * "Hide Notes Section?" — the room-wide half of the notes tab's `hidden` binding.
    *
@@ -721,6 +732,8 @@ export interface RoomSessionSettings {
    * raises. This is the owner's term, and it was the missing half.
    */
   recordingReminder?: boolean;
+  /** Presenter-only policy gate for the controller-owned Discord OAuth integration. */
+  enableDiscord?: boolean;
   /**
    * "Restream URL" — the `rtmp://` destination the room republishes its stream to.
    *
@@ -755,6 +768,8 @@ export interface RoomMembership {
   isP: boolean;
   isNonPresenterAdmin: boolean;
   isFT: boolean;
+  /** Controller-derived membership age; never asserted by this browser. */
+  isNew: boolean;
   denyArchivesAccess: boolean;
   restrictPmUser: boolean;
   muted: boolean;
@@ -784,6 +799,12 @@ export interface RoomBadges {
 }
 
 export interface RoomConfig {
+  /** Server-owned deployment facts used only by presenter diagnostics. */
+  deployment?: {
+    appVersion: string;
+    streamServer: string;
+    serverId: string;
+  };
   badges?: RoomBadges;
   /**
    * "Play chat message sound for" — the member email HASHES an arriving message is checked against.
@@ -910,7 +931,10 @@ async function fetchRoomConfig(shortCode: string, memberEmail?: string): Promise
   let response: Response;
   try {
     response = await fetch(url, {
-      headers: { authorization: `Bearer ${configReadToken(secret, shortCode)}` },
+      headers: {
+        authorization: `Bearer ${configReadToken(secret, shortCode)}`,
+        'x-room-app-version': roomAppVersion
+      },
       // Both halves of a timeout: `AbortSignal.timeout` bounds the whole exchange, including a
       // controller that accepts the connection and then never answers.
       signal: AbortSignal.timeout(TIMEOUT_MS)
@@ -1036,6 +1060,167 @@ export async function restoreMobileTokens(
     failed: count('failed'),
     pruned: count('pruned')
   };
+}
+
+export type AlertDeliveryStatus =
+  'queued' | 'sending' | 'sent' | 'failed' | 'suppressed' | 'no-registration';
+
+export interface AlertDeliveryReport {
+  alertId: string;
+  completed: boolean;
+  createdAt: string;
+  completedAt: string | null;
+  rows: Array<{
+    roomName: string;
+    roomShortCode: string;
+    recipientName: string;
+    recipientEmail: string;
+    status: AlertDeliveryStatus;
+    reason: string | null;
+    registrationCount: number;
+    sentCount: number;
+    failedCount: number;
+    prunedCount: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+  }>;
+}
+
+const ALERT_DELIVERY_TIMEOUT_MS = 25_000;
+const ALERT_DELIVERY_STATUSES = new Set<AlertDeliveryStatus>([
+  'queued',
+  'sending',
+  'sent',
+  'failed',
+  'suppressed',
+  'no-registration'
+]);
+
+function parseAlertDeliveryReport(value: unknown): AlertDeliveryReport {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new RoomConfigUnavailable('the controller returned an invalid delivery report');
+  }
+  const input = value as Record<string, unknown>;
+  if (
+    typeof input.alertId !== 'string' ||
+    typeof input.completed !== 'boolean' ||
+    typeof input.createdAt !== 'string' ||
+    (input.completedAt !== null && typeof input.completedAt !== 'string') ||
+    !Array.isArray(input.rows)
+  ) {
+    throw new RoomConfigUnavailable('the controller returned an invalid delivery report');
+  }
+  const count = (row: Record<string, unknown>, key: string): number => {
+    const result = row[key];
+    if (typeof result !== 'number' || !Number.isInteger(result) || result < 0) {
+      throw new RoomConfigUnavailable('the controller returned an invalid delivery count');
+    }
+    return result;
+  };
+  const rows = input.rows.map((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new RoomConfigUnavailable('the controller returned an invalid delivery row');
+    }
+    const row = value as Record<string, unknown>;
+    if (
+      typeof row.roomName !== 'string' ||
+      typeof row.roomShortCode !== 'string' ||
+      typeof row.recipientName !== 'string' ||
+      typeof row.recipientEmail !== 'string' ||
+      typeof row.status !== 'string' ||
+      !ALERT_DELIVERY_STATUSES.has(row.status as AlertDeliveryStatus) ||
+      (row.reason !== null && typeof row.reason !== 'string') ||
+      (row.startedAt !== null && typeof row.startedAt !== 'string') ||
+      (row.finishedAt !== null && typeof row.finishedAt !== 'string')
+    ) {
+      throw new RoomConfigUnavailable('the controller returned an invalid delivery row');
+    }
+    return {
+      roomName: row.roomName,
+      roomShortCode: row.roomShortCode,
+      recipientName: row.recipientName,
+      recipientEmail: row.recipientEmail,
+      status: row.status as AlertDeliveryStatus,
+      reason: row.reason as string | null,
+      registrationCount: count(row, 'registrationCount'),
+      sentCount: count(row, 'sentCount'),
+      failedCount: count(row, 'failedCount'),
+      prunedCount: count(row, 'prunedCount'),
+      startedAt: row.startedAt as string | null,
+      finishedAt: row.finishedAt as string | null
+    };
+  });
+  return {
+    alertId: input.alertId,
+    completed: input.completed,
+    createdAt: input.createdAt,
+    completedAt: input.completedAt as string | null,
+    rows
+  };
+}
+
+/** Creates or resumes the controller-side idempotent push dispatch for one local alert. */
+export async function requestAlertDelivery(input: {
+  shortCode: string;
+  alertId: number;
+  body: string;
+  dontCrossPost: boolean;
+}): Promise<AlertDeliveryReport> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+  const base = alertDeliveryUrl(input.shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+  let response: Response;
+  try {
+    response = await fetch(base, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configWriteToken(secret, input.shortCode)}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        alertId: String(input.alertId),
+        idempotencyKey: `${input.shortCode}:${input.alertId}:push:v1`,
+        body: input.body,
+        dontCrossPost: input.dontCrossPost
+      }),
+      signal: AbortSignal.timeout(ALERT_DELIVERY_TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(
+      `the alert delivery request failed or timed out after ${ALERT_DELIVERY_TIMEOUT_MS}ms`,
+      { cause }
+    );
+  }
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+  return parseAlertDeliveryReport(await response.json());
+}
+
+/** Reads a controller-owned per-member report without exposing any registration token. */
+export async function requestAlertDeliveryReport(
+  shortCode: string,
+  alertId: number
+): Promise<AlertDeliveryReport | null> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+  const base = alertDeliveryUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+  const url = new URL(base);
+  url.searchParams.set('alertId', String(alertId));
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { authorization: `Bearer ${configReadToken(secret, shortCode)}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the delivery report request timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+  if (response.status === 404) return null;
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+  return parseAlertDeliveryReport(await response.json());
 }
 
 /**
@@ -1483,6 +1668,142 @@ export async function requestStreamReadToken(
     configured: payload.configured === true,
     expiresInSeconds: typeof payload.expiresInSeconds === 'number' ? payload.expiresInSeconds : 0
   };
+}
+
+/**
+ * Exchanges the room server's authenticated capability for a short-lived anonymous-viewer token.
+ * The public browser never calls the controller and never receives the shared room secret.
+ */
+export async function requestPublicStreamReadToken(
+  shortCode: string
+): Promise<StreamReadToken | null> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) return null;
+  const url = publicStreamReadUrl(shortCode);
+  if (!url) return null;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${configReadToken(secret, shortCode)}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as Partial<StreamReadToken>;
+    if (typeof payload.mtxToken !== 'string' || !payload.mtxToken) return null;
+    return {
+      mtxToken: payload.mtxToken,
+      streamServerMTX: typeof payload.streamServerMTX === 'string' ? payload.streamServerMTX : '',
+      configured: payload.configured === true,
+      expiresInSeconds: typeof payload.expiresInSeconds === 'number' ? payload.expiresInSeconds : 0
+    };
+  } catch (cause) {
+    console.warn('[public-player] could not mint playback token', { shortCode, cause });
+    return null;
+  }
+}
+
+export interface DiscordIntegrationStatus {
+  checked: true;
+  connected: boolean;
+  userId: string | null;
+  username: string | null;
+  configured: boolean;
+}
+
+function discordUrl(shortCode: string, memberEmail: string): URL {
+  const base = discordIntegrationUrl(shortCode);
+  if (!base) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+  const url = new URL(base);
+  url.searchParams.set('email', memberEmail);
+  return url;
+}
+
+/** Reads the caller's Discord link state without exposing an OAuth access token. */
+export async function requestDiscordStatus(
+  shortCode: string,
+  memberEmail: string
+): Promise<DiscordIntegrationStatus> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+  let response: Response;
+  try {
+    response = await fetch(discordUrl(shortCode, memberEmail), {
+      headers: { authorization: `Bearer ${configReadToken(secret, shortCode)}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the Discord status request timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+  const payload = (await response.json()) as Partial<DiscordIntegrationStatus>;
+  if (
+    payload.checked !== true ||
+    typeof payload.connected !== 'boolean' ||
+    typeof payload.configured !== 'boolean'
+  ) {
+    throw new RoomConfigUnavailable('the controller answered an unrecognised Discord status');
+  }
+  return {
+    checked: true,
+    connected: payload.connected,
+    configured: payload.configured,
+    userId: typeof payload.userId === 'string' ? payload.userId : null,
+    username: typeof payload.username === 'string' ? payload.username : null
+  };
+}
+
+/** Creates a single-use, ten-minute OAuth state and returns Discord's authorization URL. */
+export async function requestDiscordAuthorization(
+  shortCode: string,
+  memberEmail: string
+): Promise<string> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+  let response: Response;
+  try {
+    response = await fetch(discordUrl(shortCode, memberEmail), {
+      method: 'POST',
+      headers: { authorization: `Bearer ${configWriteToken(secret, shortCode)}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(
+      `the Discord authorization request timed out after ${TIMEOUT_MS}ms`,
+      {
+        cause
+      }
+    );
+  }
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+  const payload = (await response.json()) as { authorizationUrl?: unknown };
+  if (
+    typeof payload.authorizationUrl !== 'string' ||
+    !payload.authorizationUrl.startsWith('https://discord.com/')
+  ) {
+    throw new RoomConfigUnavailable('the controller returned an invalid Discord authorization URL');
+  }
+  return payload.authorizationUrl;
+}
+
+/** Removes only the caller's stored Discord identity; no provider token is retained locally. */
+export async function unlinkDiscord(shortCode: string, memberEmail: string): Promise<void> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+  let response: Response;
+  try {
+    response = await fetch(discordUrl(shortCode, memberEmail), {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${configWriteToken(secret, shortCode)}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the Discord unlink request timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
 }
 
 /** What the controller answers when asked whether an attempt may enter. */

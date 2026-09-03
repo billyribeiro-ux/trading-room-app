@@ -393,6 +393,8 @@ export type RosterUser = {
   isP: boolean;
   /** `r.isFT` - a free-trial account. `getRandomUser`'s "Trials only" branch filters on it. */
   isFT: boolean;
+  /** Controller-derived membership-age policy; exposed only to presenters by roster fan-out. */
+  isNew?: boolean;
   /**
    * `r.hasAdminChat` on the ENTRY, which is not the same flag as the viewer's.
    *
@@ -483,6 +485,12 @@ export type ConnectionFacts = {
   readonly address: string;
   /** `privData.uaStr` — the `User-Agent` header on that same request. */
   readonly userAgent: string;
+  /** SvelteKit asset version for the server/client build that opened this connection. */
+  readonly appVersion?: string;
+  /** Controller-owned MediaMTX host selected for this room. */
+  readonly streamServer?: string;
+  /** Controller-owned cluster identifier, falling back to the media host. */
+  readonly serverId?: string;
 };
 
 /**
@@ -505,7 +513,10 @@ export type ConnectionFacts = {
  */
 export const UNKNOWN_CONNECTION: ConnectionFacts = {
   address: 'unknown',
-  userAgent: 'unknown'
+  userAgent: 'unknown',
+  appVersion: 'unknown',
+  streamServer: 'not-configured',
+  serverId: 'not-configured'
 };
 
 type ListenerContext = {
@@ -683,7 +694,7 @@ export function roomRoster(room: string): RosterUser[] {
   for (const { user } of listeners.values()) {
     if (user && !byId.has(user.id)) byId.set(user.id, user);
   }
-  return [...byId.values()];
+  return [...byId.values()].map((user) => ({ ...user, isNew: user.isNew === true }));
 }
 
 /**
@@ -828,7 +839,8 @@ export function publishRosterToRoom(room: string): void {
     hasMic: false,
     hasScreen: false,
     hasCam: false,
-    canEditNotes: false
+    canEditNotes: false,
+    isNew: false
   }));
 
   for (const [listener, { user: viewer }] of listeners) {

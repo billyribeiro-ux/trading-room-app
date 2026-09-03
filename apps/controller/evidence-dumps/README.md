@@ -16,27 +16,18 @@ updated consumers, and verification results are recorded in
 | `COPY/` | Saved controller and room-login page sources |
 | `NEXT-STEP/` | Capture-gap outputs and decoded reference assets |
 | `TIER1-fetched/` | Static artifacts fetched read-only 2026-08-13 — bundles, raw stylesheets, webfont, API markdown, and the AngularJS `templateUrl` partials under `views/`. Closes Tier 1 of `docs/reference/evidence-gap-register.md`. |
-| `account-page/` | **NOT IN THIS REPOSITORY.** Authenticated account and badge-prompt evidence. See the note below. |
+| `account-page/` | Authenticated account page and upload-image badge-prompt evidence, restored and SHA-256 sealed 2026-09-03. |
 | `home-page/` | Original public home-page source |
 | `login-page/` | Public, authenticated, API, launch, and manage-page sources |
 | `main-nav-login-clicked/` | Authenticated navigation-state source |
 | `register-page/` | Registration-page source |
 | `room-login/` | Room-login source |
 
-## One documented set is not here
+## Restored account-page evidence
 
-`account-page/` is listed in the map above because documents in `docs/reference/` cite it, and it
-has **never been committed** — `git log --all -- 'apps/controller/evidence-dumps/account-page*'`
-returns nothing, so it was not deleted either. It is a capture that stayed on the machine that took
-it, the same way `apps/room/scripts/` did until it was republished.
-
-It is named rather than removed because conclusions drawn from it are still in the tree. A reader of
-a clone cannot re-check those conclusions against the capture, and that is the honest state to be
-in until somebody commits the set.
-
-`scripts/verify-evidence-layout.mjs` pins the absence: restore the directory and the verifier goes
-RED, naming the two lists the entry has to move to. That is deliberate — a set that reappears should
-be verified, not merely present.
+The previously machine-local `account-page/` capture was restored on 2026-09-03. The layout gate
+now requires both artifacts and verifies their documented SHA-256 digests, so clones can re-check
+the account-page conclusions and any byte-level drift fails closed.
 
 ## Handling contract
 

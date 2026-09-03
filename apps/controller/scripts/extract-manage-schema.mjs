@@ -169,6 +169,7 @@ const ROOM_CONSUMED = [
   'hasBenzingaNews',
   'hideAppInfo',
   'hideChatAlerts',
+  'recordChat',
   'hideChatLog',
   'hideFiles',
   'hideMobileCredentials',
@@ -247,6 +248,7 @@ const ROOM_CONSUMED = [
      at its entry in `room-config.ts`. */
   'smallerImagePreview',
   'hideRecs',
+  'recsInRoom',
   'individualVolumeControls',
   'userJoinAndLeavePopup',
   'isChatOnlyRoom',
@@ -475,7 +477,8 @@ const ROOM_CONSUMED = [
      the same value for the reminder it draws on load (byte 2,500,153).
 
      It is also the second setting the room may WRITE - see ROOM_WRITABLE_SETTINGS. */
-  'isLocked'
+  'isLocked',
+  'isNewIndicatorOn'
 ];
 
 /**
@@ -503,8 +506,12 @@ const ROOM_PRESENTER_CONSUMED = [
      Also the SECOND setting the room writes back. SC-13 in the surface audit: the pane Set and
      Clear buttons wrote it as a per-viewer PREFERENCE that nothing anywhere read, so a presenter
      set a destination and the room republished nowhere while the pane showed the value back. */
-  'restreamToURL'
+  'restreamToURL',
+  'enableDiscord'
 ];
+
+/** Settings consumed entirely inside the controller and therefore never transported to a browser. */
+const CONTROL_PLANE_CONSUMED = ['clusterID', 'backupClusterID', 'linkedRoomAlerts'];
 
 /**
  * The WordPress SSO door, via `(public)/sso/[code]/+server.ts`.
@@ -526,7 +533,13 @@ const SSO_CONSUMED = [
   'tokenExpiresIn'
 ];
 
-const WIRED_SETTINGS = new Set([...LOGIN_CONSUMED, ...ROOM_CONSUMED, ...ROOM_PRESENTER_CONSUMED, ...SSO_CONSUMED]);
+const WIRED_SETTINGS = new Set([
+  ...LOGIN_CONSUMED,
+  ...ROOM_CONSUMED,
+  ...ROOM_PRESENTER_CONSUMED,
+  ...CONTROL_PLANE_CONSUMED,
+  ...SSO_CONSUMED
+]);
 
 /* Reuse the outline decoder so the parse below sees the same tree the docs do. */
 const tempDirectory = mkdtempSync(join(tmpdir(), 'proroom-schema-'));
@@ -1084,7 +1097,7 @@ const missingWiredSettings = [...WIRED_SETTINGS].filter((name) => !defs.some((de
 //
 // The literal is a tripwire, not a fact about the schema — it is here so the wired set cannot grow
 // by accident, which is why changing it is a deliberate edit.
-if (WIRED_SETTINGS.size !== 113 || missingWiredSettings.length > 0) {
+if (WIRED_SETTINGS.size !== 120 || missingWiredSettings.length > 0) {
   throw new Error(
     `wired-setting contract invalid: ${WIRED_SETTINGS.size} keys, missing ${missingWiredSettings.join(', ') || 'none'}`
   );

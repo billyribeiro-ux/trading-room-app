@@ -7,6 +7,7 @@ import { requireOwnedRoom, requireUser } from '#lib/server/auth.js';
 import { handoffUrl, siteHandoffToken } from '#lib/server/room-handoff.js';
 import { recordVisit } from '#lib/server/room-visits.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
+import { redirectToConfiguredLocation } from '#lib/server/configured-redirect.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -108,5 +109,5 @@ export const GET: RequestHandler = async ({ params, locals, request, getClientAd
   );
   // Unreachable: the blank case redirected above. Narrowed rather than asserted.
   if (!target) redirect(303, `/session/${encodeURIComponent(room.shortCode)}`);
-  redirect(303, target.toString());
+  redirectToConfiguredLocation(target);
 };

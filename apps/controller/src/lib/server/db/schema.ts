@@ -473,13 +473,7 @@ export const roomUsers = pgTable(
      * no writer today.
      */
     phone: text('phone'),
-    /**
-     * Written by the room's Discord integration, which is gated on the `enableDiscord`
-     * room setting and is not built here. The reference's row renders
-     * "Discord Username: <id>" in red under `ng-show="user.discordUserId"`, so the
-     * column exists and the row reads it; nothing in this application writes it yet.
-     * That gap is recorded in `docs/OUTSTANDING.md` rather than left looking wired.
-     */
+    /** Provider identity written by the gated OAuth callback; access tokens are never persisted. */
     discordUserId: text('discord_user_id'),
     /** Per-user permission flags the #permissionsModal edits. */
     permissionsJson: text('permissions_json').notNull().default('{}'),
@@ -487,6 +481,22 @@ export const roomUsers = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull()
   },
   (t) => [uniqueIndex('room_users_unique_idx').on(t.roomId, t.userId)]
+);
+
+/** Single-use, hashed OAuth state for linking one presenter membership to Discord. */
+export const discordOauthStates = pgTable(
+  'discord_oauth_states',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    stateHash: text('state_hash').notNull().unique(),
+    roomUserId: integer('room_user_id')
+      .notNull()
+      .references(() => roomUsers.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull()
+  },
+  (t) => [index('discord_oauth_states_expiry_idx').on(t.expiresAt)]
 );
 
 /**
@@ -763,5 +773,91 @@ export const streamIngestKeys = pgTable(
   (table) => [
     uniqueIndex('stream_ingest_keys_key_idx').on(table.ingestKey),
     uniqueIndex('stream_ingest_keys_room_user_idx').on(table.roomId, table.userId)
+  ]
+);
+
+/**
+ * One alert-delivery request received from the room.
+ *
+ * The room's alert id is only unique inside that room, so the caller supplies a versioned
+ * idempotency key and the database enforces it per room. Retrying a timed-out room-to-controller
+ * request therefore resumes the same dispatch instead of notifying every device twice.
+ */
+export const alertDispatches = pgTable(
+  'alert_dispatches',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    roomId: integer('room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    idempotencyKey: text('idempotency_key').notNull(),
+    externalAlertId: text('external_alert_id').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    dontCrossPost: boolean('dont_cross_post').notNull().default(false),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    uniqueIndex('alert_dispatches_room_idempotency_idx').on(table.roomId, table.idempotencyKey),
+    index('alert_dispatches_room_alert_idx').on(table.roomId, table.externalAlertId)
+  ]
+);
+
+/**
+ * The durable outcome for one room member in one dispatch.
+ *
+ * Contact values are snapshots: deleting or renaming a member must not rewrite the historical
+ * answer to who an alert was sent to. Device tokens are deliberately absent; they are credentials,
+ * and counts plus a reason are sufficient for an operator report.
+ */
+export const alertDeliveryAttempts = pgTable(
+  'alert_delivery_attempts',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    dispatchId: integer('dispatch_id')
+      .notNull()
+      .references(() => alertDispatches.id, { onDelete: 'cascade' }),
+    roomUserId: integer('room_user_id').references(() => roomUsers.id, { onDelete: 'set null' }),
+    recipientKey: text('recipient_key').notNull(),
+    recipientName: text('recipient_name').notNull(),
+    recipientEmail: text('recipient_email').notNull(),
+    status: text('status').notNull().default('queued'),
+    reason: text('reason'),
+    registrationCount: integer('registration_count').notNull().default(0),
+    sentCount: integer('sent_count').notNull().default(0),
+    failedCount: integer('failed_count').notNull().default(0),
+    prunedCount: integer('pruned_count').notNull().default(0),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    uniqueIndex('alert_delivery_attempts_dispatch_recipient_idx').on(table.dispatchId, table.recipientKey),
+    index('alert_delivery_attempts_dispatch_status_idx').on(table.dispatchId, table.status)
+  ]
+);
+
+/** Durable attribution from an alert's source-room dispatch to each same-account linked-room dispatch. */
+export const alertDispatchLinks = pgTable(
+  'alert_dispatch_links',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    sourceDispatchId: integer('source_dispatch_id')
+      .notNull()
+      .references(() => alertDispatches.id, { onDelete: 'cascade' }),
+    targetDispatchId: integer('target_dispatch_id')
+      .notNull()
+      .references(() => alertDispatches.id, { onDelete: 'cascade' }),
+    targetRoomId: integer('target_room_id')
+      .notNull()
+      .references(() => rooms.id, { onDelete: 'cascade' }),
+    targetRoomName: text('target_room_name').notNull(),
+    targetRoomCode: text('target_room_code').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    uniqueIndex('alert_dispatch_links_source_target_idx').on(table.sourceDispatchId, table.targetRoomId),
+    uniqueIndex('alert_dispatch_links_target_dispatch_idx').on(table.targetDispatchId)
   ]
 );

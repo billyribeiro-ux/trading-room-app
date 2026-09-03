@@ -47,6 +47,10 @@ const SHARE = readFileSync(
 );
 const MODAL = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 const PANE = readFileSync(new URL('./components/ScreenPane.svelte', import.meta.url), 'utf8');
+const STATUS = readFileSync(
+  new URL('./components/ScreenPaneStatus.svelte', import.meta.url),
+  'utf8'
+);
 
 const stripComments = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
@@ -153,7 +157,9 @@ describe('ours: the switch reaches the media layer', () => {
   });
 
   it('the pane hides the video and shows the reference message', () => {
-    expect(paneCode).toContain('{ hidden: stream === null || saveData');
-    expect(paneCode).toContain('<h3 class="mt-4 text-center">Video Disabled</h3>');
+    expect(paneCode).toContain('const pictureHidden = $derived(!connected || saveData);');
+    expect(paneCode).toContain('{ hidden: pictureHidden,');
+    expect(paneCode).toContain('<ScreenPaneStatus');
+    expect(stripComments(STATUS)).toContain('<h3 class="mt-4 text-center">Video Disabled</h3>');
   });
 });

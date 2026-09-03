@@ -90,6 +90,8 @@ const INGEST_DOMAIN = 'stream-ingest:';
  * cached counter — not a per-segment membership query.
  */
 export const READ_TOKEN_TTL_SECONDS = 43_200;
+/** Public-player media grants rotate on every page load and expire within five minutes. */
+export const PUBLIC_READ_TOKEN_TTL_SECONDS = 300;
 
 export interface IngestTokenClaims {
   /**
@@ -208,9 +210,17 @@ export function mintIngestToken(
 export function mintRoomReadToken(
   secret: string,
   roomKey: string,
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+  ttlSeconds: number = READ_TOKEN_TTL_SECONDS
 ): string {
-  return mintIngestToken(secret, { sub: roomKey, scope: 'read' }, nowSeconds);
+  const header = base64Url({ alg: 'HS256', typ: 'JWT' });
+  const body = base64Url({
+    sub: roomKey,
+    scope: 'read',
+    iat: nowSeconds,
+    exp: nowSeconds + ttlSeconds
+  } satisfies IngestTokenClaims);
+  return `${header}.${body}.${signature(secret, `${INGEST_DOMAIN}${header}.${body}`)}`;
 }
 
 export type IngestTokenResult =

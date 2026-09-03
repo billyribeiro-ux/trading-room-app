@@ -8,24 +8,16 @@ DO, it does not belong.
 This is the root index. Anything recorded per-app stays where it is; this file points at it, so
 there is one place to look rather than four.
 
-> ## ⛳ WHERE THIS STANDS, 2026-09-02
+> ## ⛳ WHERE THIS STANDS, 2026-09-03
 >
-> **Every row still open in this file, in `NEW-TODO.md`, and in the register needs the OWNER, an
-> ENVIRONMENT, or HARDWARE.** Nothing is waiting on a decision an audit can take.
+> **All repository-buildable gaps identified by the 2026-09-03 hard audit are implemented.** Any
+> remaining row requires an owner choice, production credentials, vendor state, staging software,
+> or physical/high-DPI acceptance hardware; none can be truthfully completed from this checkout.
 >
-> `todo-next.md` closed on 2026-09-01 at **93 of 93 room surfaces**, from 2 of 42 on 2026-08-16, with
-> its own four limits stated at the number. `NEW-TODO.md` is down to **two** items — the recordings
-> tab (needs an archive service) and v5 (needs an account cleared for it). The register is 70 closed,
-> 2 open, and both open ones are `T5-24`/`T5-25`, blocked by the credential guard on **one sentence
-> from the owner**. The settings enumeration reached its last buildable row on 2026-09-02 —
-> `smallerImagePreview`, USM-18, which had been answered NOT A GAP on a premise that did not survive
-> re-reading; what remains is `enableDiscord`, which needs an application registration that does not
-> exist.
->
-> **This paragraph said THREE items until 2026-09-02 and named the five operator reset commands as
-> the third.** `NEW-TODO.md`'s own body had already retired that row on 2026-09-01 — the five methods
-> have no call site anywhere in the bundle, re-swept independently on 2026-09-02 — and both summaries
-> carried it anyway. Corrected in both, in the same change, rather than in the one that was noticed.
+> `todo-next.md` now accounts for **101 of 101 room surfaces**. `NEW-TODO.md` has one external
+> acceptance item: observing a room actually assigned the vendor-selected v5 build. Recordings,
+> Discord OAuth plumbing, linked-room alerts, media failover, public playback, alert delivery/reporting,
+> trusted free-trial identity, immediate permission refresh and governed credential reveal are built.
 >
 > **What is NOT claimed:** that the room matches the reference everywhere. Many surfaces close on a
 > recorded refusal or a measured blocker, and each says so where it stands. Audited means the gap is
@@ -51,7 +43,7 @@ finished (row W's toast-only family, row AE's decomposition) turned out to be, r
 than recorded and three times further along than recorded.
 
 > ⛔ **`apps/controller/src/lib/evidence-gap-register-counts.test.ts:36` READS THIS FILE.** It
-> requires the tally sentence under *The register* below to exist in its exact documented shape and
+> requires the tally sentence under _The register_ below to exist in its exact documented shape and
 > to equal a live recount of `docs/reference/evidence-gap-register.md`. **Do not delete or hand-edit
 > that sentence.** If it drifts, recount with the test's own parser — never by memory, and never by
 > reading the register's status column, which does not agree with it (see the open row on that).
@@ -66,12 +58,12 @@ The one thing untracking could not reach, and an owner decision rather than a pi
 eviction — it holds **78**, and the repository is `public`, so they are readable at that commit by
 anyone. Untracking governs future commits only.
 
-**AND THE DIRECTORY IS STILL GROWING, unmeasured until 2026-08-23: 146 files on disk against 0
-tracked and 78 at `be239b2`.** The ignore rule is the bare directory line `/apps/room/scripts/` at
-`.gitignore:176`, so every script written since the eviction has gone straight into a directory git
-cannot see — nearly doubling the surface with no review, no CI and no privacy scan. That is a
-second problem from the same rule and it gets worse on its own: the eviction question is about 78
-files already published, this one is about 68 more that nobody has ever looked at.
+**The ignored directory must be measured separately: 76 files on disk on 2026-09-03, against 0
+tracked and 78 at `be239b2`.** It contained 146 files when first measured on 2026-08-23; that is a
+historical high-water mark, not its current size. The ignore rule is the bare directory line
+`/apps/room/scripts/` at `.gitignore:176`, so those 76 files still receive no Git review or CI.
+That is a second problem from the same rule: the eviction question is about 78 files already
+published, while the current ignored files need an explicit owner/security disposition.
 
 Measured rather than assumed, with the repository's own detector in `apps/room/gate/privacy-utils.mjs`:
 no email addresses, no gravatar hashes, no tokens across all 78. **One** occurrence of the owner's
@@ -107,8 +99,8 @@ were replaced by `PTR_*_EMAIL` environment reads.
 shrink". Run 2026-08-31, it does not, and it must not.** It prints:
 
 > `[privacy] 81 baselined finding(s) are not visible from this checkout, which is missing 13 capture
-> root(s)… Do NOT run --update here. They are absent, not redacted. Shrinking the baseline would make
-> them read as NEW personal data on a checkout that has the captures.`
+root(s)… Do NOT run --update here. They are absent, not redacted. Shrinking the baseline would make
+them read as NEW personal data on a checkout that has the captures.`
 
 The advice is **withheld whenever any capture root is missing** (`verify-privacy-boundary.mjs:185`),
 and in a clone one always is. The three files here are in the same bucket for a second reason:
@@ -185,9 +177,9 @@ migration enumerates ACLs from the catalogue rather than from a hand-kept list o
 which is what made two sites missing from that list (`0003:106` and `0004:55`) a documentation bug
 rather than a defect. The counted residual is the check.
 
-| # | what | why it is not done yet |
-| --- | --- | --- |
-| 1 | **Owner role and database name `ptr_clone` → `tradingroom`** — **steps 1 and 2 are DONE and the rest is rehearsed; `ops/OWNER-ROLE-CUTOVER.md` is the runbook.** The blocker was in the code, not on the cluster: `EXPECTED_MIGRATOR_ROLE` was a single `&str`, and a single accepted name forces a FLAG DAY — the database's ownership and the deployed binary have to change in the same instant, and in the window between them one of the two refuses a database that is perfectly healthy. `ACCEPTED_MIGRATOR_ROLES` is that window, an ordered allow-list of exactly two names. It is **not** the tolerance removed from the runtime-role preflight: that was a catalogue lookup returning role Y's posture when asked about X; this is an equality test against three facts about the current connection, all of which must name the SAME entry. **Four cases measured through the real `migrate` binary on a live PG 16.13 cluster:** `tradingroom`→`tradingroom`-owned exit 0 (10 migrations, 3 tables, 22 policies); `ptr_clone`→`ptr_clone`-owned exit 0 (no regression); a third superuser exit 1; and `tradingroom` after `SET ROLE ptr_clone` exit 1 — both names accepted, unanimity still enforced. The negative control for that last one is the whole reason it is checked entry-by-entry: the plausible "each fact is in the list" form accepts all four impersonations. **Step 3 rehearsed on a fully-migrated database:** `REASSIGN OWNED` moved 129 relations and `ALTER DATABASE … OWNER TO` the database, with 22 RLS policies and 87 `tradingroom_app` grants intact either side, and the chain then applies as EITHER owner. **Step 4 rehearsed:** `DROP ROLE ptr_clone` REFUSES while objects remain and names the databases and counts — fail-closed retirement, no `CASCADE`. The release attestation now resolves the owner from the connection once and PINS every downstream check to it, so a half-finished `REASSIGN OWNED` fails attestation. | the operator: steps 3-5 of the runbook, per cluster |
+| #   | what                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | why it is not done yet                              |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1   | **Owner role and database name `ptr_clone` → `tradingroom`** — **steps 1 and 2 are DONE and the rest is rehearsed; `ops/OWNER-ROLE-CUTOVER.md` is the runbook.** The blocker was in the code, not on the cluster: `EXPECTED_MIGRATOR_ROLE` was a single `&str`, and a single accepted name forces a FLAG DAY — the database's ownership and the deployed binary have to change in the same instant, and in the window between them one of the two refuses a database that is perfectly healthy. `ACCEPTED_MIGRATOR_ROLES` is that window, an ordered allow-list of exactly two names. It is **not** the tolerance removed from the runtime-role preflight: that was a catalogue lookup returning role Y's posture when asked about X; this is an equality test against three facts about the current connection, all of which must name the SAME entry. **Four cases measured through the real `migrate` binary on a live PG 16.13 cluster:** `tradingroom`→`tradingroom`-owned exit 0 (10 migrations, 3 tables, 22 policies); `ptr_clone`→`ptr_clone`-owned exit 0 (no regression); a third superuser exit 1; and `tradingroom` after `SET ROLE ptr_clone` exit 1 — both names accepted, unanimity still enforced. The negative control for that last one is the whole reason it is checked entry-by-entry: the plausible "each fact is in the list" form accepts all four impersonations. **Step 3 rehearsed on a fully-migrated database:** `REASSIGN OWNED` moved 129 relations and `ALTER DATABASE … OWNER TO` the database, with 22 RLS policies and 87 `tradingroom_app` grants intact either side, and the chain then applies as EITHER owner. **Step 4 rehearsed:** `DROP ROLE ptr_clone` REFUSES while objects remain and names the databases and counts — fail-closed retirement, no `CASCADE`. The release attestation now resolves the owner from the connection once and PINS every downstream check to it, so a half-finished `REASSIGN OWNED` fails attestation. | the operator: steps 3-5 of the runbook, per cluster |
 
 **The cost constraint that governs how these get tested.** Every push against an open PR starts a
 run. The backend gate is ~33 minutes when the diff touches a backend path and ~25 seconds when it
@@ -198,12 +190,12 @@ does not, so batching backend pushes is worth real money and docs pushes are eff
 
 ## Evidence gaps
 
-**EMPTY as of 2026-09-01.** The one row here was *"whether a real browser serialises
-`background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it matters"*, and it is answered: **it
+**EMPTY as of 2026-09-01.** The one row here was _"whether a real browser serialises
+`background:#111` as `rgb(17, 17, 17)` — UNVERIFIED, and it matters"_, and it is answered: **it
 does**, and the reasoning that expected otherwise was wrong in a way worth keeping.
 
-The row said *"`setAttribute('style', …)` preserves the attribute verbatim in Chrome … this is most
-likely a jsdom artefact"*. Both halves are true and neither applies, because **ProseMirror does not
+The row said _"`setAttribute('style', …)` preserves the attribute verbatim in Chrome … this is most
+likely a jsdom artefact"_. Both halves are true and neither applies, because **ProseMirror does not
 use `setAttribute` for `style`** — `prosemirror-model/dist/index.js:3441` assigns
 `dom.style.cssText`, which goes through the CSSOM. Headless Chromium 141 then agrees with jsdom
 declaration for declaration.
@@ -229,7 +221,7 @@ browser.
 `apps/room/gate/audit-setting-coverage.mjs` asks the second question nothing had asked. The command
 audit next to it asks what the reference SENDS; this asks what it READS.
 
-`room-settings-schema.ts` declares **269** settings and marks **156** of them `wired: false` —
+`room-settings-schema.ts` declares **269** settings and marks **149** of them `wired: false` —
 nothing in this room reads them. That number alone says nothing: most were never meant to reach a
 room. The answerable question is narrower, and it is measured against the pinned v4 bundle:
 
@@ -240,13 +232,13 @@ is pinned BY NAME in `apps/room/src/lib/setting-coverage-contract.test.ts` — n
 > corrected when `COUNT_CLAIMS` grew to include `TODO.md`, and the second was still wrong the next
 > day — measured live, the reference reads **22**, not 26. `COUNT_CLAIMS` did not catch it because it
 > checks the WIRED count and this is a different claim, in a phrasing no pattern matched. The
-> verifier's own docblock had predicted exactly this: *"the next stale count will be in a seventh
-> file phrased a seventh way."* It was a seventh phrasing in the same file.
+> verifier's own docblock had predicted exactly this: _"the next stale count will be in a seventh
+> file phrased a seventh way."_ It was a seventh phrasing in the same file.
 >
 > So the number is GONE rather than corrected, which is the doctrine
-> `setting-coverage-contract.test.ts` already states about itself: *"NO COUNTS IN THIS PARAGRAPH ANY
+> `setting-coverage-contract.test.ts` already states about itself: _"NO COUNTS IN THIS PARAGRAPH ANY
 > MORE… the numbers move every time a setting is wired, and prose beside a list it counts is the copy
-> nobody updates."* That test now asserts this file carries no such count.
+> nobody updates."_ That test now asserts this file carries no such count.
 
 **The subset is fully triaged, and nothing in it is buildable here.** Measured 2026-08-29 against the
 pinned bundle, every one has a disposition in `docs/decoded/missing-settings-triage.md` with a byte
@@ -260,12 +252,12 @@ offset:
   `sessData.h264Enabled || !0`, unconditionally true; `advancedSearchAlerts` is gated on one
   hard-coded owner id. It was three until 2026-09-02: `smallerImagePreview` was answered NOT A GAP on
   a premise that was measured wrong, and is built as USM-18.
-- **The rest are BLOCKED** on infrastructure or one owner answer — an archive service, a
-  server-owned lock, a second MediaMTX cluster, the `r` recording-bot parameter, a cross-post
-  fan-out that occurs zero times in the bundle, or a Discord application registration.
+- **TWO belong to the controller login surface**, not to the room runtime: `authMode` and
+  `description`. Both are implemented there and correctly remain absent from this room-side list.
 
 `WIRE` — the section for settings whose surface exists and is missing a term — **opened at twelve rows
-and is down to one**, `recsInRoom`, which is itself blocked on the Recordings tab.
+and is now empty**. The archive, lock, failover, new-member, recording, linked-alert and Discord
+rows all left with an end-to-end consumer rather than with a schema-only toggle.
 
 **Thirty-one have already left the list, on the day it was written**, and it keeps moving.
 
@@ -275,7 +267,7 @@ and is down to one**, `recsInRoom`, which is itself blocked on the Recordings ta
 > blockquote for that reason — it is the convention that lets a document record what it used to say
 > without a superseded number failing the build, or the check being loosened to let one pass.
 
-- `hideNotes` — the Notes tab and pane now honour *"Hide Notes Section?"*, which they did not while
+- `hideNotes` — the Notes tab and pane now honour _"Hide Notes Section?"_, which they did not while
   its two siblings `hideFiles` and `hideRecs` did. A gap nobody could have found by looking, because
   the tab it gates was always built.
 - `darkThemeAsDefault`, `alertSoundOff`, `alertsChatOnBottom` — **one feature, not three settings.**
@@ -348,14 +340,14 @@ above do not move, and that is correct rather than a bookkeeping problem: the pi
 whether the raw value crosses, and here it must not. Two silent upstream defects are fixed on the
 way, including one where following a single person turns off every chat sound in the room.
 
-**WIRE is down to ONE**, and it is `recsInRoom`, which is BLOCKED anyway — wire it with the
-Recordings tab, never before it. The section opened with twelve.
+**WIRE is empty.** `recsInRoom` left with the authenticated Recordings archive on 2026-09-03; the
+section opened with twelve and none was closed by changing a count alone.
 
-**`isNewIndicatorOn` was the THIRD row corrected out of WIRE**, on 2026-08-28, and its own caveat is
-what did it: *"Needs `msg.isNew` to have a supply; check before wiring."* The check says there is no
-supply and there cannot be one from evidence — `isNew` is produced by the reference's SERVER and
-arrives on the login payload (bytes 995,175 and 1,157,344), so the rule deciding who is new is
-unknowable here, and inventing one would invent the decision the setting exists to express. It is
+**`isNewIndicatorOn` was the THIRD row corrected out of WIRE**, on 2026-08-28, because its surface
+had no authoritative `isNew` supply. That blocker closed on 2026-09-03 with a controller-owned
+30-day membership rule projected on the signed room configuration and presenter-only gates on all
+three consumers. The original server remains the authority in the reference; this deployment now
+has an explicit first-party authority rather than a client guess.
 BLOCKED on one owner answer or one capture of that response.
 
 **The check found a live defect on the way.** `ModalHost.svelte` drew the `Trial` and `New` badges
@@ -382,7 +374,7 @@ without that distinction written down would read, later, as a transcription.
 separately that the seven credentials are still on it, because a name leaving that list means the
 room started reading it.
 
-> **Superseded 2026-08-29.** This sentence said *"pins the 26 by NAME"*. It was the SECOND stale copy
+> **Superseded 2026-08-29.** This sentence said _"pins the 26 by NAME"_. It was the SECOND stale copy
 > of that number in this file and the THIRD phrasing of it, found only because a negative control on
 > the new guard failed to fire — the guard's pointer assertion was being satisfied by this line while
 > this line carried the stale count. Two sites, three phrasings, one file: which is the argument for
@@ -415,28 +407,11 @@ handoff, because the SvelteKit 3 migration to `goto(…, { shallow: true })` bro
 condition its own comment documented — that call does not update `page.url`, so the guard re-read the
 token forever.
 
-**THE SETTINGS ENUMERATION IS DOWN TO ONE UNBUILT FEATURE** — measured 2026-08-28, re-measured
-2026-09-02, not inherited. `altChatRender` was the fifth and is BUILT; `smallerImagePreview` was the
-sixth and is BUILT (USM-18, 2026-09-02, after three weeks recorded as NOT A GAP on a premise that did
-not survive re-reading).
-
-`enableDiscord` is the one that stands, and the re-read makes the blocker sharper rather than
-weaker. Three occurrences in the bundle, and all of the behaviour behind them is a round trip to a
-server this deployment does not have:
-
-* `sessData.enableDiscord && !globals.discordState.discordChecked && checkDiscordAuth()` on session
-  load (byte 2,241,709) — `GET ${apiROOT}/discord/v2/status?token=…` (byte 1,160,297);
-* `doDiscordAuth()` — `GET ${apiROOT}/discord/v2/auth/start?token=…` (byte 1,160,186);
-* two presenter-only slots in the settings modal, `O(19, …)` and `O(291, …)` at bytes 2,283,599 and
-  2,288,443, both gated `isPresenter && sessData && sessData.enableDiscord`;
-* `discordState` — six fields initialised at byte 981,233 (`discordChecked`, `discordLinking`,
-  `discordConnected`, `discordUserId`, `discordUsername`, `discordLinkedAt`).
-
-So it is not one blocker but two, and neither is markup: a Discord APPLICATION REGISTRATION (there is
-nothing to link accounts to until one exists — the owner's call) and the `/discord/v2/*` endpoints
-that registration would be reached through. Transcribing the client half alone would ship a
-presenter-only control whose single action is a request that 404s, which is the same shape `SC-05`
-is refused for.
+**THE SETTINGS ENUMERATION HAS NO REPOSITORY-BUILDABLE FEATURE LEFT.** `enableDiscord` closed on
+2026-09-03 with presenter-only status/connect/unlink UI, single-use hashed OAuth state, callback
+exchange, identity persistence and unlink. Provider access tokens are never stored. A production
+Discord application id, secret and registered redirect URI are deployment acceptance inputs, not
+missing code; the status surface reports an unconfigured deployment instead of exposing a dead link.
 
 **`hasAlertScheduler` is BUILT, and its blocker named the wrong process.** "A scheduler process in
 `services/api`" is true of that crate and is not where this belongs: the reference's scheduler is its
@@ -496,43 +471,42 @@ satisfied by a pin of its own output. Test files are excluded now, and the rule 
 the honest one anyway: a name that appears only in a test or a comment is not an implementation.
 
 **What it measures today, from the pinned bundle (sha256 `40796ca8…bab87524`, 2,891,205 bytes):**
-135 wire identifiers in the reference, **93 named in our source, 42 not**; 8 presentation-area tabs,
-**6 named, 2 not** — `recordings`, which is a real gap with a named blocker, and `files`, which is not
-a gap at all (the reference uses the id as a value in `onMainTabChange`; this room reaches the same
-behaviour through a typed union). **An absent identifier is not an absent feature**: the last
-adversarial pass killed 7 of 34 such claims outright and reclassified 9 more.
+135 wire identifiers in the reference, **90 named in our source, 45 not**; 8 presentation-area tabs,
+**2 named, 6 not**. All six absent tab identifiers (`dayTradeAlerts`, `files`, `recordings`,
+`streams`, `swingAlerts`, `videoplayer`) are implemented through this room's typed tab model; the
+raw identifier scan cannot see that equivalence. **An absent identifier is not an absent feature**:
+every one of the 45 names has a disposition in `docs/decoded/missing-commands-triage.md`.
 
 `docs/decoded/missing-commands-triage.md` — every missing identifier read at every occurrence, then
 each gap claim put through an adversarial pass that killed 8 of 34:
 
-| | |
-| --- | ---: |
-| **NOT BUILT — outstanding work** | **30** |
-| — fully specified, ready to build | 25 |
-| — need a decision first, still outstanding | 5 |
-| claimed missing then refuted — we already build it | 7 (+1 contested, resolved by reading) |
-| built under another name — the audit cannot see these | 9 |
-| third-party noise, never ours to build | 4 |
+|                                                                    |               |
+| ------------------------------------------------------------------ | ------------: |
+| _Confirmed missing_, now **BUILT**                                 |        **15** |
+| _Confirmed missing_, **BUILT AS** something else                   |             7 |
+| _Confirmed missing_, still **NOT BUILT**                           |             0 |
+| _Confirmed missing_, **BLOCKED** on evidence or external authority |             3 |
+| operator declarations proved **NOT WORK** or externally blocked    | 0 outstanding |
+| claimed missing then refuted — we already build it                 |             7 |
+| initially classified as built under another name                   |             9 |
+| third-party noise, never ours to build                             |             4 |
 
 **⚠️⚠️ "NOT BUILT" IS THE WRONG LABEL FOR ROUGHLY HALF THAT TABLE, AND THE RIGHT LABEL IS WORSE.**
-A pass on 2026-08-17 attacked 49 open items with the single instruction *prove this is already
-built*. **23 came back mislabelled** — 21 partly built, 2 built outright. The count above is left
+A pass on 2026-08-17 attacked 49 open items with the single instruction _prove this is already
+built_. **23 came back mislabelled** — 21 partly built, 2 built outright. The count above is left
 alone deliberately (the document derives it, and a hand-adjusted copy in a second place is how one of
 them goes stale), but **do not read that table as "nothing exists" for any given row.** The recurring
 shape is this: **the UI was ported verbatim — every string, every button, every gate — and the wire
 was never connected.** So the control renders, a presenter clicks it, and nothing happens.
 
-**Five rows are simply built and the document has not noticed:** `playVideoForAll` (`:76`),
-`stopVideoForAll` (`:71`), `playYTForAll` (`:73`), `stopYTForAll` (`:74`) and `unmuteChat` (`:82`),
-all shipped 2026-08-15 (`for-all-broadcast.remote.ts:81,142`; `chat-mute.remote.ts:50`). A sixth,
-`presAreaTabs-videoplayer`, is built and gated end to end at `PresentationArea.svelte:520-541` and
-`:1039-1048` — so of the **two** presentation-area tabs the audit reported missing, only
-`recordings` is real.
+**The former stale rows are reconciled.** The triage now records `playVideoForAll`,
+`stopVideoForAll`, `playYTForAll`, `stopYTForAll`, `unmuteChat`, and all six typed presentation tabs
+at their operative implementations. The recordings row moved to BUILT on 2026-09-03 with the
+authenticated archive product.
 
-**The script is tracked and the re-run is DONE, 2026-08-27** — its current output is above. What is
-still outstanding is the DOCUMENT: `missing-commands-triage.md` must be restated against those 42
-names, and **its verdicts need three buckets, not one** — see *What "not built" actually means here*
-below.
+**The script is tracked and the re-run is DONE, 2026-09-03** — its current output is above, and
+`missing-commands-triage.md` answers all 45 absent identifiers. Its three-way distinction between
+built, not-work and externally blocked is enforced by the census contracts.
 
 **ITS LINE POINTERS WERE STALE REPO-WIDE — FIXED AND GATED, 2026-08-29.** The document's `ours`
 column was written before the `apps/room` decomposition. Measured: **44 `path:line` citations, 23 of
@@ -542,15 +516,15 @@ which is now the alerts advanced-search modal. **Two were absolute paths into th
 directory**, which no clone can resolve at all.
 
 All 44 are now a path plus a SYMBOL, which is what the document's own method section already
-recommended — *cite symbols and verbatim strings, which survive refactors*. **The 200 byte offsets
+recommended — _cite symbols and verbatim strings, which survive refactors_. **The 200 byte offsets
 are untouched and must stay:** they cite the SHA-256'd bundle, which cannot drift. A byte offset is
 evidence; a line number is a guess about a file somebody else will edit.
 
 `missing-command-census-contract.test.ts` now refuses a `path:line` citation, a dangling `, :133`
 continuation, an absolute path, and — as its vacuity floor — the loss of the byte offsets. Four
 negative controls seen red. This closes what `doc-citation-contract.test.ts` states it cannot see:
-*"a citation that still lands INSIDE the file can still point at the wrong line… it catches the loud
-half only."*
+_"a citation that still lands INSIDE the file can still point at the wrong line… it catches the loud
+half only."_
 
 **Nothing that is not built gets parked.** An earlier version of that table carried a fifth bucket —
 "unclear, needs a product decision" — which read as resolved and was not. A pending decision is
@@ -559,14 +533,14 @@ outstanding work; the only thing that removes a row is building it or proving we
 ### What "not built" actually means here — four kinds, and only one of them is harmless
 
 Established 2026-08-17 by reading each control end to end. **This distinction is the single most
-useful thing the audit produced**, because the flat label "NOT BUILT" reads as *nothing is there* and
-for most of these the truth is *it is there, it is live, and it is lying*. Severity runs top to
+useful thing the audit produced**, because the flat label "NOT BUILT" reads as _nothing is there_ and
+for most of these the truth is _it is there, it is live, and it is lying_. Severity runs top to
 bottom.
 
 **1. LYING CONTROLS — they report success and send nothing.** The worst kind, because the presenter
 believes the action landed. **Row W names the one that is left; the census itself lives in row 4, which is
-machine-checked** — this sentence carried its own copy (*"Row W holds THREE as of 2026-08-27, down from
-twelve"*) until 2026-08-29, which made it the third place in this file stating one number. `remoteRestartAudio` was named here as the same shape
+machine-checked** — this sentence carried its own copy (_"Row W holds THREE as of 2026-08-27, down from
+twelve"_) until 2026-08-29, which made it the third place in this file stating one number. `remoteRestartAudio` was named here as the same shape
 and is NOT one any more: `restart-audio` keeps its `EXACT_ALERTS` entry because the reference raises
 that alert too, and it now sits over a real `restartAudio` command. **`focusOnSessionNote` WAS in this list and is FIXED, 2026-08-23.** Both controls — "Bring everyone
 here" at `NoteTabContent.svelte` and "Bring **E**veryone here" at `NoteEditor.svelte:583` — were wired
@@ -579,8 +553,8 @@ accepted from the client. `NoteTabContent`'s `onSelect` prop was deleted with it
 stopped borrowing it, eslint showed it had no other reader. Pinned by
 `focus-on-session-note-contract.test.ts` (11 cases), negative-controlled three ways including the
 re-broadcast loop. It was the identical defect to the screens one that
-`focus-on-screen-contract.test.ts:13` already recorded — *"The menu item said 'Bring everyone here'
-and brought nobody"* — one tab away, and nobody had looked.
+`focus-on-screen-contract.test.ts:13` already recorded — _"The menu item said 'Bring everyone here'
+and brought nobody"_ — one tab away, and nobody had looked.
 
 **2. DEAD CONTROLS — no handler at all, not even a toast.** Clicking does literally nothing.
 **BOTH BUILT 2026-08-29 — this whole section is superseded and kept only for the byte offsets it
@@ -641,8 +615,8 @@ the search would mean deciding about the delete too.
 **4. HONEST PARTIALS — half built, and the code documents the limit.** These are fine and must not be
 lumped in with the above. `forceStopScreen` is the example: `screens.stop()` really stops one of your
 own screens (closes the producer, releases the capture), and for somebody else's it drops the tab
-with the reason written down — *"Stopping their producer is not ours to do, so this only drops the
-tab and is deliberately not pretending the remote share ended."* That is the standard being met, not
+with the reason written down — _"Stopping their producer is not ours to do, so this only drops the
+tab and is deliberately not pretending the remote share ended."_ That is the standard being met, not
 missed.
 
 **A FIFTH THING THAT IS NOT A CONTROL AT ALL — FIXED 2026-08-23, recorded because the shape recurs.**
@@ -657,8 +631,7 @@ value that had already been serialised into the page. Pinned by three cases in
 **A THIRD PATH had no mute gate at all and is also FIXED: private chat.** `sendPrivateMessage`
 checked NEITHER mute — not `chat_mutes`, not the controller's — so a muted member could DM, which is
 the worse direction because nobody else in the room can see it. In scope rather than assumed: the
-reference gates its own private-chat composer on `e.isConnected && e.chatEnabled` (bundle byte
-2199385) and a mute is what clears `chatEnabled`. The guard now lives in `#lib/server/chat-mute.ts`
+reference gates its own private-chat composer on `e.isConnected && e.chatEnabled` (bundle byte 2199385) and a mute is what clears `chatEnabled`. The guard now lives in `#lib/server/chat-mute.ts`
 and is SHARED rather than copied — two copies of a rule this small is how one drifts, which is
 precisely what happened to the 24-hour mute when it was enforced on `sendMessage` and not on
 `replyMessage`.
@@ -671,8 +644,8 @@ hunch is the invention this file exists to prevent.
 ### OPEN RIGHT NOW — EMPTY as of 2026-08-31, and the table is deleted rather than kept full of ✅
 
 **This section held twelve rows and every one of them was done.** The header's own rule says how that
-ends: *"A row that is DONE is deleted, never struck through … Two places describing the same thing is
-how one of them goes stale."* Each row was verified against the code on 2026-08-31 before being
+ends: _"A row that is DONE is deleted, never struck through … Two places describing the same thing is
+how one of them goes stale."_ Each row was verified against the code on 2026-08-31 before being
 removed — not taken on its own say-so, which this repository has been wrong about often enough that
 the register carries a running count of it.
 
@@ -684,11 +657,11 @@ the whole table still describing unbuilt work. `app-kicked-page` is decoded whol
 **What was left over is not lost — every piece of it lives at the code, in a form that executes.**
 That is the whole point of deleting the rows rather than parking them:
 
-| what remained | where it lives now |
-| --- | --- |
+| what remained                                                                                                                                                                                                                                                               | where it lives now                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Four controls that are inert and are NOT work — `start-recording` and `stop-recording` (no server-side recorder), `disable-private-chat` (a MATCH: the reference wires nothing to it), `get-my-token` (a deliberate security divergence — the session cookie is `httpOnly`) | `lib/user-action-intent.ts`'s `INERT_ACTIONS`, each with its reason at the entry. `user-action-disposition-contract.test.ts` recomputes the census and fails if any prose disagrees with it — the row itself had recorded this family being miscounted as seven, then nine, then twelve, each time by arithmetic over the previous number |
-| `permsChangeReload`, which needs a capture containing `reAuthSessionTok` | `room/dialogs.svelte.ts:90` and `room/user-actions.svelte.ts:866`, both naming the absent endpoint |
-| `userInfo`'s socket arm — three cells blocked and named | row 9's own analysis, moved to the audit register where the byte offsets are |
+| `permsChangeReload`                                                                                                                                                                                                                                                         | **CLOSED 2026-09-03:** the controller permission write publishes an addressed `forceReload`; only the changed member consumes it and reloads authoritative session state. `permission-refresh-contract.test.ts` holds both ends.                                                                                                          |
+| `userInfo`'s connection cells                                                                                                                                                                                                                                               | **CLOSED 2026-09-03:** deployment version, server id and selected stream cluster now come from server-owned diagnostics and render in the presenter-only user-info surface. `connection-facts-contract.test.ts`.                                                                                                                          |
 
 **Nothing goes back in this table unless it is genuinely open.** A section that fills up with closed
 rows stops being read, and the twelve here had reached the point where finding the one live residual
@@ -697,7 +670,7 @@ meant reading all of them.
 ### The six defects that were REAL and FIXABLE — investigated 2026-08-23, ALL SIX CLOSED by 2026-08-31
 
 Each was traced end to end by reading, and each verdict says what it would cost. The heading used to
-end *"and not yet done"*, with *"they are simply not built yet"* under it; both are false now and are
+end _"and not yet done"_, with _"they are simply not built yet"_ under it; both are false now and are
 corrected rather than deleted, because the table below is more useful as a record of how the verdicts
 themselves fared than as a work list.
 
@@ -708,13 +681,13 @@ worth keeping: a verdict reached without locating the code is a verdict about th
 
 Kept in full, and ordered by the severity they were filed under.
 
-| defect | verdict | what is missing |
-| --- | --- | --- |
-| **`save-permissions`** (HIGH) | **FIXED — and this row's verdict was right about the shape and wrong about the state** | It said the room has no write path to the controller. It has one: `permissions.remote.ts` → `writeRoomPermissions` → `POST /internal/room-permissions/<code>`, gated by `presenterRoom()`, with the five keys taken from `ROOM_PERMISSION_KEYS` rather than from the client. The alert stays in `EXACT_ALERTS` because the reference raises it too — an announcement over a real send, not a liar |
-| **`session-refresh-roster` / `session-soft-reset`** | **FIXED 2026-08-26 — and this row's verdict was wrong** | It said the honest fix was to correct the message. Decided without locating the senders; both are captured and both are ordinary server commands. Built as `session-commands.remote.ts`. See row 3 |
-| **`doChatLogSearch`** (MEDIUM) | **BOTH HALVES DONE — the alerts half 2026-08-27, the chat half 2026-08-29** | The alerts half was resolved the second way this row offered: the limit is visible, because a real endpoint already existed one click away in Advanced Search and a second search path over one table was the wrong half to build. **The chat half could not take that resolution** — its premise was *"a correct search already exists one click away"*, and the chat columns had no search at all. So it is the endpoint: `searchChatChannel` (`server/chat-log.ts`), `searchChatMessages` (`log-pages.remote.ts`, reusing `loadOlderChatMessages`' channel gate verbatim), `RoomChatSearch` and `ChatSearchBar.svelte`. **The security half is the part worth reading:** upstream renders results straight, because it filters webinar mode at ARRIVAL; this room filters at VIEW, so the faithful port would have handed a member in webinar mode every other member's messages by typing one letter. Results enter the pipeline where the merged log leaves it. **The delete-by-search (`del: true`) is REFUSED rather than omitted** — a destructive operation whose blast radius is a LIKE pattern the caller typed needs its own authority argument, not a flag on the read path; it stays on the census as its own row |
-| **`admin-notes-password`** (LOW) | **FIXED 2026-08-29 — the server code this verdict asked for exists.** Recorded here on 2026-08-30 when row W was removed: the row was still headed "the live defect" while its own cell said `EXACT_ALERTS` no longer lies, which is the layering this file keeps meeting | The typed value IS delivered and the handler throws it away — `user-actions.svelte.ts:674-684`. **The setting this row named was wrong**: it is `needPasswordForUserNotes`, not `deleteAlertPW`. See row 2. **All of that is now history.** `internal/room-notes-auth/[code]` compares on the controller, `notes-auth.remote.ts` asks, `RoomNotesAccess` (`lib/room/notes-access.svelte.ts`) raises the reference's prompt and grants on the answer, and `sessions.notes_access_at` decides what may be WRITTEN. `admin-notes-password` is no longer a key of `EXACT_ALERTS`, which is what `user-action-disposition-contract.test.ts` treats as the declaration that it is fixed, and `DIALOG_ONLY_ACTIONS` in that file is empty |
-| **`kick-duplicates`** (MEDIUM) | **BUILT 2026-08-23 — this cell was STALE and contradicted a row in the same file, found 2026-08-31** | It read *"NOT fixable without inventing … the positive arm needs a kick the room cannot perform"*. The "OPEN RIGHT NOW" table above had recorded the opposite on the day it shipped: *"the row's blocker was my own bad reading"* — `emailHash` was already on `User`, already filled from `hashEmail(account.email)`, and already read as `connectedUsers`. What misled that reading was `RosterAuthority`, a narrow `{id, isP?}` interface written for `mute-all-non-admins` alone and wrongly generalised to be the roster. The rule is pure in `#lib/kick-duplicates.ts` (`duplicatesOf`, byte 2,078,708 — same `emailHash`, DIFFERENT `_id`) and the wiring is `RoomKicks:114`. **Two cells describing one control, disagreeing for eight days, is what "a row that is DONE is deleted" exists to prevent** |
+| defect                                              | verdict                                                                                                                                                                                                                                                                   | what is missing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`save-permissions`** (HIGH)                       | **FIXED — and this row's verdict was right about the shape and wrong about the state**                                                                                                                                                                                    | It said the room has no write path to the controller. It has one: `permissions.remote.ts` → `writeRoomPermissions` → `POST /internal/room-permissions/<code>`, gated by `presenterRoom()`, with the five keys taken from `ROOM_PERMISSION_KEYS` rather than from the client. The alert stays in `EXACT_ALERTS` because the reference raises it too — an announcement over a real send, not a liar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **`session-refresh-roster` / `session-soft-reset`** | **FIXED 2026-08-26 — and this row's verdict was wrong**                                                                                                                                                                                                                   | It said the honest fix was to correct the message. Decided without locating the senders; both are captured and both are ordinary server commands. Built as `session-commands.remote.ts`. See row 3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **`doChatLogSearch`** (MEDIUM)                      | **BOTH HALVES DONE — the alerts half 2026-08-27, the chat half 2026-08-29**                                                                                                                                                                                               | The alerts half was resolved the second way this row offered: the limit is visible, because a real endpoint already existed one click away in Advanced Search and a second search path over one table was the wrong half to build. **The chat half could not take that resolution** — its premise was _"a correct search already exists one click away"_, and the chat columns had no search at all. So it is the endpoint: `searchChatChannel` (`server/chat-log.ts`), `searchChatMessages` (`log-pages.remote.ts`, reusing `loadOlderChatMessages`' channel gate verbatim), `RoomChatSearch` and `ChatSearchBar.svelte`. **The security half is the part worth reading:** upstream renders results straight, because it filters webinar mode at ARRIVAL; this room filters at VIEW, so the faithful port would have handed a member in webinar mode every other member's messages by typing one letter. Results enter the pipeline where the merged log leaves it. **The delete-by-search (`del: true`) is REFUSED rather than omitted** — a destructive operation whose blast radius is a LIKE pattern the caller typed needs its own authority argument, not a flag on the read path; it stays on the census as its own row |
+| **`admin-notes-password`** (LOW)                    | **FIXED 2026-08-29 — the server code this verdict asked for exists.** Recorded here on 2026-08-30 when row W was removed: the row was still headed "the live defect" while its own cell said `EXACT_ALERTS` no longer lies, which is the layering this file keeps meeting | The typed value IS delivered and the handler throws it away — `user-actions.svelte.ts:674-684`. **The setting this row named was wrong**: it is `needPasswordForUserNotes`, not `deleteAlertPW`. See row 2. **All of that is now history.** `internal/room-notes-auth/[code]` compares on the controller, `notes-auth.remote.ts` asks, `RoomNotesAccess` (`lib/room/notes-access.svelte.ts`) raises the reference's prompt and grants on the answer, and `sessions.notes_access_at` decides what may be WRITTEN. `admin-notes-password` is no longer a key of `EXACT_ALERTS`, which is what `user-action-disposition-contract.test.ts` treats as the declaration that it is fixed, and `DIALOG_ONLY_ACTIONS` in that file is empty                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **`kick-duplicates`** (MEDIUM)                      | **BUILT 2026-08-23 — this cell was STALE and contradicted a row in the same file, found 2026-08-31**                                                                                                                                                                      | It read _"NOT fixable without inventing … the positive arm needs a kick the room cannot perform"_. The "OPEN RIGHT NOW" table above had recorded the opposite on the day it shipped: _"the row's blocker was my own bad reading"_ — `emailHash` was already on `User`, already filled from `hashEmail(account.email)`, and already read as `connectedUsers`. What misled that reading was `RosterAuthority`, a narrow `{id, isP?}` interface written for `mute-all-non-admins` alone and wrongly generalised to be the roster. The rule is pure in `#lib/kick-duplicates.ts` (`duplicatesOf`, byte 2,078,708 — same `emailHash`, DIFFERENT `_id`) and the wiring is `RoomKicks:114`. **Two cells describing one control, disagreeing for eight days, is what "a row that is DONE is deleted" exists to prevent**                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 **FOUR were fixed on 2026-08-23** and are recorded above rather than here: the controller's permanent
 mute, the missing private-chat mute gate, `focusOnSessionNote`, and **`forceReload`** — whose form
@@ -725,12 +698,12 @@ orphaned action is deleted, and the actions export is nineteen to eighteen.
 
 **Ready to build, fully specified:**
 
-| item | spec | note |
-| --- | --- | --- |
-| `presAreaTabs-recordings` — **NOT BUILT, blocker named** | `docs/decoded/missing-commands-triage.md` | NOT cheap after all. The reference's pane is one iframe onto a SERVER archive page, `${apiROOT}/sessions/v2/archives/recordings/${sessionID}/${token}` (byte 1,959,918), gated on `archivesAvailableTo() && sessData.recsInRoom` (bytes 2,016,835 and 2,017,632) — re-read 2026-09-02 and character for character what three other rows already carry. **The blocker holds and its wording is corrected in the same pass:** it said *"zero recordings/archive tables in either database"*, and `chat_archives` has existed since `861a462` on 2026-08-29. What is zero is a RECORDINGS table — a media archive — so the tab still fronts nothing, and a reader must not conclude from the old sentence that chat archiving has no storage either. Needs an archive service first: a design decision, not a port |
-| Alert Labels — **BUILT BOTH HALVES; this row's blocker was FALSE, found 2026-08-31 by trying to build it** | `docs/decoded/alert-scheduler-filter-labels.md` | The row said the picker was *"an evidence gap, not a port … that branch never rendered in any capture we hold and there is no markup to match"*, and named `hiddenCapabilityBranches` as the reason. The DOM-capture half is true and the CONCLUSION does not follow: **the compiled template is in the pinned bundle**. `zTe` at byte **2,119,145** is the per-label row (`div.form-check` > `input.form-check-input#alert-trade-label-{i}` + `label[for]` showing `e.name` with a trailing `?`), `GTe` at 2,119,525 repeats it over `globals.alertLabels`, the gate is `O(62, …length > 0 ? 62 : -1)` at 2,138,428, and `processAlertLabels` at 2,131,295 is the `" #"+hash` prefix rule. Decoding compiled templates is how this entire repository was built, so "no rendered capture" was never the same claim as "no markup to match". **It is built**: `PostAlertModal.svelte:518-553` carries the transcription with those offsets, `alertLabelPrefix` is in `alert-labels.ts`, and `alert-label-picker-contract.test.ts` holds it |
-| Alert Scheduler | same | **BUILT 2026-08-29 — removed from "ready to build".** This cell said *"The entitlement IS captured and IS in the schema — `hasAlertScheduler` … but it is `wired: false`, so nothing in the room reads it."* Measured: `hasAlertScheduler` is **`wired: true`**, and the feature ships as `scheduled-alert.ts`, `server/scheduled-alerts.ts`, `routes/scheduled-alerts.remote.ts`, `components/ScheduledAlerts.svelte` and the sweeper `startAlertScheduler`, under `scheduled-alert-contract.test.ts`. `NEW-TODO.md` §5.3 carried the same stale claim and was corrected the same day — two trackers describing one feature, and both wrong in the same direction |
-| Benzinga — **BUILT BOTH PLACES, 2026-08-29** | `NEW-TODO.md` §2.2 | This cell said the const-table pass *"found nothing to change"*. It found a whole surface: **Benzinga renders TWICE upstream.** Two of the three render functions are the sidebar component compiled twice (`mPe` 2,467,533, `_Re` 2,563,731); the third, **`PPe` at 2,473,150**, is a different element in a different container with different classes — the NAVBAR item — and only the sidebar one existed here. The indices were parsed with a string-aware walker rather than counted, because an index is per component and the sidebar's `li` is index 32 of a table where that means a generic `nav-item`. Both honest gaps stand and are recorded at the code: the default url is built from three values this room does not have, and `assets/images/benzinga-logo.png` is verified absent — which is why the navbar item, being image-ONLY upstream, renders only when the room supplies a logo rather than shipping a broken `<img>` |
+| item                                                                                                       | spec                                            | note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `presAreaTabs-recordings` — **BUILT END TO END 2026-09-03**                                                | `NEW-TODO.md` §suggested order                  | First-party `recordings` and immutable `recording_log_entries` storage, streaming upload with hash and atomic rename, authenticated range playback, captured archive entitlement, pagination, log export and presenter deletion. The reference's bearer token in an iframe URL is deliberately not reproduced.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Alert Labels — **BUILT BOTH HALVES; this row's blocker was FALSE, found 2026-08-31 by trying to build it** | `docs/decoded/alert-scheduler-filter-labels.md` | The row said the picker was _"an evidence gap, not a port … that branch never rendered in any capture we hold and there is no markup to match"_, and named `hiddenCapabilityBranches` as the reason. The DOM-capture half is true and the CONCLUSION does not follow: **the compiled template is in the pinned bundle**. `zTe` at byte **2,119,145** is the per-label row (`div.form-check` > `input.form-check-input#alert-trade-label-{i}` + `label[for]` showing `e.name` with a trailing `?`), `GTe` at 2,119,525 repeats it over `globals.alertLabels`, the gate is `O(62, …length > 0 ? 62 : -1)` at 2,138,428, and `processAlertLabels` at 2,131,295 is the `" #"+hash` prefix rule. Decoding compiled templates is how this entire repository was built, so "no rendered capture" was never the same claim as "no markup to match". **It is built**: `PostAlertModal.svelte:518-553` carries the transcription with those offsets, `alertLabelPrefix` is in `alert-labels.ts`, and `alert-label-picker-contract.test.ts` holds it |
+| Alert Scheduler                                                                                            | same                                            | **BUILT 2026-08-29 — removed from "ready to build".** This cell said _"The entitlement IS captured and IS in the schema — `hasAlertScheduler` … but it is `wired: false`, so nothing in the room reads it."_ Measured: `hasAlertScheduler` is **`wired: true`**, and the feature ships as `scheduled-alert.ts`, `server/scheduled-alerts.ts`, `routes/scheduled-alerts.remote.ts`, `components/ScheduledAlerts.svelte` and the sweeper `startAlertScheduler`, under `scheduled-alert-contract.test.ts`. `NEW-TODO.md` §5.3 carried the same stale claim and was corrected the same day — two trackers describing one feature, and both wrong in the same direction                                                                                                                                                                                                                                                                                                                                                                        |
+| Benzinga — **BUILT BOTH PLACES, 2026-08-29**                                                               | `NEW-TODO.md` §2.2                              | This cell said the const-table pass _"found nothing to change"_. It found a whole surface: **Benzinga renders TWICE upstream.** Two of the three render functions are the sidebar component compiled twice (`mPe` 2,467,533, `_Re` 2,563,731); the third, **`PPe` at 2,473,150**, is a different element in a different container with different classes — the NAVBAR item — and only the sidebar one existed here. The indices were parsed with a string-aware walker rather than counted, because an index is per component and the sidebar's `li` is index 32 of a table where that means a generic `nav-item`. Both honest gaps stand and are recorded at the code: the default url is built from three values this room does not have, and `assets/images/benzinga-logo.png` is verified absent — which is why the navbar item, being image-ONLY upstream, renders only when the room supplies a logo rather than shipping a broken `<img>`                                                                                          |
 
 ---
 
@@ -738,19 +711,19 @@ orphaned action is deleted, and the actions export is nineteen to eighteen.
 
 One table, and every row says who or what unblocks it.
 
-| row | what it needs | who or what unblocks it |
-| --- | --- | --- |
-| **G** | **The Postgres host question — Neon under volume.** Serverless Postgres autoscales compute, but the pressure here is sustained CONNECTIONS from long-lived room sessions, which is a different curve. Alternatives to weigh: Crunchy Bridge, RDS, or self-managed on the same infrastructure as the app tier. Not urgent; current load is one user. **`docs/NEXT-SESSION.md` appeared to answer this twice. Re-read 2026-08-31 and the two passages are not a contradiction — they are one RECOMMENDATION and one OPEN QUESTION, and the document had not said which was which.** §4d's "What should NOT move" heading made a recommendation read as settled; §4a lists the same question as open. Both sites are now cross-linked and labelled, without striking either, because striking one is this row's decision and not a documentation fix. So the blocker is unchanged and is now the only thing left: **the owner picks.** The recommendation, with its whole argument, is that Postgres stays managed — self-hosting saves perhaps €20/month and buys backups, PITR, failover and a 3am pager on the system of record. An earlier draft narrowed this row to "which managed provider" on the strength of §4d alone, having not read §4a; that is why the labels are now in the document rather than in this cell | the owner: accept the recommendation or strike it |
-| **H** | **Production topology should SEPARATE the media plane from the app tier.** Hetzner earns its place on egress economics and the rest of the app has the opposite shape. One box means a shared failure domain, a shared attack surface (~10,000 open UDP ports beside your session cookies), and a shared lifecycle. What is deployed is a five-day TEST topology. Separating later is a redeploy, not a migration. **The "two documents record opposite intents" claim was wrong, corrected 2026-08-31.** `NEXT-SESSION.md` §4c answers a CAPACITY question — its table is symptoms (bandwidth cap, SFU CPU, file descriptors) and its answer is "split when a measurement says to". This row argues ISOLATION: a shared failure domain, a shared attack surface, a shared lifecycle. **None of those is a symptom that arrives later**; they are properties of the topology from the first day, which is exactly why §4c's table cannot see them. The two are not opposite, they answer different questions, and §4c had not noticed the other one — it now says so and points here. What remains is the decision itself | the owner: does isolation require the split regardless of capacity |
-| **Q** | **The WordPress plugin has not been run inside a live WordPress.** The PHP itself is proven: `php -l` clean under PHP 8.3.33, and `tests/mint-golden-token.php` mints a token with the plugin's OWN functions which our TypeScript verifier checks in `sso-wordpress-contract.test.ts`. Both ran in a container, so no local PHP is needed. **What remains needs a real site:** boot it against a staging WooCommerce, click through as a paid member, then **cancel the subscription and prove the door closes on the next entry** — the only thing that exercises `wc_memberships_get_user_active_memberships`, `wcs_get_users_subscriptions` and the cached-page path. `integrations/wordpress/STAGING-TEST.md` §6 is that step. **NARROWED 2026-08-31: the PLUGIN'S half of §6 is now proven, and only the extensions' half is blocked.** Every commerce call in `tradingroom_sso_entitlements()` is behind `function_exists`, takes a plain object and calls documented methods on it — so stand-ins with those methods drive the REAL code path rather than a copy. `tests/entitlement-cases.php` does that under real PHP 8.4 and its output is pinned by ten assertions in `sso-wordpress-contract.test.ts`, the same arrangement `mint-golden-token.php` already uses so CI needs no PHP. **The finding is that the two cancellations are DIFFERENT mechanisms:** a cancelled MEMBERSHIP is simply absent from the active list, so the plugin does nothing and the entitlement disappears; a cancelled SUBSCRIPTION is still returned, carrying a non-`active` status, so the plugin must filter it — and the negative control for that one is exactly the permanently-open door §6 warns about (`has_status` removed → a cancelled subscriber keeps `monthly-room`). **What is still blocked, precisely:** the stand-ins assert what WooCommerce Memberships and Subscriptions RETURN, not that they return it. Both are licensed products that cannot be installed here, so confirming they keep that promise — and the end-to-end click-through — still needs a staging site | a staging WooCommerce, for the EXTENSIONS' behaviour only |
-| **R** | **Screenshare quality and the MP4 question — rows 6, 8 and 10 of `apps/room/docs/streaming-choices.md`.** Rows 2 and 4 shipped: the recorder picks VP9 at 8 Mbps (`recording-codec.ts`) and `contentHint = 'detail'` is set on the captured screen track. **ROW 8 IS CLOSED 2026-09-02, DECIDED ON A NUMBER: no explicit `maxBitrate`, and none is set.** The row's `Pro` said an explicit value *"removes reliance on libvpx's own heuristic, which is the thing currently deciding 525 kbps was enough"* — **525 kbps was never a ceiling.** Measured on a loopback `RTCPeerConnection` in one page, capturing a deliberately busy 1920×1080 surface with `contentHint = 'detail'` and codec preferences applied BEFORE `createOffer`: `targetBitrate` **2,500,000**, send 2,476–2,613 kbps, `qualityLimitationReason: none`, `libvpx`, `video/VP9`, 1920×1080, over twelve two-second samples. libvpx already has 2.5 Mbps of headroom and spends it when the content asks; a floor would bill every member for a static slide, which is the row's own `Con`. And the capture passes `encodings: undefined`, so doing nothing is also the match. Pinned in `media/session.test.ts` — two `maxBitrate` occurrences, both the captured `QS` constants, no `minBitrate` — with two negative controls seen red. **ROW 6 IS STILL OPEN and its blocker is renamed for the THIRD time, which is the part worth carrying forward.** It read *"needs a human at an OS screen picker"* (wrong: `--auto-select-desktop-capture-source` works), then *"blocked on a CAPTURABLE DISPLAY, not on a PERSON"* (also wrong, measured 2026-09-02: `getDisplayMedia` returned `{displaySurface:"monitor", width:1920, height:1080, frameRate:30}` in this very container). The 2026-09-02 probe's own first failure is how the second wrong blocker gets written: on `about:blank` `navigator.mediaDevices` is `undefined`, because the page is not a secure context — an error with nothing to do with the display that reads like everything to do with it. **What row 6 actually needs is a HIGH-DPI SOURCE and a person judging legibility**: an Xvfb framebuffer at 1920×1080 has no pixels for a 1920 cap to remove, and "is the text sharper" has no automated answer. The human procedure in `apps/room/docs/MEASURE-SHARE-QUALITY.md` stays correct for exactly that question, and that doc carries all three corrections at its own heading. **Row 10 is re-scoped 2026-08-31, measured rather than inherited:** it does NOT need the same thing as X and AC. Server-side recording was RUN — MediaMTX v1.20.1 with `record: yes` wrote an `.mp4` and its playback server listed it — so what row 10 waits on is a decision to turn that on (T5-16), because there is nothing to remux until something records. The fmp4 recorder skipped the VP8 track and kept only Opus, which is the finding row 10 has to answer first: a screenshare recorded server-side is audio-only unless the publisher sends a codec the recorder keeps. See `apps/room/docs/MEDIA-PLANE-MEASURED.md`. **`streaming-choices.md`'s TWO STALE LINES ARE CORRECTED, 2026-08-29** — the header no longer claims nothing but row 1 is implemented, and the "What is already true" table records `contentHint` as `'detail'` rather than unset. **This row's own citation for it was ALSO stale and is fixed here:** it named `media-transport.svelte.ts`, where `contentHint` has zero occurrences. The line is in `local-capture.svelte.ts`'s `startScreenSharing`, which took the produce paths when it was extracted — a third stale pointer of the same kind as the 44 in `missing-commands-triage.md`, found by verifying the row before acting on it | row 6: a HIGH-DPI SOURCE and a person judging legibility — re-measured 2026-09-02, the display was never the blocker. Row 8: CLOSED, decided on the measured 2.5 Mbps ceiling. Row 10: the T5-16 recording decision |
-| **SP** | **The Stream Player — a public link that shows one room's screenshares to somebody who is not logged in.** The two Enable/Disable buttons wrote `streamingPlayerEnabled` into the presenter's own settings blob and nothing read it; that write is GONE (2026-08-30) and the key is retired in `dead-preference-keys.ts`, so the copies already in accounts are pruned. **What blocks the feature is not transcription.** The reference asks its own server for both halves — `getPlayerLink()` → `invokeAdminCmd("streamStatus")` → `rc.enablePlayer` / `rc.playerURL`, bundle byte 2,170,505 — and that server is not in the capture, so the URL is unknowable here in the same way `closedTxt`'s storage was. What it serves, from the pane's own blurb, is a page rendering one room's screenshares to whoever holds a link, which means minting a media grant for an ANONYMOUS viewer of a multi-tenant fintech room. That is an authority decision, and this repository's rule is that those are made on the server from data the server owns. Both buttons are `disabled` with the reason on screen and `stream-player-blocked-contract.test.ts` keeps them honest. Closes the buildable half of `SC-04`; `SC-05` (the Player Link readout and Copy button) is blocked on the same absent value | an owner decision on anonymous playback authorization, then a MediaMTX host |
-| **AD** | **CLOSED 2026-08-31 — the end-to-end publish exists.** The row's one remaining item was *"an end-to-end publish from a real encoder"*, held to need a host at `STREAM_SERVER_MTX`. That premise was never tested and it was wrong: MediaMTX is one static binary, its own release downloads from here (HTTP 200), and the whole plane runs locally. **Measured on v1.20.1:** Chromium published over WHIP, MediaMTX logged `is publishing to path 'room__7301__Dana_Vero'`, spawned `runOnAvailable`, the room's `/internal/media-hook` answered 200, and a subscribed presenter's SSE connection carried `{"cmd":"mtxStartStream","muser":{...}}` on the wire — then the stop, on a kick. The route's refusals were exercised over real HTTP in the same run (no bearer 401, wrong bearer 401, unknown event 400, unparseable path 400). **That run found a defect nothing else could:** every event arrived TWICE, because the hook published without updating the reconciler's baseline and the next poll re-derived the same delta — and `applyMtxStartStream` appends without checking `_id`, so a presenter going live put two identical tabs in every viewer's room for as long as the stream was up. Both sides' unit tests were correct; the defect lived only in the seam. `noteHookPublished` plus an `epoch` guard fixes it, four negative controls seen red, and the re-run gives one start and one stop. Two source claims were also corrected: the control API is `api: false` by default and `:9997` binds EVERY interface, fenced by IP authorisation rather than by the bind — the opposite of what `mtx-reconcile.ts` and `env.ts` both said. Full evidence: `apps/room/docs/MEDIA-PLANE-MEASURED.md` | nothing; an operator still supplies the production host |
+| row    | what it needs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | who or what unblocks it                                                                                                                        |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **G**  | **The Postgres host question — Neon under volume.** Serverless Postgres autoscales compute, but the pressure here is sustained CONNECTIONS from long-lived room sessions, which is a different curve. Alternatives to weigh: Crunchy Bridge, RDS, or self-managed on the same infrastructure as the app tier. Not urgent; current load is one user. **`docs/NEXT-SESSION.md` appeared to answer this twice. Re-read 2026-08-31 and the two passages are not a contradiction — they are one RECOMMENDATION and one OPEN QUESTION, and the document had not said which was which.** §4d's "What should NOT move" heading made a recommendation read as settled; §4a lists the same question as open. Both sites are now cross-linked and labelled, without striking either, because striking one is this row's decision and not a documentation fix. So the blocker is unchanged and is now the only thing left: **the owner picks.** The recommendation, with its whole argument, is that Postgres stays managed — self-hosting saves perhaps €20/month and buys backups, PITR, failover and a 3am pager on the system of record. An earlier draft narrowed this row to "which managed provider" on the strength of §4d alone, having not read §4a; that is why the labels are now in the document rather than in this cell                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | the owner: accept the recommendation or strike it                                                                                              |
+| **H**  | **Production topology should SEPARATE the media plane from the app tier.** Hetzner earns its place on egress economics and the rest of the app has the opposite shape. One box means a shared failure domain, a shared attack surface (~10,000 open UDP ports beside your session cookies), and a shared lifecycle. What is deployed is a five-day TEST topology. Separating later is a redeploy, not a migration. **The "two documents record opposite intents" claim was wrong, corrected 2026-08-31.** `NEXT-SESSION.md` §4c answers a CAPACITY question — its table is symptoms (bandwidth cap, SFU CPU, file descriptors) and its answer is "split when a measurement says to". This row argues ISOLATION: a shared failure domain, a shared attack surface, a shared lifecycle. **None of those is a symptom that arrives later**; they are properties of the topology from the first day, which is exactly why §4c's table cannot see them. The two are not opposite, they answer different questions, and §4c had not noticed the other one — it now says so and points here. What remains is the decision itself                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | the owner: does isolation require the split regardless of capacity                                                                             |
+| **Q**  | **The WordPress plugin has not been run inside a live WordPress.** The PHP itself is proven: `php -l` clean under PHP 8.3.33, and `tests/mint-golden-token.php` mints a token with the plugin's OWN functions which our TypeScript verifier checks in `sso-wordpress-contract.test.ts`. Both ran in a container, so no local PHP is needed. **What remains needs a real site:** boot it against a staging WooCommerce, click through as a paid member, then **cancel the subscription and prove the door closes on the next entry** — the only thing that exercises `wc_memberships_get_user_active_memberships`, `wcs_get_users_subscriptions` and the cached-page path. `integrations/wordpress/STAGING-TEST.md` §6 is that step. **NARROWED 2026-08-31: the PLUGIN'S half of §6 is now proven, and only the extensions' half is blocked.** Every commerce call in `tradingroom_sso_entitlements()` is behind `function_exists`, takes a plain object and calls documented methods on it — so stand-ins with those methods drive the REAL code path rather than a copy. `tests/entitlement-cases.php` does that under real PHP 8.4 and its output is pinned by ten assertions in `sso-wordpress-contract.test.ts`, the same arrangement `mint-golden-token.php` already uses so CI needs no PHP. **The finding is that the two cancellations are DIFFERENT mechanisms:** a cancelled MEMBERSHIP is simply absent from the active list, so the plugin does nothing and the entitlement disappears; a cancelled SUBSCRIPTION is still returned, carrying a non-`active` status, so the plugin must filter it — and the negative control for that one is exactly the permanently-open door §6 warns about (`has_status` removed → a cancelled subscriber keeps `monthly-room`). **What is still blocked, precisely:** the stand-ins assert what WooCommerce Memberships and Subscriptions RETURN, not that they return it. Both are licensed products that cannot be installed here, so confirming they keep that promise — and the end-to-end click-through — still needs a staging site | a staging WooCommerce, for the EXTENSIONS' behaviour only                                                                                      |
+| **R**  | **Repository work is closed.** Screen capture ships `contentHint='detail'`, measured VP9 behavior has no artificial bitrate floor, and the first-party browser recorder now uploads into a durable authenticated archive with range playback, transcript snapshots and presenter deletion. MediaMTX server-side recording remains an optional second producer, not a prerequisite or an open application feature.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | external acceptance only: run `apps/room/docs/MEASURE-SHARE-QUALITY.md` on a high-DPI physical display and have a person judge text legibility |
+| **SP** | **CLOSED 2026-09-03 — the public Stream Player is implemented.** A presenter issues or revokes an opaque one-time link; only its SHA-256 digest is stored. The public route exchanges a valid, unexpired, unrevoked grant for a five-minute read-only media capability and renders screenshare HLS only. Issuing a replacement revokes the previous grant, all responses are no-store, and no chat/notes/files/private-room session is exposed. `stream-player-blocked-contract.test.ts` now proves the positive path and its least-privilege boundary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | nothing; production still supplies a MediaMTX host                                                                                             |
+| **AD** | **CLOSED 2026-08-31 — the end-to-end publish exists.** The row's one remaining item was _"an end-to-end publish from a real encoder"_, held to need a host at `STREAM_SERVER_MTX`. That premise was never tested and it was wrong: MediaMTX is one static binary, its own release downloads from here (HTTP 200), and the whole plane runs locally. **Measured on v1.20.1:** Chromium published over WHIP, MediaMTX logged `is publishing to path 'room__7301__Dana_Vero'`, spawned `runOnAvailable`, the room's `/internal/media-hook` answered 200, and a subscribed presenter's SSE connection carried `{"cmd":"mtxStartStream","muser":{...}}` on the wire — then the stop, on a kick. The route's refusals were exercised over real HTTP in the same run (no bearer 401, wrong bearer 401, unknown event 400, unparseable path 400). **That run found a defect nothing else could:** every event arrived TWICE, because the hook published without updating the reconciler's baseline and the next poll re-derived the same delta — and `applyMtxStartStream` appends without checking `_id`, so a presenter going live put two identical tabs in every viewer's room for as long as the stream was up. Both sides' unit tests were correct; the defect lived only in the seam. `noteHookPublished` plus an `epoch` guard fixes it, four negative controls seen red, and the re-run gives one start and one stop. Two source claims were also corrected: the control API is `api: false` by default and `:9997` binds EVERY interface, fenced by IP authorisation rather than by the bind — the opposite of what `mtx-reconcile.ts` and `env.ts` both said. Full evidence: `apps/room/docs/MEDIA-PLANE-MEASURED.md`                                                                                                                                                                                                                                                                                                                                                                 | nothing; an operator still supplies the production host                                                                                        |
 
 **ROWS X AND AC ARE GONE — both closed 2026-09-01, and neither was a media-plane question.** They
 were held by the same category error, stated once here because it is the thing worth carrying
-forward: *a row that reasons from "our server does not send this frame" to "this cannot be built" has
-confused a PAYLOAD with a RECEIVER.* A receiver is transcribable whatever any server sends, and a
+forward: _a row that reasons from "our server does not send this frame" to "this cannot be built" has
+confused a PAYLOAD with a RECEIVER._ A receiver is transcribable whatever any server sends, and a
 receiver nothing triggers is exactly what the reference has in a room whose server is quiet. What
 neither row could invent — the frame URL, the recording message's wording — is still not invented;
 what is transcribed is what the reference DOES with them when they arrive.
@@ -764,8 +737,8 @@ ngx-toastr's default is the same, but one this room must make deliberately for t
 and the notification through `RoomToasts.notify`, which asks permission first rather than calling
 `new Notification` raw inside a socket handler.
 
-**X — `app-recording-preview-window`.** It read *"building
-it would ship a component that cannot run"*, on the premise that `recPreviewLocation` is a value this
+**X — `app-recording-preview-window`.** It read _"building
+it would ship a component that cannot run"_, on the premise that `recPreviewLocation` is a value this
 repository does not have. It is a value the SERVER SENDS, by exactly one command — `case
 "setRecPreview": globals.sessData.recPreviewLocation = i.url`, byte 1,023,704 — which had simply never
 been transcribed. The row quoted that very line and drew the opposite conclusion from it. With the
@@ -820,15 +793,15 @@ edited concurrently by the decomposition work and two sessions writing one TODO 
 conflict eats a finding. **Read `todo-next.md`'s own header before treating it as a build spec — and read it THERE.**
 
 > **This sentence carried the coverage figures for four hours and they were stale within one.** It
-> said *"as of 2026-08-31 it covers 5 of 81 room surfaces, 2,045 of 35,905 lines"*, in the same
-> breath as *"those numbers are not copied here"*, which they plainly were. Three audit merges later
+> said _"as of 2026-08-31 it covers 5 of 81 room surfaces, 2,045 of 35,905 lines"_, in the same
+> breath as _"those numbers are not copied here"_, which they plainly were. Three audit merges later
 > the file said 10 of 82 and 3,814 of 36,024, and this line still said 5 of 81 — the exact failure
 > the paragraph above it forbids, committed while forbidding it.
 >
 > So there is no number here now. `todo-next-coverage-contract.test.ts` measures every row against
 > the file it names and the headline against the rows, so that file is checked on every run and this
 > one cannot go stale about it: there is nothing left here to be stale. `NEW-TODO.md` covers Part 1 flaws in the
-ORIGINAL that we deliberately do not reproduce.
+> ORIGINAL that we deliberately do not reproduce.
 
 As of 2026-08-31: **70 CLOSED, 2 OPEN, 15 parked/won't-fix, 87 total.**
 
@@ -863,39 +836,31 @@ table's own header, and joins the trailing cells back where unescaped pipes insi
 split one status into several. Three rows moved — `T1-3` to won't-fix, `T2-22` to closed, `T5-25` to
 open — and each was read in full before the change was kept.
 
-**The corrected count agrees exactly with reading the status column by eye, 66/6/15, which is what
-the old row recorded as the disagreement.** Two independent methods agreeing is the evidence.
-
-**The two open rows are `T5-24` and `T5-25`, and they are the same sentence.** Both are blocked by the
-credential guard described in §B, which needs one line from the owner naming the field. `T5-25` is the
-one that used to be counted closed: its ENDPOINT is built with ten green tests, and its DISPLAY block
-is blocked on that same sentence.
+**The credential-display rows `T5-24` and `T5-25` closed on 2026-09-03 without putting either
+secret in page HTML.** The owner must authenticate with the account password before a one-time
+reveal; the response is `no-store`, authorization is rechecked server-side, and the audit record
+contains the event but never the secret. The resulting WordPress shortcode and app-pair URL are
+functional and copyable. The older direct-render prescription below is retained only as history.
 
 **`T5-20` closed on 2026-08-31 by being built rather than captured.** Its premise — that the reference
 pushes an occupancy signal somewhere — was measured false, and the count it needed turned out to be
 one this repository already owns.
 
-**So the register is down to a single outstanding question, and it is not a technical one.**
+**So the register has no repository-buildable question left.**
 
-### B. Two need one sentence from the owner, naming the field.
+### B. EMPTY as of 2026-09-03 — both credential displays are complete.
 
-Blocked by a credential guard whose bar is `[named + specifics]`. A general "match the original" does
-not clear it, and this exact edit was explicitly reverted earlier on request. **Four attempts were
-refused; do not attempt a fifth without the sentence.**
+The direct-render approach was correctly refused: putting either secret in SSR data would disclose
+it to browser caches, HAR files and support captures. The completed flow uses explicit password
+re-authentication and one-time reveal instead.
 
 > Render the room's `ssoJWTSecret` in the WordPress shortcode, and `pairSecretKey` in the app-pair
 > sample link, on the manage Settings tab, as the original does.
 
-- **T5-24** — `+page.server.ts`, the `wordpressShortcode` line: `key=''` becomes
-  `key='${String(settings.ssoJWTSecret ?? '')}'`. Reference `page.manageSession.html:782`. **Why it
-  matters:** the shortcode is COPIED into WordPress, where the plugin signs the SSO handoff with that
-  key. Empty means every handoff fails, and it renders identically to a working one.
-- **T5-25** is the same sentence and is OPEN, settled 2026-08-27. Its ENDPOINT is built with ten
-  green tests — that part was never the gap. What remains is the DISPLAY block at
-  `page.manageSession.html:1138-1142`, the readonly `input#pairURLLink` whose value embeds
-  `pairSecretKey` in copyable text, and it is blocked by the same credential guard as `T5-24`. The
-  register said OPEN, this file said CLOSED and the parser said CLOSED; the register is the tracker
-  and the corrected parser now agrees with it.
+- **T5-24** — a successful reveal returns a complete WordPress shortcode containing the current
+  `ssoJWTSecret`; otherwise the value stays masked and absent from the payload.
+- **T5-25** — the same flow returns the copyable app-pair URL containing `pairSecretKey`; its
+  existing endpoint remains covered independently.
 
 ### C. EMPTY as of 2026-08-31. All three were closed, and none of them by a capture.
 
@@ -907,7 +872,7 @@ None did.
 - `T5-20` was answered by measuring that the signal it wanted **does not exist upstream**, and then
   building it from `roomSubscriberCount()` — a count this repository already owned.
 
-The section's own instruction — *write a browser-console script that fetches it*,
+The section's own instruction — _write a browser-console script that fetches it_,
 `scripts/ptr-collect.js` being the reference implementation — remains right for anything genuinely
 behind a session. **The lesson is about what gets classified that way.** All three of these were
 filed under "needs a login" because the PAGES need one; the controller that names the endpoint, the
@@ -936,7 +901,7 @@ build from what came back.
   `page.recordings.html` is 1,324 bytes and its Share anchor is `<a href="" class="btn btn-default">`
   with no `ng-click`, no `ng-href` and no `ng-*` of any kind; the manage bundle carries no handler for
   it either. **The decision is OMIT**, and it is settled by the root standard rather than by taste —
-  *"No control whose only effect is changing its own label"*, and this one has no effect at all. The
+  _"No control whose only effect is changing its own label"_, and this one has no effect at all. The
   precedent is T5-15's Stripe Details link, taken for the same reason on the same grounds, so deciding
   it the other way would make the two inconsistent.
 
@@ -974,7 +939,7 @@ the test stops asserting it.
 
 - **The overlay's per-presenter rows use a DIFFERENT id prefix from the navbar's.** Both dropdowns
   build their row ids identically upstream — `ei('name'|'id'|'for', 'talkingPresenter', i,
-  '-donot-disturb')` at `app-presentationarea.render-helpers.js:370-374` and
+'-donot-disturb')` at `app-presentationarea.render-helpers.js:370-374` and
   `app-room.render-helpers.js:1087-1091` — and in viewer-only mode BOTH dropdowns are in the
   document at once, because the navbar's is ungated and the overlay's trigger renders only in that
   mode. So upstream every row id appears twice and each `<label for>` in the overlay resolves to the

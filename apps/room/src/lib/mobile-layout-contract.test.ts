@@ -69,7 +69,11 @@ const SHELL = readFileSync(new URL('./components/RoomShell.svelte', import.meta.
   the text absent because the region left, not because the guard still holds.
 */
 const SPLIT = readFileSync(new URL('./room/split.svelte.ts', import.meta.url), 'utf8');
-const compact = (source: string) => source.replace(/\s+/g, '');
+const compact = (source: string) =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\s+/g, '');
 
 describe('the 601px threshold selects a template, and is read not chosen', () => {
   it('is <= 601 at init and on resize upstream', () => {
@@ -122,7 +126,7 @@ describe('K4e reverses the child order, which is why the DOM is reordered', () =
     );
     // Desktop: chat/alerts, the extra column, presentation, gutter.
     expect(source).toContain(
-      '{:else}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible}{@renderextraChatPane()}{/if}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{/if}'
+      '{:else}{#if!hideChatAlerts}{@renderchatAlertsPane()}{/if}{#if!hideChatAlerts&&extraChatColumnVisible&&split.roomIsHorizontal}{@renderextraChatSideArea()}{/if}{#if!hidePresentation}{@renderpresentationPane()}{/if}{@rendermainGutter()}{/if}'
     );
     // The ordering exists in ONE place. Two would drift the first time somebody edited one.
     expect(compact(PAGE), 'the pane ordering moved to RoomShell in S8').not.toContain(

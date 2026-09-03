@@ -24,34 +24,13 @@
     onconfirm: (message: string, accept: () => void) => void;
     onpost: (submission: PostAlertSubmission) => Promise<boolean>;
     onpastepost: (submission: PastedImageSubmission) => Promise<boolean>;
-    /**
-     * "Sticky non-trade alert?" — whether the Non-Trade checkbox starts ticked, on every open.
-     *
-     * `this.nonTradeAlert = sessData.styckyNonTradeAlert || !1` inside `doAlertsModal`, byte
-     * 2,124,407. It defaults `false` rather than being required, because `ModalHost` is rendered by
-     * tests that predate this prop and a composer that starts un-ticked is the state every one of
-     * them was written against.
-     */
+    /** Captured `styckyNonTradeAlert` seed, re-applied on every open. */
     stickyNonTradeAlert?: boolean;
-    /**
-     * `sessData.hasAlertScheduler` — whether this room may schedule alerts for later.
-     *
-     * A prop rather than a read here, for the reason every other room setting reaches this component
-     * as one: the page owns `data.sessData` and resolves it once, so a component cannot read a
-     * setting and decide for itself. Defaults `false`, which is the fail-closed direction.
-     */
+    /** `sessData.hasAlertScheduler`; false is the fail-closed default. */
     schedulerAvailable?: boolean;
-    /**
-     * The room's configured Alert Labels — the picker, byte 2,119,145.
-     *
-     * `O(62, globals.alertLabels && globals.alertLabels.length > 0 ? 62 : -1)` is the whole gate: a
-     * room with no labels draws nothing, which is why this defaults to an empty list rather than
-     * being required.
-     *
-     * Parsed by the page (`gates.alertLabels`) rather than here, for the reason every other room
-     * setting reaches this component already resolved — and because `parseAlertLabels` runs
-     * `JSON.parse`, which a component that re-ran it per open would run per open.
-     */
+    /** Whether this room has validated linked-room alert targets. */
+    crossPostAvailable?: boolean;
+    /** Parsed once by `gates.alertLabels`; an empty room table hides the picker. */
     alertLabels?: readonly AlertLabel[];
   }
 
@@ -66,6 +45,7 @@
     onpastepost,
     stickyNonTradeAlert = false,
     schedulerAvailable = false,
+    crossPostAvailable = false,
     alertLabels = []
   }: Props = $props();
 
@@ -94,10 +74,8 @@
   let keepOpen = $state(false);
   let postOnX = $state(false);
   let dontPush = $state(false);
-  /* `false` here and seeded in `beginOpenState`, which the `$effect` below runs on every transition
-     to open — including the first. Seeding the declaration too would capture the prop's initial
-     value, which is what `state_referenced_locally` warns about, and would buy nothing: the modal
-     is never read before it opens. */
+  let dontCrossPost = $state(false);
+  /* Seeded in `beginOpenState` on every transition to open, including the first. */
   /*
     ── THE LABEL PICKER'S SELECTION ────────────────────────────────────────────────────────────────
 
@@ -165,6 +143,7 @@
   function beginOpenState() {
     clearInputFields();
     postOnX = false;
+    dontCrossPost = false;
     nonTradeAlert = stickyNonTradeAlert;
   }
 
@@ -234,6 +213,7 @@
       keepOpen,
       postOnX,
       dontPush,
+      dontCrossPost,
       nonTradeAlert,
       legalDisclosure,
       legalDisclosureText,
@@ -273,6 +253,7 @@
       keepOpen,
       postOnX,
       dontPush,
+      dontCrossPost,
       nonTradeAlert,
       legalDisclosure,
       legalDisclosureText,
@@ -533,6 +514,17 @@
           />
           <label for="alert-push-label">Don't send to push notification?</label>
         </div>
+        {#if crossPostAvailable}
+          <div class="form-check">
+            <input
+              type="checkbox"
+              id="alert-dont-cross-post-label"
+              class="form-check-input"
+              bind:checked={dontCrossPost}
+            />
+            <label for="alert-dont-cross-post-label">Don't cross post to linked alert rooms</label>
+          </div>
+        {/if}
         <div class="form-check">
           <input
             type="checkbox"
@@ -597,7 +589,6 @@
         {/if}
         <!--
           `hasAlertScheduler` — the send-later pane, and the manage table reached from it.
-
           Rendered only when the room has the scheduler, matching where upstream puts it (inside
           `app-post-alert-modal`, gated on `sessData.hasAlertScheduler`). The gate is drawn here AND
           enforced on the server: `scheduled-alerts.remote.ts` refuses all three commands without the
@@ -607,6 +598,8 @@
           <ScheduledAlerts
             body={alertText}
             {nonTradeAlert}
+            {dontPush}
+            {dontCrossPost}
             {onalert}
             {onconfirm}
             onscheduled={() => {

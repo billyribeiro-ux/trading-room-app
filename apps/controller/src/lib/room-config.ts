@@ -230,6 +230,8 @@ export const ROOM_VISIBLE_SETTINGS = [
   // `archivesAvailableTo()` and the three gates inside the Archives menu.
   'hideChatLog',
   'hideRecs',
+  // The recordings archive tab; access is still independently enforced by archivesAvailableTo.
+  'recsInRoom',
   'showArchivesToSpecificPresenters',
   'showArchivesToUsers',
   /*
@@ -307,6 +309,12 @@ export const ROOM_VISIBLE_SETTINGS = [
   */
   'allowUsersToChangeUsername',
   /*
+    Presenter-only NEW badges. The fact itself is produced from the membership's controller-owned
+    `createdAt` timestamp by `internal/room-config`; the browser is never allowed to assert it.
+    Thirty days is the first-party policy and lives beside that derivation, not in the UI.
+  */
+  'isNewIndicatorOn',
+  /*
     "Hide Files Section?" — `z('hidden', o.hideFiles)`, applied by the reference to BOTH the Files
     main-tab `li` (`app-presentationarea.full.js:5375`) and the `#files` pane itself (5410-5413).
 
@@ -348,12 +356,12 @@ export const ROOM_VISIBLE_SETTINGS = [
     Not a credential and not a policy the room could infer: it is a per-room preference the owner
     ticks, and the room is where the column is drawn.
 
-    `recordChat` is deliberately NOT added beside it. It appears only inside the `videoOnlyMode`
-    writer (`:1898-1900`), and `videoOnlyMode` is the `r` query parameter — the recording-bot mode —
-    which this room does not model, the same honest gap recorded above for `hideFiles`. Sending
-    `recordChat` would put a setting on the wire that nothing can read.
+    `recordChat` now also drives the recording archive: the room server snapshots alert and chat
+    rows inside the authenticated recording window. It therefore crosses beside this setting and
+    is consumed on the upload boundary, never trusted from a browser-provided flag.
   */
   'hideChatAlerts',
+  'recordChat',
   /*
     "Hide Notes Section?" — the THIRD of a trio whose other two have been on this list since it was
     written, and the one that was missed.
@@ -1241,7 +1249,9 @@ export const ROOM_PRESENTER_SETTINGS = [
     textarea opened empty on a room that already had a destination configured, so pressing Set on an
     untouched pane would have cleared it — if the write had gone anywhere.
   */
-  'restreamToURL'
+  'restreamToURL',
+  /** Presenter identity linking, backed by the controller's Discord OAuth endpoints. */
+  'enableDiscord'
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 const ROOM_PRESENTER_ONLY = new Set<string>(ROOM_PRESENTER_SETTINGS);

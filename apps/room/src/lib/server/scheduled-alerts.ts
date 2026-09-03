@@ -10,6 +10,7 @@ import {
 import { db } from './db';
 import { alerts, scheduledAlerts } from './db/schema';
 import { publishToRoom } from './room-events';
+import { enqueueAlertDelivery } from './alert-delivery-outbox';
 
 /**
  * `hasAlertScheduler` — the STORE and the SWEEP.
@@ -74,6 +75,8 @@ export function scheduleAlert(input: {
   senderName: string;
   body: string;
   nonTrade: boolean;
+  dontPush?: boolean;
+  dontCrossPost?: boolean;
   repeat: RepeatMode;
   ignoreWeekends: boolean;
   sendOn: Date;
@@ -90,6 +93,8 @@ export function scheduleAlert(input: {
       senderName: input.senderName,
       body: input.body,
       nonTrade: input.nonTrade,
+      dontPush: input.dontPush ?? false,
+      dontCrossPost: input.dontCrossPost ?? false,
       repeatMode: input.repeat,
       /*
         `ignoreWeekends: "daily" === repeat && ignoreWeekends` — the composer's own expression,
@@ -191,18 +196,29 @@ export function claimDueScheduledAlerts(now: Date): (typeof scheduledAlerts.$inf
  * and recoverable.
  */
 export function fireScheduledAlert(row: typeof scheduledAlerts.$inferSelect, now: Date): void {
-  const inserted = db
-    .insert(alerts)
-    .values({
+  const inserted = db.transaction((transaction) => {
+    const alert = transaction
+      .insert(alerts)
+      .values({
+        roomShortCode: row.roomShortCode,
+        senderId: row.senderId,
+        kind: 'text',
+        body: row.body,
+        nonTrade: row.nonTrade,
+        createdAt: now
+      })
+      .returning()
+      .get();
+    if (!alert) throw new Error('the scheduled alert could not be stored');
+    enqueueAlertDelivery(transaction, {
+      alertId: alert.id,
       roomShortCode: row.roomShortCode,
-      senderId: row.senderId,
-      kind: 'text',
-      body: row.body,
-      nonTrade: row.nonTrade,
-      createdAt: now
-    })
-    .returning()
-    .get();
+      dontPush: row.dontPush,
+      dontCrossPost: row.dontCrossPost,
+      now
+    });
+    return alert;
+  });
 
   /*
     The same frame `post-alert.remote.ts` publishes, so every member's room updates without a reload

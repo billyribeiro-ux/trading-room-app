@@ -41,6 +41,10 @@ const ROOM_CONFIG_CLIENT = readFileSync(
   new URL('./server/room-config-client.ts', import.meta.url),
   'utf8'
 );
+const RECORDING_UPLOAD = readFileSync(
+  new URL('../routes/recordings/upload/+server.ts', import.meta.url),
+  'utf8'
+);
 
 /*
   `.room-sidebar` became `RoomSidebar.svelte` on 2026-08-15. The reference-bundle assertions are
@@ -124,8 +128,10 @@ describe('hideChatAlerts is ONE flag, not one mechanism per writer', () => {
     */
     expect(SHELL).toContain('{#if !hideChatAlerts}');
     expect(PAGE).toContain('hideChatAlerts={gates.hideChatAlerts}');
-    // ONE `as-split`. A second would render the whole room twice.
-    expect(PAGE, 'the split moved to RoomShell in S8').not.toContain('<as-split\n');
+    // The root split is owned by RoomShell. Nested splits on the page belong to snippets passed
+    // into that shell and are not duplicate room roots.
+    expect(SHELL).toContain('<as-split');
+    expect(PAGE).toContain('<RoomShell');
     /*
       The defect this replaced: `viewerOnlyMode` and `chatAlertsDetached` each had their own branch
       on this column, so the room SETTING had nowhere to be read and did nothing. Either name
@@ -135,16 +141,10 @@ describe('hideChatAlerts is ONE flag, not one mechanism per writer', () => {
     expect(PAGE).not.toContain('{:else if chatAlertsDetached}');
   });
 
-  it('carries the setting across the boundary, with recordChat deliberately left off', () => {
+  it('carries both room policies across the boundary to their authoritative consumers', () => {
     expect(ROOM_CONFIG_CLIENT).toContain('hideChatAlerts?: boolean;');
-    /*
-      `recordChat` appears ONLY inside the `videoOnlyMode` writer, and `videoOnlyMode` is the `r`
-      query parameter this room does not model. Sending it would put a setting on the wire that
-      nothing can read — the "no config nothing reads" rule, applied to a field that looks useful.
-    */
-    // The FIELD, not the word: the doc comment beside `hideChatAlerts` names `recordChat` to say
-    // why it is absent, and an assertion that forbids the name forbids explaining the decision.
-    expect(ROOM_CONFIG_CLIENT).not.toContain('recordChat?:');
+    expect(ROOM_CONFIG_CLIENT).toContain('recordChat?: boolean;');
+    expect(RECORDING_UPLOAD).toContain('access.config.settings.recordChat === true');
   });
 });
 

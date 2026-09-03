@@ -234,12 +234,12 @@ export const load: PageServerLoad = async ({ depends, locals, request, cookies }
         isLimitedPresenter   runtime only; false on arrival, set by `giveMicScreen`
     */
     /*
-      One source, not a fallback pair. `account.role` is reconciled from this same membership a few
-      lines above, so `isPresenterRole(account.role)` would be the same answer computed twice — and
-      two ways of computing it is precisely how `isP` and `isPresenter` came to disagree.
+      One source, not a fallback pair. `account.role` comes from this membership, so a second
+      `isPresenterRole(account.role)` computation risks the old `isP`/`isPresenter` disagreement.
     */
     isP: roomConfig.member?.isP === true,
-    isFT: roomConfig.member?.isFT ?? false,
+    isFT: roomConfig.member?.isFT ?? locals.isFreeTrial,
+    isNew: roomConfig.member?.isNew ?? false,
     hasAdminChat: roomConfig.member?.permissions.hasAdminChat ?? false,
     /*
       Fail CLOSED when a membership exists but does not say.

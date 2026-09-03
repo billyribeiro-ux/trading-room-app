@@ -61,13 +61,11 @@ describe('app-post-alert-modal — audited 2026-09-01', () => {
     expect(report.views.unresolved).toEqual([]);
   });
 
-  it('has exactly four const values left, and each is a refusal on record', () => {
+  it('has exactly three const values left, and each is a refusal on record', () => {
     /*
       `alert-text-label` — the "Text this out?" checkbox, Twilio SMS, in
       `direct-evidence-contract.ts`'s `hiddenCapabilityBranches`: no capture this repository holds
       ever rendered it and the feature behind it is blocked outright.
-
-      `alert-dont-cross-post-label` — the same, for the linked-room fan-out.
 
       `sendLaterAsEmail` / `sendLaterAsNick` — `PAM-10`'s refusal, argued in `ScheduledAlerts.svelte`:
       upstream's form lets a presenter post an alert under someone ELSE's name and address, so those
@@ -75,20 +73,14 @@ describe('app-post-alert-modal — audited 2026-09-01', () => {
     */
     expect(report.constGaps.map((gap) => gap.value)).toEqual([
       'alert-text-label',
-      'alert-dont-cross-post-label',
       'sendLaterAsEmail',
       'sendLaterAsNick'
     ]);
   });
 
-  it('and exactly four text literals, which are the same four refusals', () => {
+  it('and exactly three text literals, which are the same three refusals', () => {
     /* One label per refused control — the labels are the controls, so the two lists agree. */
-    expect(report.textGaps).toEqual([
-      'Text this out?',
-      "Don't cross post to linked alert rooms",
-      'Send as email:',
-      'Send as Name:'
-    ]);
+    expect(report.textGaps).toEqual(['Text this out?', 'Send as email:', 'Send as Name:']);
   });
 });
 
@@ -653,22 +645,17 @@ describe('app-alert-logs-modal — audited 2026-09-01', () => {
 
 describe('app-alert-send-report-modal — audited 2026-09-01', () => {
   /*
-    ONE REFUSAL, FORTY-SIX GAPS. Every value below belongs to the report body, the search bar, the
-    status select, the flot pie or the per-recipient row — and all five rest on the same thing:
-    a list of DELIVERY RECORDS for one alert, which this application has nowhere.
-
-    `AlertSendReportModal.svelte` carries the measurement in full: 24 tables searched for `queue`,
-    `latency`, `fail_reason`, `sent_time` and `delivery`; `alerts.dispatch` is five booleans naming
-    which channels the presenter TICKED, not what happened; no mail transport exists in
-    `apps/room/src/lib/server` at all; and `getAlertReport` has zero occurrences across `apps/`.
-
-    So this is not a backlog. It is one decision, and the list is here so that BUILDING the queue
-    turns this test red — forty-six values arriving at once is exactly the signal that the refusal
-    expired.
+    Re-audited 2026-09-03 after the refusal expired. The controller now owns durable dispatch and
+    per-recipient attempt ledgers, the room owns a transactional retrying outbox, and this surface
+    renders the captured report structure over real records.
   */
   const report = auditSurface({
     selector: 'app-alert-send-report-modal',
-    files: ['src/lib/components/AlertSendReportModal.svelte', 'src/lib/components/Modal.svelte']
+    files: [
+      'src/lib/components/AlertSendReportModal.svelte',
+      'src/lib/components/AlertDeliveryReportBody.svelte',
+      'src/lib/components/Modal.svelte'
+    ]
   });
 
   it('reads the component it says it reads', () => {
@@ -677,72 +664,12 @@ describe('app-alert-send-report-modal — audited 2026-09-01', () => {
     expect(report.views.unresolved).toEqual([]);
   });
 
-  it('is missing exactly the report, and nothing outside it', () => {
-    /*
-      Asserted as a SET rather than a length. Half of these are generic Bootstrap classes —
-      `input-group`, `form-select`, `fw-bold`, `bg-dark` — that this application uses freely
-      elsewhere; they are absent HERE because the elements that would carry them are refused, and a
-      count could not tell that apart from one of them turning up on something unrelated.
-    */
-    expect(report.constGaps.map((gap) => gap.value)).toEqual([
-      /* the spinner, RPT-02's fake-loading defect */
-      'my-4',
-      'ml-2',
-      'fas',
-      'fa-spinner',
-      'fa-spin',
-      /* the report container and its header */
-      'w-100',
-      'report-header-container',
-      'text-white',
-      'my-1',
-      'report-header',
-      /* `$.plot("#pie-container", …)` — jQuery flot, which this room does not load */
-      'pie-container',
-      /* the status select: All / sent / queued / failed */
-      'input-group',
-      'search-select-addon',
-      'input-group-text',
-      'Search select',
-      'form-select',
-      'sent',
-      'queued',
-      'failed',
-      /* the search box and its two addons, including upstream's `btn-ligth` typo */
-      'search-term',
-      'search-addon',
-      'Enter search term',
-      'form-control',
-      'clear-search-addon',
-      'btn-ligth',
-      'fa-search',
-      'report-body',
-      'fa-times',
-      /* the per-recipient row: name, address, sent time, latency, failure reason */
-      'list-group',
-      'list-group-item',
-      'list-group-item-action',
-      'border-0',
-      'bg-dark',
-      'fw-bold',
-      'sent-time',
-      'failed-reason',
-      'm-1',
-      'fa-clock',
-      'ms-1',
-      'fa-exclamation-circle',
-      'me-1'
-    ]);
+  it('renders the complete report structure', () => {
+    expect(report.constGaps).toEqual([]);
   });
 
-  it('and the five literals are the four filter labels and the empty-queue answer', () => {
-    /*
-      `No Reports.` is deliberately NOT rendered. It means "the fetch came back empty", and there is
-      no fetch — a presenter reading it under a title carrying a real AlertID would conclude their
-      alert reached nobody. `REPORT_UNAVAILABLE` says what is actually true instead, and is marked
-      as ours at the code.
-    */
-    expect(report.textGaps).toEqual([' Loading...', 'All', 'Queued', 'Failed', 'No Reports.']);
+  it('renders every report literal the reference does', () => {
+    expect(report.textGaps).toEqual([]);
   });
 });
 
@@ -879,13 +806,8 @@ describe('app-room — audited 2026-09-01, the whole page', () => {
     expect(report.region.consts).toBe(229);
     expect(report.views.resolved).toBe(108);
     expect(report.views.unresolved).toEqual([]);
-    /*
-      84 -> 85, 2026-09-02: `SessionInfoModal.svelte`. The scope of this audit is the page and every
-      component under `lib/components`, so a new component widens it — which is why the count is
-      asserted rather than the glob simply being trusted. The three numbers above did NOT move,
-      which is the check that the new file adds no unresolved reference const to `app-room`.
-    */
-    expect(files.length, 'a component was added or removed from lib/components').toBe(85);
+    /* The scope is the page plus every component; the count makes a new surface explicit. */
+    expect(files.length, 'a component was added or removed from lib/components').toBe(90);
   });
 
   it('has five const values left, and every one is on record', () => {
@@ -958,15 +880,15 @@ describe('app-presentationarea — audited 2026-09-01, the page s other giant', 
     expect(report.region.consts).toBe(292);
     expect(report.views.resolved).toBe(125);
     expect(report.views.unresolved).toEqual([]);
-    /* 94 -> 95, 2026-09-02: `SessionInfoModal.svelte`, for the reason recorded on `app-room`'s. */
-    expect(files.length, 'a component was added or removed under lib/components').toBe(95);
+    /* Four bounded feature components landed with the 2026-09-03 end-to-end completion. */
+    expect(files.length, 'a component was added or removed under lib/components').toBe(100);
   });
 
-  it('is missing the RECORDINGS tab and NOTHING else', () => {
+  it('renders the authenticated RECORDINGS tab and every other captured const', () => {
     /*
       `recordings`, `recordings-tab`, `#recordings`, `fa-file-video` and the literal `"Recordings"`
-      are one blocked feature: a recordings archive, which needs a service neither database has a
-      table for. `TODO.md` carries it as blocked on an archive service, not as a decision.
+      now belong to the authenticated recording archive built on 2026-09-03. The earlier external
+      service blocker ended when the room gained its own catalog, storage and range-read route.
 
       **`dropdownMenuNote` LEFT THIS LIST on 2026-09-02**, and it left by being built. It was
       `NTC-3`, a recorded divergence: the capture freezes the per-note gear's `id` at that literal,
@@ -978,22 +900,17 @@ describe('app-presentationarea — audited 2026-09-01, the page s other giant', 
       This assertion is where that showed up independently: five residual const values became four
       without anybody editing this file, which is what an enumeration is for.
     */
-    expect(report.constGaps.map((gap) => gap.value)).toEqual([
-      'recordings',
-      'recordings-tab',
-      '#recordings',
-      'fa-file-video'
-    ]);
+    expect(report.constGaps).toEqual([]);
   });
 
-  it('and two literals: the same tab, and the never-fetched files message', () => {
+  it('leaves only the never-fetched files message absent', () => {
     /*
       `"No room files found."` is the `#files` region's own recorded refusal —
       `O(84, sessionFiles ? -1 : 84)` and `O(85, sessionFiles && length > 0 ? 85 : -1)` are NOT
       complements, because an empty array is truthy, so it is the never-fetched state and our loader
       ends in `.all()`.
     */
-    expect(report.textGaps).toEqual(['Recordings', 'No room files found.']);
+    expect(report.textGaps).toEqual(['No room files found.']);
   });
 });
 

@@ -126,7 +126,8 @@ function chatQuery(where: SQL | undefined) {
         senderEmail: users.email,
         senderAvatarUrl: users.avatarUrl,
         senderRole: users.role,
-        senderStatus: users.status
+        senderStatus: users.status,
+        isNew: users.isNew
       })
       .from(messages)
       .innerJoin(users, eq(messages.senderId, users.id))

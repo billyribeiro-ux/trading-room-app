@@ -51,6 +51,18 @@ export const variables = defineEnvVars({
     description: 'Private master key used to encrypt owner-visible API-key secrets at rest.',
     schema: optionalText
   },
+  DISCORD_CLIENT_ID: {
+    description: 'Discord OAuth2 application client id. Required only when a room enables Discord linking.',
+    schema: optionalText
+  },
+  DISCORD_CLIENT_SECRET: {
+    description: 'Discord OAuth2 application secret. Server-only and never persisted or exposed to either browser.',
+    schema: optionalText
+  },
+  DISCORD_REDIRECT_URI: {
+    description: 'Exact HTTPS callback URI registered on the Discord application.',
+    schema: optionalUrl
+  },
   ROOM_BASE_URL: {
     description: 'Optional absolute URL of the separate live-room application.',
     schema: optionalUrl
@@ -58,6 +70,11 @@ export const variables = defineEnvVars({
   STREAM_SERVER_MTX: {
     description:
       "Host of the MediaMTX media server that external encoders (OBS, XSplit) publish into — HOST ONLY, no scheme and no port, because the two ingest URLs append their own: WHIP is http://<host>:8889/<path>/whip and RTMP is rtmp://<host>/<path>. Named after the reference's own `globals.streamServerMTX` so the two systems can be read side by side. Optional, and its absence is REPORTED rather than defaulted: with it blank the room's OBS panel says the server is not configured instead of handing a presenter a link to nowhere. It is a separate host from the SFU, and deliberately so — the reference keeps `streamServerMTX` and `streamServer` as two globals.",
+    schema: optionalText
+  },
+  MEDIA_CLUSTER_HOSTS_JSON: {
+    description:
+      'Optional JSON object mapping clusterID values to MediaMTX hosts. A value may be a host string or {"host":"media.example.com","healthUrl":"https://media.example.com/health"}. When both primary and backup clusters are configured, a failed primary health check selects the backup.',
     schema: optionalText
   },
   PUBLIC_SITE_ORIGIN: {

@@ -69,6 +69,7 @@ export interface PostAlertSubmission {
   keepOpen: boolean;
   postOnX: boolean;
   dontPush: boolean;
+  dontCrossPost: boolean;
   nonTradeAlert: boolean;
   legalDisclosure: boolean;
   legalDisclosureText: string;
@@ -90,6 +91,7 @@ export interface PastedImageSubmission {
   keepOpen: boolean;
   postOnX: boolean;
   dontPush: boolean;
+  dontCrossPost: boolean;
   nonTradeAlert: boolean;
   legalDisclosure: boolean;
   legalDisclosureText: string;

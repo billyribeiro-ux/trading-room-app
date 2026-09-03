@@ -68,6 +68,11 @@ export const EVIDENCE_ROOTS = Object.freeze([
   'css'
 ]);
 
+/** Roots absent from a clean checkout. `css` is tracked and must never suppress a test in CI. */
+export const OFF_REPO_EVIDENCE_ROOTS = Object.freeze(
+  EVIDENCE_ROOTS.filter((name) => name !== 'css')
+);
+
 /*
   A root counts as referenced only where it appears as a path SEGMENT — opening a quote, or after a
   slash in a relative specifier. Matching the bare word would catch `css` in a class name and
@@ -117,19 +122,17 @@ function codeOf(source) {
 }
 
 /**
- * The pattern for the roots that are actually absent, built per call rather than once at module
- * load: the answer depends on the filesystem, and a constant computed at import time would be wrong
- * on any machine where a symlink is created after this module is first loaded.
+ * The pattern for the selected roots, built per call so the stable inventory and the current
+ * machine's exclusion subset use the same discovery implementation.
  *
- * @param {string} root
+ * @param {readonly string[]} roots
  * @returns {RegExp}
  */
-function referencePattern(root) {
-  const missing = missingEvidenceRoots(root);
-  // No missing root means nothing can be evidence-bound: match nothing rather than everything.
-  if (missing.length === 0) return /(?!)/;
+function referencePattern(roots) {
+  // No selected root means nothing can be evidence-bound: match nothing rather than everything.
+  if (roots.length === 0) return /(?!)/;
   return new RegExp(
-    `(?:['"\`]|\\.\\./|/)(?:${missing.map((name) => name.replace('/', '\\/')).join('|')})/`
+    `(?:['"\`]|\\.\\./|/)(?:${roots.map((name) => name.replace('/', '\\/')).join('|')})/`
   );
 }
 
@@ -176,13 +179,17 @@ function collectTestFiles(dir, out) {
 }
 
 /**
- * Every test file under `src/` that reads a path inside an evidence root, as paths relative to
- * `apps/room` and sorted, so the result is stable enough to assert on.
+ * Every test file under `src/` that reads a path inside a selected evidence root, as paths relative
+ * to `apps/room` and sorted. The default is the stable full inventory; Vite passes only the roots
+ * missing from the current checkout when computing exclusions.
+ *
+ * @param {string} root
+ * @param {readonly string[]} roots
  */
-export function discoverEvidenceBoundTests(root = appRoot()) {
+export function discoverEvidenceBoundTests(root = appRoot(), roots = OFF_REPO_EVIDENCE_ROOTS) {
   const src = join(root, 'src');
   if (!existsSync(src)) return [];
-  const pattern = referencePattern(root);
+  const pattern = referencePattern(roots);
   return collectTestFiles(src, [])
     .filter((path) => pattern.test(codeOf(readFileSync(path, 'utf8'))))
     .map((path) => relative(root, path).split('\\').join('/'))

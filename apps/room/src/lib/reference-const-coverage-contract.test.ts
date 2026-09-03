@@ -392,9 +392,9 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
 
     ## What is genuinely absent, measured the same day
 
-    `#recordings`, `#discord-settings` and `#navbarsExampleDefault` — three, not fourteen. Those name
-    panes or bars this room does not build, and they are the only members of this group that are a
-    statement about the room rather than about the sweep.
+    `#recordings` and `#discord-settings` left this group on 2026-09-03 when the authenticated
+    recording archive and Discord OAuth tab were built. `#navbarsExampleDefault` is the one
+    genuinely absent selector that remains.
 
     The composed fourteen stay LISTED rather than excluded, because the sweep's rule is that it
     reports what it can and cannot see, and quietly dropping a row it cannot measure is how a
@@ -580,24 +580,11 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     '/assets/images/playing.gif'
   ],
   /*
-    The `RPT-*` refusal, enumerated as orphans in `alert-report-modal-contract.test.ts`. Fifteen when
-    this table was written and twelve now: `search-addon`, `Enter search term` and `btn-ligth` are
-    shared with the two log modals, and building the archived-log viewer shipped all three.
+    `app-alert-send-report-modal` is fully covered as of 2026-09-03. Its prior refusal expired when
+    the controller gained durable dispatch/attempt ledgers and the room gained a transactional
+    outbox. The captured report header, status filter, search controls, chart, recipient rows and
+    timing/error fields now render over those authoritative records.
   */
-  'app-alert-send-report-modal': [
-    'report-header-container',
-    'report-header',
-    'pie-container',
-    'search-select-addon',
-    'Search select',
-    'queued',
-    'clear-search-addon',
-    'report-body',
-    'sent-time',
-    'failed-reason',
-    'fa-clock',
-    'fa-exclamation-circle'
-  ],
   /*
     TRACED VALUE BY VALUE ON 2026-08-31, and none of the seven is work. Written out because the group
     heading above would otherwise read them as unfinished, which is what the heading itself got wrong.
@@ -605,10 +592,10 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     - `#scheduledAlertsModal` WAS group three, a `data-bs-target`; it left this list on 2026-09-01
       when `XTe`'s "See Scheduled Alerts" control was transcribed with its pair.
     - `alert-text-label` is the id of the "Text this out?" checkbox (`VTe`, byte 2,118,282, model
-      `sendText`) and `alert-dont-cross-post-label` is "Don't cross post to linked alert rooms"
-      (`WTe`, byte 2,119,672, model `dontCrossPost`). Both are in `direct-evidence-contract.ts`'s
-      `hiddenCapabilityBranches`: no capture this repository holds ever rendered either, and the
-      features behind them — Twilio SMS and the linked-room fan-out — are both blocked outright.
+      `sendText`). It remains in `direct-evidence-contract.ts`'s `hiddenCapabilityBranches`: no
+      capture this repository holds rendered it, and the Twilio SMS downstream is absent.
+    - `alert-dont-cross-post-label` left this list on 2026-09-03 when linked-room push fan-out gained
+      its captured per-alert suppression, including the scheduled-alert path.
     - `sendLaterAsEmail` and `sendLaterAsNick` are `PAM-10`'s REFUSAL, argued in
       `ScheduledAlerts.svelte`: upstream's form lets a presenter post an alert under someone else's
       name and address, so those two fields are not on the wire here and the server derives the
@@ -624,16 +611,11 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
       Same measurement, same day, as the two note-modal titles — and the same one that keeps the
       Giphy modal's `modal-basic-title` out, because that picker is mounted four times.
   */
-  'app-post-alert-modal': [
-    'alert-text-label',
-    'alert-dont-cross-post-label',
-    'sendLaterAsEmail',
-    'sendLaterAsNick'
-  ],
-  /* `recordings` is the archive tab — blocked on an archive service, and recorded as such. */
-  'app-presentationarea': ['recordings', 'recordings-tab', '#recordings', 'fa-file-video'],
+  'app-post-alert-modal': ['alert-text-label', 'sendLaterAsEmail', 'sendLaterAsNick'],
+  /* The authenticated Recordings tab and archive surface are fully covered as of 2026-09-03. */
   /*
-    `discord-settings` is the Discord-registration blocker.
+    The Discord tab and panel are fully covered as of 2026-09-03. OAuth registration is deployment
+    configuration; the application path uses single-use hashed state and stores no provider token.
 
     The two `presenterStyle.` are the SAME upstream defect as `app-user-info-modal`'s five, and since
     2026-09-01 that is a reading rather than a cross-reference — `the seven <expression>-as-a-value
@@ -656,13 +638,7 @@ const RESIDUALS: Readonly<Record<string, readonly string[]>> = {
     cover `savePresenterColors`, whose payload the reference builds at byte 2,243,603. What is not
     reproduced is a colour input shipping the text `presenterStyle.color` as its value.
   */
-  'app-user-settings-modal': [
-    'discord-settings',
-    'discord-settings-tab',
-    '#discord-settings',
-    'presenterStyle.color',
-    'presenterStyle.bgColor'
-  ]
+  'app-user-settings-modal': ['presenterStyle.color', 'presenterStyle.bgColor']
   /*
     `ACA-06` in `ChatSearchBar.svelte`: the chat toolbar's save control is `K_e` at byte 1,421,929 and
     is not built, while the ALERTS column's twin is (`AlertChatArea.svelte`, "Save alerts messages").
@@ -754,7 +730,7 @@ describe('coverage of the reference const tables', () => {
     ).toEqual(RESIDUALS);
   });
 
-  it('holds the ratchet: forty-two components fully covered, eighty-one values not', () => {
+  it('holds the ratchet: forty-four components fully covered, sixty-one values not', () => {
     /*
       Both totals are derived from the table above, so this case cannot disagree with it — it exists
       to state the two numbers in words a reader can find, and to fail loudly on the day somebody
@@ -770,7 +746,7 @@ describe('coverage of the reference const tables', () => {
       41 -> 42, 2026-09-02. `app-session-transcript` joined by being BUILT — the whole component,
       which is why the drop below is the largest this ratchet has ever taken in one step.
     */
-    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(42);
+    expect(ROWS.filter((row) => row.residuals.length === 0)).toHaveLength(44);
     /*
       115 -> 111 -> 110 -> 108 on 2026-09-01. The last two are `app-rec-preview`'s pair, and they left
       the way the ratchet is meant to be paid: the recorded blocker was re-measured and turned out to
@@ -785,7 +761,7 @@ describe('coverage of the reference const tables', () => {
       and it was paid the way the note above describes — the recorded blocker was re-measured and
       the half of it that mattered turned out to be false. Group one's paragraph carries the record.
     */
-    expect(residuals).toBe(81);
+    expect(residuals).toBe(61);
   });
 
   it('every #-prefixed residual with a composing site is emitted at runtime', () => {
@@ -845,7 +821,7 @@ describe('coverage of the reference const tables', () => {
     }
 
     /*
-      And the other half of the correction: exactly THREE `#`-prefixed residuals are real. Derived
+      And the other half of the correction: exactly ONE selector-shaped residual is real. Derived
       from the table rather than listed twice, so closing one of them fails here until this is
       updated — which is the point, because these three ARE work and the fourteen are not.
     */
@@ -864,9 +840,7 @@ describe('coverage of the reference const tables', () => {
       ...COMPOSED[2].ids.map((id) => `#nav-${id}`)
     ]);
     expect(hashResiduals.filter((value) => !composedValues.has(value)).sort()).toEqual([
-      '#discord-settings',
-      '#navbarsExampleDefault',
-      '#recordings'
+      '#navbarsExampleDefault'
     ]);
   });
 
@@ -1010,8 +984,8 @@ describe('how much of the gap has already been written about', () => {
     measured against stripped source. The two siblings (`#navbarsExampleDefault` and the bare id) did
     NOT move, because the reason they already carried named them literally.
   */
-  it('splits the 81 into what is on record and what nobody has looked at', () => {
-    expect(all).toHaveLength(81);
+  it('splits the 61 into what is on record and what nobody has looked at', () => {
+    expect(all).toHaveLength(61);
     /*
       34 -> 38 -> 37, 2026-09-01, and the two steps are the two different events this note keeps
       separating.
@@ -1049,7 +1023,8 @@ describe('how much of the gap has already been written about', () => {
       this split is for: twenty-six of twenty-seven values in the largest unbuilt surface in the
       reference had never been named by anyone.
     */
-    expect(all.filter(mentioned)).toHaveLength(40);
+    /* 24 -> 23: the now-built dontCrossPost control was an examined residual. */
+    expect(all.filter(mentioned)).toHaveLength(23);
     /*
       85 -> 81 on 2026-09-01, and the whole move is on the UNEXAMINED side, which is the side that
       means work: the four were `app-session-login`'s loading view and they left `all` by being
@@ -1070,7 +1045,7 @@ describe('how much of the gap has already been written about', () => {
       67 -> 41, 2026-09-02: the twenty-six above. The largest fall this side has taken, and it is a
       BUILD rather than a re-argument — the whole of `app-session-transcript` renders now.
     */
-    expect(all.filter((value) => !mentioned(value))).toHaveLength(41);
+    expect(all.filter((value) => !mentioned(value))).toHaveLength(38);
   });
 
   it('and app-room, the most audited surface here, has NO unexamined residual', () => {
@@ -1199,6 +1174,6 @@ describe('the comment stripping is load-bearing', () => {
       `recPreviewScreen` were both quoted in docblocks AND absent from markup, so only the stripped
       read called them gaps; the card was BUILT, and they are now absent from both reads.
     */
-    expect(stripped - raw).toBe(19);
+    expect(stripped - raw).toBe(14);
   });
 });

@@ -230,6 +230,7 @@ describe('posting an alert', () => {
       postOnX: false,
       nonTradeAlert: false,
       dontPush: false,
+      dontCrossPost: false,
       legalDisclosure: false,
       legalDisclosureText: ''
     });
@@ -241,7 +242,14 @@ describe('posting an alert', () => {
     const { composer, alerts } = make();
     await composer.postPollResults('the results');
     expect(alerts).toEqual([
-      { kind: 'text', body: 'the results', targetUrl: null, nonTradeAlert: false }
+      {
+        kind: 'text',
+        body: 'the results',
+        targetUrl: null,
+        nonTradeAlert: false,
+        dontPush: false,
+        dontCrossPost: false
+      }
     ]);
   });
 });

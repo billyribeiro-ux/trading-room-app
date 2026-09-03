@@ -32,7 +32,14 @@ const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
   through `internal/room-config/[code]`, ONE by the room but only for a presenter, and six by the
   WordPress SSO door at `(public)/sso/[code]`. `allowUsersToChangeUsername` is on the first two
   lists, and so now are `showPasswordField`, `usernameInstructions` and `hasRequiredPhoneInLogin`,
-  so the union is 113.
+  so the union is 120.
+
+  113 -> 120 on 2026-09-03: `isNewIndicatorOn`, `recsInRoom`, `recordChat`, `enableDiscord`,
+  `linkedRoomAlerts`, `clusterID` and `backupClusterID`. Each now has a server-side policy decision
+  or deployment resolver and a visible consumer: the
+  presenter-only New badge, authorized recording catalog/transcript, Discord account linking, and
+  same-account linked-room alert dispatch respectively. Media-cluster selectors are control-plane
+  consumers and never cross to an untrusted browser.
 
   112 -> 113 on 2026-09-03: openLoginLink, the operator's own page opened once as a member enters
   (bundle bytes 1,437,913 and 2,384,175). It came off `audit-setting-coverage.mjs`'s own list of
@@ -365,7 +372,8 @@ const EXPECTED_WIRED_SETTINGS = [
     Added 2026-08-14 with the Streams pane. `useMediaMTX` is the whole Streams tab — the reference
     derives `hideStreams` by negating it and hides both the main-tab item and the pane on that one
     value. `overlayUserIdOnScreenshare` gates the viewer id printed over the video for
-    non-presenters. Their manage-page neighbours, the two MediaMTX cluster ids, stay unwired.
+    non-presenters. The two MediaMTX cluster ids are now consumed by the controller failover
+    resolver and remain absent from the browser boundary.
   */
   'useMediaMTX',
   'overlayUserIdOnScreenshare',
@@ -452,6 +460,13 @@ const EXPECTED_WIRED_SETTINGS = [
     rather than corrected, is at its entry in `src/lib/room-config.ts`.
   */
   'smallerImagePreview',
+  'clusterID',
+  'backupClusterID',
+  'linkedRoomAlerts',
+  'enableDiscord',
+  'recordChat',
+  'recsInRoom',
+  'isNewIndicatorOn',
   /*
     Added 2026-08-30 with SC-12 and SC-13 of the room-surface audit, and it is the FIRST wired
     setting that does not cross to every member.

@@ -76,6 +76,7 @@ export const GET: RequestHandler = async ({ params, locals, request, getClientAd
     room's own role — which is the same answer this endpoint gave before it asked at all.
   */
   let membership: RoomMembership | null = null;
+  let deployment: Awaited<ReturnType<typeof readRoomConfig>>['deployment'];
   /*
     The chat channels this connection may RECEIVE, resolved here for the same reason the membership
     is: one config read per CONNECTION, not per message.
@@ -87,7 +88,9 @@ export const GET: RequestHandler = async ({ params, locals, request, getClientAd
   */
   let chatChannels: readonly string[] = BUILT_IN_CHAT_TABS;
   try {
-    membership = (await readRoomConfig(request, room, user.email)).member;
+    const config = await readRoomConfig(request, room, user.email);
+    membership = config.member;
+    deployment = config.deployment;
     chatChannels = await memberChatChannels(request, room, user);
   } catch (cause) {
     console.warn('[events] no membership for this subscriber; roster flags fall back', cause);
@@ -199,7 +202,9 @@ export const GET: RequestHandler = async ({ params, locals, request, getClientAd
           /* Filled in by `POST /api/roster/location` once the browser's lookup answers. */
           locStr: '',
           isP: membership?.isP === true,
-          isFT: membership?.isFT ?? false,
+          /* Same source order as the page load: membership first, guest admission session second. */
+          isFT: membership?.isFT ?? locals.isFreeTrial,
+          isNew: membership?.isNew ?? false,
           hasAdminChat: membership?.permissions.hasAdminChat ?? false,
           /*
           The other four, so `#permissionsModal` seeds from the truth rather than from `undefined`.
@@ -242,7 +247,10 @@ export const GET: RequestHandler = async ({ params, locals, request, getClientAd
             rendering as the string "null". 512 is well past every real agent string and short
             enough that the cell stays a cell.
           */
-          userAgent: (request.headers.get('user-agent') ?? '').slice(0, 512) || 'unknown'
+          userAgent: (request.headers.get('user-agent') ?? '').slice(0, 512) || 'unknown',
+          appVersion: deployment?.appVersion ?? 'unknown',
+          streamServer: deployment?.streamServer ?? 'not-configured',
+          serverId: deployment?.serverId ?? 'not-configured'
         }
       );
 

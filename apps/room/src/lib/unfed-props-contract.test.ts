@@ -163,18 +163,6 @@ function spreadFields(site: { source: string }): Set<string> {
  * being a defect and becomes a decision, and a bare name with no reason should not survive review.
  */
 const DELIBERATELY_UNSUPPLIED: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  'lib/components/RoomMessage.svelte': {
-    /*
-      `enableQaReactions` and `isQaMessage` were BOTH exempt here until 2026-08-28, on the reason the
-      entries gave: the Q&A thread rendered with `onaction={() => {}}`, so anything they lit could
-      not act. Both are supplied now — the thread has two commands behind it — and the entries are
-      deleted rather than reworded, which is what this list means by a prop stopping being a
-      decision. `qa-thread-contract.test.ts`.
-    */
-    showNewIndicator:
-      'needs `isNewIndicatorOn` (unwired) AND a supply for `item.isNew`, which no feed populates. ' +
-      'A presenter-only marker with no data behind it is a marker that never shows.'
-  },
   'lib/components/StreamTabs.svelte': {
     lockedScreenId:
       '`globals.lockedScreenID` — the SCREENSHARE lock field, and not a typo. The badge at the top ' +

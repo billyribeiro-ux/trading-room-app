@@ -5,6 +5,7 @@ import { getDb } from '#lib/server/db/index.js';
 import { rooms } from '#lib/server/db/schema.js';
 import { guestHandoffToken, handoffUrl } from '#lib/server/room-handoff.js';
 import { recordVisit } from '#lib/server/room-visits.js';
+import { redirectToConfiguredLocation } from '#lib/server/configured-redirect.js';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -84,7 +85,7 @@ export const load: PageServerLoad = async ({ params, cookies, request, getClient
     if (!secret) error(500, 'Room launch is not configured.');
 
     const target = handoffUrl(ROOM_BASE_URL, room.shortCode, guestHandoffToken(secret, { name, email }));
-    if (target) redirect(303, target.toString());
+    if (target) redirectToConfiguredLocation(target);
   }
 
   return { roomName: room.name, name };

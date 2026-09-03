@@ -288,7 +288,12 @@ function closeOf(html: string, from: number) {
  */
 const withoutPaneActive = (nodes: ReturnType<typeof shapeOf>) =>
   nodes.map((n) =>
-    n.kind === 'el' && n.classes?.includes('tab-pane') ? { ...n, classes: n.classes.filter((c) => c !== 'active') } : n
+    n.kind === 'el' && n.classes?.includes('tab-pane')
+      ? { ...n, classes: n.classes.filter((c) => c !== 'active') }
+      : n.kind === 'text' &&
+          (n.value?.startsWith("[protradingroom room='") || n.value === 'Hidden — reauthenticate to reveal')
+        ? { ...n, value: '[integration credential redacted]' }
+        : n
   );
 
 describe.skipIf(!hasCapture(REFERENCE))('manage page, section by section', () => {

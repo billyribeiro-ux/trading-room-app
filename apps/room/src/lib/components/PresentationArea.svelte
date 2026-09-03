@@ -3,7 +3,7 @@
   import { userIdWatermark as resolveUserIdWatermark } from '#lib/user-id-watermark.js';
   /*
     `app-webcam-holder` + `app-presentationarea` — the fifth and last of the plan's template
-    regions, and the biggest: the webcam strip, the main tab bar and every one of its seven panes.
+    regions, and the biggest: the webcam strip, the main tab bar and every pane.
 
     ## Why it is one component and not seven
 
@@ -11,14 +11,7 @@
     `FilesPane`, `ScreenTabs`, `ScreenPane`, `StreamTabs`, `StreamingView`, `VideoPlayer`. What is
     left here is the WIRING between the tab strip and those components, and wiring is one concern:
     `mainTab` is a single value that every tab reads and every tab writes.
-
-    `FilesPane` was the last of them and landed on 2026-08-16, one pass after this component did.
-    Splitting it out separately was deliberate — two extractions at once is how a mangle ships, and
-    this one had already re-pointed 40 assertions across 11 contract files. Its 22 props are still
-    declared below and passed straight through, because the PAGE owns the handlers behind them.
-
-    ## The prop list came from the COMPILER, as it did for `AlertChatArea`
-
+    The prop list came from the compiler, as it did for `AlertChatArea`.
     Empty `<script>`, `svelte-check --output machine`, and every `Cannot find name` became a prop.
     It found things a hand scan would not have: `screenVolume` is a SNIPPET, not a value, and
     `captureVideoImage` is an import from `#lib/screen-zoom.js` rather than page state.
@@ -59,6 +52,7 @@
   import StreamTabs from '#lib/components/StreamTabs.svelte';
   import SwingAlertsPane from '#lib/components/swing-alerts/SwingAlertsPane.svelte';
   import VideoPlayer from '#lib/components/VideoPlayer.svelte';
+  import RecordingArchivePane from '#lib/components/RecordingArchivePane.svelte';
   import YoutubePlayerOverlay from '#lib/components/YoutubePlayerOverlay.svelte';
   import type { Snippet } from 'svelte';
   import type { MtxStreamTabs } from '#lib/room-mtx.svelte.js';
@@ -126,6 +120,7 @@
     /** BINDABLE: the overlay's own history toggle writes it. */
     speechRecoHistoryMode: boolean;
     archivesAvailable: boolean;
+    recordingsVisible?: boolean;
     openTranscriptPage: () => void;
 
     // ── the webcam strip ───────────────────────────────────────────────────────
@@ -309,6 +304,7 @@
     captionHistory,
     speechRecoHistoryMode = $bindable(false),
     archivesAvailable,
+    recordingsVisible = false,
     openTranscriptPage,
     previewWindowsVisible,
     webcams,
@@ -500,6 +496,7 @@
         canEditNotes={data.canEditNotes}
         {hideStreams}
         {hideNotes}
+        {recordingsVisible}
         {menus}
         {notes}
         {broadcasts}
@@ -864,6 +861,9 @@
             />
           {/if}
         </div>
+        {#if recordingsVisible}
+          <RecordingArchivePane active={mainTab === 'recordings'} {isPresenter} />
+        {/if}
         <!--
           `PA-08` — the VIDEOPLAYER PANE COMES FIRST of the three, and it did not.
 

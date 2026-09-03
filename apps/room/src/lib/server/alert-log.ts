@@ -48,7 +48,8 @@ export function loadAlertPage(roomShortCode: string, page = 0) {
         senderEmail: users.email,
         senderAvatarUrl: users.avatarUrl,
         senderRole: users.role,
-        senderStatus: users.status
+        senderStatus: users.status,
+        isNew: users.isNew
       })
       .from(alerts)
       .innerJoin(users, eq(alerts.senderId, users.id))
@@ -159,7 +160,8 @@ export function searchAlertLog(
       senderEmail: users.email,
       senderAvatarUrl: users.avatarUrl,
       senderRole: users.role,
-      senderStatus: users.status
+      senderStatus: users.status,
+      isNew: users.isNew
     })
     .from(alerts)
     .innerJoin(users, eq(alerts.senderId, users.id))

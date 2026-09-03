@@ -56,11 +56,11 @@ const requireScheduler = async (room: string, email: string): Promise<void> => {
  *
  * ## What is accepted, and what is refused at the boundary
  *
- * The reference's payload carries twelve fields. Six of them — `sendTxt`, `sendEmail`, `sendTweet`,
- * `sendLaterAsNick`, `sendLaterAsEmail`, `dontCrossPost` — are instructions to downstreams this
- * deployment does not have: SMS, the mailer's alert path, Twitter, and the cross-post fan-out that
- * `linkedRoomAlerts` is itself blocked on. They are left OUT of the schema rather than accepted and
- * dropped, so `z.strictObject` refuses them loudly. Accepting a field nothing reads is how a
+ * Five reference fields — `sendTxt`, `sendEmail`, `sendTweet`, `sendLaterAsNick` and
+ * `sendLaterAsEmail` — target downstreams this deployment does not have. They stay OUT of the
+ * schema rather than being accepted and dropped. `dontCrossPost` is accepted because linked-room
+ * push fan-out now exists and the presenter must be able to suppress it per alert.
+ * `z.strictObject` refuses the other fields loudly. Accepting a field nothing reads is how a
  * presenter comes to believe an alert was texted to their members.
  *
  * `sendLaterAs*` deserves its own sentence, because refusing it is a SECURITY decision and not only
@@ -72,12 +72,22 @@ export const scheduleAlertLater = command(
   z.strictObject({
     body: z.string().min(1).max(MAX_ALERT_BODY),
     nonTradeAlert: z.boolean(),
+    dontPush: z.boolean().optional(),
+    dontCrossPost: z.boolean().optional(),
     repeat: z.enum(REPEAT_MODES),
     ignoreWeekends: z.boolean(),
     /** An epoch millisecond, because a serialised Date across the wire is a string nobody validates. */
     sendOn: z.number().int().finite()
   }),
-  async ({ body, nonTradeAlert, repeat, ignoreWeekends, sendOn }) => {
+  async ({
+    body,
+    nonTradeAlert,
+    dontPush = false,
+    dontCrossPost = false,
+    repeat,
+    ignoreWeekends,
+    sendOn
+  }) => {
     ensureDatabase();
     const { locals } = getRequestEvent();
     const user = requireUser(locals);
@@ -101,6 +111,8 @@ export const scheduleAlertLater = command(
       senderName: user.displayName,
       body,
       nonTrade: nonTradeAlert,
+      dontPush,
+      dontCrossPost,
       repeat,
       ignoreWeekends,
       sendOn: new Date(sendOn)

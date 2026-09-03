@@ -6,6 +6,7 @@ import { presenterRoom, requireUser } from '#lib/server/auth.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users } from '#lib/server/db/schema.js';
 import { RoomPermissionsRefused, writeRoomPermissions } from '#lib/server/room-config-client.js';
+import { publishToUsers } from '#lib/server/room-events.js';
 import { ROOM_PERMISSION_KEYS } from '#lib/permission-keys.js';
 
 /*
@@ -110,6 +111,17 @@ export const savePermissions = command(
 
     try {
       await writeRoomPermissions(room, actor.email, target.email, granted);
+      /*
+        Commit first, then address the affected member. The existing forceReload receiver closes
+        the realtime channel, explains the reload, and re-enters through the ordinary page load,
+        which reads the newly committed membership. Publishing before the controller write would
+        race the reload against stale permissions; a room-wide frame would interrupt everybody for
+        one member's change.
+      */
+      publishToUsers(room, [targetUserId], {
+        channel: 'privCmds',
+        data: { cmd: 'forceReload', targetUserId }
+      });
     } catch (cause) {
       // A refusal is an ANSWER and must not read as an outage; `RoomConfigUnavailable` is left to
       // propagate exactly as it does for every other control-plane call in this app.
