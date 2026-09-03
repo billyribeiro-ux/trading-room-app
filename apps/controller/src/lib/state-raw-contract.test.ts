@@ -410,7 +410,9 @@ describe('replace-only objects use $state.raw', () => {
       types. The alternative to inference is deny-by-default: every call-initialised site is listed
       HERE with what its call returns, and an uncatalogued one fails. Measured across this app on
       2026-09-01 there are exactly two, so the list is a fact a reader can check rather than a
-      pattern nobody can.
+      pattern nobody can. The profile authority slice adds two more calls: both use `untrack` to
+      seed editable form buffers once, and both return primitives for which `$state.raw` has no
+      semantic or performance benefit.
 
       The ROOM has twelve of these and none is a defect, measured the same day: eleven are scalars
       seeded through `untrack(...)`, and the twelfth — `ModalHost.svelte`'s
@@ -436,6 +438,18 @@ describe('replace-only objects use $state.raw', () => {
         why:
           'four 60-element arrays from `sparkWalks.map(...)`, replaced wholesale every 420ms and ' +
           'read whole per tick.'
+      },
+      'src/routes/(app)/account/+page.svelte:profileDisplayName': {
+        raw: false,
+        why:
+          '`untrack` returns the initial display-name string; the form binding reassigns that ' +
+          'primitive and never mutates an object graph.'
+      },
+      'src/routes/(app)/account/+page.svelte:profileChatTextSize': {
+        raw: false,
+        why:
+          '`untrack` returns the initial integer chat size; the range binding reassigns that ' +
+          'primitive and never mutates an object graph.'
       }
     };
 
