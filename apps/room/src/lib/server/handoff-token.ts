@@ -56,6 +56,17 @@ export type HandoffResult =
   { ok: true; claims: HandoffClaims } | { ok: false; reason: HandoffRejection };
 
 /**
+ * Only an authenticated controller-account launch may select a room membership by email.
+ *
+ * A guest token proves that the controller admitted a self-declared room identity; it does not
+ * prove ownership of an account with the same email address. Keeping this decision beside token
+ * verification prevents a signed guest token from being mistaken for an account credential.
+ */
+export function authorityEmailForHandoff(claims: HandoffClaims | null): string {
+  return claims?.type === 'site' ? claims.email : '';
+}
+
+/**
  * Skew tolerance on `exp`.
  *
  * The token lives 60 seconds and crosses two processes; without a little slack, a clock a second

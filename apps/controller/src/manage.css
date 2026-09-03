@@ -1378,6 +1378,11 @@
   min-width: 260px;
   margin: 0 6px;
 }
+
+.mg-root #mg-shortcode[role='button'] {
+  cursor: pointer;
+  text-decoration: underline;
+}
 .mg-root .dropdown-menu > li > button[disabled],
 .mg-root .dropdown-menu > li > form > button[disabled] {
   color: rgb(119, 119, 119);

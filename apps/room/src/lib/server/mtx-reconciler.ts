@@ -140,6 +140,11 @@ async function fetchLiveStreams(room: string): Promise<MtxStream[] | null> {
   return streams;
 }
 
+/** One bounded MediaMTX snapshot for the anonymous player; no process-local subscriber required. */
+export async function liveMtxStreamsForRoom(room: string): Promise<MtxStream[] | null> {
+  return fetchLiveStreams(room);
+}
+
 /**
  * One poll: ask, diff, publish what changed.
  *

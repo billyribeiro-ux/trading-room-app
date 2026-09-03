@@ -34,6 +34,8 @@ declare global {
        * which is the only case the room has to fall back for.
        */
       roomShortCode: string | null;
+      /** The signed-in room session was admitted by the free-trial password. */
+      isFreeTrial: boolean;
     }
   }
 }

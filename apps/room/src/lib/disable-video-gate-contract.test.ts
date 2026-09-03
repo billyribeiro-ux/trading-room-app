@@ -192,7 +192,7 @@ describe('ours: the flag reaches the markup', () => {
       never notice, since the message would be visible and the screens would keep streaming
       underneath it.
     */
-    const gate = paneMarkup.indexOf('{#if videoDisabled}');
+    const gate = paneMarkup.indexOf('{:else if videoDisabled}');
     expect(gate, 'the screens pane must be gated on videoDisabled').toBeGreaterThan(-1);
     const message = paneMarkup.indexOf('Video off to preserve data...', gate);
     const otherwise = paneMarkup.indexOf('{:else}', gate);

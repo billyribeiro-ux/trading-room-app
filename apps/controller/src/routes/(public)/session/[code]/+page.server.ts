@@ -6,6 +6,7 @@ import { rooms } from '#lib/server/db/schema.js';
 import { readSettings } from '#lib/server/rooms.js';
 import { resolveRoomConfig, roomLoginConfig } from '#lib/room-config.js';
 import { decideRoomEntry, type RoomEntrySettings } from '#lib/room-entry.js';
+import { redirectToConfiguredLocation } from '#lib/server/configured-redirect.js';
 import { ROOM_BASE_URL } from '$app/env/private';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -58,7 +59,7 @@ export const load: PageServerLoad = async ({ params, cookies, locals }) => {
   if (ROOM_BASE_URL?.trim()) {
     const target = new URL('/session', ROOM_BASE_URL);
     target.searchParams.set('id', room.shortCode);
-    redirect(303, target.toString());
+    redirectToConfiguredLocation(target);
   }
 
   // The screen the guest sees is decided by the room's settings, exactly as the
@@ -165,7 +166,7 @@ export const actions: Actions = {
 
     if (!decision.ok) {
       // A room that sets `loginErrorURL` wants its own page, not ours.
-      if (decision.redirectTo) redirect(303, decision.redirectTo);
+      if (decision.redirectTo) redirectToConfiguredLocation(decision.redirectTo);
       return fail(400, { error: decision.message });
     }
 

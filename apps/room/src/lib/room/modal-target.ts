@@ -80,6 +80,7 @@ export interface RosterRowForTarget {
     boundary, once, rather than either name leaking across it.
   */
   isFT?: boolean;
+  isNew?: boolean;
   /**
    * `locStr` — the member's city line, e.g. `Waterbury, CT, US`. THE MODAL'S `location` CELL.
    *
@@ -102,11 +103,8 @@ export interface RosterRowForTarget {
 }
 
 /**
- * A roster row as the modal sees it.
- *
- * `userXrefID` and `_id` are the reference's own identifiers and are spread in only for a member
- * who is actually connected — upstream sets them from the live socket entry, so an offline row
- * carrying them would claim a session that does not exist.
+ * The live-only reference identifiers are spread only for a connected roster row; putting them on
+ * an offline row would claim a session that does not exist.
  */
 export function modalTargetFromRosterRow(user: RosterRowForTarget): ModalTargetUser {
   return {
@@ -140,6 +138,7 @@ export function modalTargetFromRosterRow(user: RosterRowForTarget): ModalTargetU
       different problem and must not be made to look like this one by a default.
     */
     isTrial: user.isFT ?? false,
+    isNew: user.isNew ?? false,
     /*
       UIM-09's `location`, and it needed no new producer — see `locStr` on the interface above for
       why the recorded "needs a geo-IP service" refusal did not survive re-measurement.

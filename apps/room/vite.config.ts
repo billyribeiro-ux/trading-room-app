@@ -82,7 +82,7 @@ const evidenceBoundExclusions = (() => {
   if (!process.env.VITEST) return [];
   const missing = missingEvidenceRoots();
   if (missing.length === 0) return [];
-  const excluded = discoverEvidenceBoundTests();
+  const excluded = discoverEvidenceBoundTests(undefined, missing);
   console.info(
     `[vitest] ${excluded.length} evidence-bound test file(s) excluded: this checkout is missing ` +
       `${missing.length} of ${EVIDENCE_ROOTS.length} reference-capture roots (${missing.join(', ')}). ` +

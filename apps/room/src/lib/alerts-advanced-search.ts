@@ -6,7 +6,7 @@
  *     the hardcoded trader table, the `search` shape, and all ten methods.
  *   * `docs/source/components/app-alerts-advanced-search.render-helpers.js` - the eleven embedded
  *     templates, which is where the branches a DOM capture never rendered actually live.
- *   * `app-room/complete.clean.html:155555` - a rendered capture of the modal, which shows the
+ *   * `app-room/complete.clean.html` byte 155,555 - a rendered capture of the modal, which shows the
  *     empty state only. That is exactly why the bundle is the authority here: the shell in
  *     `ModalHost.svelte` matched this capture and was missing every gated branch.
  *

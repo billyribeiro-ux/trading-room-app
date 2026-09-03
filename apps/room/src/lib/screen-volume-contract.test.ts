@@ -287,13 +287,15 @@ describe('the menu reproduces its consts attribute for attribute', () => {
 
     // The `h4`'s own text node, spaces included: `v(6, ' Volume ')`.
     expect(HELPERS).toContain("v(6, ' Volume ')");
-    expect(controlMarkup).toMatch(/<h4>\s*Volume/);
+    expect(controlMarkup).toMatch(/<h4>\s*\{' Volume '\}/);
 
     const closer = CONSTS.findIndex(
       (entry) => Array.isArray(entry) && classesOf(entry).join(' ') === 'float-right mr-2'
     );
     expect(attributesOf(CONSTS[closer])).toEqual({ 'data-bs-toggle': 'dropdown' });
-    expect(controlMarkup).toContain('<span data-bs-toggle="dropdown" class="float-right mr-2">');
+    expect(controlMarkup).toContain(
+      '<span data-bs-toggle="dropdown" class="float-right mr-2" onclick={ontoggle}>'
+    );
 
     const master = CONSTS.findIndex(
       (entry) => Array.isArray(entry) && classesOf(entry).join(' ') === 'mx-auto py-2 volCtrl'
@@ -535,6 +537,10 @@ describe('the NAVBAR dropdown, which is the same control in a different componen
 
 describe('viewer-only mode drives every binding the reference gives it', () => {
   const TABS = readFileSync(new URL('./components/ScreenTabs.svelte', import.meta.url), 'utf8');
+  const MAIN_TABS = readFileSync(
+    new URL('./components/MainTabStrip.svelte', import.meta.url),
+    'utf8'
+  );
   const PANE = readFileSync(new URL('./components/ScreenPane.svelte', import.meta.url), 'utf8');
   const SHARE_HELPERS = readFileSync(
     new URL('../../docs/source/components/app-screenshare-view.render-helpers.js', import.meta.url),
@@ -547,7 +553,7 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
 
   it('hides the main tab strip', () => {
     expect(COMPILED).toContain("z('hidden', o.appService.globals.viewerOnlyMode)");
-    expect(PRESENTATION).toContain('hidden={viewerOnlyMode}');
+    expect(MAIN_TABS).toContain('hidden={viewerOnlyMode}');
   });
 
   it('hides the chat and alerts column', () => {
@@ -714,18 +720,23 @@ describe('viewer-only mode drives every binding the reference gives it', () => {
     expect(SHARE_COMPILED.replace(/\s+/g, '')).toContain(
       '!o.isConnected||(o.isPresentingThisScreen&&!o.localpreview)||o.mediaService.saveData'
     );
-    expect(stripComments(PANE)).toContain('{ hidden: stream === null || saveData');
+    expect(stripComments(PANE)).toContain(
+      'const pictureHidden = $derived(!connected || saveData);'
+    );
+    expect(stripComments(PANE)).toContain('{ hidden: pictureHidden,');
     // The class needs a rule, and this component's copy is scoped — hence its own style block.
     expect(PANE).toMatch(/\.hidden\s*\{\s*display:\s*none;/);
   });
 
-  it('does not reproduce `controls`, because upstream it can never be true', () => {
-    // `showControls = !1`, toggled only by a click on the element that carries
-    // `.webcamScreen { pointer-events: none }` — so the binding is permanently false upstream.
+  it('reproduces the captured controls binding and its only writer', () => {
+    // The reference initializes the flag false, binds it to the video, and toggles it on the
+    // video click. The captured pointer-events rule is retained as part of the same contract.
     expect(SHARE_COMPILED).toContain('(this.showControls = !1)');
     expect(SHARE_COMPILED).toContain('o.showControls = !o.showControls');
     expect(SHARE_COMPILED).toContain('pointer-events:none');
-    expect(stripComments(PANE)).not.toMatch(/<video[^>]*\scontrols/);
+    expect(stripComments(PANE)).toContain('controls={showControls}');
+    expect(stripComments(PANE)).toContain('onclick={() => (showControls = !showControls)}');
+    expect(stripComments(PANE)).toContain('pointer-events: none');
   });
 
   it('and every one of those classes is painted by the sheet this app serves', () => {

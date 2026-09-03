@@ -356,7 +356,7 @@ describe('MTS-07 — the two cogs do the same three things', () => {
   });
 });
 
-describe('MTS-03 — the Recordings pane is an iframe onto the archive service', () => {
+describe('MTS-03 — recordings remain reference-compatible without exposing the legacy token URL', () => {
   /*
     The row lists three structural steps to unblock this tab. They are real and they are not the
     blocker: the pane those steps would create is one `<iframe>` whose `src` is the archive
@@ -406,15 +406,22 @@ describe('MTS-03 — the Recordings pane is an iframe onto the archive service',
     expect(register.split('sessions/v2/archives/recordings').length - 1).toBe(6);
   });
 
-  it('and NOTHING here is built toward it, which is what makes waiting correct', () => {
-    /*
-      The negative half. Adding the type member, the settings wire, the tab and the pane before the
-      service exists is scaffolding — four things that compile and cannot work — and the pane would
-      iframe a 404 carrying a session token, which is the objection `G01` already records.
-    */
+  it('is now backed by a first-party archive surface and authenticated media route', () => {
     const types = readFileSync('src/lib/types.ts', 'utf8');
-    expect(types, "MainTab gained 'recordings' — is the archive service live?").not.toContain(
-      "| 'recordings'"
-    );
+    const strip = readFileSync('src/lib/components/MainTabStrip.svelte', 'utf8');
+    const recordingTab = readFileSync('src/lib/components/RecordingTab.svelte', 'utf8');
+    const pane = readFileSync('src/lib/components/RecordingArchivePane.svelte', 'utf8');
+    const media = readFileSync('src/routes/recordings/[id]/media/+server.ts', 'utf8');
+
+    expect(types).toContain("| 'recordings'");
+    expect(strip).toContain('<RecordingTab {recordingsVisible} bind:mainTab />');
+    expect(recordingTab).toContain("mainTab = 'recordings'");
+    expect(pane).toContain('src={row.mediaUrl}');
+    expect(media).toContain('requireRecordingAccess');
+    expect(media).toContain("'cache-control': 'private, max-age=3600'");
+
+    /* The legacy reference leaked its bearer token in an iframe URL. The replacement must not. */
+    expect(pane).not.toContain('sessionToken');
+    expect(pane).not.toContain('sessions/v2/archives/recordings');
   });
 });

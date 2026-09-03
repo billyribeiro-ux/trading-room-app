@@ -1,10 +1,11 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
 import { roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { readSettings } from '#lib/server/rooms.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
+import { redirectToConfiguredLocation } from '#lib/server/configured-redirect.js';
 import { guestHandoffToken, handoffUrl } from '#lib/server/room-handoff.js';
 import { evaluateEntitlement } from '#lib/server/sso-entitlement.js';
 import { resolveMaxTokenAge, verifySsoToken, type SsoRejection } from '#lib/server/sso-token.js';
@@ -92,7 +93,7 @@ export const GET: RequestHandler = async ({ params, url, getClientAddress }) => 
     });
 
     const target = typeof settings.loginErrorURL === 'string' ? settings.loginErrorURL.trim() : '';
-    if (target) redirect(303, target);
+    if (target) redirectToConfiguredLocation(target);
 
     const message = typeof settings.loginErrorMsg === 'string' ? settings.loginErrorMsg.trim() : '';
     error(403, message || REFUSAL);
@@ -227,5 +228,5 @@ export const GET: RequestHandler = async ({ params, url, getClientAddress }) => 
   );
   if (!target) error(500, 'This room is not available right now.');
 
-  redirect(303, target.toString());
+  redirectToConfiguredLocation(target);
 };

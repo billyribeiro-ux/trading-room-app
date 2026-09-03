@@ -1887,30 +1887,13 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     file: 'lib/components/AlertSendReportModal.svelte',
     /*
       The Alert Sent Report modal, lifted out of `ModalHost.svelte` on 2026-08-30 when RPT-01
-      through RPT-08 were dispositioned.
-
-      **It is ninety percent argument and ten percent markup, and that ratio is the reason it is a
-      file.** Six of upstream's controls for this surface — the fetch, the per-status rows, the
-      search box, the status select, the flot pie and the token dialog — all rest on a list of
-      per-recipient DELIVERY RECORDS. This product has none: 24 tables and not one records a
-      delivery, `alerts.dispatch` is five booleans naming which channels were requested rather than
-      what happened, no mail transport exists in the room at all and the controller's has no alert
-      caller, and `getAlertReport` has no server half anywhere in `apps/`. That measurement is what
-      the file mostly contains.
-
-      It renders one sentence. Somebody will one day decide to build the six controls, and they will
-      stand exactly here when they do — which is the whole argument for the explanation living with
-      the surface rather than in the host that opens it.
-    */
-    /*
-      165 -> 162, 2026-08-31. ASR-1/2/3 added an eight-line pointer and the argument itself went to
-      `alert-report-modal-contract.test.ts`: the reference stylesheet's thirteen rules, the
-      self-referential `aria-labelledby` shared by ten of this room's twenty-two dialogs, and the
-      focus-on-open that is one line of `Modal.svelte` away. Eleven lines of prose left the file
-      with them.
+      through RPT-08 were dispositioned. The original no-ledger refusal ended on 2026-09-03: the
+      controller now owns dispatch and attempt ledgers, and the room owns a transactional outbox.
+      This file owns request cancellation and modal states; the report body is extracted because
+      filtering, status aggregation and recipient rows are one independently bounded surface.
     */
     max: 162,
-    why: 'the alert-report modal — one honest notice, and the measurement that decided against six controls'
+    why: 'the authenticated alert-report request lifecycle and modal state machine'
   },
   {
     file: 'lib/components/LogArchiveModals.svelte',
@@ -5776,23 +5759,9 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       join-with-spaces wrong.
     */
     /*
-      851 -> 874, 2026-09-02, and no code changed: PAM-17's disposition, plus a DEFECT found while
-      writing it that neither the audit nor the re-triage names.
-
-      The refusal holds and is re-measured rather than inherited: `dontPush` would instruct a
-      downstream that does not exist — nothing in `services/api` reads a dispatch flag and no Twilio,
-      Resend, SendGrid, APNs or Firebase client is in it, asserted in
-      `alert-report-modal-contract.test.ts` — and `scheduled-alerts.remote.ts` refuses six of the
-      reference's twelve payload fields on the same ground.
-
-      **What that argument never covered is the CHECKBOX.** `PostAlertModal.svelte` renders one, the
-      value is threaded through `submission.dontPush` into `#persistAlert`, and it dies there. A
-      presenter ticks "don't push" and the room records nothing and says nothing. No disposition list
-      names it: `INERT_ACTIONS` covers the user-action dispatcher, not a modal's own checkboxes.
-
-      The note ends with two coherent endings and takes neither, because both are the owner's — stop
-      rendering a control the capture has, or store an intention nothing performs. The sentence it
-      replaced, *"has no consumer in this room yet"*, is what let the checkbox hide behind the field.
+      851 -> 874 on 2026-09-02 recorded that `dontPush` died in this class. Closed 2026-09-03: both
+      delivery suppressions now cross this single content boundary into the room's durable outbox;
+      `dontCrossPost` continues through retries and scheduled occurrences to controller fan-out.
     */
     max: 874,
     why: 'everything that leaves the browser as content; five entry points, one refusal path'
@@ -9694,6 +9663,36 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 192,
     why: 'RMSG-01..06: where app-st-message and app-st-compactmessage disagree, with the consumers beside the measurements'
+  },
+  {
+    file: 'lib/components/AlertDeliveryReportBody.svelte',
+    max: 200,
+    why: 'the delivery summary, status/search controls, and authoritative per-recipient ledger rows'
+  },
+  {
+    file: 'lib/components/DiscordSettingsPane.svelte',
+    max: 103,
+    why: 'the presenter-only Discord OAuth status, connect and unlink state machine'
+  },
+  {
+    file: 'lib/components/PublicPlayerPane.svelte',
+    max: 120,
+    why: 'the one-time public-player grant lifecycle and read-only player link surface'
+  },
+  {
+    file: 'lib/components/RecordingTab.svelte',
+    max: 32,
+    why: 'the reference recordings tab, its entitlement gate, and roving-tabindex behavior'
+  },
+  {
+    file: 'lib/components/RecordingArchivePane.svelte',
+    max: 331,
+    why: 'the paginated recording catalog, authenticated playback, transcript snapshot and delete flow'
+  },
+  {
+    file: 'routes/player/[room]/+page.svelte',
+    max: 77,
+    why: 'the capability-authenticated screenshare-only public player page'
   }
 ];
 

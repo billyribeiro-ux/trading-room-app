@@ -22,18 +22,8 @@ import { describe, expect, it } from 'vitest';
  * The `Trial` badge is the live half — `isTrial` HAS a supply — so a member who opened another
  * member's info card could read their billing status.
  *
- * ## Why the third term is NOT added, and why that is not an oversight
- *
- * `isNewIndicatorOn` stays off `ROOM_VISIBLE_SETTINGS` because **`isNew` has no supply**. Upstream
- * it arrives on the login payload from the reference's own server —
- * `globals.user.isNew = B.data.isNew` (byte 995,175) and `isNew: s.isNew || !1` (1,157,344) — and
- * that server is not in the capture, so the rule deciding who counts as new is unknowable. Measured
- * rather than assumed: `isNew` occurs zero times in `apps/room/src/lib/server` and zero times on the
- * controller.
- *
- * A gate with nothing to gate is not a consumer. `enableBadges` was held out of the boundary on
- * exactly this reasoning while `item.badges` was empty, and `missing-settings-triage.md` now carries
- * `isNewIndicatorOn` as BLOCKED rather than as a cheap WIRE.
+ * The controller now derives `isNew` from immutable membership creation time using a documented
+ * thirty-day window. The room receives that server-owned fact and applies all three terms.
  */
 const modalHost = readFileSync(new URL('./components/ModalHost.svelte', import.meta.url), 'utf8');
 
@@ -43,7 +33,7 @@ describe('the user-info badges', () => {
   });
 
   it('shows the New badge to presenters only', () => {
-    expect(modalHost).toContain('{#if isPresenter && targetUser.isNew}');
+    expect(modalHost).toContain('{#if showNewIndicator && isPresenter && targetUser.isNew}');
   });
 
   /*
@@ -56,13 +46,13 @@ describe('the user-info badges', () => {
   });
 });
 
-describe('the setting behind the New badge stays uncrossed', () => {
-  it('is absent from the room boundary, because its data has no supply', () => {
+describe('the setting behind the New badge has an authoritative supply', () => {
+  it('crosses the room boundary now that its data has a consumer', () => {
     const boundary = readFileSync(
       new URL('../../../controller/src/lib/room-config.ts', import.meta.url),
       'utf8'
     );
-    expect(boundary).not.toContain("'isNewIndicatorOn'");
+    expect(boundary).toContain("'isNewIndicatorOn'");
   });
 
   /*
@@ -71,16 +61,16 @@ describe('the setting behind the New badge stays uncrossed', () => {
     disposition is a claim about the repository, and a claim about the repository should be checked
     by reading the repository.
   */
-  it('and `isNew` still has no server-side supply', () => {
+  it('derives and transports `isNew` on server-owned membership data', () => {
     const serverFiles = [
       '../lib/server/room-events.ts',
       '../lib/server/room-config-client.ts',
-      '../../../controller/src/lib/room-config.ts'
+      '../../../controller/src/routes/internal/room-config/[code]/+server.ts'
     ];
     for (const file of serverFiles) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');
       const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-      expect(withoutComments, `${file} has begun supplying isNew`).not.toMatch(/\bisNew\b/);
+      expect(withoutComments, `${file} must participate in the isNew supply`).toMatch(/\bisNew\b/);
     }
   });
 });

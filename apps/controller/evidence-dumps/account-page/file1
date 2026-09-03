@@ -1,0 +1,86 @@
+<div class="tab-pane ng-scope active" ng-repeat="tab in tabs" ng-class="{active: tab.active}" tab-content-transclude="tab">
+
+                        <fieldset class="ng-scope">
+
+                            <div class="form-group ">
+                                <div class="col-sm-4 pull-left">
+
+                                              <div>
+                                                <p class="form-control-static">
+                                                        <label class="col-sm-4 control-label">Start Date:</label>
+                                                        <a href="#" editable-date="statsDate" class="ng-scope ng-binding editable editable-click">07-31-2026</a>
+                                                        <br><label class="muted">Choose a start date</label>
+                                                </p>
+                                                <p class="form-control-static">
+                                                        <label class="col-sm-4 control-label">End Date:</label>
+                                                        <a href="#" editable-date="statsDateEnd" class="ng-scope ng-binding editable editable-click">08-01-2026</a>
+                                                        <br><label class="muted">Choose an end date</label>
+                                                </p>
+                                              </div>
+
+                                            <button class="btn btn-md btn-info" ng-click="loadStats(statsDate,statsDateEnd,uSearchStat,filterFT,remDupes,showMobileStat)"><i class="fa fa-user-plus" aria-hidden="true"></i> Load Stats</button>
+                                            <button class="btn btn-md btn-info" ng-click="exportStatsToCSV(statsDate)"><i class="fa fa-floppy-o" aria-hidden="true"></i> Export</button>
+                                            <button class="btn btn-md btn-info" ng-click="loadMontlyStats(statsDate,statsDateEnd,false)" ng-show="statXrefsMontly.length===0"><i class="fa fa-users" aria-hidden="true"></i> Monthly report for date range</button>
+                                            <button class="btn btn-md btn-info ng-hide" ng-click="loadMontlyStats(statsDate,statsDateEnd,true)" ng-show="statXrefsMontly.length&gt;0"><i class="fa fa-trash" aria-hidden="true"></i> Clear monthly report</button>
+                                            <button class="btn btn-md btn-info ng-hide" ng-click="downloadMontlyStats(statXrefsMontly)" ng-show="statXrefsMontly.length&gt;0"><i class="fa fa-download" aria-hidden="true"></i> Download monthly report</button>
+                                </div>
+
+
+                            </div>
+                            <div ng-show="statXrefs.length&gt;0 || true">
+                            <label class="col-sm-2 control-label ">Search Users</label>
+                            <div class="col-sm-4">
+                                <input type="search " name="title " required=" " class="form-control  ng-pristine ng-untouched ng-invalid ng-invalid-required" ng-model="uSearchStat "><br>
+                                <label>
+                                        <input type="checkbox" ng-model="filterOnline" class="ng-pristine ng-untouched ng-valid">&nbsp;Show Online Users Only
+                                </label>
+                                <label>
+                                    <input type="checkbox" ng-model="filterFT" class="ng-pristine ng-untouched ng-valid">&nbsp;Show <span class="badge badge-danger">Free Trials</span> Only?
+                                </label>
+                                 <label>
+                                    <input type="checkbox" ng-model="showMobileStat" class="ng-pristine ng-untouched ng-valid">&nbsp;Show Mobile Only?
+                                </label>
+                                <label>
+                                    <input type="checkbox" ng-model="remDupes" class="ng-pristine ng-untouched ng-valid">&nbsp;Remove duplicates?
+                                </label>
+
+                            </div>
+
+                            </div>
+
+                        </fieldset>
+                            <h3 ng-hide="statXrefs.length&gt;0 || statXrefsMontly.length&gt;0" class="ng-scope">No results to show. Select a date above...</h3>
+                            <div ng-show="loadingUsersStats" class="ng-scope ng-hide">
+                                <div id="chatLogLoading" style="padding: 25px; text-align: center;" class="div">
+                  <img src="app/img/ajax_loader.gif">
+                  <label>&nbsp;&nbsp;Loading...</label>
+                </div>
+                            </div>
+
+                             <div ng-show="!loadingUsersStats &amp;&amp; statXrefsMontly.length&gt;0" class="ng-scope ng-hide">
+                                <h4>Monthly report: <strong class="ng-binding"></strong> - Total Logins: <strong class="ng-binding">0</strong></h4>
+                                 <table class="table table-striped">
+                                        <tbody><!-- ngRepeat: montlyStat in statXrefsMontly -->
+
+                                </tbody></table>
+                             </div>
+
+
+                            <table class="table table-striped  ng-scope ng-hide" ng-show="!loadingUsersStats &amp;&amp; statXrefs.length&gt;0">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Nick</th>
+                                        <th>Email / IP</th>
+                                        <th>Time Stamps <a href="" ng-click="reverseStatSort()">Reverse</a></th>
+                                        <th>Duration (Hours)</th>
+
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- ngRepeat: userStat in statXrefs | filter: uSearchStat -->
+                                </tbody>
+                            </table>
+
+
+                    </div>

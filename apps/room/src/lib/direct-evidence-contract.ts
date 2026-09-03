@@ -108,14 +108,15 @@ export const DIRECT_EVIDENCE_CONTRACT = {
     urlSchemeError: 'The link seems to be missing "https://" or "http://"',
     uploadPath: '{upload_server}/image/{sessionID}',
     uploadAuthorization: 'Client-ID {cdn_upload_key}',
-    visibleFlags: ['keepOpen', 'postOnX', 'dontPush', 'nonTradeAlert', 'legalDisclosure'],
-    hiddenCapabilityBranches: [
-      'sendText',
-      'alertLabels',
+    visibleFlags: [
+      'keepOpen',
+      'postOnX',
+      'dontPush',
       'dontCrossPost',
-      'sendLater',
-      'scheduledAlerts'
+      'nonTradeAlert',
+      'legalDisclosure'
     ],
+    hiddenCapabilityBranches: ['sendText', 'alertLabels', 'sendLater', 'scheduledAlerts'],
     presenterHeaderActions: ['Poll', 'Post Alert'],
     idleToastHost: true
   },

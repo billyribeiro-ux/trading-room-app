@@ -9,7 +9,7 @@
  * The mirror image of the controller's `ROOM_BASE_URL`, and blank by the same logic: a room that
  * has not been told where its controller is should say so rather than guess at a hostname.
  */
-import { redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { CONTROL_BASE_URL } from '$app/env/private';
 
 /*
@@ -90,6 +90,21 @@ export function redirectSignedOut(status: 303 | 307 = 303): never {
   redirect(status, signedOutDestination(), { external: origin ? [origin] : false });
 }
 
+/** Redirect to an owner-configured error page while permitting only its exact HTTP(S) origin. */
+export function redirectToConfiguredLocation(location: string): never {
+  let absolute: URL | null = null;
+  try {
+    absolute = new URL(location);
+  } catch {
+    if (location.startsWith('//')) error(500, 'Configured redirect is invalid.');
+  }
+  if (!absolute) redirect(303, location);
+  if (absolute.protocol !== 'http:' && absolute.protocol !== 'https:') {
+    error(500, 'Configured redirect is invalid.');
+  }
+  redirect(303, absolute, { external: [absolute.origin] });
+}
+
 /** The room's own configuration read: `GET {control}/internal/room-config/{shortCode}`. */
 export function roomConfigUrl(shortCode: string): string | null {
   const origin = controlPlaneOrigin();
@@ -117,6 +132,12 @@ export function mobilePinUrl(shortCode: string): string | null {
 export function mobileRestoreUrl(shortCode: string): string | null {
   const origin = controlPlaneOrigin();
   return origin ? `${origin}/internal/mobile-restore/${encodeURIComponent(shortCode)}` : null;
+}
+
+/** Durable alert push dispatch and its presenter-facing delivery report. */
+export function alertDeliveryUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/alert-delivery/${encodeURIComponent(shortCode)}` : null;
 }
 
 /**
@@ -310,4 +331,16 @@ export function streamIngestUrl(shortCode: string): string | null {
 export function streamReadUrl(shortCode: string): string | null {
   const origin = controlPlaneOrigin();
   return origin ? `${origin}/internal/stream-read/${encodeURIComponent(shortCode)}` : null;
+}
+
+/** A five-minute MediaMTX read token for a locally validated public-player grant. */
+export function publicStreamReadUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/public-stream-read/${encodeURIComponent(shortCode)}` : null;
+}
+
+/** Presenter-scoped Discord identity status, OAuth initiation, and unlinking. */
+export function discordIntegrationUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/discord/${encodeURIComponent(shortCode)}` : null;
 }

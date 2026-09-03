@@ -4,8 +4,8 @@ import { count, desc, eq } from 'drizzle-orm';
 import { PUBLIC_SITE_ORIGIN } from '$app/env/public';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
-import { badges, roomSessions, roomUsers, rooms } from '#lib/server/db/schema.js';
-import { requireOwnedRoom, requireUser } from '#lib/server/auth.js';
+import { adminAudit, badges, roomSessions, roomUsers, rooms, users as accountUsers } from '#lib/server/db/schema.js';
+import { requireOwnedRoom, requireUser, verifyPassword } from '#lib/server/auth.js';
 import {
   MANY_OPCODES,
   PERMISSION_KEYS,
@@ -435,7 +435,8 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
      * reference builds it. Not a stored setting — it is derived, so it is
      * computed rather than kept in the settings blob where it could go stale.
      */
-    wordpressShortcode: `[protradingroom room='${publicId}' key='' link_text='Enter Room' mode='urlv3']`,
+    /* Credentials are returned only by the password-reauthenticated reveal action below. */
+    wordpressShortcode: null as string | null,
     /** the account's badges, for the row menu's Badges submenu */
     badges: await getDb().select().from(badges).where(eq(badges.accountId, user.accountId)),
     // Sent once, used by every tab that renders fields.
@@ -531,6 +532,54 @@ function failFor(e: unknown) {
 }
 
 export const actions: Actions = {
+  /**
+   * Reveal copyable integration credentials only after current-password reauthentication.
+   * Every outcome is appended to the audit trail and no credential value is written to it.
+   */
+  revealIntegrationCredentials: async ({ request, params, locals, url, getClientAddress }) => {
+    const roomId = await ownedRoomId(locals, params.id);
+    const actor = requireUser(locals);
+    const [accountUser] = await getDb()
+      .select({ passwordHash: accountUsers.passwordHash })
+      .from(accountUsers)
+      .where(eq(accountUsers.id, actor.id))
+      .limit(1);
+    const password = String((await request.formData()).get('password') ?? '');
+    const accepted = Boolean(accountUser && verifyPassword(password, accountUser.passwordHash));
+    await getDb()
+      .insert(adminAudit)
+      .values({
+        userId: actor.id,
+        outcome: accepted ? 'granted' : 'refused',
+        path: url.pathname,
+        remoteIp: getClientAddress(),
+        action: 'reveal-room-integration-credentials',
+        targetAccountId: actor.accountId,
+        reason: `room:${params.id}`,
+        createdAt: new Date()
+      });
+    if (!accepted) return fail(403, { message: 'Your current password was not accepted.' });
+
+    const [room] = await getDb().select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
+    const settings = await readSettings(roomId);
+    const publicId = room.publicId ?? String(room.id);
+    const ssoSecret = String(settings.ssoJWTSecret ?? '');
+    const pairSecret = String(settings.pairSecretKey ?? '');
+    if (!ssoSecret) return fail(409, { message: 'Set SSO JWT Secret before revealing a shortcode.' });
+    if (ssoSecret.includes("'")) {
+      return fail(409, { message: 'SSO JWT Secret may not contain an apostrophe when used in a shortcode.' });
+    }
+    const origin = siteOrigin(url);
+    return {
+      credentialBundle: {
+        wordpressShortcode: `[protradingroom room='${publicId}' key='${ssoSecret}' link_text='Enter Room' mode='urlv3']`,
+        appPairUrl:
+          settings.hasAppPairLink === true && pairSecret
+            ? `${origin}/ptr_app/sessions/v2/addUser/${encodeURIComponent(publicId)}/?sec=${encodeURIComponent(pairSecret)}&email=__userEmail__&name=__userName__`
+            : null
+      }
+    };
+  },
   /** `resetMaxCount()` — clears the room's high-water mark, not its members. */
   /**
    * `resetMaxCount()` — clears the occupancy HIGH-WATER MARK.
@@ -986,7 +1035,28 @@ export const actions: Actions = {
        * which is a stored-XSS hole; ours is sanitised against an allowlist on
        * the way IN, on the server, because the action is reachable with curl.
        */
-      const cleaned = name === 'description' && raw !== null ? sanitizeHtml(String(raw)) : raw;
+      let cleaned = name === 'description' && raw !== null ? sanitizeHtml(String(raw)) : raw;
+      if (name === 'linkedRoomAlerts' && raw !== null) {
+        const text = String(raw).trim();
+        if (text && !/^\d+(?:\s*,\s*\d+)*$/.test(text)) {
+          return fail(400, { message: 'Linked rooms must be a comma-separated list of numeric room IDs.' });
+        }
+        const ids = Array.from(new Set(text ? text.split(',').map((value) => Number(value.trim())) : []));
+        if (ids.length > 20) {
+          return fail(400, { message: 'At most 20 linked rooms may receive an alert.' });
+        }
+        if (ids.includes(roomId)) {
+          return fail(400, { message: 'A room cannot link alerts back to itself.' });
+        }
+        const allowedIds = new Set(await accountRoomIds(roomId));
+        const outsideAccount = ids.filter((id) => !allowedIds.has(id));
+        if (outsideAccount.length > 0) {
+          return fail(400, {
+            message: `These linked rooms do not belong to this account: ${outsideAccount.join(', ')}.`
+          });
+        }
+        cleaned = ids.join(',');
+      }
       const value = await saveSetting(roomId, name, cleaned === null ? null : String(cleaned));
       return { saved: name, value };
     } catch (e) {

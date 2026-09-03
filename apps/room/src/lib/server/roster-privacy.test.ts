@@ -271,6 +271,8 @@ describe('the roster payload is an EXACT key set, per role', () => {
     'id',
     // `r.isFT` — the "Only select from Trials?" filter on the random draw.
     'isFT',
+    // Controller-derived membership age, used only by presenter-facing New markers.
+    'isNew',
     // `r.isP` — four gates read the presenter flag off the ENTRY rather than off `role`.
     'isP',
     // Presenter-only. The city line, resolved by the browser and posted back after subscribe.

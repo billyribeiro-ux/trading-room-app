@@ -156,6 +156,9 @@ export function readUserDetail(room: string, userId: number): UserDetail | null 
     email: row.email,
     loggedIn: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
     ip: connection?.address ?? null,
-    userAgent: connection?.userAgent ?? null
+    userAgent: connection?.userAgent ?? null,
+    appVersion: connection?.appVersion ?? null,
+    streamServer: connection?.streamServer ?? null,
+    serverId: connection?.serverId ?? null
   };
 }

@@ -103,13 +103,11 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
  * asking whether the room allowed it. `hasTypingIndicator` joined on the same day and gates the SEND
  * as well as the display.
  *
- * `hasAlertScheduler` left last on 2026-08-28, and `smallerImagePreview` (USM-18) left on 2026-09-02
- * — which is why "the LAST buildable row" is a claim this file no longer makes about a date. What
- * remains is `enableDiscord`, and its blocker is TWO things rather than one, re-read 2026-09-02: a
- * Discord application registration (nothing to link accounts to until one exists) AND the
- * `/discord/v2/status` and `/discord/v2/auth/start` endpoints it would be reached through, at bundle
- * bytes 1,160,297 and 1,160,186. The client half alone is a presenter-only control whose single
- * action is a request that 404s. `hasAlertScheduler`'s own blocker named
+ * `hasAlertScheduler` left last on 2026-08-28, `smallerImagePreview` (USM-18) left on 2026-09-02,
+ * and `enableDiscord` left on 2026-09-03 with an OAuth state ledger, controller-owned callback,
+ * capability-scoped start/status/unlink endpoints and a presenter-only room control. Production
+ * registration remains deployment configuration, not an absent application path.
+ * `hasAlertScheduler`'s own blocker named
  * the wrong process: *"a scheduler process in `services/api`, and the crate's TEST targets cannot
  * build here."* Both halves are true of that crate and neither is a reason to put the scheduler in
  * it. The reference's scheduler is its own Node server; this stack's long-lived Node process is the
@@ -179,7 +177,6 @@ import { auditSettingCoverage } from '../../gate/audit-setting-coverage.mjs';
 const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'deleteAlertPW',
   'allRoomsWelcomeMatPW',
-  'isNewIndicatorOn',
   /*
     `openLoginLink` LEFT THIS LIST on 2026-09-03, and it was the ONE of the nineteen that was work.
 
@@ -194,14 +191,14 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
     second is a real upstream defect and it shaped the build rather than blocking it: the call is in
     the page's `onMount`, so it fires ONCE and the extra column cannot double it.
 
-    That leaves EIGHTEEN, and what the sweep found about the rest is worth as much as the build.
+    That leaves the genuinely non-crossing settings, and what the sweep found about them is worth
+    as much as the build.
     Three are UNREACHABLE UPSTREAM — `advancedSearchAlerts` is gated on a hardcoded owner id,
     `h264Enabled` is read as `|| !0` so the setting cannot change the value it feeds, and
     `playChatMessageSoundFor` is a declared refusal. Seven are the credentials. Four wait on a host
     or a service. Three travel as a question instead of a value. One waits on the owner.
   */
   'authMode',
-  'enableDiscord',
   /*
     `isLocked` LEFT THIS LIST on 2026-09-02, and its blocker was a SHAPE rather than evidence.
 
@@ -255,13 +252,9 @@ const REFERENCE_READS_AND_WE_DO_NOT: readonly string[] = [
   'description',
   'needPasswordForUserNotes',
   'obsStreamKey',
-  'recordChat',
-  'recsInRoom',
   'advancedSearchAlerts',
-  'backupClusterID',
   'banIPList',
   'h264Enabled',
-  'linkedRoomAlerts',
   'modAdminLoginList',
   'twillioApiSID'
 ];

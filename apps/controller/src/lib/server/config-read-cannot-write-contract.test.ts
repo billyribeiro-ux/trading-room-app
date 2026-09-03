@@ -203,8 +203,10 @@ describe('every internal route verifies the credential its job needs', () => {
     'room-welcome-mat-auth',
     'mobile-pin',
     'mobile-restore',
+    'public-stream-read',
     'stream-read'
   ];
+  const METHOD_SCOPED = ['alert-delivery', 'discord'];
 
   it.each(WRITES)('%s verifies a WRITE capability', async (route) => {
     const source = await sourceOf(route);
@@ -216,6 +218,12 @@ describe('every internal route verifies the credential its job needs', () => {
     const source = await sourceOf(route);
     expect(source).toContain('verifyConfigReadToken');
     expect(source).not.toContain('verifyConfigWriteToken(');
+  });
+
+  it.each(METHOD_SCOPED)('%s separates its read and write methods', async (route) => {
+    const source = await sourceOf(route);
+    expect(source).toContain('verifyConfigReadToken');
+    expect(source).toContain('verifyConfigWriteToken');
   });
 
   /*
@@ -278,7 +286,7 @@ describe('every internal route verifies the credential its job needs', () => {
       `media-auth` is the one route with no MAC at all, deliberately and by its own docblock, so it
       is named here rather than silently missing from both lists.
     */
-    expect(onDisk).toEqual([...WRITES, ...READS, 'media-auth'].sort());
+    expect(onDisk).toEqual([...WRITES, ...READS, ...METHOD_SCOPED, 'media-auth'].sort());
   });
 });
 

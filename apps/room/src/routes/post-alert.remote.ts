@@ -7,6 +7,7 @@ import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { alerts } from '#lib/server/db/schema.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
 import { publishToRoom } from '#lib/server/room-events.js';
+import { enqueueAlertDelivery } from '#lib/server/alert-delivery-outbox.js';
 
 /*
   Posting an alert — the presenter act the whole room is watching for.
@@ -37,12 +38,8 @@ import { publishToRoom } from '#lib/server/room-events.js';
  * test plus the room, returned only after it passes, so "who may post" and "which room they post
  * into" are one decision instead of two that can be applied separately.
  *
- * ## `dontPush` is sent and not read, and that is unchanged
- *
- * The client sets it; the action never looked at it and neither does this. It is left OUT of the
- * schema rather than accepted and ignored — a `z.strictObject` refusing it is honest about the fact
- * that nothing here consumes it, where accepting it would imply something does. What it is FOR
- * (suppressing the push notification) has no consumer in this room yet.
+ * The alert row and its delivery-outbox row commit together. This is what makes `dontPush` an
+ * operative suppression and prevents a controller outage between two writes from losing a send.
  */
 export const postAlert = command(
   z.strictObject({
@@ -53,9 +50,11 @@ export const postAlert = command(
     kind: z.enum(['text', 'url', 'media']),
     body: z.string().min(1).max(MAX_ALERT_BODY),
     targetUrl: z.string().nullable().optional(),
-    nonTradeAlert: z.boolean()
+    nonTradeAlert: z.boolean(),
+    dontPush: z.boolean().optional(),
+    dontCrossPost: z.boolean().optional()
   }),
-  async ({ kind, body, targetUrl, nonTradeAlert }) => {
+  async ({ kind, body, targetUrl, nonTradeAlert, dontPush = false, dontCrossPost = false }) => {
     ensureDatabase();
     const { locals } = getRequestEvent();
     const user = requireUser(locals);
@@ -75,20 +74,32 @@ export const postAlert = command(
 
     const room = presenterRoom();
 
-    const inserted = db
-      .insert(alerts)
-      .values({
-        // `/sess/${sessionID}/alerts/` — an alert belongs to one room.
+    const now = new Date();
+    const inserted = db.transaction((transaction) => {
+      const row = transaction
+        .insert(alerts)
+        .values({
+          // `/sess/${sessionID}/alerts/` — an alert belongs to one room.
+          roomShortCode: room,
+          senderId: user.id,
+          kind,
+          body,
+          targetUrl: kind === 'media' ? (targetUrl ?? null) : null,
+          nonTrade: nonTradeAlert,
+          createdAt: now
+        })
+        .returning()
+        .get();
+      if (!row) error(500, 'The alert could not be stored.');
+      enqueueAlertDelivery(transaction, {
+        alertId: row.id,
         roomShortCode: room,
-        senderId: user.id,
-        kind,
-        body,
-        targetUrl: kind === 'media' ? (targetUrl ?? null) : null,
-        nonTrade: nonTradeAlert,
-        createdAt: new Date()
-      })
-      .returning()
-      .get();
+        dontPush,
+        dontCrossPost,
+        now
+      });
+      return row;
+    });
 
     publishToRoom(room, {
       channel: 'alerts',

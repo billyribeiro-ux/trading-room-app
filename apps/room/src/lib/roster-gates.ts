@@ -17,6 +17,7 @@ export interface RosterSessionFlags {
   showOnlyUsernames?: boolean;
   showArchivesToUsers?: boolean;
   showArchivesToSpecificPresenters?: string[] | null;
+  isNewIndicatorOn?: boolean;
 }
 
 /** The connected account, as `globals.user` plus `globals.isPresenter`. */

@@ -3,6 +3,7 @@ export type MainTab =
   | 'screens'
   | 'streams'
   | 'notes'
+  | 'recordings'
   | 'videoplayer'
   | 'files'
   /** `presAreaTabs-swingAlerts`. Present only in rooms with `hasSwingTradeAlerts`. */
@@ -43,7 +44,7 @@ export type FileTab = 'files' | 'images' | 'sounds';
  * list arrives with the page as `data.chatTabs`, already decided.
  */
 export type ChatChannelName = string;
-export type SettingsTab = 'app' | 'alerts' | 'chat' | 'presenter';
+export type SettingsTab = 'app' | 'alerts' | 'chat' | 'presenter' | 'discord';
 export type AlertTab = 'text' | 'url' | 'media';
 
 /**
@@ -96,9 +97,9 @@ export interface ModalTargetUser extends ManagedChatUser {
   */
   ip?: string | null;
   userAgent?: string | null;
-  appVersion?: string;
-  streamServer?: string;
-  serverId?: string;
+  appVersion?: string | null;
+  streamServer?: string | null;
+  serverId?: string | null;
   permissions?: 'r' | 'a' | string;
   isTrial?: boolean;
   isNew?: boolean;

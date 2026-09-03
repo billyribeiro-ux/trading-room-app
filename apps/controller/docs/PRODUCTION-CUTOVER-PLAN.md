@@ -95,9 +95,9 @@ permit real signup, login, account, room, API-key, or payment traffic.
       and `api/fixtures/seed.sql` loaded. 413 passed, 0 failed — 155 API library,
       126 API PostgreSQL integration, 9 release-attestor, 112 media library, 11
       media binary — plus full-workspace Clippy with warnings denied and
-      `pnpm quality` locally with 1204
-      Vitest tests, 20 Playwright tests across Chromium, Firefox, WebKit, and
-      responsive Chromium, and the Vercel production build. This is source-tree
+      `pnpm quality` locally with 1233
+      Vitest tests, 9 Playwright tests in Chromium, and the Vercel production
+      build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
       for the complete current-revision database suite.
 - [x] Obtain the first successful default-branch backend workflow result. Run

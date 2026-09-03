@@ -162,6 +162,8 @@ export type RoomMessageChrome = {
    * here.
    */
   readonly allowDeleteOwnMessage: boolean;
+  /** Whether presenter views display the server-derived NEW membership marker. */
+  readonly showNewIndicator: boolean;
 };
 
 /**
@@ -192,6 +194,7 @@ export interface MessageChromeSettings {
   readonly altChatRender?: boolean;
   readonly copyTrades?: boolean;
   readonly usersCanDeleteOwnMsgs?: boolean;
+  readonly isNewIndicatorOn?: boolean;
 }
 
 export interface MessageChromeSources {
@@ -269,6 +272,7 @@ export function buildMessageChrome(sources: MessageChromeSources): RoomMessageCh
     hideAvatars: settings?.hideAvatars === true,
     altChatRender: settings?.altChatRender === true,
     copyTrades: settings?.copyTrades === true,
-    allowDeleteOwnMessage: settings?.usersCanDeleteOwnMsgs === true
+    allowDeleteOwnMessage: settings?.usersCanDeleteOwnMsgs === true,
+    showNewIndicator: settings?.isNewIndicatorOn === true
   };
 }

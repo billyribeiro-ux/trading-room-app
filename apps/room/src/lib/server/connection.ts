@@ -16,6 +16,8 @@ interface ConnectedIdentity {
    * from somewhere the browser cannot edit.
    */
   roomShortCode: string | null;
+  /** Server-owned admission fact used by trial-specific room gates. */
+  isFreeTrial: boolean;
 }
 
 export function gravatarUrl(identity: string) {
@@ -52,7 +54,11 @@ function getSessionUser(sessionId: string | undefined) {
     single-use, unexpired token that `/session` has already verified.
   */
   return db
-    .select({ user: users, roomShortCode: sessions.roomShortCode })
+    .select({
+      user: users,
+      roomShortCode: sessions.roomShortCode,
+      isFreeTrial: sessions.isFreeTrial
+    })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(
@@ -140,7 +146,8 @@ export function resolveConnectedIdentity(cookies: Cookies): ConnectedIdentity {
   // from request headers, and no longer invents a guest user for anyone without a session: both
   // handed out a working `staff` identity to any caller, which made the role column meaningless and
   // left the room open to anyone who could reach it.
-  if (!user || !sessionId) return { user: null, sessionId: undefined, roomShortCode: null };
+  if (!user || !sessionId)
+    return { user: null, sessionId: undefined, roomShortCode: null, isFreeTrial: false };
 
   if (user.avatarUrl === '/avatar.svg') {
     user = db
@@ -158,7 +165,12 @@ export function resolveConnectedIdentity(cookies: Cookies): ConnectedIdentity {
 
   ensureSettings(user.id, now);
 
-  return { user, sessionId, roomShortCode: session?.roomShortCode ?? null };
+  return {
+    user,
+    sessionId,
+    roomShortCode: session?.roomShortCode ?? null,
+    isFreeTrial: session?.isFreeTrial === true
+  };
 }
 
 /**

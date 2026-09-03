@@ -1,6 +1,10 @@
 import { autoRecordAction, type AutoRecordTrigger } from '#lib/auto-record.js';
 import { startSpeechRecognition } from '#lib/media/speech-reco.js';
 import { chooseRecordingOptions } from '#lib/recording-codec.js';
+import {
+  RecordingArchiveLifecycle,
+  uploadRecordingArchive
+} from '#lib/recording-archive-client.js';
 
 import { recordingState } from '../../routes/recording-state.remote';
 
@@ -24,10 +28,6 @@ type RecordingTransition = Parameters<typeof recordingState>[0]['cmd'];
  * `scroll-follow.ts` are in `lib/room/` on the same footing, and the size contract caps plain `.ts`
  * modules for exactly that reason.
  *
- * Phase 5 slice 20: `MediaRecorder`, the preview window it opens, the room-wide broadcast that
- * tells everyone else a recording started, and the two speech-recognition calls that share the
- * recorder's audio source.
- *
  * **Speech recognition travels WITH the recorder rather than with the transport**, and the reason
  * is the microphone. `RoomMediaTransport` owns the track — acquiring one and producing it into the
  * SFU is a single act, which is why that class is one module — but recognition is not a second
@@ -35,11 +35,6 @@ type RecordingTransition = Parameters<typeof recordingState>[0]['cmd'];
  * events the recorder does, writes into the caption list rather than onto a producer, and reaches
  * the transport through the same injected reference every other feature uses. Putting it in the
  * transport would have meant a class that both publishes media and transcribes it.
- *
- * **The recorder's own state travels too**, all four fields: the `MediaRecorder`, the chunk list it
- * fills, the preview `Window` and the speech teardown. Every one of them was a page-level `let`
- * read by nothing outside these ten functions — measured, not assumed — so injecting them would
- * have been the shared-field pattern applied where nothing is shared.
  *
  * **The room learns a recording started from the SERVER, never from this flag.** `#recording` is
  * what this browser's own UI renders; `broadcastRecordingState` is what tells the room, and the
@@ -52,6 +47,7 @@ export class RoomRecording {
   #recordedScreenChunks: Blob[];
   #recPreviewWindow: Window | null;
   #stopSpeechReco: (() => void) | null;
+  #archive: RecordingArchiveLifecycle;
   constructor(options: {
     dialogs: RoomDialogs;
     media: RoomMedia;
@@ -88,6 +84,7 @@ export class RoomRecording {
      * that file's docblock for why a client-named speaker is refused in a transcript specifically.
      */
     recordTranscript: (line: { text: string; spokenAt: number }) => Promise<unknown>;
+    archiveRecording?: typeof uploadRecordingArchive;
   }) {
     this.#dialogs = options.dialogs;
     this.#media = options.media;
@@ -98,6 +95,14 @@ export class RoomRecording {
     this.#speechRecognitionAvailable = options.speechRecognitionAvailable;
     this.#autoRecordSettings = options.autoRecordSettings;
     this.#recordTranscript = options.recordTranscript;
+    this.#archive = new RecordingArchiveLifecycle(
+      options.archiveRecording ?? uploadRecordingArchive,
+      (cause) => {
+        console.error('recording archive upload failed', cause);
+        this.#dialogs.alert =
+          'The recording was downloaded locally, but the room archive upload failed.';
+      }
+    );
 
     this.#screenRecorder = null;
 
@@ -131,14 +136,9 @@ export class RoomRecording {
    * Server-side recording needs the recording/transcoding workers that the deployment plan defers,
    * so this records in the browser instead.
    *
-   * Three things were wrong with it:
-   *
-   *   1. SILENT. `getDisplayMedia({ audio: false })` means `screenStream` carries video only, so
-   *      every recording was a silent movie. The presenter's microphone is mixed in below.
-   *   2. UNREACHABLE. `media.recordedUrl` is only set by the recorder's `stop` event, which also
-   *      sets `media.recording` false - and the menu item that exposed it sat inside that branch.
-   *      It existed only at the moment it became invisible.
-   *   3. NEVER SAVED. A blob URL was created and nothing ever downloaded it.
+   * The original silent, unreachable and ephemeral output defects are all closed below: microphone
+   * audio is mixed in, the completed URL remains reachable, and the blob both downloads locally
+   * and uploads to the room archive.
    */
   startRecording() {
     if (
@@ -187,19 +187,20 @@ export class RoomRecording {
           return;
         }
         const type = this.#screenRecorder?.mimeType || 'video/webm';
-        this.#media.recordedUrl = URL.createObjectURL(
-          new Blob(this.#recordedScreenChunks, { type })
-        );
+        const blob = new Blob(this.#recordedScreenChunks, { type });
+        this.#media.recordedUrl = URL.createObjectURL(blob);
         this.downloadRecording();
+        this.#archive.finish(blob);
       },
       { once: true }
     );
     // A timeslice, so `dataavailable` fires periodically instead of only at stop. Without it a
     // recording lost to a crash or a closed tab is a recording with zero chunks.
     this.#screenRecorder.start(1000);
+    const recordingName = this.#archive.begin();
     this.#media.recording = true;
     // The room learns from the server, never from this flag - see `broadcastRecordingState`.
-    void this.#broadcastRecordingState('startRec', `room-recording-${new Date().toISOString()}`);
+    void this.#broadcastRecordingState('startRec', recordingName);
     this.#media.recordingPaused = false;
     this.#media.recordingReminder = true;
     this.#menus.set('recording', false);

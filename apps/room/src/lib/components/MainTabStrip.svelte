@@ -41,21 +41,18 @@
     `hideStreams`, at 1,955,678 — and `hideScreens` is not among them. Nothing writes it, ever. A
     prop and a `hidden` binding here would be a gate no caller could ever open, which is the
     "nothing exists without a consumer" rule pointed the other way.
+    `aria-selected` is derived here where the capture hardcodes it on all eight anchors; that
+    deliberate accessibility correction is enforced in `main-tab-strip-gates.svelte.test.ts`.
 
-    Two further departures — the absent `Recordings` tab and the fact that `aria-selected` is
-    DERIVED here where the capture hardcodes it on all eight anchors — are argued where they are
-    enforced, in `main-tab-strip-gates.svelte.test.ts`.
-
-    ## What it does NOT decide
-
-    Every gate arrives already decided. Nothing here reads `sessData`, opens a device or starts a
-    stream; `mainTab` is the only value it writes, and it is `$bindable` because that is what a tab
+    Nothing here reads `sessData` or opens a device; `mainTab` is the only value it writes, and it is
+    `$bindable` because that is what a tab
     strip is for.
 
     Every anchor's `tabindex={mainTab === … ? 0 : -1}` is a ROVING tabindex and the `0` half is
     load-bearing: it read `? undefined : -1` until 2026-08-31, which left every one of the seven
     `onkeydown` handlers below unreachable. Same file, same reason.
   */
+  import RecordingTab from '#lib/components/RecordingTab.svelte';
   import TabGearMenu from '#lib/components/TabGearMenu.svelte';
   import type { RoomBroadcasts } from '#lib/room/broadcasts.svelte.js';
   import type { RoomFiles } from '#lib/room/files.svelte.js';
@@ -95,6 +92,7 @@
     hideStreams: boolean;
     /** "Hide Notes Section?" ORed with viewer-only mode — see `RoomGates.notesHidden`. */
     hideNotes: boolean;
+    recordingsVisible?: boolean;
     /** The two dropdowns this strip owns, and the only state it toggles. */
     menus: RoomMenus;
     /** For the two `{@attach}` mount points on the notes and files dropdown menus. */
@@ -114,6 +112,7 @@
     canEditNotes,
     hideStreams,
     hideNotes,
+    recordingsVisible = false,
     menus,
     notes,
     broadcasts,
@@ -230,6 +229,7 @@
       </div>
     </a>
   </li>
+  <RecordingTab {recordingsVisible} bind:mainTab />
   <!--
     The captured gate, verbatim, on both the tab (slot 25, byte 2,016,864) and its
     pane (slot 47, byte 2,017,661):

@@ -140,6 +140,15 @@ describe('a second login evicts the first', () => {
     const id = createSessionFor(cookies, member.id, false, '1111');
     expect(cookies.get('ptr_connection')).toBe(id);
   });
+
+  it('stores trial admission on the session and clears it on a later paid entry', () => {
+    const trial = createSessionFor(jar(), member.id, false, '1111', true);
+    expect(db.select().from(sessions).where(eq(sessions.id, trial)).get()?.isFreeTrial).toBe(true);
+
+    const paid = createSessionFor(jar(), member.id, false, '1111', false);
+    expect(sessionStillAuthenticates(trial), 'newest-entry-wins still applies').toBe(false);
+    expect(db.select().from(sessions).where(eq(sessions.id, paid)).get()?.isFreeTrial).toBe(false);
+  });
 });
 
 describe('sessionStillAuthenticates', () => {

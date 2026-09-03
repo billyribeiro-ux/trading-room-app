@@ -1604,12 +1604,8 @@
               `O(3, e.hidePresentation ? -1 : 3)` (`app-room.render-helpers.js:1662`), whose flag is
               set by `(chatOnlyMode || sessData.isChatOnlyRoom)` (`app-room.full.js:1903-1904`).
 
-              The `co=1` half was already here and is unchanged in effect: the popout carries the
-              alerts and chat, so the presentation area is not rendered in it at all, which is what
-              stopped "Detach Alerts" opening a second copy of the entire room. What this adds is the
-              SECOND term - the room-wide "Chat Only Room?" setting - and the name upstream gives the
-              pair. They are one decision with two sources, and writing the mode alone meant an owner
-              could configure a chat-only room and still get a presentation area for every member.
+              Both `co=1` and the room-wide "Chat Only Room?" setting suppress the presentation;
+              omitting the second term exposed it to every member of an owner-configured chat room.
             -->
             {#snippet presentationPane()}
               <PresentationArea
@@ -1630,6 +1626,9 @@
                 {captionHistory}
                 bind:speechRecoHistoryMode
                 archivesAvailable={gates.archivesAvailable}
+                recordingsVisible={gates.archivesAvailable &&
+                  data.sessData?.recsInRoom === true &&
+                  data.sessData?.hideRecs !== true}
                 openTranscriptPage={() => alertsPane.openTranscript()}
                 {previewWindowsVisible}
                 {webcams}

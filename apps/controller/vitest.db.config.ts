@@ -1,5 +1,5 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { kitConfig } from './kit.config';
+import { kitConfig } from './kit.config.js';
 import { defineConfig } from 'vitest/config';
 
 /**

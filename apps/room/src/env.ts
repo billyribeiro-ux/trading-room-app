@@ -156,6 +156,16 @@ export const variables = defineEnvVars({
     description: 'Directory for uploaded files. Defaults to the app-relative store when unset.',
     schema: optionalText
   },
+  RECORDING_DIR: {
+    description:
+      'Private directory for room recording media. Defaults to .data/recordings and must be on persistent storage in production.',
+    schema: optionalText
+  },
+  RECORDING_MAX_BYTES: {
+    description:
+      'Maximum accepted recording size in bytes. Defaults to 2147483648 (2 GiB); enforced while streaming and against Content-Length.',
+    schema: optionalText
+  },
   PUBLIC_PTR_UPLOAD_SERVER: {
     public: true,
     description: 'Optional external upload endpoint used by the composer.',

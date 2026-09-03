@@ -109,7 +109,7 @@ describe('screen controls', () => {
 
     // app-screenshare-view, const 4 - the popout's cluster. `ScreenPane` owns it.
     expect(bundle).toContain('[1,"zoom-controls-container-detached"');
-    expect(paneMarkup).toContain('class="zoom-controls-container-detached"');
+    expect(paneMarkup).toContain("'zoom-controls-container-detached'");
 
     // And the pane must NOT carry the bar's container. Rendering the attached class in the
     // detached position is exactly the defect: `-detached` is a distinct class, so a substring
@@ -297,6 +297,7 @@ describe('viewerOnlyMode is ATTACHED-ONLY, and the capture is what says so', () 
   it('the detached cluster is gated by `detached`, which is what replaces the hidden binding', () => {
     // If this gate were removed, the attached view would grow a cluster the reference hides.
     expect(pane).toContain('{#if detached}');
-    expect(pane).toContain('<div class="zoom-controls-container-detached">');
+    expect(pane).toContain("'zoom-controls-container-detached'");
+    expect(pane).toContain('{ hidden: detachedClusterHidden }');
   });
 });

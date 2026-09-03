@@ -733,16 +733,12 @@
 <!--
   `app-rec-preview` — the server's recording preview card.
 
-  It mounted inside `ModalHost` until 2026-09-01, which was the wrong layer twice over: it is not a
-  modal, and that host has neither `media` nor `prefs`, so the card could not be given the four
-  state terms its arming test needs. This component is defined as *"everything that floats above the
-  room"* and already takes all three props whole, so the card asks nothing new of anybody.
-
-  The card renders its markup unconditionally — the reference's template is unconditional, and the
-  generated stylesheet scopes ten rules to `app-rec-preview`, which need an element to attach to.
-  Whether it is ever SEEN is decided inside it, by the capture's own gate.
+  This overlay owns the stateful card; the snippet only preserves the reference's root-host order.
+  Its markup is unconditional and visibility is decided inside it by the capture's own gate.
 -->
-<RecordingPreviewCard {media} {prefs} {isPresenter} />
+{#snippet recordingPreview()}
+  <RecordingPreviewCard {media} {prefs} {isPresenter} />
+{/snippet}
 <!--
   "Session Information" — `getMyToken()`, byte 2,255,348.
 
@@ -821,6 +817,7 @@
   customCSS={data.sessData?.customCSS}
 />
 <ModalHost
+  {recordingPreview}
   name={modals.modal}
   mediaIceServers={media.iceServers}
   {mobilePin}
@@ -829,6 +826,9 @@
   modAlertFilterList={data.sessData?.modAlertFilterList}
   stickyNonTradeAlert={data.sessData?.styckyNonTradeAlert === true}
   schedulerAvailable={data.sessData?.hasAlertScheduler === true}
+  crossPostAvailable={data.sessData?.hasLinkedRoomAlerts === true}
+  showNewIndicator={data.sessData?.isNewIndicatorOn === true}
+  discordEnabled={data.sessData?.enableDiscord === true}
   bind:alertFilterFor={alerts.filterFor}
   bind:showAlertsFrom={alerts.showFrom}
   onsavealertfilter={saveAlertFilter}

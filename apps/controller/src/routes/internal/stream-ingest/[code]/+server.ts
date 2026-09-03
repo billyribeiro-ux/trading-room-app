@@ -1,11 +1,13 @@
 import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { ROOM_JWT_SECRET, STREAM_SERVER_MTX } from '$app/env/private';
+import { ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { verifyConfigWriteToken } from '#lib/server/room-handoff.js';
 import { ingestPathFor, mintRoomIngestKey } from '#lib/server/stream-ingest.js';
+import { readSettings } from '#lib/server/rooms.js';
+import { resolveMediaCluster } from '#lib/server/media-cluster.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -163,7 +165,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     ingestPath
   });
 
-  const host = STREAM_SERVER_MTX?.trim() ?? '';
+  const cluster = await resolveMediaCluster(await readSettings(room.id));
 
   return json({
     /** The reference's field name, unchanged. The panel reads `rc.rtmpToken`. */
@@ -173,7 +175,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       Blank when the deployment has no media host. The room renders that as "not configured"
       rather than composing `http://:8889/…`, which is a link that looks real and cannot work.
     */
-    streamServerMTX: host,
-    configured: host !== ''
+    streamServerMTX: cluster.host,
+    configured: cluster.configured
   });
 };

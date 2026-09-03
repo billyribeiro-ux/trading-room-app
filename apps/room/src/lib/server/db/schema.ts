@@ -14,6 +14,8 @@ export const users = sqliteTable('users', {
   avatarUrl: text('avatar_url').notNull().default('/avatar.svg'),
   role: text('role').notNull().default('staff'),
   status: text('status').notNull().default('offline'),
+  /** Controller-derived room-membership age, refreshed on every signed handoff. */
+  isNew: integer('is_new', { mode: 'boolean' }).notNull().default(false),
   // Null for every row that predates password login, and for any account that is not meant to log
   // in with one. verifyPassword() treats null as "cannot authenticate" rather than as an error.
   passwordHash: text('password_hash'),
@@ -258,12 +260,10 @@ export const messages = sqliteTable('messages', {
  *
  * ## What is NOT stored, and why
  *
- * `sendTxt`, `sendEmail`, `sendTweet`, `sendLaterAsNick`, `sendLaterAsEmail` and `dontCrossPost`
- * all travel on the reference's `alertMsgLater` payload and are dropped here. Every one of them is
- * an instruction to a downstream this deployment does not have — SMS, the mailer's alert path,
- * Twitter, and the cross-post fan-out `linkedRoomAlerts` is itself blocked on. Storing a flag no
- * consumer reads is the thing this repository refuses by name, so they are refused at the boundary
- * and the refusal is recorded rather than the column being created empty.
+ * `sendTxt`, `sendEmail`, `sendTweet`, `sendLaterAsNick` and `sendLaterAsEmail` target downstreams
+ * this deployment does not have and remain rejected. `dontCrossPost` is different now that linked
+ * push fan-out exists: it is durable here so a scheduled occurrence preserves the presenter's
+ * per-alert suppression all the way to controller dispatch.
  */
 export const scheduledAlerts = sqliteTable('scheduled_alerts', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -282,6 +282,10 @@ export const scheduledAlerts = sqliteTable('scheduled_alerts', {
   senderName: text('sender_name').notNull(),
   body: text('body').notNull(),
   nonTrade: integer('non_trade', { mode: 'boolean' }).notNull().default(false),
+  /** Suppresses the push outbox when this occurrence fires. */
+  dontPush: integer('dont_push', { mode: 'boolean' }).notNull().default(false),
+  /** Suppresses controller fan-out to linked rooms for this occurrence. */
+  dontCrossPost: integer('dont_cross_post', { mode: 'boolean' }).notNull().default(false),
   /** `''` | `'daily'` | `'weekly'` — `#lib/scheduled-alert.ts` owns the vocabulary and the advance. */
   repeatMode: text('repeat_mode').notNull().default(''),
   ignoreWeekends: integer('ignore_weekends', { mode: 'boolean' }).notNull().default(false),
@@ -343,6 +347,114 @@ export const alerts = sqliteTable('alerts', {
   reactionsJson: text('reactions_json').notNull().default('{}'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
 });
+
+/**
+ * Transactional outbox for alert push delivery.
+ *
+ * The alert and this row are inserted in the same SQLite transaction. A controller outage can
+ * therefore delay delivery, but it cannot make an alert silently disappear between persistence
+ * and the external side effect. `next_attempt_at = NULL` is terminal; a non-null value is eligible
+ * for the bounded retry worker.
+ */
+export const alertDeliveryJobs = sqliteTable(
+  'alert_delivery_jobs',
+  {
+    alertId: integer('alert_id')
+      .primaryKey()
+      .references(() => alerts.id, { onDelete: 'cascade' }),
+    roomShortCode: text('room_short_code').notNull(),
+    dontCrossPost: integer('dont_cross_post', { mode: 'boolean' }).notNull().default(false),
+    status: text('status', {
+      enum: ['queued', 'dispatching', 'delivered', 'failed', 'suppressed']
+    })
+      .notNull()
+      .default('queued'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    nextAttemptAt: integer('next_attempt_at', { mode: 'timestamp_ms' }),
+    lastError: text('last_error'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull()
+  },
+  (table) => [
+    index('alert_delivery_jobs_due_idx').on(table.status, table.nextAttemptAt),
+    index('alert_delivery_jobs_room_idx').on(table.roomShortCode, table.alertId)
+  ]
+);
+
+/** Immutable recording metadata; the media bytes live outside SQLite under a random name. */
+export const recordings = sqliteTable(
+  'recordings',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    roomShortCode: text('room_short_code').notNull(),
+    recordedByUserId: integer('recorded_by_user_id')
+      .notNull()
+      .references(() => users.id),
+    title: text('title').notNull(),
+    storedName: text('stored_name').notNull().unique(),
+    contentType: text('content_type', { enum: ['video/webm', 'video/mp4'] }).notNull(),
+    size: integer('size').notNull(),
+    sha256: text('sha256').notNull(),
+    durationMs: integer('duration_ms').notNull(),
+    startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
+    endedAt: integer('ended_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull()
+  },
+  (table) => [
+    index('recordings_room_started_idx').on(table.roomShortCode, table.startedAt),
+    uniqueIndex('recordings_stored_name_idx').on(table.storedName)
+  ]
+);
+
+/** Immutable chat/alert rows captured inside a recording window when room policy enables it. */
+export const recordingLogEntries = sqliteTable(
+  'recording_log_entries',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    recordingId: integer('recording_id')
+      .notNull()
+      .references(() => recordings.id, { onDelete: 'cascade' }),
+    sourceKind: text('source_kind', { enum: ['chat', 'alert'] }).notNull(),
+    sourceId: integer('source_id').notNull(),
+    channel: text('channel'),
+    senderName: text('sender_name').notNull(),
+    body: text('body').notNull(),
+    occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull()
+  },
+  (table) => [
+    index('recording_log_entries_recording_time_idx').on(table.recordingId, table.occurredAt),
+    uniqueIndex('recording_log_entries_source_idx').on(
+      table.recordingId,
+      table.sourceKind,
+      table.sourceId
+    )
+  ]
+);
+
+/**
+ * Revocable, opaque grants for the anonymous screenshare-only player.
+ *
+ * Only a SHA-256 digest is stored. The raw bearer exists solely in the link returned once to the
+ * presenter, so a database read cannot recover a share URL. Revocation is a timestamp rather than
+ * deletion so an incident can distinguish “never existed” from “explicitly disabled”.
+ */
+export const publicPlayerGrants = sqliteTable(
+  'public_player_grants',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    roomShortCode: text('room_short_code').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    createdByUserId: integer('created_by_user_id')
+      .notNull()
+      .references(() => users.id),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull()
+  },
+  (table) => [
+    index('public_player_grants_room_expiry_idx').on(table.roomShortCode, table.expiresAt)
+  ]
+);
 
 // The captured Q&A modal lists the questions asked against an alert ("There are no questions."
 // when empty) and the alert row already carries questionCount/questionAnswered, but the question
@@ -1052,6 +1164,15 @@ export const sessions = sqliteTable(
      * client's version of the answer.
      */
     alertDeleteAccessAt: integer('alert_delete_access_at', { mode: 'timestamp' }),
+    /**
+     * Whether this authenticated room session entered with the room's free-trial password.
+     *
+     * This belongs on the session, not on `users`: the same email can be paid in one room and a
+     * trial guest in another, and a later paid entry must not inherit a flag from an older visit.
+     * It also cannot live in browser state — `disablePMForTrials`, `chatDisabledForTrials` and the
+     * mobile-app gate are authorization decisions whose input must be server-owned.
+     */
+    isFreeTrial: integer('is_free_trial', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
     lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }).notNull()
   },

@@ -1,5 +1,11 @@
-import adapter from '@sveltejs/adapter-vercel';
+import node from '@sveltejs/adapter-node';
+import vercel from '@sveltejs/adapter-vercel';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+const adapterTarget = process.env.ADAPTER ?? 'vercel';
+if (adapterTarget !== 'vercel' && adapterTarget !== 'node') {
+  throw new Error(`Unsupported ADAPTER ${JSON.stringify(adapterTarget)}; expected "vercel" or "node".`);
+}
 
 /**
  * The SvelteKit options, in ONE place.
@@ -18,7 +24,9 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
  */
 export const kitConfig = {
   preprocess: vitePreprocess(),
-  adapter: adapter(),
+  // Vercel is production. The Node artifact gives Playwright a stable production server instead
+  // of a Vite dev process that can accept requests while generated Kit modules are being reloaded.
+  adapter: adapterTarget === 'node' ? node() : vercel(),
   /*
     RUNES MODE, FOR EVERY COMPONENT, ENFORCED BY THE COMPILER.
 

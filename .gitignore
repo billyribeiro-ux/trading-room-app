@@ -2,6 +2,7 @@
 # Build output and dependencies
 # ---------------------------------------------------------------------------------------------
 node_modules/
+.pnpm-store/
 .svelte-kit/
 build/
 dist/
@@ -52,6 +53,9 @@ collect-*.json
 proroom-*.json
 must-match/
 account-page/
+!apps/controller/evidence-dumps/account-page/
+!apps/controller/evidence-dumps/account-page/file1
+!apps/controller/evidence-dumps/account-page/upload-image-badge-prompt.html
 mising/
 second-dump/
 more-fucking-evidence/

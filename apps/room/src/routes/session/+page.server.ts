@@ -7,7 +7,11 @@ import { users } from '#lib/server/db/schema.js';
 import { createSessionFor } from '#lib/server/auth.js';
 import { isBannedFromRoom, isShutOutByRoomState, roomRoleFor } from '#lib/server/room-role.js';
 import { closedRoomMessage } from '#lib/server/closed-room-message.js';
-import { verifyHandoffToken } from '#lib/server/handoff-token.js';
+import {
+  authorityEmailForHandoff,
+  verifyHandoffToken,
+  type HandoffClaims
+} from '#lib/server/handoff-token.js';
 import { hashEmail } from '#lib/server/connection.js';
 import {
   decideRoomEntryRemotely,
@@ -15,6 +19,7 @@ import {
   type RoomConfig,
   type RoomMembership
 } from '#lib/server/room-config-client.js';
+import { redirectToConfiguredLocation } from '#lib/server/control-plane.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -203,7 +208,7 @@ async function verifyEntry(request: Request, token: string | null, shortCode: st
     A PRESENT token must be valid. Absent is a guest; present-and-broken is somebody holding an
     expired or forged credential, and telling them apart matters — the second is not a guest.
   */
-  let claims: { name: string; email: string } | null = null;
+  let claims: HandoffClaims | null = null;
   if (token) {
     const verified = verifyHandoffToken(secret, token);
     if (!verified.ok) {
@@ -219,12 +224,14 @@ async function verifyEntry(request: Request, token: string | null, shortCode: st
   if (shortCode) {
     try {
       /*
-        The membership lookup is by the VERIFIED email only. A guest is read with no email at all,
-        so the controller answers with the room's settings and no membership — which is exactly the
-        authority a self-declared identity should carry: none.
+        The membership lookup is by an authenticated SITE token's verified email only. A guest
+        token is read with no authority email at all, so the controller answers with the room's
+        settings and no membership — exactly the authority a self-declared identity should carry:
+        none.
       */
-      roomConfig = await readRoomConfig(request, shortCode, claims?.email ?? '');
-      membership = claims ? roomConfig.member : null;
+      const authorityEmail = authorityEmailForHandoff(claims);
+      roomConfig = await readRoomConfig(request, shortCode, authorityEmail);
+      membership = authorityEmail ? roomConfig.member : null;
     } catch (cause) {
       // Fail CLOSED. `roomRoleFor(null)` is `member`, the safe answer to "cannot tell".
       console.error('[session] could not read the membership; entering as a member', cause);
@@ -381,7 +388,7 @@ export const actions: Actions = {
 
     if (!decision.ok) {
       // A room that sets `loginErrorURL` wants its own page, not ours.
-      if (decision.redirectTo) redirect(303, decision.redirectTo);
+      if (decision.redirectTo) redirectToConfiguredLocation(decision.redirectTo);
       return fail(400, { message: decision.message });
     }
 
@@ -417,7 +424,12 @@ export const actions: Actions = {
             refused to demote on a `guest` one — reasoning about the DOOR when the question is about
             the MEMBERSHIP.
           */
-          .set({ displayName, status: 'online', role })
+          .set({
+            displayName,
+            status: 'online',
+            role,
+            isNew: membership?.isNew === true
+          })
           .where(eq(users.id, existing.id))
           .returning()
           .get() ?? existing)
@@ -429,6 +441,7 @@ export const actions: Actions = {
             avatarUrl: `https://www.gravatar.com/avatar/${hashEmail(email)}?d=mm`,
             role,
             status: 'online',
+            isNew: membership?.isNew === true,
             // No password hash, and `authSource: 'handoff'` to say so on purpose.
             passwordHash: null,
             authSource: 'handoff',
@@ -446,7 +459,13 @@ export const actions: Actions = {
       `rememberMe` and posts it, and that checkbox now exists — so this reads it rather than
       deciding for the member.
     */
-    createSessionFor(cookies, account.id, form.get('remember') === 'on', shortCode ?? null);
+    createSessionFor(
+      cookies,
+      account.id,
+      form.get('remember') === 'on',
+      shortCode ?? null,
+      decision.asFreeTrial
+    );
     redirect(303, shortCode ? `/?room=${encodeURIComponent(shortCode)}` : '/');
   }
 };

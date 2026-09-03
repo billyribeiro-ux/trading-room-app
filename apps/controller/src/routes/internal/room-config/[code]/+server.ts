@@ -8,6 +8,7 @@ import { resolveRoomConfig, roomPresenterConfig, roomVisibleConfig } from '#lib/
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { createHash } from 'node:crypto';
 import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
+import { resolveMediaCluster } from '#lib/server/media-cluster.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -100,6 +101,9 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
 
   const roomSettings = await readSettings(room.id);
   const resolved = roomVisibleConfig(roomSettings);
+  const allSettings = resolveRoomConfig(roomSettings).values;
+  const hasLinkedRoomAlerts = String(allSettings.linkedRoomAlerts ?? '').trim().length > 0;
+  const reportedVersion = request.headers.get('x-room-app-version')?.trim() ?? '';
 
   /*
     The member, when the caller names one.
@@ -251,8 +255,14 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
     .map((address) => address.trim().toLowerCase())
     .filter((address) => address.length > 0)
     .map((address) => createHash('md5').update(address).digest('hex'));
+  const mediaCluster = await resolveMediaCluster(allSettings);
 
   return json({
+    deployment: {
+      appVersion: /^[A-Za-z0-9._+-]{1,128}$/.test(reportedVersion) ? reportedVersion : 'unknown',
+      streamServer: mediaCluster.host || 'not-configured',
+      serverId: mediaCluster.clusterId || mediaCluster.host || 'not-configured'
+    },
     badges: { definitions: badgeDefinitions, byEmailHash: memberBadges },
     /* Derived from `playChatMessageSoundFor`, which itself never crosses. See above. */
     chatSoundForEmailHashes: [...new Set(chatSoundForEmailHashes)],
@@ -280,7 +290,12 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
       both lists resolves to the same `resolveRoomConfig` value either way — but no name should be
       on both, and `room-config-boundary.test.ts` fails if one ever is.
     */
-    settings: { ...resolved.values, ...roomPresenterConfig(roomSettings, isPresenter) },
+    settings: {
+      ...resolved.values,
+      ...roomPresenterConfig(roomSettings, isPresenter),
+      // The target ids stay controller-side; a presenter only needs the bit that gates suppression.
+      ...(isPresenter ? { hasLinkedRoomAlerts } : {})
+    },
     locked: resolved.locked,
     /*
       The member, translated once here so the room never has to know the numeric model.
@@ -316,6 +331,8 @@ export const GET: RequestHandler = async ({ params, request, url }) => {
           isNonPresenterAdmin: membership.roomUser.role === 1 && membership.roomUser.nonPresenter,
           /** `r.isFT`. Per room, which is why the room may not keep it on an account. */
           isFT: membership.roomUser.isFreeTrial,
+          /** First-party policy: a room membership is NEW for its first 30 complete days. */
+          isNew: membership.roomUser.createdAt.getTime() >= Date.now() - 30 * 24 * 60 * 60 * 1_000,
           denyArchivesAccess: membership.roomUser.denyArchivesAccess,
           restrictPmUser: membership.roomUser.restrictPmUser,
           /*

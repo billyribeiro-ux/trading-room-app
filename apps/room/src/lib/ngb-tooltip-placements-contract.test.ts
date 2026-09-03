@@ -357,6 +357,14 @@ describe('no tooltip in the room can flip, so not running Popper costs nothing',
 describe('the tooltips the reference BINDS rather than writes', () => {
   const ROOM_MESSAGE = readFileSync(resolve(cwd, 'src/lib/components/RoomMessage.svelte'), 'utf8');
   const MODAL_HOST = readFileSync(resolve(cwd, 'src/lib/components/ModalHost.svelte'), 'utf8');
+  const ALERT_REPORT_MODAL = readFileSync(
+    resolve(cwd, 'src/lib/components/AlertSendReportModal.svelte'),
+    'utf8'
+  );
+  const ALERT_REPORT = readFileSync(
+    resolve(cwd, 'src/lib/components/AlertDeliveryReportBody.svelte'),
+    'utf8'
+  );
 
   it('the bundle binds five of them, all message timestamps', () => {
     /*
@@ -410,13 +418,15 @@ describe('the tooltips the reference BINDS rather than writes', () => {
     }
   });
 
-  it('all three timestamp hosts in this app are wired to it', () => {
+  it('all four timestamp hosts in this app are wired to it', () => {
     // Each carries `placement: 'top'`; before this they carried it with nothing attached.
-    expect((ROOM_MESSAGE.match(/@attach ngbTooltipWith\(/g) ?? []).length).toBe(2);
-    expect((MODAL_HOST.match(/@attach ngbTooltipWith\(/g) ?? []).length).toBe(1);
-    for (const src of [ROOM_MESSAGE, MODAL_HOST]) {
+    expect((ROOM_MESSAGE.match(/@attach ngbTooltipWith\(/g) ?? []).length).toBe(3);
+    expect((ALERT_REPORT.match(/@attach ngbTooltipWith\(/g) ?? []).length).toBe(1);
+    for (const src of [ROOM_MESSAGE, ALERT_REPORT]) {
       expect(src).toContain('alertDateFormatter');
     }
+    expect(MODAL_HOST).toContain('<AlertSendReportModal');
+    expect(ALERT_REPORT_MODAL).toContain('<AlertDeliveryReportBody');
   });
 
   it('reuses the existing `short` formatter rather than declaring a second one', () => {

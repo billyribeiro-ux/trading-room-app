@@ -7,12 +7,12 @@
     `src/routes` held no `+error.svelte` and `src` held no error shell, so every `error(...)` this
     app raises rendered SvelteKit's built-in fallback: an unstyled white page with the status and the
     message and no font, no colour and no name on it. Measured rather than assumed —
-    `find src/routes -name '+error.svelte'` returned nothing, against **127** `error(<status>, …)`
-    call sites (44 × 403, 41 × 404, 31 × 400, 5 × 502, 3 × 409, 2 × 429, 1 × 500).
+    `find src/routes -name '+error.svelte'` returned nothing, against **148** `error(<status>, …)`
+    call sites (49 × 403, 46 × 404, 36 × 400, 5 × 502, 3 × 409, 3 × 500, 2 × 429,
+    and one each of 410, 413, 415, and 503).
 
-    124 → 126 → 127 on 2026-09-02, and each step is a door: the transcript's two, both 403 and both
-    in `session-transcript.remote.ts` (a config the controller could not answer, and a caller the
-    archives gate refuses), then `lockSession`'s 502 when the controller refuses the write.
+    The count rose again on 2026-09-03 when the alert-delivery, Discord, public-player, and
+    recording endpoints added explicit fail-closed doors.
 
     Restated rather than left, because the sentence beside it argues that this number is measured and
     not recalled — and three restatements in one day is the argument for having the check.

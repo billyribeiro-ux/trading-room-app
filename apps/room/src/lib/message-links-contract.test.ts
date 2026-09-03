@@ -28,7 +28,8 @@ import { describe, expect, it } from 'vitest';
        it does not appear in the serialised HTML. Kept because the capture has it.
 */
 
-const source = readFileSync(new URL('./components/RoomMessage.svelte', import.meta.url), 'utf8');
+const source = readFileSync(new URL('./components/MessageBody.svelte', import.meta.url), 'utf8');
+const segments = readFileSync(new URL('./message-body-segments.ts', import.meta.url), 'utf8');
 const main = readFileSync(
   new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
   'utf8'
@@ -58,13 +59,13 @@ describe('message bodies', () => {
 
   it("keeps the capture's URL pattern verbatim, range and all", () => {
     // `\/-;` is a RANGE - narrowing it would stop matching URLs the room links today.
-    expect(source).toContain(
+    expect(segments).toContain(
       '/((http|https|ftp):\\/\\/[\\w?=&.@\\/-;#~%-]+(?![\\w\\s?&.@\\/;#~%"=-]*>))/gi'
     );
   });
 
   it('renders image URLs inline instead of as an anchor', () => {
-    expect(source).toContain("'.png', '.jpg', '.jpeg', '.gif', '.jfif'");
+    expect(segments).toContain("'.png', '.jpg', '.jpeg', '.gif', '.jfif'");
     expect(source).toContain('uploaded-img');
   });
 
@@ -74,7 +75,7 @@ describe('message bodies', () => {
 
   it('never routes a body through {@html}', () => {
     // The capture's `bypassSecurityTrustHtml` has no counterpart here, on purpose.
-    const body = source.slice(source.indexOf('function parseBodySegments'));
-    expect(body).not.toContain('{@html');
+    expect(source).not.toContain('{@html');
+    expect(segments).not.toContain('{@html');
   });
 });

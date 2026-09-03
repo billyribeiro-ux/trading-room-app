@@ -1,6 +1,5 @@
 <script lang="ts">
   import { afterNavigate } from '$app/navigation';
-  import { page } from '$app/state';
   import ControllerChrome from '#lib/components/ControllerChrome.svelte';
   import ConsentBanner from '#lib/components/home/ConsentBanner.svelte';
   import HomeFooter from '#lib/components/home/HomeFooter.svelte';
@@ -42,7 +41,7 @@
   import '@fortawesome/fontawesome-free/css/all.min.css';
   import 'font-awesome/css/font-awesome.min.css';
   import { resolveChrome } from '#lib/chrome.js';
-import type { LayoutProps } from './$types';
+  import type { LayoutProps } from './$types';
 
   /**
    * The single place chrome is decided.
@@ -79,7 +78,7 @@ import type { LayoutProps } from './$types';
 
   /* Manage Session is the controller's one full-bleed page — `.ng-fluid`, panel
      at x=0 w=1989, and no page footer. Everything else is the 1170 container. */
-  const fluid = $derived(/^\/account\/rooms\//.test(page.url.pathname));
+  const fluid = $derived(/^\/account\/rooms\//.test(data.pathname));
 
   /*
     The decision itself lives in `#lib/chrome.ts` so it can be tested.
@@ -89,7 +88,7 @@ import type { LayoutProps } from './$types';
     `.pub-root` while wearing the controller's `acc-*` classes, which put every field at twice its
     intended width. That file records the measurement and carries the cases.
   */
-  const chrome = $derived(resolveChrome(page.url.pathname));
+  const chrome = $derived(resolveChrome(data.pathname));
 
 </script>
 
@@ -121,7 +120,7 @@ import type { LayoutProps } from './$types';
     >{@render children()}</ControllerChrome
   >
 {:else if chrome === 'marketing'}
-  {#if page.url.pathname === '/'}
+  {#if data.pathname === '/'}
     <!-- The cinematic home surface (docs/decisions/0005-cinematic-home.md) owns its own chrome —
          nav, consent, footer — and its styles live in home.css under `.home-cine` plus component
          <style> blocks. It deliberately does NOT render inside `.pub-root`: the Bootstrap 3.1.1

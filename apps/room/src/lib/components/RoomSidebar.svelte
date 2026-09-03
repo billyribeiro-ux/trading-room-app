@@ -829,7 +829,7 @@
                                       same moderation fact showed on a member's card and in the
                                       message log and vanished in the list between them.
                                     -->
-                                    {#if isPresenter && user.isNew}
+                                    {#if session?.isNewIndicatorOn && isPresenter && user.isNew}
                                       <span class="badge bg-warning new-badge">New</span>
                                     {/if}
                                     <!--

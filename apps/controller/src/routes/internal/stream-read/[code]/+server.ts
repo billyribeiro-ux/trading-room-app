@@ -1,10 +1,12 @@
 import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { ROOM_JWT_SECRET, STREAM_SERVER_MTX } from '$app/env/private';
+import { ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/db/schema.js';
 import { verifyConfigReadToken } from '#lib/server/room-handoff.js';
 import { READ_TOKEN_TTL_SECONDS, mintRoomReadToken } from '#lib/server/stream-ingest.js';
+import { readSettings } from '#lib/server/rooms.js';
+import { resolveMediaCluster } from '#lib/server/media-cluster.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -117,13 +119,13 @@ export const POST: RequestHandler = async ({ params, request }) => {
     error(403, 'Forbidden.');
   }
 
-  const host = STREAM_SERVER_MTX?.trim() ?? '';
+  const cluster = await resolveMediaCluster(await readSettings(room.id));
 
   return json({
     /* The reference's own global name. The room stores it as `globals.mtxToken`. */
     mtxToken: mintRoomReadToken(secret, room.shortCode),
-    streamServerMTX: host,
-    configured: host !== '',
+    streamServerMTX: cluster.host,
+    configured: cluster.configured,
     /* So the room can refresh before it lapses rather than discovering it mid-playback. */
     expiresInSeconds: READ_TOKEN_TTL_SECONDS
   });

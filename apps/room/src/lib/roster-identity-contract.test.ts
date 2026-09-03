@@ -192,9 +192,8 @@ describe('the twenty consts that ARE built, and the four that are blocked', () =
         O(8, sessData.isNewIndicatorOn && isPresenter && e.isNew ? 8 : -1)
         O(9, sessData.disableStarYears || e.isP || !e.data.years ? -1 : 9)
 
-      `isNewIndicatorOn` is the one term deliberately left off — `isNew` has no producer and a gate
-      with nothing to gate is not a consumer, which is `moderation-badge-contract.test.ts`'s
-      argument and the form `ModalHost.svelte` already renders.
+      `isNewIndicatorOn` crosses the controller boundary with the authoritative membership-created
+      timestamp and is therefore part of the gate, matching the captured three-term condition.
 
       Source text here, VALUES in `RoomSidebar.svelte.test.ts`, which mounts the rail and gives each
       of the three terms its own negative control. This half is what catches a term deleted during a
@@ -202,7 +201,7 @@ describe('the twenty consts that ARE built, and the four that are blocked', () =
     */
     const code = codeOf('src/lib/components/RoomSidebar.svelte', SIDEBAR);
     expect(code, 'the New badge lost its presenter gate').toContain(
-      '{#if isPresenter && user.isNew}'
+      '{#if session?.isNewIndicatorOn && isPresenter && user.isNew}'
     );
     expect(code, 'the membership star lost a gate term').toContain(
       '{#if !session?.disableStarYears && !user.isP && user.years}'

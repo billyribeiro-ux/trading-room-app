@@ -9,6 +9,7 @@ import { hashEmail } from '#lib/server/connection.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { alertQuestions, alerts } from '#lib/server/db/schema.js';
 import { consumeRateLimit } from '#lib/server/rate-limit.js';
+import { refuseIfChatMuted } from '#lib/server/chat-mute.js';
 import { readRoomConfig } from '#lib/server/room-config-client.js';
 import { publishToRoom } from '#lib/server/room-events.js';
 import { messageMutationFrame } from '#lib/message-mutation-frames.js';
@@ -99,7 +100,7 @@ export const askQuestion = command(
   }),
   async ({ body: submittedBody, alertId }) => {
     ensureDatabase();
-    const { locals } = getRequestEvent();
+    const { locals, request } = getRequestEvent();
     const user = requireUser(locals);
     const shortCode = requireRoomShortCode(locals);
 
@@ -118,6 +119,14 @@ export const askQuestion = command(
     const body = submittedBody.trim();
     if (!body) error(400, 'A question is required.');
     if (body.length > MAX_QUESTION_BODY) error(400, 'That question is too long.');
+
+    /*
+      A Q&A post is member-authored room communication and follows the same mute as public and
+      private chat. Enforced here, not only by hiding the button: a muted member can call a remote
+      command directly. The shared helper checks both the room's expiring mute and the controller's
+      permanent membership mute, so the three text-submission paths cannot drift.
+    */
+    await refuseIfChatMuted(request, shortCode, user);
 
     const alertAuthorId =
       alertId > 0

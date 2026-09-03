@@ -979,8 +979,8 @@ describe('the alert-sound row buttons', () => {
 
     /*
       The two elements, by their own markup rather than by a count of the word `hidden` — and since
-      2026-08-16 they are in two FILES. The tab is in the main strip, which stayed in
-      `PresentationArea`; the pane is `FilesPane` itself. Reading both is what keeps the pair
+      the main-strip extraction they are in two FILES. The tab is in `MainTabStrip`; the pane is
+      `FilesPane` itself. Reading both is what keeps the pair
       honest: either one alone leaves a tab that opens nothing or a pane still reachable from a tab
       that is gone, which is the whole point of the assertion.
     */

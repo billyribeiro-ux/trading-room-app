@@ -14,32 +14,22 @@ established it says so.
 
 ---
 
-> ## ⛳ WHERE THIS FILE STANDS, 2026-09-02
+> ## ⛳ WHERE THIS FILE STANDS, 2026-09-03
 >
-> **Two items remain and both are blocked on something outside this repository.** Parts 1, 2, 4 and 5
-> are built; the "suggested order" below records each landing.
+> **All repository-buildable work in this file is complete.** The recordings row closed with a
+> first-party durable archive, and Parts 1, 2, 4 and 5 are built. One vendor-only validation remains:
 >
-> | remaining | blocked on |
-> | --- | --- |
-> | `presAreaTabs-recordings` | an archive service. Fully SPECIFIED 2026-08-31 so building it is a transcription — the entitlement, the URL and a measured MediaMTX candidate are all recorded, and all three were re-read on 2026-09-02 and match — but no RECORDINGS table exists in either database. (This cell said *"no recordings or archive tables"* until 2026-09-02; `chat_archives` has existed since 2026-08-29, and the imprecision would have read as chat archiving having no storage either.) |
-> | Part 3, v5 | an account the vendor has cleared for v5. Re-tested 2026-08-31: the `/v5` 404 now distinguishes nothing (every version path 404s), and the conclusion rests on its other measurement instead |
+> | external acceptance | blocked on                                                                                                                                                             |
+> | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | Part 3, v5          | a vendor account whose room is actually assigned the server-selected v5 build. The public `/v5` path is not evidence because every version path currently returns 404. |
 >
-> **THIS TABLE HAD A THIRD ROW UNTIL 2026-09-02 AND THE BODY OF THIS FILE HAD ALREADY DELETED IT.**
-> It read *"the five operator reset commands | a central console AND a media plane. What is missing is
-> REACH, not the commands"*. The section below re-measured that on 2026-09-01 and answered NOT WORK:
-> `resetAudioBridge`, `resetAudioBridgeOnServer`, `resetAllMediaServers`, `hardResetMediaServer`,
-> `hardResetMediaServerOnServer` and `getMediaServerLost` have **no call site anywhere in the
-> bundle** — every occurrence is the declaration or the command string inside its own body.
-> Re-swept independently on 2026-09-02 and the counts are 2, 2, 3, 1, 1 and 1, every one of them
-> accounted for. Building senders would INVENT controls the reference does not have.
+> `presAreaTabs-recordings` closed on 2026-09-03 without reproducing the reference's bearer token in
+> an iframe URL. The room now stores a media catalog and immutable recording-log snapshots, streams
+> uploads, serves authenticated range playback, enforces the captured archive entitlement on both
+> list and media routes, and exposes pagination, transcript download and presenter deletion.
 >
-> The summary going stale against its own body is the failure this file warns about two hundred lines
-> below — *"two places recording one thing is how one of them goes stale, and the stale one is always
-> the summary"* — so the correction is left visible rather than quietly applied.
->
-> `TODO.md`'s header carries the same statement for the whole repository, and `todo-next.md` closed
-> at 93 of 93 room surfaces on the same day.
-
+> The five reset methods remain NOT WORK: the pinned bundle contains declarations but no call sites,
+> so inventing controls for them would diverge from the reference.
 
 # PART 1 — BOTH BUILT, 2026-08-27
 
@@ -59,13 +49,13 @@ self-service: the real subscriber logs in again and evicts the freeloader.
 
 **The three decisions this file said to take first, and the answers:**
 
-| decision | answer |
-| --- | --- |
-| Newest wins, or oldest holds? | **Newest.** Oldest-holds turns every shared password into a support ticket |
-| Per account, or per account per room? | **Per account, globally.** Per-room would let one shared login serve two rooms at the same moment |
-| Presenter exemption? | **None, for any role.** Put to the owner on 2026-08-27 with the laptop-and-phone case named; answered "everything, no exception". Asserted in `session-limit-contract.test.ts` so adding a role test later is a visible policy change |
-| How does the evicted device find out? | The SSE channel pushes `sessionRevoked` with the reason — the shared plumbing this file predicted, and both features do use it |
-| What happens when the controller is unreachable? | **Bounded grace**, chosen by the owner over closing immediately and over never closing. Three minutes without a confirmed answer ends the stream; a definite lapse ends it in under one |
+| decision                                         | answer                                                                                                                                                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Newest wins, or oldest holds?                    | **Newest.** Oldest-holds turns every shared password into a support ticket                                                                                                                                                            |
+| Per account, or per account per room?            | **Per account, globally.** Per-room would let one shared login serve two rooms at the same moment                                                                                                                                     |
+| Presenter exemption?                             | **None, for any role.** Put to the owner on 2026-08-27 with the laptop-and-phone case named; answered "everything, no exception". Asserted in `session-limit-contract.test.ts` so adding a role test later is a visible policy change |
+| How does the evicted device find out?            | The SSE channel pushes `sessionRevoked` with the reason — the shared plumbing this file predicted, and both features do use it                                                                                                        |
+| What happens when the controller is unreachable? | **Bounded grace**, chosen by the owner over closing immediately and over never closing. Three minutes without a confirmed answer ends the stream; a definite lapse ends it in under one                                               |
 
 **Where it lives:** `apps/room/src/lib/server/live-access.ts` (the rule, pure), the poll in
 `sess/[room]/events/+server.ts`, `createSessionFor` in `server/auth.ts`,
@@ -121,19 +111,19 @@ each button `btn btn-sm m-1` plus `st-fileSortName` / `st-fileSortDate`; the lab
 
 **The four title strings, verbatim:**
 
-| button | when | title |
-| --- | --- | --- |
-| Name | `desc` | `Sorted Z to A (click to sort A to Z)` |
-| Name | otherwise | `Sorted A to Z (click to sort Z to A)` |
-| Date | `asc` | `Sorted oldest to newest (click to sort newest to oldest)` |
-| Date | otherwise | `Sorted newest to oldest (click to sort oldest to newest)` |
+| button | when      | title                                                      |
+| ------ | --------- | ---------------------------------------------------------- |
+| Name   | `desc`    | `Sorted Z to A (click to sort A to Z)`                     |
+| Name   | otherwise | `Sorted A to Z (click to sort Z to A)`                     |
+| Date   | `asc`     | `Sorted oldest to newest (click to sort newest to oldest)` |
+| Date   | otherwise | `Sorted newest to oldest (click to sort oldest to newest)` |
 
 **Icons — note the asymmetry, it is easy to get wrong:**
 
-| button | asc | desc | inactive |
-| --- | --- | --- | --- |
-| Name | `fa-sort-alpha-down` | `fa-sort-alpha-up` | `fas fa-sort ml-2` |
-| Date | `fa-sort-amount-down` | `fa-sort-amount-up` | `fas fa-sort ml-2` |
+| button | asc                   | desc                | inactive           |
+| ------ | --------------------- | ------------------- | ------------------ |
+| Name   | `fa-sort-alpha-down`  | `fa-sort-alpha-up`  | `fas fa-sort ml-2` |
+| Date   | `fa-sort-amount-down` | `fa-sort-amount-up` | `fas fa-sort ml-2` |
 
 **The comparator** (`sortFiles` pipe, verbatim behaviour): date sorts on
 `new Date(created).getTime()`, name on `(name||"").toLowerCase()`; equal values return `0`, so ties
@@ -145,9 +135,19 @@ do NOT fall back to the other field.
 **CSS — and this is the theming rule in miniature:**
 
 ```css
-.st-fileSortBar{font-size:12px}
-.st-fileSortName,.st-fileSortDate{color:var(--tabs-color);background-color:transparent;border:1px solid var(--file-see-more-bg)}
-.st-fileSortName.active,.st-fileSortDate.active{background-color:var(--file-see-more-bg)}
+.st-fileSortBar {
+  font-size: 12px;
+}
+.st-fileSortName,
+.st-fileSortDate {
+  color: var(--tabs-color);
+  background-color: transparent;
+  border: 1px solid var(--file-see-more-bg);
+}
+.st-fileSortName.active,
+.st-fileSortDate.active {
+  background-color: var(--file-see-more-bg);
+}
 ```
 
 **Both tokens already exist** in `css/complete-app-styles.css` and `src/app.css`. Build against the
@@ -158,16 +158,16 @@ token names.
 The outstanding decode pass is done, and it produced a finding this section did not contain:
 **Benzinga renders in TWO places upstream, not one.**
 
-| | where | consts | image | fallback |
-| --- | --- | --- | --- | --- |
-| sidebar | `mPe` 2,467,533 and `_Re` 2,563,731 — the same component compiled twice | `nav-link sidebar-item ps-1` / `benzinga-logo-alt` / `fas fa-newspaper` | `altBenzingaLogoURL` | icon + the words "Benzinga News" |
-| **navbar** | **`PPe` 2,473,150** | `90 [1,"nav-item","animated","fadeIn","benzinga-li"]`, `141 ["target","_blank","title","Benzinga News",1,"nav-link"]`, `142 [1,"benzinga-logo","animated","fadeIn",3,"src"]` | `altBenzingaLogoURL \|\| "/assets/images/benzinga-logo.png"` | **none — image only** |
+|            | where                                                                   | consts                                                                                                                                                                       | image                                                        | fallback                         |
+| ---------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------- |
+| sidebar    | `mPe` 2,467,533 and `_Re` 2,563,731 — the same component compiled twice | `nav-link sidebar-item ps-1` / `benzinga-logo-alt` / `fas fa-newspaper`                                                                                                      | `altBenzingaLogoURL`                                         | icon + the words "Benzinga News" |
+| **navbar** | **`PPe` 2,473,150**                                                     | `90 [1,"nav-item","animated","fadeIn","benzinga-li"]`, `141 ["target","_blank","title","Benzinga News",1,"nav-link"]`, `142 [1,"benzinga-logo","animated","fadeIn",3,"src"]` | `altBenzingaLogoURL \|\| "/assets/images/benzinga-logo.png"` | **none — image only**            |
 
 Only the sidebar one existed here. The navbar one shipped on 2026-08-29
 (`benzinga-navbar-contract.test.ts`, 9 tests, 5 negative controls seen red).
 
 **The const indices were parsed with a string-aware walker, not counted by eye** — an index is per
-component, and the sidebar's `li` is index 32 of a *different* table, where it is a generic
+component, and the sidebar's `li` is index 32 of a _different_ table, where it is a generic
 `nav-item` shared with "Manage Muted Users".
 
 **Two divergences, both measured and both recorded at the code:**
@@ -194,8 +194,8 @@ open, and the server half, which is not in evidence at all.
 and `internal/mobile-restore/[code]` on the controller. `mobile-restore-contract.test.ts`, 16 tests,
 6 negative controls seen red.
 
-**Row 24 was already closed.** The doc records `freeTrialsGetApp` as *"absent from the doc, from
-`room-settings-schema.ts` and from `room-config-client.ts`"*. Measured 2026-08-29: it is in
+**Row 24 was already closed.** The doc records `freeTrialsGetApp` as _"absent from the doc, from
+`room-settings-schema.ts` and from `room-config-client.ts`"_. Measured 2026-08-29: it is in
 `room-settings-schema.ts:333` (`wired: true`), `room-config.ts:271`, `room-config-client.ts:123` and
 consumed at `gates.ts:306`. It is now also re-checked on the new controller route.
 
@@ -205,8 +205,8 @@ room with no app configured would otherwise show a tab whose only button answers
 
 **What the server does was DERIVED, and that is stated rather than implied.** There is no inbound
 handler anywhere in the bundle — the switch at 1,020,600–1,022,200 was read in full — so the
-reference's server is not in evidence. The pane's own copy is: *"restore your mobile app connectivity
-and get a test notification on your device"*, shown to somebody who *"is not getting notifications"*.
+reference's server is not in evidence. The pane's own copy is: _"restore your mobile app connectivity
+and get a test notification on your device"_, shown to somebody who _"is not getting notifications"_.
 With a token store that has one honest meaning, and `sendTestPushToMember` already did it for the
 Manage page.
 
@@ -217,8 +217,8 @@ sentence from what happened, keeping the captured string for the case it is true
 
 ## 2.6 Removed upstream — THE CLAIM WAS FALSE, closed 2026-08-29 ✅
 
-This row read: *"`Connectivity/Mic Troubleshooter` is in our older bundle and **gone** from the
-current v4. If we built it, it should probably come out."* We did build it, so the row's instruction
+This row read: _"`Connectivity/Mic Troubleshooter` is in our older bundle and **gone** from the
+current v4. If we built it, it should probably come out."_ We did build it, so the row's instruction
 was to delete a working feature — four tabs of `#webrtc-troubleshooter-modal`.
 
 **Counted in the current v4 bundle with `String.indexOf`, not `grep -c`:** `Connectivity/Mic` 2,
@@ -250,12 +250,12 @@ What is established (see `v5.md`, measured 2026-08-15):
 
 # PART 4 — The theming rule, which applies to everything above
 
-**Owner, 2026-08-15:** *"Simpler Trading chose their own theme and we have to stick to Bootstrap so
-customers can customize theirs like Simpler's."*
+**Owner, 2026-08-15:** _"Simpler Trading chose their own theme and we have to stick to Bootstrap so
+customers can customize theirs like Simpler's."_
 
 **The evidence agrees, and the original already works this way.** Its stylesheet carries **573 CSS
 custom properties**, and every colour in the new sort-bar rules is a `var(--…)`. Simpler Trading's
-"theme" *is* those variables set to their values.
+"theme" _is_ those variables set to their values.
 
 **So, for every feature in this file:**
 
@@ -270,17 +270,17 @@ custom properties**, and every colour in the new sort-bar rules is a `var(--…)
 
 **All three are BUILT, and their sections are removed from this file — 2026-08-29.**
 
-| | shipped as | contract |
-|---|---|---|
-| **5.1 Alert Filter** | `alert-filter.ts`, persisted through `savePreference('alertFilterFor')`, consumed in `alerts.svelte.ts`, `alerts-pane.ts` and `create-room.svelte.ts` | `alert-filter-contract.test.ts` — 26 tests |
-| **5.2 Alert Labels** | `alert-labels.ts`, rendered by `RoomMessage.svelte` and configured in `ModalHost.svelte` | `alert-labels-contract.test.ts` |
+|                         | shipped as                                                                                                                                                                                                | contract                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **5.1 Alert Filter**    | `alert-filter.ts`, persisted through `savePreference('alertFilterFor')`, consumed in `alerts.svelte.ts`, `alerts-pane.ts` and `create-room.svelte.ts`                                                     | `alert-filter-contract.test.ts` — 26 tests              |
+| **5.2 Alert Labels**    | `alert-labels.ts`, rendered by `RoomMessage.svelte` and configured in `ModalHost.svelte`                                                                                                                  | `alert-labels-contract.test.ts`                         |
 | **5.3 Alert Scheduler** | `scheduled-alert.ts`, `server/scheduled-alerts.ts`, `routes/scheduled-alerts.remote.ts`, `components/ScheduledAlerts.svelte`, and the sweeper `startAlertScheduler`; `hasAlertScheduler` is `wired: true` | `scheduled-alert-contract.test.ts` — with 5.2, 50 tests |
 
 **Why they are removed rather than re-marked.** The three sections here were a SUMMARY of
 `docs/decoded/alert-scheduler-filter-labels.md`, which carries the same evidence — the byte offsets,
 the verbatim strings, the two 2026-08-15 corrections — roughly five times over. Two places recording
 one thing is how one of them goes stale, and it is exactly what happened: on 2026-08-29 §5.3 still
-carried a 🔴 and still said *"`hasAlertScheduler` … is NOT in `room-settings-schema.ts`"*, while the
+carried a 🔴 and still said _"`hasAlertScheduler` … is NOT in `room-settings-schema.ts`"_, while the
 entitlement had been wired and all four modules shipped. **The decoded document is the spec. This
 file tracks what is left to build, and none of this is.**
 
@@ -307,8 +307,8 @@ each landed.
 re-reading, one of which ships a control that looks right and behaves wrong. Build from
 `docs/decoded/files-sort-bar.md`, not from §2.1.
 
-**Removed from this order on 2026-08-29 because they are built:** *1.1 + 1.2 together* (PART 1
-records them CLOSED on 2026-08-27), *5.1 Alert Filter*, *5.2 Alert Labels* and *5.3 Alert Scheduler*
+**Removed from this order on 2026-08-29 because they are built:** _1.1 + 1.2 together_ (PART 1
+records them CLOSED on 2026-08-27), _5.1 Alert Filter_, _5.2 Alert Labels_ and _5.3 Alert Scheduler_
 (PART 5 above). The order below was still scheduling all five, which is how a plan outlives the work
 it was planning.
 
@@ -317,64 +317,22 @@ it was planning.
    resets to that field's default (`field === 'date' ? 'desc' : 'asc'`, line 189), and
    `INITIAL_FILE_SORT = { field: 'date', direction: 'desc' }`. The labels keep their leading and
    trailing spaces, cited at `FilesPane.svelte:328`. This entry was still scheduling it.
-2. **`presAreaTabs-recordings` — NOT BUILT. Blocker named, and it is not parked.** The pane is one iframe
-   onto `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{token}`, a SERVER archive page.
-   Measured: **zero recordings or archive tables in either database** — 22 room tables, 15 controller
-   tables, none matching. Our Recordings is a different thing: `recording-codec.ts` records the
-   presenter's screen locally to a download. That is the ACT of recording; this tab is PLAYBACK of
-   past archives. Building the surface now yields an iframe pointing at nothing, which is the dead
-   scaffolding the standard forbids. **Needs an archive service first, which is a design decision.**
+2. ~~`presAreaTabs-recordings`~~ — **BUILT END TO END 2026-09-03.** The implementation keeps the
+   captured entitlement but deliberately replaces the reference's bearer-token iframe with same-origin,
+   cookie-authenticated APIs:
 
-   Two corrections to the triage's own claims, measured here: `recsInRoom` is NOT absent from the
-   repo — it is in `room-settings-schema.ts:247` unwired and `room-settings-profile.ts:78` — and
-   `hideRecs` is already in `ROOM_VISIBLE_SETTINGS` at `room-config.ts:214`.
+   - `recordings` and `recording_log_entries` are the durable catalog and immutable chat/alert snapshot;
+   - `/recordings/upload` streams the body to a temporary file, hashes it, atomically renames it and
+     commits metadata only after durable storage succeeds;
+   - `/recordings/[id]/media` rechecks archive access and supports HTTP range requests;
+   - `RecordingArchivePane.svelte` provides pagination, playback/download, log view/export and
+     presenter-only deletion, behind `recsInRoom`, `hideRecs` and `archivesAvailableTo`;
+   - `recordChat` snapshots only authoritative rows whose timestamps fall inside the recording window.
 
-   **FULLY SPECIFIED 2026-08-31, so that building it is a transcription rather than an
-   investigation.** The blocker is unchanged and is still only the SERVICE; everything around it is
-   now read from the pinned bundle rather than left to be rediscovered.
+   The storage root and maximum upload size are deployment configuration. A server-side MediaMTX
+   recorder remains an optional future producer, not a prerequisite for the product path: the existing
+   browser recorder uploads its completed blob while retaining the local download as a recovery copy.
 
-   *The entitlement is already built and is an exact transcription.* `archivesAvailableTo` appears
-   twice in the reference, byte-identical, at bytes 1,959,906 and 2,568,449:
-
-   ```js
-   archivesAvailableTo(){return isPresenter && !isLimitedPresenter
-     ? !(sessData.showArchivesToSpecificPresenters
-         && !sessData.showArchivesToSpecificPresenters.includes(user.email))
-     : !(!sessData.showArchivesToUsers || user.denyArchivesAccess)}
-   ```
-
-   `apps/room/src/lib/roster-gates.ts:60` is that, line for line. Two branches, and the asymmetry is
-   the part worth knowing: for a FULL presenter `showArchivesToSpecificPresenters` is an allow-list
-   that only ever NARROWS (absent means everyone), while for members and limited presenters
-   `showArchivesToUsers` must be on AND the per-user `denyArchivesAccess` off. All three exist here —
-   the two settings in `room-settings-schema.ts:152-153`, and `denyArchivesAccess` already on the
-   wire at `create-room.svelte.ts:375`.
-
-   *The URL in this row is the ROOM's and is correct.* There are TWO archive routes in the reference,
-   in two different applications, and they are not the same one:
-
-   | app | route | how it opens |
-   | --- | --- | --- |
-   | room (`main.d1d09071be31f1ba.js`) | `${apiROOT}/sessions/v2/archives/recordings/{sessionID}/{sesionToken}` | the pane's iframe, plus `window.open(…, "_blank")` twice |
-   | manage (`app.min.js`, pinned 2026-08-31) | `/users/v1/archives/recordings/{sessData._id}/{jwtToken}` | `openRecs`, a new window |
-
-   `sesionToken` is the reference's own spelling, one `s`, and it is what the room's globals are
-   keyed on — transcribe it rather than correcting it.
-
-   *Three consumers, of which we have one.* `getRecordingsUrl()` (the pane) and two
-   `launchRecordings()` sites (byte 2,522,214 and 2,568,449) are absent here, correctly: each opens
-   the archive URL. The fourth use of the same predicate — the speech-reco overlay's "Full Transcript
-   History" button, `O(5, e.archivesAvailableTo() ? 5 : -1)` — IS built, in
-   `SpeechRecoOverlay.svelte:199`. So the entitlement has a live consumer already and is not a
-   predicate waiting for one.
-
-   *And the service now has a candidate that was measured rather than assumed.* MediaMTX v1.20.1 was
-   run on 2026-08-31 with `record: yes` and `playback: yes`: it wrote a real `.mp4` and its playback
-   server answered `GET /list?path=…` with `[{start, duration, url}]`, which maps onto every cell the
-   reference's own recordings response carries. `apps/room/docs/MEDIA-PLANE-MEASURED.md` has the run,
-   including the catch that its fmp4 recorder skips VP8 — a WebRTC screenshare recorded server-side
-   is audio-only unless the publisher sends a codec the recorder keeps. **That is what the design
-   decision is now about**, and it is a smaller question than "is there an archive service at all".
 3. **Part 3 v5** — when an account is cleared for it. **Re-tested 2026-08-31 and the block HOLDS, but
    one piece of evidence for it must stop being cited.** The room host's version paths were probed
    again: `/` answers 200, and `/v3`, `/v4`, `/v5` and `/v6` all answer **404**. On 2026-08-15 `/v3`
@@ -393,8 +351,8 @@ it was planning.
 and we do not. **This paragraph pointed at work that is finished, and is corrected 2026-08-30 by
 reading that document rather than by remembering it.**
 
-It used to say *"Moderation (`kickUser`, `unmuteChat`, `lockSession`) and the archives pair
-(`archiveLogs` / `unarchiveLogs`) are the largest clusters left."* Every one of those five is built:
+It used to say _"Moderation (`kickUser`, `unmuteChat`, `lockSession`) and the archives pair
+(`archiveLogs` / `unarchiveLogs`) are the largest clusters left."_ Every one of those five is built:
 `kicks.ts`, `chat-mute.ts` (whose docblock quotes the reference's own `subscribe("unmuteChat", …)`),
 and `chat-archive-port.ts`, which wires `archiveChatLog` and `unarchiveChatLogCommand`. The triage's
 own measured tally is **0 still NOT BUILT** — 15 built, 7 built under another name, 3 blocked with
@@ -449,13 +407,13 @@ stands in its place; that is a stated equivalence and it is at the code.
 
 This heading read **"Evidence, all committed"**. Measured with `git ls-files` and on disk:
 
-| | tracked | present here | |
-|---|---|---|---|
-| `apps/room/docs/source-v4-2026-08-15/` | **5 files** | yes | the current v4: three artifacts + `sha256sums.txt` + a README recording how it was verified and what changed. All three verified `OK` against that file on 2026-08-29 |
-| `v5.md` | **yes** | yes | the version measurements and the retraction |
-| `apps/room/scripts/collect-app-versions.js` | **0** | **no** | the read-only version collector. `.gitignore` excludes `/apps/room/scripts/` whole, deliberately — the collectors in it reach the reference application and this repository is public. `docs/UNPUBLISHED-SCRIPTS.md` records what is in there |
-| `apps/room/docs/source/` | **0** | **no** | the OLDER v4. Gitignored for the same reason, and its absence is why **42 evidence-bound test files are excluded from every run in a fresh clone** — `gate/evidence-bound-tests.mjs` prints that on every invocation |
+|                                             | tracked     | present here |                                                                                                                                                                                                                                               |
+| ------------------------------------------- | ----------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/room/docs/source-v4-2026-08-15/`      | **5 files** | yes          | the current v4: three artifacts + `sha256sums.txt` + a README recording how it was verified and what changed. All three verified `OK` against that file on 2026-08-29                                                                         |
+| `v5.md`                                     | **yes**     | yes          | the version measurements and the retraction                                                                                                                                                                                                   |
+| `apps/room/scripts/collect-app-versions.js` | **0**       | **no**       | the read-only version collector. `.gitignore` excludes `/apps/room/scripts/` whole, deliberately — the collectors in it reach the reference application and this repository is public. `docs/UNPUBLISHED-SCRIPTS.md` records what is in there |
+| `apps/room/docs/source/`                    | **0**       | **no**       | the OLDER v4. Gitignored for the same reason, and its absence is why **42 evidence-bound test files are excluded from every run in a fresh clone** — `gate/evidence-bound-tests.mjs` prints that on every invocation                          |
 
-The correction matters more than the two entries do: a list headed "all committed" is read as *a
-clone has these*, and a clone has half of them. What a clone actually holds is the v4 bundle and
+The correction matters more than the two entries do: a list headed "all committed" is read as _a
+clone has these_, and a clone has half of them. What a clone actually holds is the v4 bundle and
 `v5.md`; everything reconstructed from a DOM capture needs the author's machine.

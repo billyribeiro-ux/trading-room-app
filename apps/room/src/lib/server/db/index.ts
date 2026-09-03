@@ -26,6 +26,7 @@ export function ensureDatabase() {
       avatar_url TEXT NOT NULL DEFAULT '/avatar.svg',
       role TEXT NOT NULL DEFAULT 'staff',
       status TEXT NOT NULL DEFAULT 'offline',
+      is_new INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS messages (
@@ -71,6 +72,63 @@ export function ensureDatabase() {
     );
     CREATE INDEX IF NOT EXISTS alert_questions_alert_created_idx
       ON alert_questions (alert_id, created_at);
+    CREATE TABLE IF NOT EXISTS alert_delivery_jobs (
+      alert_id INTEGER PRIMARY KEY REFERENCES alerts(id) ON DELETE CASCADE,
+      room_short_code TEXT NOT NULL,
+      dont_cross_post INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued', 'dispatching', 'delivered', 'failed', 'suppressed')),
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at INTEGER,
+      last_error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS alert_delivery_jobs_due_idx
+      ON alert_delivery_jobs(status, next_attempt_at);
+    CREATE INDEX IF NOT EXISTS alert_delivery_jobs_room_idx
+      ON alert_delivery_jobs(room_short_code, alert_id);
+    CREATE TABLE IF NOT EXISTS recordings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      recorded_by_user_id INTEGER NOT NULL REFERENCES users(id),
+      title TEXT NOT NULL,
+      stored_name TEXT NOT NULL UNIQUE,
+      content_type TEXT NOT NULL CHECK (content_type IN ('video/webm', 'video/mp4')),
+      size INTEGER NOT NULL,
+      sha256 TEXT NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS recordings_room_started_idx
+      ON recordings(room_short_code, started_at DESC, id DESC);
+    CREATE TABLE IF NOT EXISTS recording_log_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recording_id INTEGER NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+      source_kind TEXT NOT NULL CHECK (source_kind IN ('chat', 'alert')),
+      source_id INTEGER NOT NULL,
+      channel TEXT,
+      sender_name TEXT NOT NULL,
+      body TEXT NOT NULL,
+      occurred_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS recording_log_entries_recording_time_idx
+      ON recording_log_entries(recording_id, occurred_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS recording_log_entries_source_idx
+      ON recording_log_entries(recording_id, source_kind, source_id);
+    CREATE TABLE IF NOT EXISTS public_player_grants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_short_code TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+      expires_at INTEGER NOT NULL,
+      revoked_at INTEGER,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS public_player_grants_room_expiry_idx
+      ON public_player_grants(room_short_code, expires_at);
     CREATE TABLE IF NOT EXISTS media_elevations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       room_short_code TEXT NOT NULL,
@@ -298,6 +356,8 @@ export function ensureDatabase() {
       sender_name TEXT NOT NULL,
       body TEXT NOT NULL,
       non_trade INTEGER NOT NULL DEFAULT 0,
+      dont_push INTEGER NOT NULL DEFAULT 0,
+      dont_cross_post INTEGER NOT NULL DEFAULT 0,
       repeat_mode TEXT NOT NULL DEFAULT '',
       ignore_weekends INTEGER NOT NULL DEFAULT 0,
       send_on INTEGER NOT NULL,
@@ -307,6 +367,7 @@ export function ensureDatabase() {
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
+      is_free_trial INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       last_seen_at INTEGER NOT NULL
     );
@@ -470,6 +531,13 @@ export function ensureDatabase() {
   if (!sessionColumns.has('alert_delete_access_at')) {
     sqlite.exec('ALTER TABLE sessions ADD COLUMN alert_delete_access_at INTEGER');
   }
+  /*
+    A trial is a property of this entry/session, never of the reusable local user row. Existing
+    sessions predate the trusted supply and therefore backfill to false rather than being guessed.
+  */
+  if (!sessionColumns.has('is_free_trial')) {
+    sqlite.exec('ALTER TABLE sessions ADD COLUMN is_free_trial INTEGER NOT NULL DEFAULT 0');
+  }
 
   const messageColumns = new Set(
     (sqlite.pragma('table_info(messages)') as Array<{ name: string }>).map((column) => column.name)
@@ -536,6 +604,9 @@ export function ensureDatabase() {
   */
   if (!userColumns.has('last_login_at')) {
     sqlite.exec('ALTER TABLE users ADD COLUMN last_login_at INTEGER');
+  }
+  if (!userColumns.has('is_new')) {
+    sqlite.exec('ALTER TABLE users ADD COLUMN is_new INTEGER NOT NULL DEFAULT 0');
   }
 
   const alertColumns = new Set(
@@ -733,6 +804,31 @@ export function ensureDatabase() {
     `CREATE INDEX IF NOT EXISTS scheduled_alerts_due_idx
        ON scheduled_alerts(send_on) WHERE claimed_at IS NULL`
   );
+
+  const scheduledAlertColumns = new Set(
+    (sqlite.pragma('table_info(scheduled_alerts)') as Array<{ name: string }>).map(
+      (column) => column.name
+    )
+  );
+  if (!scheduledAlertColumns.has('dont_push')) {
+    sqlite.exec('ALTER TABLE scheduled_alerts ADD COLUMN dont_push INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!scheduledAlertColumns.has('dont_cross_post')) {
+    sqlite.exec(
+      'ALTER TABLE scheduled_alerts ADD COLUMN dont_cross_post INTEGER NOT NULL DEFAULT 0'
+    );
+  }
+
+  const alertDeliveryJobColumns = new Set(
+    (sqlite.pragma('table_info(alert_delivery_jobs)') as Array<{ name: string }>).map(
+      (column) => column.name
+    )
+  );
+  if (!alertDeliveryJobColumns.has('dont_cross_post')) {
+    sqlite.exec(
+      'ALTER TABLE alert_delivery_jobs ADD COLUMN dont_cross_post INTEGER NOT NULL DEFAULT 0'
+    );
+  }
 
   /* The manage modal's list: one room's pending alerts, soonest first. */
   sqlite.exec(

@@ -11,6 +11,7 @@ import { building } from '$app/env';
 import { resolveConnectedIdentity } from '#lib/server/connection.js';
 import { ensureDatabase } from '#lib/server/db/index.js';
 import { startAlertScheduler } from '#lib/server/scheduled-alerts.js';
+import { startAlertDeliveryWorker } from '#lib/server/alert-delivery-outbox.js';
 import { startVideoScheduler } from '#lib/server/room-media-state.js';
 
 /**
@@ -30,6 +31,10 @@ import { startVideoScheduler } from '#lib/server/room-media-state.js';
  * without its own check is an open door.
  */
 const PUBLIC_PATHS = new Set(['/session', '/internal/media-hook']);
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname) || pathname.startsWith('/player/');
+}
 
 /**
  * `hasAlertScheduler` — the sweep that posts alerts a presenter scheduled for later.
@@ -61,6 +66,7 @@ const PUBLIC_PATHS = new Set(['/session', '/internal/media-hook']);
 if (!building) {
   ensureDatabase();
   startAlertScheduler();
+  startAlertDeliveryWorker();
   /*
     The VIDEO scheduler, added 2026-09-01, and it is here for exactly the reason the alert one is:
     a play armed for later has to fire whether or not the presenter's tab is still open, and this
@@ -138,10 +144,11 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.user = connection.user;
   event.locals.sessionId = connection.sessionId;
   event.locals.roomShortCode = connection.roomShortCode;
+  event.locals.isFreeTrial = connection.isFreeTrial;
 
   // A single choke point for authentication: every route except PUBLIC_PATHS is behind it, so no
   // page or form action can be reached without a session, including the `?/action` POSTs on `/`.
-  if (!connection.user && !PUBLIC_PATHS.has(event.url.pathname)) {
+  if (!connection.user && !isPublicPath(event.url.pathname)) {
     /*
       Nowhere local to send them. The room has no login of its own any more, and inventing a page
       that says so would be a dead end wearing a UI. `403` names the actual situation: this room is

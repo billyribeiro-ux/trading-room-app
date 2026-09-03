@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import {
   alertQuestions,
+  alertDeliveryJobs,
   alerts,
   chatMutes,
   messages,
@@ -437,19 +438,35 @@ describe('postAlert', () => {
     }
   });
 
-  it('refuses `dontPush`, which the action accepted and never read', async () => {
-    /*
-      `z.strictObject` refusing an unknown field is the honest shape: accepting one implies
-      something consumes it. Nothing does — the suppression it names has no consumer in this room —
-      so the client stopped sending it.
-    */
-    await expectSchemaRefusal(
+  it('persists `dontPush` as a terminal outbox suppression', async () => {
+    await expect(
       post(presenter, {
         kind: 'text',
         body: 'a',
         nonTradeAlert: false,
         dontPush: true
-      } as unknown as Parameters<typeof postAlert>[0])
+      })
+    ).resolves.toBeUndefined();
+    const [alert] = db.select().from(alerts).all();
+    expect(db.select().from(alertDeliveryJobs).all()).toEqual([
+      expect.objectContaining({
+        alertId: alert.id,
+        status: 'suppressed',
+        nextAttemptAt: null,
+        lastError: 'suppressed-by-sender'
+      })
+    ]);
+  });
+
+  it('persists `dontCrossPost` on a queued delivery job', async () => {
+    await post(presenter, {
+      kind: 'text',
+      body: 'source room only',
+      nonTradeAlert: false,
+      dontCrossPost: true
+    });
+    expect(db.select().from(alertDeliveryJobs).get()).toEqual(
+      expect.objectContaining({ status: 'queued', dontCrossPost: true })
     );
   });
 });
@@ -502,6 +519,29 @@ describe('askQuestion', () => {
     // Derived from the rows rather than incremented, so the badge cannot drift from the list.
     expect(stored?.questionCount).toBe(1);
     expect(stored?.questionAnswered).toBe(false);
+  });
+
+  it('refuses questions from both locally and permanently muted members', async () => {
+    const alert = await alertBy(presenter);
+    muteMember(new Date(Date.now() + 60_000));
+
+    await expect(
+      callRemote(locals(member), () =>
+        askQuestion({ body: 'local mute bypass?', alertId: alert.id })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+
+    db.delete(chatMutes).run();
+    controller.permanentlyMuted = true;
+    await expect(
+      callRemote(locals(member), () =>
+        askQuestion({ body: 'permanent mute bypass?', alertId: alert.id })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+
+    expect(
+      db.select().from(alertQuestions).where(eq(alertQuestions.alertId, alert.id)).all()
+    ).toHaveLength(0);
   });
 
   /*

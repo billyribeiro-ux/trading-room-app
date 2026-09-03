@@ -21,18 +21,13 @@
    * which matters because that file sits on its size ceiling; and the two halves share one question
    * — what is already scheduled — so splitting them would mean two components refetching the same
    * list and disagreeing about it after a removal.
+   * The body comes from the composer, and nothing else does.
+   * The composer supplies its authored fields, including the two delivery suppressions; this pane
+   * owns the date and repeat. SMS, email, Twitter and client-asserted sender fields remain refused.
+   * The SENDER is never a field: it is taken from the session on the server.
    *
-   * ## The body comes from the composer, and nothing else does
-   *
-   * `body` and `nonTradeAlert` are props because they are the composer's fields; everything else on
-   * the reference's `alertMsgLater` payload is either owned here (the date, the repeat) or refused at
-   * the boundary (`sendTxt`, `sendEmail`, `sendTweet`, `sendLaterAs*`, `dontCrossPost` — see
-   * `routes/scheduled-alerts.remote.ts` for why each). The SENDER is never a field: it is taken from
-   * the session on the server.
-   *
-   * ## The list is refetched, never spliced
-   *
-   * Upstream splices its local copy on removal (`globals.scheduledAlerts.splice(se, 1)`). This
+   * The list is refetched, never spliced. Upstream splices its local copy on removal
+   * (`globals.scheduledAlerts.splice(se, 1)`). This
    * refetches, because this repository's rule after a mutation is to reassign from the SERVER
    * response rather than from the local guess — a splice that succeeds against a delete that failed
    * leaves a presenter believing an alert is cancelled when it is still going to fire.
@@ -45,11 +40,14 @@
     /** The composer's alert text. Empty disables scheduling, exactly as it disables posting. */
     body: string;
     nonTradeAlert: boolean;
+    dontPush: boolean;
+    dontCrossPost: boolean;
     /** Announced so the composer can clear itself, the same way a successful post does. */
     onscheduled?: () => void;
   }
 
-  let { body, nonTradeAlert, onscheduled, onalert, onconfirm }: Props = $props();
+  let { body, nonTradeAlert, dontPush, dontCrossPost, onscheduled, onalert, onconfirm }: Props =
+    $props();
 
   /**
    * The datetime-local value, as the browser gives it: `YYYY-MM-DDTHH:mm`, in the VIEWER's timezone.
@@ -141,6 +139,8 @@
       await scheduleAlertLater({
         body: body.trim(),
         nonTradeAlert,
+        dontPush,
+        dontCrossPost,
         repeat,
         ignoreWeekends,
         sendOn: new Date(sendOnLocal).getTime()
