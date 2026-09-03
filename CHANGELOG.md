@@ -75,6 +75,13 @@ PostgreSQL 17 container, including a second-request read-after-write proof; the 
 test passed; migration integrity passed 13 pinned migrations; and provenance passed 98 imported
 plus nine locally authored service files. No production activation or deployment is claimed.
 
+The first clean full-controller run also caught two integration omissions before release: account
+SSR fixtures did not yet carry the new disabled-authority branch, and the naming boundary had not
+declared `0012`'s deliberate denial of the retired baseline role. The fixtures now exercise legacy
+mode explicitly. The migration remains byte-immutable after application; its single exact-path
+exemption documents why owner-only conversion ledgers revoke that historic role instead of erasing
+sqlx checksum history.
+
 ### 2026-09-03 19:17 EDT — clean-checkout contracts stopped borrowing workstation state
 
 **Runtime impact: no; this changes test fixtures, comments, and CI contracts only.** Two hosted

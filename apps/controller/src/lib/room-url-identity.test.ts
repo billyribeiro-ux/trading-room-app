@@ -50,6 +50,7 @@ function html(rooms: unknown[]) {
           emailVerifiedAt: new Date()
         },
         emailUnproved: false,
+        profileAuthority: { enabled: false },
         entitlements: { marketplace: true },
         rooms,
         badges: [],

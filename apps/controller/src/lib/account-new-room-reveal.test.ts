@@ -38,6 +38,7 @@ function emptyAccount() {
         apiScopes: [],
         entitlements: { marketplace: true, 'text-list': true, sso: true, mobile: true },
         user: { id: 1, displayName: 'Ada Lovelace', email: 'ada@example.com', emailVerifiedAt: new Date() },
+        profileAuthority: { enabled: false },
         verificationEnforced: false
       },
       form: null

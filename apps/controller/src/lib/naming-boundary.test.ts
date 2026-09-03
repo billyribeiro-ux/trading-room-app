@@ -99,6 +99,13 @@ const ALLOWED_PREFIXES = Object.freeze([
     measured, not reasoned — see the migration's closing note.
   */
   'services/api/migrations/0010_retire_ptr_clone_app.sql',
+  /*
+    `0012` creates owner-only conversion ledgers after the baseline role has been retired from live
+    ACLs. Its two explicit revocations name that historic role so a partially upgraded cluster
+    cannot expose reconciliation records. The migration is already applied, checksum-ledgered
+    history, so deleting the literals would violate the stronger forward-only migration boundary.
+  */
+  'services/api/migrations/0012_legacy_cutover_ledger.sql',
   'services/api/tests/',
   '.github/workflows/backend-quality.yml',
   'apps/controller/scripts/verify-backend.mjs',
@@ -213,8 +220,13 @@ describe('the reference name never leaks into live code', () => {
       name: it revokes every privilege `ptr_clone_app` holds in the database it runs on. It cannot
       be written without naming what it strips.
 
-      Every other entry on this list is a use that must be TOLERATED. This is the only one working
-      to shorten the list — it takes the name out of every ACL in every live database. It does not
+      41 -> 42 on 2026-09-03 admits one already-applied migration, `0012`, whose explicit deny for
+      the retired role protects owner-only conversion evidence. Editing that SQL after application
+      would break sqlx checksum history, so the narrow migration exemption is the only forward-only
+      correction; the CHANGELOG records the gate that found the missed declaration.
+
+      Every other entry on this list is a use that must be TOLERATED. `0010` is the only one working
+      to shorten the live ACL list — it takes the name out of every ACL in every live database. It does not
       take itself off the list: the ROLE survives the chain deliberately, because dropping a
       cluster-global role stops the next database from starting its own chain. That is the argument,
       and the CHANGELOG carries the evidence: four databases on a live PostgreSQL 16.13 cluster,
@@ -222,7 +234,7 @@ describe('the reference name never leaks into live code', () => {
       three-database entry — and the convergence test that failed against the version which did
       drop it.
     */
-    expect(ALLOWED_PREFIXES.length).toBeLessThanOrEqual(41);
+    expect(ALLOWED_PREFIXES.length).toBeLessThanOrEqual(42);
   });
 
   it('never permits an exception inside the running application code', () => {

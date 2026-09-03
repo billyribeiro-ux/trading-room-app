@@ -63,6 +63,7 @@
   import { enhance } from '$app/forms';
   import { resolve } from '$app/paths';
   import { bootbox } from '#lib/bootbox.svelte.js';
+  import { untrack } from 'svelte';
   import type { SubmitFunction } from '$app/forms';
   import type { PageProps } from './$types';
   import PasswordReveal from '#lib/components/PasswordReveal.svelte';
@@ -77,14 +78,13 @@
    * way a room gets created here — there is no always-visible create form.
    */
   let showNewRoom = $state(0);
-  let profileDisplayName = $state('');
-  let profileChatTextSize = $state(13);
+  // These are editable form buffers, deliberately seeded once rather than kept in sync with load
+  // data. A successful enhanced submission preserves exactly what the operator just entered.
+  let profileDisplayName = $state(untrack(() => data.user.displayName));
+  let profileChatTextSize = $state(
+    untrack(() => (data.profileAuthority.enabled ? data.profileAuthority.chatTextSize : 13))
+  );
   let showAddBadge = $state(false);
-
-  $effect(() => {
-    profileDisplayName = data.user.displayName;
-    profileChatTextSize = data.profileAuthority.enabled ? data.profileAuthority.chatTextSize : 13;
-  });
   /*
     The badge editor's own state, mirroring the reference's `badges.*` scope.
 
