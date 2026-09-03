@@ -336,6 +336,52 @@ describe('the triage document tells the truth about what is built', () => {
     );
   });
 
+  it('and the operator-toolkit row is recomputed too, which it was not', () => {
+    /*
+      THE ONE ROW OF THAT HEADLINE NOTHING CHECKED, closed 2026-09-02.
+
+      Every other row above is derived from the *Confirmed missing* table. This one — the five
+      commands under "NOT WORK, and one BLOCKED" — was prose, and it read *"all still outstanding |
+      5"* for a fortnight after four of them had been measured to have no call site anywhere in the
+      bundle. A number nobody recomputes in a table where every other number is recomputed is the
+      exact shape this document's own header warns about, and it was mine to leave or to close.
+
+      What is asserted is the SIZE of that section's table against the sentence beside it, plus that
+      the section states both dispositions. The dispositions themselves are measurements recorded in
+      the prose — four with no call site, one blocked on a repeater fleet — and a count cannot check
+      those; what it can stop is the count and the table disagreeing again.
+    */
+    const doc = readFileSync(TRIAGE, 'utf8');
+
+    const heading = doc.indexOf('## NOT WORK, and one BLOCKED');
+    expect(heading, 'the operator-toolkit section must be findable').toBeGreaterThan(-1);
+    const next = doc.indexOf('\n## ', heading + 1);
+    expect(next, 'the section must be bounded by the one after it').toBeGreaterThan(heading);
+    const section = doc.slice(heading, next);
+
+    /* Its rows are `| \`name\` | N | prose |` — a command, an occurrence count, a description. */
+    const operatorRows = [...section.matchAll(/^\| `([A-Za-z]+)` \| \d+ \| /gm)].map((m) => m[1]);
+    expect(operatorRows).toEqual([
+      'getMyRepeater',
+      'resetAudioBridge',
+      'resetAllMediaServers',
+      'resetMediaServer',
+      'resetAudioBridgeOnServer'
+    ]);
+
+    expect(doc).toContain(
+      `| the "operator toolkit" five, below — **4 NOT WORK, 1 BLOCKED** as of 2026-09-02 | 0 outstanding |`
+    );
+    expect(operatorRows).toHaveLength(5);
+
+    /*
+      And the two dispositions are stated where the rows are, not only in the headline. A summary
+      that names a verdict its own section does not is how the previous one went wrong.
+    */
+    expect(section).toContain('no call site anywhere in');
+    expect(section).toContain('repeater fleet');
+  });
+
   it('and NEW-TODO.md, which restates that tally, is checked against it too', () => {
     /*
       THE SUMMARY OF THE SUMMARY, added 2026-08-30 — and it is here because it had already gone

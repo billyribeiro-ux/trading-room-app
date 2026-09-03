@@ -31,7 +31,7 @@ again without a red test.
 | *Confirmed missing*, **BUILT AS** something else | 7 |
 | *Confirmed missing*, still **NOT BUILT** | 0 |
 | *Confirmed missing*, **BLOCKED** — cannot be built here, blocker named | 3 |
-| need a decision first (the operator toolkit, below) — all still outstanding | 5 |
+| the "operator toolkit" five, below — **4 NOT WORK, 1 BLOCKED** as of 2026-09-02 | 0 outstanding |
 | claimed missing, then REFUTED — we already have it | 7 |
 | classified as built-under-another-name at triage | 9 |
 | framework/library noise, not our work at all | 4 |
@@ -48,9 +48,20 @@ away from the warning. **A citation is not a test.** It was built on 2026-08-29 
 **There is no "parked" bucket, and there must never be one.** An earlier version of this document
 filed five commands under "unclear, needs a decision rather than more reading", which read as a
 resolved category and was not one. **A pending decision is outstanding work.** The only thing that
-removes a row from the outstanding count is building it, or proving we already did. The four NOISE
-rows are the sole exception, because they are third-party library internals and were never ours to
-build.
+removes a row from the outstanding count is building it, or **proving it is not work** — and the
+four NOISE rows were the sole exception, because they are third-party library internals and were
+never ours to build.
+
+**That last clause gained a second case on 2026-09-02, and the difference matters.** The operator
+five are now 0 outstanding, and NOT because a decision was taken: four of them have **no call site
+anywhere in the bundle**, so building senders would invent controls the reference does not render.
+"Proving we already did" and "proving there is nothing to do" are both measurements; "deciding it can
+wait" is the thing this paragraph refuses, and it is still refused.
+
+The row that had to be separated out to reach that answer is the useful part: `getMyRepeater` sat in
+that bucket for a fortnight and is a member's own reconnect exchange over the ORDINARY transport,
+fully live upstream. A bucket named for what its members are FOR will keep collecting things that are
+not.
 
 That mistake has now been made twice in this repository in two different shapes: a TODO sentence
 claiming everything buildable was built while two whole tabs sat undiscovered, and this bucket. Both
@@ -211,7 +222,13 @@ internals. **Volume is not evidence of importance.**
 
 ---
 
-## NOT BUILT — the five that need a decision first, and are outstanding regardless
+## NOT WORK, and one BLOCKED — re-measured 2026-09-02
+
+**This section was headed *"the five that need a decision first, and are outstanding regardless"*
+until 2026-09-02.** It is not five rows of work: four are commands the reference declares and never
+sends, and the fifth is a member's own reconnect exchange blocked on a repeater fleet. The heading is
+left visible rather than quietly swapped, because a section that read as a backlog for a fortnight is
+the kind of drift this document's own footer warns about.
 
 | command | occ | what it does |
 | --- | ---: | --- |
@@ -221,16 +238,50 @@ internals. **Volume is not evidence of importance.**
 | `resetMediaServer` | 3 | Hard-resets ONE media server. Two wrappers send it. hardResetMediaServer(e) at offset 2168026 takes a parameter and then ignores it, sending an empty payload {} — a real upstream quirk, recorded as read. hardResetMediaServerOnServer(e) sends {server:e} where e |
 | `resetAudioBridgeOnServer` | 2 | Resets the audio bridge on one named server. Full method, offset 2166727: resetAudioBridgeOnServer(e){bootbox.confirm(`Are you sure you want to reset the audio on Server: ${e} ?`,i=>{i&&(this.done(),this.appService.sendServerAdminCommand("resetAudioBridgeOnSer |
 
-**The decision these were waiting on is ANSWERED, by the owner, 2026-08-15.** They are not "should a
-presenter be able to reset shared media infrastructure" — they are the **SaaS operator's toolkit**:
-when a tenant has a problem, the operator resets, diagnoses, and hard-reboots their room. That is
-what this platform is sold as, and these are the controls that do it.
+**FOUR OF THESE FIVE ARE NOT WORK, RE-MEASURED 2026-09-01 AND AGAIN 2026-09-02, AND THE FIFTH IS NOT
+LIKE THEM.** This section had been read as a backlog for a fortnight and it is not one.
 
-Three things follow, and they raise the priority of every row above rather than lowering it:
+`resetAudioBridge`, `resetAudioBridgeOnServer`, `resetAllMediaServers` and `resetMediaServer` — with
+the two `hardResetMediaServer*` wrappers named inside that last row — have **no call site anywhere in
+the 2,891,205-byte bundle.** Every occurrence is the method DECLARATION or the command string inside
+its own body; swept independently twice, and the counts are 4, 2, 3, 3, 2 and 1, every one accounted
+for. There is no `x("click", … resetAudioBridge() …)`. Building senders would INVENT controls the
+reference does not render, which is the disposition `giveMicScreen` carries for the same reason.
+
+**`getMyRepeater` does not belong in this table and never did.** It is the only row here that is
+LIVE upstream, and it is not an operator control at all — it is the client's own reconnect behaviour:
+
+```
+byte 1,115,897   on reconnect:  appEventBus.emit("getMyRepeater", {currentStreamServer: s})
+byte 1,144,067   subscriber:    → sendServerCommand("getMyRepeater", {currentStreamServer})
+byte 1,023,916   also sent after a soft reset, jittered: setTimeout(… , 3000 * Math.random())
+byte 1,021,388   receiver:      case "getMyRepeater": this.setMyRepeater(i.streamServer)
+byte 1,026,712   setMyRepeater(e) { globals.streamServer = globals.forcedStreamServer || e }
+```
+
+A full chain, and a second source for the same value at byte **994,388**, where the LOGIN payload
+carries `data.streamServer`. So it asks "which media server should I be on" after a reconnect, and
+the answer picks one out of a POOL.
+
+**Its blocker is therefore a repeater fleet, not a decision.** This deployment has one media plane
+and no assignment step, so the reply has no source — the same shape as `backupClusterID`, and it
+moves to BLOCKED rather than staying here. The jitter is worth carrying when it is ever built: three
+seconds of random delay so a room reconnecting after an outage does not ask as one.
+
+**What the section header said, kept because the reasoning was sound where it applied.** The owner
+answered on 2026-08-15 that these are not "should a presenter be able to reset shared media
+infrastructure" — they are the **SaaS operator's toolkit**: when a tenant has a problem, the operator
+resets, diagnoses, and hard-reboots their room. That is what this platform is sold as. It remains
+true of what an operator console would need; it is not an argument for building senders for
+methods the reference itself never calls.
+
+Two further things follow, and the second is the more useful:
 
 1. **They all travel on a SEPARATE channel** — `sendAdminCmd` → `socket.transmit("adminCmd", …)`,
    distinct from the ordinary command transport. The reference has a dedicated admin command path,
-   which is what an operator toolkit looks like from the client side.
+   which is what an operator toolkit looks like from the client side. (`getMyRepeater` does not: it
+   goes over the ORDINARY `cmd` transport, `sendServerCommand`, which is the tell that it was
+   mis-clustered here — the same tell this document already applies to `notyping`.)
 2. **Six of the wider reset/diagnose family are built here** — `hardResetSession`,
    `softResetSession`, `reloadSessionConfig`, `saveAndCloseSession`, `saveCloseMessage` and
    `refreshRoster`. So this is not new ground.
@@ -247,9 +298,12 @@ Three things follow, and they raise the priority of every row above rather than 
    A markup search cannot tell a wired control from an inert one, which is the same lesson this
    document's own footer draws about PRESENT rows being a floor. This sentence is what it looks like
    when one is trusted anyway.
-3. **What is missing is REACH, not the commands.** Ours work inside a room, for that room. The
-   operator need is to invoke them for a tenant's room from a central console. `/admin` already has
-   impersonation, which is half that bridge.
+3. **"What is missing is REACH, not the commands" — WITHDRAWN 2026-09-02.** The sentence read: *"Ours
+   work inside a room, for that room. The operator need is to invoke them for a tenant's room from a
+   central console."* That is a true description of an operator console and it is not a description
+   of these five rows, because four of them are commands the reference never sends and the fifth is a
+   member's own reconnect. A row's SIZE cannot be reasoned about from what a feature is for; it has
+   to be measured from what calls it.
 
 ---
 
