@@ -424,11 +424,26 @@ not exist for them at all.
 | `isNewIndicatorOn` | **Its data.** The gate is `isNewIndicatorOn && isPresenter && <row>.isNew` at four sites (bytes 1,344,564 / 1,382,617 / 2,034,811 / 2,060,925), and `isNew` is not computed in the browser at all: it arrives on the login payload from the reference's own server — `globals.user.isNew = B.data.isNew` (995,175), `isNew: s.isNew || !1` (1,157,344) — so the rule deciding who counts as new is unknowable from the capture. Measured 2026-08-28: `isNew` occurs ZERO times in `apps/room/src/lib/server` and zero times on the controller. Crossing the setting would put a gate on a value nothing supplies, which is what `enableBadges` was held out of the boundary to avoid. Unblocked by one answer from the owner about what makes a member new, or by a capture of that login response. |
 | `linkedRoomAlerts` | **The server-side fan-out, which is not in the capture.** The setting's own help text is *"Comma separated list of Room IDs of the rooms to PUSH our alerts to"* — the pushing is the reference's SERVER. What the client contributes is one composer row (`WTe`, byte 2,119,618) whose checkbox is `dontCrossPost`, sent on the `alertMsg` and `alertMsgLater` payloads. **Measured 2026-08-28: `crossPost` occurs ZERO times in the bundle**, so the browser never does the fan-out and never reads the flag back. Building the checkbox alone would ship a control whose only effect is sending a field nothing reads — the thing this repository refuses by name. Unblocked by cross-posting existing at all, which is its own feature and needs an owner decision about what "linked room" means across two databases. |
 | `recsInRoom` | The Recordings tab it gates. `presAreaTabs-recordings` is an iframe onto a server archive page, and there are zero recordings or archive tables in either database. `TODO.md` carries the blocker. Wire the setting WITH the tab, never before it. |
-| `isLocked` | Byte 1,148,353 — refuses a non-presenter at connect with a named dialog, and byte 2,500,128 offers the presenter an unlock confirm. Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is not a lock. |
 | `backupClusterID` | Media infrastructure — a second MediaMTX cluster. Same blocker as every other `STREAM_SERVER_MTX` row. |
 | `recordChat` | Only ever read inside the `videoOnlyMode` recording-bot branch (bytes 1,497,779 and 2,498,823), and this room does not model the `r` query parameter. The same honest gap `files-gates.ts` already records for `hideFiles`. |
 | `authMode` | Login-page state on the controller side, not a room read. `e.authMode` is a component field. |
 | `description` | The login page's room blurb — the controller's surface, and already documented there. |
+
+---
+
+**`isLocked` LEFT THIS TABLE ON 2026-09-02, and its blocker was a SHAPE rather than evidence.** It
+read: *"Needs a lock the SERVER owns; `room_state` has no column for it, and a client-side lock is
+not a lock."* Both halves are true and the conclusion did not follow. The lock is a room SETTING on
+the **controller**, `room_state` was never where it belonged, and `decideRoomEntry` has refused a
+locked room at the guest door (`room-entry.ts:221`) since before the room's three Lock Session
+buttons were written.
+
+What was missing was the WRITE — and worse than missing. Those three buttons wrote `sessionLocked`
+and `sessionLockKick` into the clicking presenter's own settings blob, **both keys with zero readers
+anywhere in `apps/room/src`**, and raised the capture's own "Session Locked" over a door that never
+closed. `isLocked` is the second setting the room may write back; `session-commands.remote.ts`'s
+`lockSession` is the command, and `{kick: true}` is the one half not reproduced, named where it is
+sent.
 
 ---
 
