@@ -5241,15 +5241,19 @@ red correction block in §11.2.
 table cell that is truncated mid-word in the source document. **Never complete a truncated citation
 from memory; open the file.**
 
-**Manage-side / P-items — genuinely outstanding, and this file is their authority:**
+**Manage-side / P-items — genuinely outstanding, and this file is their authority.**
 
-| | outstanding work | evidence complete? |
-|---|---|---|
-| **P-1** | wire entitlement → the push fan-out. Signal, decision point and lever all identified (§8.2) | **Client side yes. Server ordering needs `POST_ROUTE_API_DOCUMENTATION.md`** |
-| **P-2** | extend `disalowMultiLogins` to be account-scoped and device-class-aware; key on md5-email (§12.1), enforce server-side | **Yes** |
-| **P-3** | the enterprise console. Existing pieces: marketplace `/ptr_app/mp/v2`, API keys, `/users/v1/adminusers`, `chatTabsWithBadges`, `modAdminLoginList` | **Partly** — Marketplace pane never rendered; `adminusers` `perms` vocabulary unknown |
-| **P-4** | drawing tool — **no evidence in any corpus.** A genuine addition, to be designed | **N/A — design task** |
-| **P-5** | Spotify. Three precedents: SoundCloud (payload = bare share URL, `roomState.soundCloudURL`, two stops), YouTube-for-all, `playSoundFile` | **Yes** |
+**Re-measured against the tree on 2026-09-03**, because the standing rule here is that a recorded
+blocker is re-measured and never inherited — and one of the five had already been built. The
+`measured` column is that pass; where it disagrees with `outstanding work`, the measurement wins.
+
+| | outstanding work | evidence complete? | measured 2026-09-03 |
+|---|---|---|---|
+| **P-1** | wire entitlement → the push fan-out. Signal, decision point and lever all identified (§8.2) | **Client side yes. Server ordering needs `POST_ROUTE_API_DOCUMENTATION.md`** | **BLOCKED, and on something larger than the recorded reason.** That document is in no corpus this repository holds — looked for, absent. The decisive blocker is that **there is no mobile client**: `mobile-app/` holds one file, `PROMPT.md`. The controller's FCM half IS built (`server/fcm.ts`, `FCM_SERVICE_ACCOUNT_JSON`, and admin actions that REFUSE rather than answer "nothing to do" when it is unset), and `internal/mobile-pin` / `internal/mobile-restore` both ship. What does not exist is anything that pushes an ALERT: `post-alert.remote.ts:45` records `dontPush` as having no consumer, and the server refuses the field rather than accepting one nothing reads. Registration tokens can only come from an app on a phone, so wiring the fan-out now would build a subsystem whose only observable behaviour is a log line. |
+| **P-2** | extend `disalowMultiLogins` to be account-scoped and device-class-aware; key on md5-email (§12.1), enforce server-side | **Yes** | **BUILT, and stricter than the row asks for.** `createSessionFor` (`apps/room/src/lib/server/auth.ts`) deletes every prior session for the account inside ONE transaction, newest-wins, and every entry to every room runs through it (`session/+page.server.ts:449`). Account-scoped and server-side, which is the row; **global rather than per-room**, which is stronger. Eight cases in `session-limit-contract.test.ts`, including that a presenter gets no exemption and that the account is never left with no session even for an instant. The open half — an ALREADY-OPEN stream — is `server/live-access.ts`. `disalowMultiLogins` itself stays `wired: false`, and its reason in `room-entry.ts` was corrected the same day: honouring the checkbox would mean RELAXING this on an operator's say-so. |
+| **P-3** | the enterprise console. Existing pieces: marketplace `/ptr_app/mp/v2`, API keys, `/users/v1/adminusers`, `chatTabsWithBadges`, `modAdminLoginList` | **Partly** — Marketplace pane never rendered; `adminusers` `perms` vocabulary unknown | Unchanged. Both gaps are EVIDENCE ABSENT: no capture this repository holds ever rendered the Marketplace pane, and the `perms` vocabulary is a server response nothing here has. |
+| **P-4** | drawing tool — **no evidence in any corpus.** A genuine addition, to be designed | **N/A — design task** | Unchanged, and it is not a divergence to close: there is nothing to match. A drawing tool built from this row would be invented product, which is the one thing the standing method forbids more firmly than it forbids an unclosed gap. **Owner's, to specify.** |
+| **P-5** | Spotify. Three precedents: SoundCloud (payload = bare share URL, `roomState.soundCloudURL`, two stops), YouTube-for-all, `playSoundFile` | **Yes** | An ADDITION rather than a match — the reference has SoundCloud, not Spotify. The blueprint below is real and the three precedents are transcribable, but which service the room integrates is a product decision with licensing behind it. **Owner's, to choose.** |
 
 ## 12.4 What remains unread, ranked — the honest list
 
