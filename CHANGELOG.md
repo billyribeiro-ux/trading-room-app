@@ -45,6 +45,36 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 19:42 EDT — Gate 3 profile authority became a reversible request-path slice
+
+**Runtime impact: yes when `PROFILE_AUTHORITY_MODE=rust`; legacy remains the default and rollback.**
+Rust now exposes an exact, bounded `PATCH /api/v1/account` contract that changes display name and
+shallow-merges preferences in one `UPDATE ... RETURNING` statement. The response is therefore the
+committed row, not a pre-write read. Guests, absent/deleted sessions, extra authority fields, empty
+or oversized names, non-object preferences, and oversized preference payloads fail closed.
+
+Forward migration `0013` adds only column-level `UPDATE` on `users.display_name` to the restricted
+runtime role. It asserts that relation-wide `UPDATE` and `is_platform_admin` mutation remain absent;
+the startup ACL guard, release attestor, immutable migration list, and service provenance seals all
+move with it. The Rust OpenAPI document now includes profile and preference operations, and the
+generated SvelteKit client plus transport validate exact request/response shapes and reject cookies
+on every account-data response.
+
+The controller adds the rollback-safe `legacy | rust` authority switch. Rust mode refuses to boot
+without a private API origin, refuses unreconciled or mismatched user/enterprise UUIDs, dual-logs in
+before creating a controller session, refreshes an expired access token at most once, repeats the
+binding proof on direct writes, excludes impersonation from profile mutation, and revokes both
+session families on logout. If the authority is unreachable during logout, local browser and
+controller credentials are still removed. The authenticated account page reads the canonical name
+and chat text size, renders a live preview, and saves them through the typed boundary. Activation,
+observation, and non-destructive rollback are recorded in `ops/PROFILE-AUTHORITY-CUTOVER.md`.
+
+Measured before the clean-checkout gate: 31 focused TypeScript assertions passed; the Rust workspace
+compiled with all targets and test features; two real-Axum profile tests passed against a fresh
+PostgreSQL 17 container, including a second-request read-after-write proof; the live runtime ACL
+test passed; migration integrity passed 13 pinned migrations; and provenance passed 98 imported
+plus nine locally authored service files. No production activation or deployment is claimed.
+
 ### 2026-09-03 19:17 EDT — clean-checkout contracts stopped borrowing workstation state
 
 **Runtime impact: no; this changes test fixtures, comments, and CI contracts only.** Two hosted

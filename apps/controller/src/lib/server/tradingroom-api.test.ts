@@ -6,10 +6,15 @@ import {
   UnsafeApiCookieError,
   apiCookieHeader,
   applyApiCookies,
+  clearApiCookies,
   getAccountBootstrap,
   isLoginRequest,
+  isPreferenceRequest,
+  isPreferencesRequest,
+  isProfileUpdateRequest,
   login,
-  logout
+  logout,
+  updateAccountProfile
 } from './tradingroom-api';
 
 const USER_ID = 'a0000001-0000-4000-8000-000000000001';
@@ -103,6 +108,26 @@ describe('Rust API cookie boundary', () => {
     });
     expect(apiCookieHeader(jar.cookies)).toBe(`${ACCESS_COOKIE}=access; ${REFRESH_COOKIE}=refresh`);
   });
+
+  it('expires both Rust cookies locally without touching controller credentials', () => {
+    const jar = cookieJar({ control_session: 'controller-secret' });
+    clearApiCookies(jar.cookies);
+    expect(jar.set).toHaveBeenNthCalledWith(1, ACCESS_COOKIE, '', {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 0
+    });
+    expect(jar.set).toHaveBeenNthCalledWith(2, REFRESH_COOKIE, '', {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 0
+    });
+    expect(jar.values.get('control_session')).toBe('controller-secret');
+  });
 });
 
 describe('typed Rust API transport', () => {
@@ -119,6 +144,17 @@ describe('typed Rust API transport', () => {
 
   it('accepts only the exact login request shape', () => {
     expect(isLoginRequest({ email: 'owner@example.test', password: 'test-password' })).toBe(true);
+  });
+
+  it('accepts only exact profile and preference request envelopes', () => {
+    expect(isProfileUpdateRequest({ displayName: 'Ada', preferences: { chatTextSize: 16 } })).toBe(true);
+    expect(isProfileUpdateRequest({ displayName: 'Ada', preferences: {}, isPlatformAdmin: true })).toBe(false);
+    expect(isProfileUpdateRequest({ displayName: 'Ada', preferences: [] })).toBe(false);
+    expect(isPreferenceRequest({ key: 'chatTextSize', value: 16 })).toBe(true);
+    expect(isPreferenceRequest({ key: 'chatTextSize' })).toBe(false);
+    expect(isPreferenceRequest({ key: 'x', value: true, userId: USER_ID })).toBe(false);
+    expect(isPreferencesRequest({ theme: 'darkTheme' })).toBe(true);
+    expect(isPreferencesRequest([])).toBe(false);
   });
 
   it('validates login before applying both host-only cookies', async () => {
@@ -321,6 +357,76 @@ describe('typed Rust API transport', () => {
       getAccountBootstrap({ cookies: jar.cookies, origin: 'https://www.example.test', fetch })
     ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamCookie' });
     expect(jar.set).not.toHaveBeenCalled();
+  });
+
+  it('sends the exact profile patch and accepts only an exact current-user response', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const body = {
+      id: USER_ID,
+      displayName: 'Canonical Name',
+      isPlatformAdmin: false,
+      isGuest: false,
+      preferences: { chatTextSize: 18 }
+    };
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('http://127.0.0.1:8080/api/v1/account');
+      expect(init?.method).toBe('PATCH');
+      expect(new Headers(init?.headers).get('origin')).toBe('https://www.example.test');
+      expect(new Headers(init?.headers).get('cookie')).toBe(`${ACCESS_COOKIE}=access-only`);
+      expect(JSON.parse(String(init?.body))).toEqual({
+        displayName: 'Canonical Name',
+        preferences: { chatTextSize: 18 }
+      });
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+
+    await expect(
+      updateAccountProfile(
+        { cookies: jar.cookies, origin: 'https://www.example.test', fetch },
+        { displayName: 'Canonical Name', preferences: { chatTextSize: 18 } }
+      )
+    ).resolves.toEqual({ ok: true, status: 200, data: body });
+    expect(jar.set).not.toHaveBeenCalled();
+
+    const leakingFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...body, email: 'must-not-cross@example.test' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    await expect(
+      updateAccountProfile(
+        { cookies: jar.cookies, origin: 'https://www.example.test', fetch: leakingFetch },
+        { displayName: 'Canonical Name', preferences: {} }
+      )
+    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamResponse' });
+  });
+
+  it('refuses cookies on profile and preference data operations', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            id: USER_ID,
+            displayName: 'Canonical',
+            isPlatformAdmin: false,
+            isGuest: false,
+            preferences: {}
+          }),
+          { status: 200, headers: sessionHeaders() }
+        )
+    );
+    await expect(
+      updateAccountProfile(
+        { cookies: jar.cookies, origin: 'https://www.example.test', fetch },
+        { displayName: 'Canonical', preferences: {} }
+      )
+    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamCookie' });
   });
 
   it('preserves the API stable error without accepting response cookies', async () => {

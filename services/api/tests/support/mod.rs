@@ -329,6 +329,52 @@ impl Harness {
             .expect("reset preferences");
     }
 
+    /// Creates an identity that no other test can observe through a seeded membership.
+    ///
+    /// Profile writes are global rather than tenant-scoped, so mutating a seeded owner would race
+    /// the bootstrap tests that deliberately run in parallel. A unique identity makes the
+    /// read-after-write proof deterministic without serialising the suite.
+    pub async fn create_profile_identity(
+        &self,
+        display_name: &str,
+        preferences: &serde_json::Value,
+        is_guest: bool,
+    ) -> Uuid {
+        let unique = Uuid::new_v4();
+        let id: Uuid = sqlx::query_scalar(
+            "INSERT INTO users (email, email_hash, display_name, is_guest) \
+             VALUES ($1, $2, $3, $4) RETURNING id",
+        )
+        .bind(format!("profile.{}@example.test", unique.simple()))
+        .bind(unique.simple().to_string())
+        .bind(display_name)
+        .bind(is_guest)
+        .fetch_one(self.db.identity_pool_for_tests())
+        .await
+        .expect("create isolated profile identity");
+
+        sqlx::query("UPDATE users SET preferences = $2 WHERE id = $1")
+            .bind(id)
+            .bind(sqlx::types::Json(preferences))
+            .execute(self.db.identity_pool_for_tests())
+            .await
+            .expect("seed isolated profile preferences");
+        id
+    }
+
+    pub async fn drop_profile_identity(&self, user_id: Uuid) {
+        sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&self.admin)
+            .await
+            .expect("drop isolated profile refresh tokens");
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(user_id)
+            .execute(&self.admin)
+            .await
+            .expect("drop isolated profile identity");
+    }
+
     /// Hard-deletes a message and its event. These are real rows in a shared fixture; a soft
     /// delete would accumulate.
     pub async fn purge_message(&self, id: &str) {

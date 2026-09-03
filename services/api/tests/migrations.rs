@@ -1275,6 +1275,7 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
     ];
     const USER_UPDATE: &[&str] = &[
         "password_hash",
+        "display_name",
         "last_login_at",
         "updated_at",
         "preferences",
@@ -1456,6 +1457,12 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
     .execute(&runtime)
     .await
     .expect("the runtime preference update remains permitted");
+
+    sqlx::query("UPDATE users SET display_name = 'Profile Owner' WHERE id = $1")
+        .bind(owner_id)
+        .execute(&runtime)
+        .await
+        .expect("the runtime profile display-name update remains permitted");
 
     let error = sqlx::query("UPDATE users SET is_platform_admin = true WHERE id = $1")
         .bind(guest_id)

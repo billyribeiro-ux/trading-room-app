@@ -10,14 +10,26 @@ import type { Cookies } from '@sveltejs/kit';
 import { TRADINGROOM_API_URL } from '$app/env/private';
 import type {
   AccountBootstrap,
+  CurrentUser,
   Error as ApiErrorBody,
   LoginRequest,
+  PreferenceRequest,
+  Preferences,
+  ProfileUpdateRequest,
   Session,
   TradingRoomApiOperation,
   TradingRoomApiOperations
 } from './tradingroom-api.generated';
 
-export type { AccountBootstrap, LoginRequest, Session } from './tradingroom-api.generated';
+export type {
+  AccountBootstrap,
+  CurrentUser,
+  LoginRequest,
+  PreferenceRequest,
+  Preferences,
+  ProfileUpdateRequest,
+  Session
+} from './tradingroom-api.generated';
 
 export const ACCESS_COOKIE = '__Host-tradingroom_access';
 export const REFRESH_COOKIE = '__Host-tradingroom_refresh';
@@ -35,7 +47,11 @@ const OPERATIONS: {
   login: { method: 'POST', path: '/api/auth/login', successStatus: 200 },
   logout: { method: 'POST', path: '/api/auth/logout', successStatus: 204 },
   refreshSession: { method: 'POST', path: '/api/auth/refresh', successStatus: 200 },
-  getAccountBootstrap: { method: 'GET', path: '/api/v1/account', successStatus: 200 }
+  getAccountBootstrap: { method: 'GET', path: '/api/v1/account', successStatus: 200 },
+  updateAccountProfile: { method: 'PATCH', path: '/api/v1/account', successStatus: 200 },
+  getAccountPreferences: { method: 'GET', path: '/api/v1/account/preferences', successStatus: 200 },
+  setAccountPreference: { method: 'PATCH', path: '/api/v1/account/preferences', successStatus: 200 },
+  updateAccountTheme: { method: 'PUT', path: '/api/v1/account/theme', successStatus: 200 }
 };
 
 export interface RequestContext {
@@ -133,19 +149,46 @@ export function isLoginRequest(value: unknown): value is LoginRequest {
   );
 }
 
+function isCurrentUser(value: unknown): value is CurrentUser {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['id', 'displayName', 'isPlatformAdmin', 'isGuest', 'preferences']) &&
+    isUuid(value.id) &&
+    typeof value.displayName === 'string' &&
+    typeof value.isPlatformAdmin === 'boolean' &&
+    typeof value.isGuest === 'boolean' &&
+    isRecord(value.preferences)
+  );
+}
+
+function isPreferences(value: unknown): value is Preferences {
+  return isRecord(value);
+}
+
+export function isProfileUpdateRequest(value: unknown): value is ProfileUpdateRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['displayName', 'preferences']) &&
+    typeof value.displayName === 'string' &&
+    isPreferences(value.preferences)
+  );
+}
+
+export function isPreferenceRequest(value: unknown): value is PreferenceRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['key', 'value']) &&
+    typeof value.key === 'string'
+  );
+}
+
+export function isPreferencesRequest(value: unknown): value is Preferences {
+  return isPreferences(value);
+}
+
 function isAccountBootstrap(value: unknown): value is AccountBootstrap {
   if (!isRecord(value) || !hasExactKeys(value, ['user', 'accounts'])) return false;
-  if (!isRecord(value.user) || !Array.isArray(value.accounts)) return false;
-  if (
-    !hasExactKeys(value.user, ['id', 'displayName', 'isPlatformAdmin', 'isGuest', 'preferences']) ||
-    !isUuid(value.user.id) ||
-    typeof value.user.displayName !== 'string' ||
-    typeof value.user.isPlatformAdmin !== 'boolean' ||
-    typeof value.user.isGuest !== 'boolean' ||
-    !isRecord(value.user.preferences)
-  ) {
-    return false;
-  }
+  if (!isCurrentUser(value.user) || !Array.isArray(value.accounts)) return false;
 
   return value.accounts.every((account) => {
     if (!isRecord(account) || !hasExactKeys(account, ['id', 'name', 'slug', 'role', 'rooms'])) return false;
@@ -169,6 +212,24 @@ function isAccountBootstrap(value: unknown): value is AccountBootstrap {
         ['owner', 'presenter', 'limited_presenter', 'moderator', 'member'].includes(String(room.role))
     );
   });
+}
+
+function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, parsed: unknown): boolean {
+  switch (operation) {
+    case 'logout':
+      return raw === '';
+    case 'login':
+    case 'refreshSession':
+      return isSession(parsed);
+    case 'getAccountBootstrap':
+      return isAccountBootstrap(parsed);
+    case 'updateAccountProfile':
+      return isCurrentUser(parsed);
+    case 'getAccountPreferences':
+    case 'setAccountPreference':
+    case 'updateAccountTheme':
+      return isPreferences(parsed);
+  }
 }
 
 function isApiError(value: unknown): value is ApiErrorBody {
@@ -291,6 +352,19 @@ export function apiCookieHeader(cookies: Pick<Cookies, 'get'>): string | undefin
   return pairs.length > 0 ? pairs.join('; ') : undefined;
 }
 
+/** Expires both Rust credentials locally even when the authority cannot be reached. */
+export function clearApiCookies(cookies: Pick<Cookies, 'set'>): void {
+  for (const name of [ACCESS_COOKIE, REFRESH_COOKIE] as const) {
+    cookies.set(name, '', {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 0
+    });
+  }
+}
+
 async function call<Operation extends TradingRoomApiOperation>(
   operation: Operation,
   context: RequestContext,
@@ -359,13 +433,7 @@ async function call<Operation extends TradingRoomApiOperation>(
     };
   }
 
-  const valid =
-    response.status === contract.successStatus &&
-    (operation === 'logout'
-      ? raw === ''
-      : operation === 'getAccountBootstrap'
-        ? isAccountBootstrap(parsed)
-        : isSession(parsed));
+  const valid = response.status === contract.successStatus && isOperationSuccess(operation, raw, parsed);
   if (!valid) {
     console.error('[tradingroom-api] invalid success response', { operation, status: response.status });
     return {
@@ -378,9 +446,9 @@ async function call<Operation extends TradingRoomApiOperation>(
 
   try {
     const responseCookies = response.headers.getSetCookie();
-    if (operation === 'getAccountBootstrap') {
+    if (operation !== 'login' && operation !== 'refreshSession' && operation !== 'logout') {
       if (responseCookies.length !== 0) {
-        throw new UnsafeApiCookieError('a read-only operation returned session cookies');
+        throw new UnsafeApiCookieError('an account-data operation returned session cookies');
       }
     } else {
       applyApiCookies(responseCookies, context.cookies, operation === 'logout' ? 'expired' : 'live');
@@ -419,6 +487,31 @@ export function logout(context: RequestContext): Promise<ApiResult<null>> {
 
 export function getAccountBootstrap(context: RequestContext): Promise<ApiResult<AccountBootstrap>> {
   return call('getAccountBootstrap', context, undefined);
+}
+
+export function updateAccountProfile(
+  context: RequestContext,
+  request: ProfileUpdateRequest
+): Promise<ApiResult<CurrentUser>> {
+  return call('updateAccountProfile', context, request);
+}
+
+export function getAccountPreferences(context: RequestContext): Promise<ApiResult<Preferences>> {
+  return call('getAccountPreferences', context, undefined);
+}
+
+export function setAccountPreference(
+  context: RequestContext,
+  request: PreferenceRequest
+): Promise<ApiResult<Preferences>> {
+  return call('setAccountPreference', context, request);
+}
+
+export function updateAccountTheme(
+  context: RequestContext,
+  request: Preferences
+): Promise<ApiResult<Preferences>> {
+  return call('updateAccountTheme', context, request);
 }
 
 export function apiResultResponse<T>(result: ApiResult<T>): Response {

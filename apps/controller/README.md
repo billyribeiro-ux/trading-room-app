@@ -65,6 +65,11 @@ CREATE is `IF NOT EXISTS` and every ALTER is `ADD COLUMN IF NOT EXISTS`, so it m
 add missing columns, backfill missing public room IDs, and seat a missing owner
 membership, but it never resets or deletes an existing database.
 
+Profile authority is independently reversible. Keep `PROFILE_AUTHORITY_MODE=legacy` until the
+offline converter has completed `plan`, `apply`, and `verify`; `rust` additionally requires
+`TRADINGROOM_API_URL` and exact UUID mappings. See
+[`ops/PROFILE-AUTHORITY-CUTOVER.md`](../../ops/PROFILE-AUTHORITY-CUTOVER.md).
+
 ```bash
 createdb tradingroom_dev
 # DATABASE_URL=postgres://<user>@localhost:5432/tradingroom_dev

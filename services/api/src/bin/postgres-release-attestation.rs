@@ -157,6 +157,7 @@ const USER_INSERT_COLUMNS: &[&str] = &[
 ];
 const USER_UPDATE_COLUMNS: &[&str] = &[
     "password_hash",
+    "display_name",
     "last_login_at",
     "updated_at",
     "preferences",
@@ -1099,7 +1100,11 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// Slot 12 is `0012_legacy_cutover_ledger.sql`. It adds explicit enterprise suspension state and
 /// two owner-only conversion evidence tables. Neither ledger table is a request-path tenant table,
 /// and the runtime role has no privilege on either; live migration tests assert that denial.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+///
+/// Slot 13 is `0013_profile_write_privilege.sql`. It adds only column-level UPDATE on
+/// `users.display_name`, asserts that relation-wide UPDATE remains absent, and explicitly refuses
+/// an accidental `is_platform_admin` write grant.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 13] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 /// The two human-facing error messages that name that chain's range in PROSE, as named constants
 /// so `the_prose_ranges_track_the_attested_chain` can hold them against
@@ -1110,9 +1115,9 @@ const ATTESTED_MIGRATION_VERSIONS: [i64; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1
 /// refused release. The embedded-contract message beside it was moved by hand both times;
 /// hand-moving is the convention that failed here, so the test moves the burden.
 const EMBEDDED_MIGRATION_CONTRACT_MESSAGE: &str =
-    "the attestor is pinned to repository migration versions 0001 through 0012";
+    "the attestor is pinned to repository migration versions 0001 through 0013";
 const MIGRATION_LEDGER_MISMATCH_MESSAGE: &str = "the SQLx ledger must contain only successful \
-     repository migrations 0001 through 0012 with exact descriptions and checksums";
+     repository migrations 0001 through 0013 with exact descriptions and checksums";
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -1672,7 +1677,7 @@ fn expected_column_privileges(table_name: &str, column_name: &str) -> Vec<String
 const fn acl_mismatch() -> AttestationError {
     AttestationError::new(
         "runtime_acl_mismatch",
-        "effective table and column privileges do not match migration 0006's exact runtime matrix",
+        "effective table and column privileges do not match the reviewed runtime matrix through migration 0013",
     )
 }
 
@@ -2592,7 +2597,7 @@ mod tests {
     fn exact_acl_fixture_accepts_only_the_migration_0006_matrix() {
         let (table_rows, mut column_rows) = exact_acl_rows();
         let evidence = validate_acl_rows(&table_rows, &column_rows)
-            .expect("the migration 0006 matrix is valid");
+            .expect("the reviewed runtime ACL matrix is valid");
         assert_eq!(evidence.objects.len(), 3);
         assert!(
             evidence

@@ -2029,3 +2029,45 @@ body.modal-open {
 .acc-text-danger {
   color: rgb(169, 68, 66);
 }
+
+/* Gate 3 canonical profile editor. Scoped to its panel so the captured account tables keep their
+   measured Bootstrap-era geometry while this new authority surface remains usable at every width. */
+.acc-profile {
+  padding: 15px;
+}
+.acc-profile .acc-h4 {
+  margin-top: 0;
+}
+.acc-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(8rem, 1fr);
+  gap: 15px;
+}
+.acc-profile-grid label,
+.acc-profile-grid label > span {
+  display: block;
+}
+.acc-profile-grid label > span {
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+.acc-profile-grid .acc-input {
+  width: 100%;
+}
+.acc-profile-preview {
+  min-height: 34px;
+  margin: 15px 0;
+  padding: 8px 12px;
+  border-left: 3px solid rgb(91, 192, 222);
+  background: rgb(245, 245, 245);
+  overflow-wrap: anywhere;
+}
+.acc-profile-saved {
+  margin-left: 10px;
+  color: rgb(60, 118, 61);
+}
+@media (max-width: 640px) {
+  .acc-profile-grid {
+    grid-template-columns: 1fr;
+  }
+}

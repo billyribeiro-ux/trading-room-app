@@ -144,13 +144,21 @@ const LOCALLY_AUTHORED = new Map([
     '0a9d0946b47a3f4f92959155587687828d785c69e4224a413be5f461ac01e695'
   ],
   [
+    // Authored here on 2026-09-03 for the first Gate 3 request-path cutover. This is the narrow
+    // database capability the canonical profile handler needs: UPDATE of display_name only, with
+    // executable assertions against relation-wide UPDATE and is_platform_admin escalation.
+    'services/api/migrations/0013_profile_write_privilege.sql',
+    'ee8eea163f4d9fb5aa4786313c48ed85ae30d1fc4bd5925ef1129aef99ff7549'
+  ],
+  [
     // Rust owns this scoped contract. The committed snapshot is equality-tested against
-    // `openapi::document`, so the generator input cannot silently lag the handlers.
+    // `openapi::document`, so the generator input cannot silently lag the handlers. Re-pinned
+    // 2026-09-03 when the profile and preference operations joined that same typed boundary.
     'services/api/openapi/v1.json',
-    'b8a6c3cf0320969ca80b2337a162d4e5c3d5ae878651d3002ab820070e9e01f9'
+    'ce678f561ffc424331061138b1ee79bedda585e416a742c7448207d9b2e86a06'
   ],
   ['services/api/src/bin/openapi.rs', '41d74030069228e6b42cd1259f22b05c10f58a665ccfec4dce3830082bf3923e'],
-  ['services/api/src/openapi.rs', 'ce5c3e33081a8e05e86add9216e54f8dc1dbb6ef33e6a43ed7a66470e1e49157']
+  ['services/api/src/openapi.rs', '6a14730a47a95ca7fc84383feafbe05c8673508360425d9ab5c86b114dd9a4e3']
 ]);
 
 /*
@@ -203,15 +211,21 @@ const DIVERGED_FROM_IMPORT = new Map([
     identity rejection, stale-token replacement, leakage exclusion, and atomic owner transfer.
     New files in the same slice are separated under LOCALLY_AUTHORED above rather than being
     mislabeled as imports.
+
+    Re-pinned again 2026-09-03 for the first Gate 3 request-path slice. `identity.rs` now performs
+    the display-name and shallow preference merge in one UPDATE/RETURNING statement;
+    `account.rs` validates the exact, bounded request and refuses guests; `v1/mod.rs` registers the
+    PATCH beside bootstrap; and `actions.rs` proves stale-token read-after-write plus anonymous,
+    guest, oversized, non-object, and over-posted refusals over real HTTP and PostgreSQL.
   */
   ['services/api/fixtures/seed.sql', '2aec9c9e3e5a7d0833142a76ae6f8df74d8e9b845180f0cc667e301f8569c0b6'],
   ['services/api/src/provision.rs', '55b989398f3c7443ecaca8efb99db1ac1d564b0862594a514dc84c85410d50fb'],
   ['services/api/tests/provision.rs', '53970226a80c603d0df63a0bcb6ce00814dd3754e167b8a05f531fc3b246e342'],
-  ['services/api/tests/actions.rs', 'ca98a860c8d618710d49463f3c9717251bff1c2ec4d31310809c3776e1d49e2f'],
-  ['services/api/src/db/repo/identity.rs', 'c2e32110e77a9480ff311d787e63b6da3c4a74a7f6c9a7e84ab5f056ed9e20fa'],
+  ['services/api/tests/actions.rs', '09f948477b318d626ad00d5b5b4b8307b3130a8f725c411ca2061b06851eb29c'],
+  ['services/api/src/db/repo/identity.rs', '5dbeb02a354f6d7910943c9c179c23b84858c065efb248afdc620ec81aceecef'],
   ['services/api/src/http/mod.rs', '6b9290757ab752310fb6a8e42324cb13b144d6a68c5bb773391057f1083c4aed'],
-  ['services/api/src/http/v1/account.rs', 'a399ce3cc2edeb670f640d08b52edf3beaafdaa7b61c01aabfd92e2acdc511e5'],
-  ['services/api/src/http/v1/mod.rs', 'cfdd65eaeefbc1b4b7bb4cf9413460f99600a27902a3e9026a2d5921b6f37bcc'],
+  ['services/api/src/http/v1/account.rs', 'c13b4636538fabd6598ce82603761e3a2c43bb9c563e771f9b7dfbbac5c58334'],
+  ['services/api/src/http/v1/mod.rs', 'bfa3ea9062f0a581f5ff34524e27e31a0c92cb93e417b7c240c72df9caa990f1'],
   ['services/api/src/lib.rs', '5f0e652995ddd924a56b366aa5e5be41048b879ceb2ec43cb2ca0b71070cec4a'],
   /*
     Diverged 2026-08-15 21:40. Three prose claims in `services/README.md` still named
@@ -410,10 +424,14 @@ const DIVERGED_FROM_IMPORT = new Map([
     enterprise suspension columns to the exact catalogue contract. The two conversion-ledger
     tables remain owner-only operational evidence and therefore do not inflate the RLS-policy
     count or receive runtime grants.
+
+    Re-pinned again 2026-09-03 for migration 0013. The attested chain now ends at 0013 and the exact
+    ACL matrix admits UPDATE on users.display_name while continuing to refuse relation-wide UPDATE
+    and is_platform_admin mutation.
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '81246f75decc66f02d0b6d34f4fd5aa6ce6c819b88fc14b9a5d967345d2e17a3'
+    '79f77f757b2627f7d4faaeb6df6fde524f5bd82b3649e7203f857591de756f45'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -437,8 +455,12 @@ const DIVERGED_FROM_IMPORT = new Map([
     Not a relaxation, which is why it is safe: below 17 the privilege does not exist, cannot be
     granted, and cannot be held. `services/compose.yml` pins `postgres:17`, where the check is
     unchanged. Negative control: the version gate removed, the same 22023 back.
+
+    Re-pinned 2026-09-03 for profile authority: the startup ACL contract now includes the one new
+    column privilege installed by migration 0013. Every other users column and every table-level
+    privilege remains enumerated and refused.
   */
-  ['services/api/src/db/mod.rs', '0953452d41a2bdd4358f4dd99349e2b2cb0237522593e35b7a20ffdf2d293a7c'],
+  ['services/api/src/db/mod.rs', '80b2778b350202338e00c4c66798e1d50bf3afa07c77d14e9ad4ca0d5fb6ee61'],
   /*
     Diverged 2026-08-31 — ONE doc comment, and it named the role the code turns away.
 
@@ -477,8 +499,12 @@ const DIVERGED_FROM_IMPORT = new Map([
     mapping one-to-one constraints, and that the runtime role cannot select or mutate either
     offline conversion ledger. The test uses all required fingerprint columns so it exercises the
     intended uniqueness constraints rather than failing earlier on NOT NULL.
+
+    Re-pinned 2026-09-03: the live runtime-privilege proof now executes an allowed display-name
+    update and includes it in the exact column matrix while retaining the platform-admin and delete
+    negative controls.
   */
-  ['services/api/tests/migrations.rs', 'c4be5c801c3fefb4d095a9db7d608b55d2af257d3605e94f90c2fcb526627e85'],
+  ['services/api/tests/migrations.rs', '072e321e66deba14dae65842aa1580b17817df9a8dcd946020ccfb30597e28b4'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
@@ -537,7 +563,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/tenancy.rs', 'f2f10d1e8b099d115525485e8b5b18957e0cab542e80f7bfa492a1d8c0d97ccb'],
   [
     'services/api/tests/support/mod.rs',
-    '7e3ca1b689bb01a512806c3c5e0d59cc6dc12b1f1a22db521d32a5330096f942'
+    'ae4ad1060e16eacd02e5571d8b1f69c8d81bd359398a2c0804fefd600ad48c85'
     /*
       Re-pinned 2026-08-31: `Scratch::sweep` now excludes the names THIS process created.
       Its safety argument — a live database keeps a backend attached, so its DROP fails — held only
@@ -552,6 +578,10 @@ const DIVERGED_FROM_IMPORT = new Map([
       caps itself at six concurrent instances, and right-sizes its three sequential-test pools.
       Red evidence was 7/29 failures (EMFILE, reset, empty status and 503); the target then passed
       29/29 twice in succession.
+
+      Re-pinned again 2026-09-03: profile tests create isolated global identities instead of
+      mutating the parallel suite's seeded owner, then delete them through the owner-only fixture
+      connection. This keeps the global, non-RLS profile proof deterministic.
     */
   ],
   [

@@ -3,13 +3,13 @@ import type { RequestHandler } from './$types';
 import {
   apiRequestContext,
   apiResultResponse,
-  getAccountBootstrap,
-  isProfileUpdateRequest,
-  updateAccountProfile
+  getAccountPreferences,
+  isPreferenceRequest,
+  setAccountPreference
 } from '#lib/server/tradingroom-api.js';
 
 export const GET: RequestHandler = async (event) =>
-  apiResultResponse(await getAccountBootstrap(apiRequestContext(event)));
+  apiResultResponse(await getAccountPreferences(apiRequestContext(event)));
 
 export const PATCH: RequestHandler = async (event) => {
   let body: unknown;
@@ -17,15 +17,15 @@ export const PATCH: RequestHandler = async (event) => {
     body = await event.request.json();
   } catch {
     return json(
-      { error: { code: 'invalid', message: 'Expected a JSON profile request.' } },
+      { error: { code: 'invalid', message: 'Expected a JSON preference request.' } },
       { status: 400, headers: { 'cache-control': 'private, no-store' } }
     );
   }
-  if (!isProfileUpdateRequest(body)) {
+  if (!isPreferenceRequest(body)) {
     return json(
-      { error: { code: 'invalid', message: 'Expected displayName and a preferences object.' } },
+      { error: { code: 'invalid', message: 'Expected a key and value.' } },
       { status: 400, headers: { 'cache-control': 'private, no-store' } }
     );
   }
-  return apiResultResponse(await updateAccountProfile(apiRequestContext(event), body));
+  return apiResultResponse(await setAccountPreference(apiRequestContext(event), body));
 };

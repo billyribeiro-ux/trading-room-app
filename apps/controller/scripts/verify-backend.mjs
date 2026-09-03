@@ -151,6 +151,17 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0012_legacy_cutover_ledger.sql',
     sha256: '0a9d0946b47a3f4f92959155587687828d785c69e4224a413be5f461ac01e695'
+  }),
+  /*
+    Authored and reviewed 2026-09-03 for the first Gate 3 request-path slice. It grants only
+    column-level UPDATE on users.display_name to the restricted runtime role and asserts that
+    relation-wide UPDATE and is_platform_admin UPDATE remain absent. The handler binds the
+    authenticated UUID; live PostgreSQL HTTP and ACL tests prove read-after-write, guest/session
+    refusal, over-post rejection, and the exact surviving privilege boundary.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0013_profile_write_privilege.sql',
+    sha256: 'ee8eea163f4d9fb5aa4786313c48ed85ae30d1fc4bd5925ef1129aef99ff7549'
   })
 ]);
 

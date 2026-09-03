@@ -36,6 +36,12 @@ export type Error = { readonly error: { readonly code: string; readonly message:
 
 export type LoginRequest = { readonly email: string; readonly password: string };
 
+export type PreferenceRequest = { readonly key: string; readonly value: unknown };
+
+export type Preferences = { readonly [key: string]: unknown };
+
+export type ProfileUpdateRequest = { readonly displayName: string; readonly preferences: Preferences };
+
 export type Session = {
   readonly displayName: string;
   readonly expiresAt: number;
@@ -70,6 +76,34 @@ export interface TradingRoomApiOperations {
     readonly path: '/api/v1/account';
     readonly request: undefined;
     readonly response: AccountBootstrap;
+    readonly successStatus: 200;
+  };
+  readonly updateAccountProfile: {
+    readonly method: 'PATCH';
+    readonly path: '/api/v1/account';
+    readonly request: ProfileUpdateRequest;
+    readonly response: CurrentUser;
+    readonly successStatus: 200;
+  };
+  readonly getAccountPreferences: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/account/preferences';
+    readonly request: undefined;
+    readonly response: Preferences;
+    readonly successStatus: 200;
+  };
+  readonly setAccountPreference: {
+    readonly method: 'PATCH';
+    readonly path: '/api/v1/account/preferences';
+    readonly request: PreferenceRequest;
+    readonly response: Preferences;
+    readonly successStatus: 200;
+  };
+  readonly updateAccountTheme: {
+    readonly method: 'PUT';
+    readonly path: '/api/v1/account/theme';
+    readonly request: Preferences;
+    readonly response: Preferences;
     readonly successStatus: 200;
   };
 }

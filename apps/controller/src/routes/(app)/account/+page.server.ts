@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { API_KEY_ENCRYPTION_KEY, ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { randomBytes, createHash } from 'node:crypto';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
@@ -11,6 +11,10 @@ import { decryptApiKeySecret, encryptApiKeySecret } from '#lib/server/api-key-se
 import { API_SCOPES, parseIpList, readRestrictions } from '#lib/server/rooms.js';
 import { launchHref } from '#lib/server/room-handoff.js';
 import { NoRoomCodeAvailable, provisionRoom } from '#lib/server/provision-room.js';
+import { profileAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import { authorityBindingFailure } from '#lib/server/profile-authority-policy.js';
+import { readProfileAuthority } from '#lib/server/profile-authority.js';
+import { apiRequestContext, updateAccountProfile } from '#lib/server/tradingroom-api.js';
 import type { Actions, PageServerLoad } from './$types';
 
 function apiKeyEncryptionMaster() {
@@ -72,8 +76,47 @@ function readRowId(form: FormData, field: string): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-export const load: PageServerLoad = async ({ locals, setHeaders }) => {
-  const user = requireUser(locals);
+export const load: PageServerLoad = async (event) => {
+  const { locals, setHeaders } = event;
+  const localUser = requireUser(locals);
+  let user = localUser;
+  let profileAuthority:
+    | { enabled: false }
+    | { enabled: true; chatTextSize: number; preferences: Readonly<Record<string, unknown>> } = {
+    enabled: false
+  };
+
+  if (profileAuthorityMode === 'rust' && localUser.impersonatedBy === undefined) {
+    const canonical = await readProfileAuthority(apiRequestContext(event));
+    if (!canonical.ok) {
+      console.error('[profile-authority] canonical account read failed', {
+        localUserId: localUser.id,
+        status: canonical.status,
+        code: canonical.code
+      });
+      error(503, 'The profile authority is temporarily unavailable.');
+    }
+    const bindingFailure = authorityBindingFailure(localUser, canonical.data);
+    if (bindingFailure) {
+      console.error('[profile-authority] canonical account binding refused', {
+        localUserId: localUser.id,
+        reason: bindingFailure
+      });
+      error(503, 'The profile authority could not verify this account.');
+    }
+
+    const storedTextSize = canonical.data.user.preferences.chatTextSize;
+    const chatTextSize =
+      typeof storedTextSize === 'number' && Number.isInteger(storedTextSize) && storedTextSize >= 10 && storedTextSize <= 32
+        ? storedTextSize
+        : 13;
+    user = { ...localUser, displayName: canonical.data.user.displayName };
+    profileAuthority = {
+      enabled: true,
+      chatTextSize,
+      preferences: canonical.data.user.preferences
+    };
+  }
   const accountId = user.accountId;
 
   // Complete API credentials are owner-visible by product contract. Do not let
@@ -116,6 +159,7 @@ export const load: PageServerLoad = async ({ locals, setHeaders }) => {
 
   return {
     user,
+    profileAuthority,
     /*
       Whether to nag, computed on the server because only the server knows whether mail is
       configured. False on a deployment with no transport, so the banner cannot ask somebody to
@@ -166,6 +210,64 @@ export const load: PageServerLoad = async ({ locals, setHeaders }) => {
 };
 
 export const actions: Actions = {
+  saveProfile: async (event) => {
+    if (profileAuthorityMode !== 'rust') {
+      return fail(409, { message: 'Canonical profile editing is not enabled on this deployment.' });
+    }
+    const user = requireUser(event.locals);
+    if (user.impersonatedBy !== undefined) {
+      return fail(403, { message: 'End impersonation before changing a canonical profile.' });
+    }
+
+    // Direct action posts do not pass through the page loader. Re-prove both immutable mappings
+    // immediately before the write rather than treating a prior GET as authorization.
+    const context = apiRequestContext(event);
+    const canonical = await readProfileAuthority(context);
+    if (!canonical.ok) {
+      return fail(503, { message: 'The profile authority is temporarily unavailable.' });
+    }
+    const bindingFailure = authorityBindingFailure(user, canonical.data);
+    if (bindingFailure) {
+      console.error('[profile-authority] profile write binding refused', {
+        localUserId: user.id,
+        reason: bindingFailure
+      });
+      return fail(503, { message: 'The profile authority could not verify this account.' });
+    }
+
+    const form = await event.request.formData();
+    const displayName = String(form.get('displayName') ?? '').trim();
+    if (!displayName || new TextEncoder().encode(displayName).byteLength > 80) {
+      return fail(400, { message: 'Display name must be between 1 and 80 bytes.' });
+    }
+    const rawTextSize = String(form.get('chatTextSize') ?? '');
+    if (!/^\d{2}$/u.test(rawTextSize)) {
+      return fail(400, { message: 'Chat text size must be a whole number from 10 to 32.' });
+    }
+    const chatTextSize = Number(rawTextSize);
+    if (chatTextSize < 10 || chatTextSize > 32) {
+      return fail(400, { message: 'Chat text size must be a whole number from 10 to 32.' });
+    }
+
+    const updated = await updateAccountProfile(context, {
+      displayName,
+      preferences: { chatTextSize }
+    });
+    if (!updated.ok) {
+      return fail(updated.status === 400 ? 400 : 503, {
+        message: updated.status === 400 ? updated.message : 'The profile authority could not save this profile.'
+      });
+    }
+    if (updated.data.id !== user.authorityUserId || updated.data.isGuest) {
+      console.error('[profile-authority] profile write returned a different identity', {
+        localUserId: user.id
+      });
+      return fail(503, { message: 'The profile authority returned an invalid identity.' });
+    }
+
+    return { profileSaved: true };
+  },
+
   createRoom: async ({ request, locals }) => {
     const owner = requireUser(locals);
     const { accountId } = owner;

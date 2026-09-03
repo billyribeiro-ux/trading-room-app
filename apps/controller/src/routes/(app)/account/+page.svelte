@@ -80,6 +80,8 @@
    * way a room gets created here — there is no always-visible create form.
    */
   let showNewRoom = $state(0);
+  let profileDisplayName = $state(data.user.displayName);
+  let profileChatTextSize = $state(data.profileAuthority.enabled ? data.profileAuthority.chatTextSize : 13);
   let showAddBadge = $state(false);
   /*
     The badge editor's own state, mirroring the reference's `badges.*` scope.
@@ -464,6 +466,47 @@
   -->
   {#if form?.message}
     <p class="acc-error" role="alert">{form.message}</p>
+  {/if}
+
+  {#if data.profileAuthority.enabled}
+    <section class="acc-panel acc-profile acc-mb" aria-labelledby="profile-heading">
+      <h4 class="acc-h4" id="profile-heading">Profile</h4>
+      <form method="POST" action="?/saveProfile" use:enhance={save}>
+        <div class="acc-profile-grid">
+          <label>
+            <span>Display name</span>
+            <input
+              class="acc-input"
+              name="displayName"
+              autocomplete="name"
+              required
+              maxlength="80"
+              bind:value={profileDisplayName}
+            />
+          </label>
+          <label>
+            <span>Chat text size</span>
+            <input
+              class="acc-input"
+              name="chatTextSize"
+              type="number"
+              min="10"
+              max="32"
+              step="1"
+              required
+              bind:value={profileChatTextSize}
+            />
+          </label>
+        </div>
+        <p class="acc-profile-preview" style:font-size={`${profileChatTextSize}px`}>
+          Message preview for {profileDisplayName || 'your profile'}
+        </p>
+        <button class="acc-btn acc-btn-info" type="submit">Save profile</button>
+        {#if form?.profileSaved}
+          <span class="acc-profile-saved" role="status">Profile saved.</span>
+        {/if}
+      </form>
+    </section>
   {/if}
 
   <!-- ── Confirm your email ─────────────────────────────────── -->

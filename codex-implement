@@ -14,8 +14,8 @@ not represented as complete here merely because the reconstructed feature surfac
 | --- | --- | --- | --- |
 | Gate 0 — domain containment | Mixed: code controls complete; legal, contact transport, monitoring, and optional history rewrite remain external/owner-gated | `apps/controller/docs/PRODUCTION-CUTOVER-PLAN.md` Gate 0 | Owner/vendor actions named by each unchecked row |
 | Gate 1 — backend SSOT/security drift | Local and hosted source gates exist; current immutable release publication/deployment/rollback evidence is not complete | backend CI, migration attestor, provenance seals | Registry/signing/provenance/target rollback exercise |
-| Gate 2 — account bootstrap | First five repository deliverables implemented in the current working tree; staging deployment remains external | migration `0011`; `/api/v1/account`; scoped OpenAPI; generated server client; exact-cookie and negative tests | Full gates, commit/push, then staging database/API deploy plus backup restore proof |
-| Gate 3 — feature migration | Conversion foundation implemented and locally proven; product slices remain open | controller migration `0018`; Rust migration `0012`; `cutover-profile-authority.mjs`; protected-workflow E2E verifier; legacy-scrypt HTTP upgrade proof | Profile UI/API authority, then rooms, settings, membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time |
+| Gate 2 — account bootstrap | Repository implementation complete and pushed; staging deployment remains external | migration `0011`; `/api/v1/account`; scoped OpenAPI; generated server client; exact-cookie and negative tests | Staging database/API deploy plus backup restore proof |
+| Gate 3 — feature migration | Conversion foundation plus the profile request-path slice are implemented and locally proven; remaining product slices stay open | controller migration `0018`; Rust migrations `0012`/`0013`; converter E2E; legacy-scrypt upgrade; reversible `PROFILE_AUTHORITY_MODE`; typed profile/preferences BFF; authenticated profile UI | Rooms, settings, membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time; staging activation follows the profile runbook |
 | Gate 4 — signup/payment/entitlements | Not production-authoritative | existing controller signup/email scaffolding and provider-independent ledgers | Verified recovery/email, idempotent billing webhooks, subscription facts, central entitlements, legal approval, provider smoke |
 | Gate 5 — media promotion | Stage 1 boundary proof only; browser is not wired to the Rust media contract | media service tests and deployment plan | session response, audience-bound grants, TURN, rotation/draining/observability, native dependency clearance, device/load/recovery evidence |
 
@@ -29,6 +29,30 @@ The implementation loop therefore follows this order and does not skip authority
 4. complete Gate 5 control-plane/media integration and its real-network acceptance matrix;
 5. build immutable release artifacts and execute the external staging/production gates without
    converting missing credentials, vendor approvals, or human acceptance into false code checkmarks.
+
+### Gate 3 profile slice — implemented 2026-09-03
+
+The canonical Rust boundary now owns atomic display-name plus preference writes through
+`PATCH /api/v1/account`, and the same OpenAPI document types profile, single-preference, theme, and
+bootstrap operations across the server-only SvelteKit transport. Migration `0013` grants only
+column-level `users.display_name` update to the restricted runtime role and asserts that table-wide
+update and platform-admin mutation remain unavailable. The controller requires both converter UUID
+mappings, dual-authenticates login before creating its local session, re-proves canonical user and
+enterprise membership on every profile load/write, refreshes at most once, and revokes both session
+families on logout. `PROFILE_AUTHORITY_MODE=legacy` is the explicit request-path rollback.
+
+The authenticated account page renders the canonical display name and persisted chat text size,
+shows the latter in a live preview, and submits one bounded profile mutation. Direct form posts
+repeat the UUID/membership proof; impersonation cannot mutate the canonical profile. The operational
+sequence and non-destructive rollback are pinned in `ops/PROFILE-AUTHORITY-CUTOVER.md`.
+
+Hard local evidence at implementation time: generated OpenAPI equality and client freshness passed;
+31 focused TypeScript transport/policy assertions passed; the Rust workspace compiled with all
+targets and testing features; two real-Axum profile tests passed against a fresh PostgreSQL 17
+container (atomic read-after-write plus anonymous/guest/over-post/shape/size refusal); the live ACL
+negative-control test passed; migration integrity reported 13 pinned migrations; and backend
+provenance reported 98 imported plus nine locally authored service files. Clean-checkout controller
+quality and the full Rust suite are required before this slice is pushed.
 
 ## Completion standard
 

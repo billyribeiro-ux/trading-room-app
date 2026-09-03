@@ -86,6 +86,7 @@ console.log(`Verifying ${file}\n`);
 // one that is absent, because "absent" has a defined fallback and "empty" usually does not.
 const REQUIRED = [
   'CONTROL_PLANE_MODE',
+  'PROFILE_AUTHORITY_MODE',
   'DATABASE_URL',
   'ROOM_JWT_SECRET',
   'ROOM_BASE_URL',
@@ -117,6 +118,14 @@ if (env.CONTROL_PLANE_MODE === 'postgres' && !env.DATABASE_URL) {
   fail('CONTROL_PLANE_MODE', 'postgres with no DATABASE_URL — the app refuses to boot');
 } else if (readable(env.CONTROL_PLANE_MODE) && !['postgres', 'marketing-only'].includes(env.CONTROL_PLANE_MODE)) {
   fail('CONTROL_PLANE_MODE', `must be postgres or marketing-only, not ${env.CONTROL_PLANE_MODE}`);
+}
+
+if (readable(env.PROFILE_AUTHORITY_MODE) && !['legacy', 'rust'].includes(env.PROFILE_AUTHORITY_MODE)) {
+  fail('PROFILE_AUTHORITY_MODE', `must be legacy or rust, not ${env.PROFILE_AUTHORITY_MODE}`);
+} else if (env.PROFILE_AUTHORITY_MODE === 'rust' && !readable(env.TRADINGROOM_API_URL)) {
+  fail('TRADINGROOM_API_URL', 'required when PROFILE_AUTHORITY_MODE=rust — profile requests fail closed');
+} else if (env.PROFILE_AUTHORITY_MODE === 'rust') {
+  ok('TRADINGROOM_API_URL', 'present for Rust profile authority');
 }
 
 /* ---- 4. Secrets are actually secret --------------------------------------------------------- */
