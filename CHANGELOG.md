@@ -45,6 +45,53 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 12:05 UTC — four gates nobody could run, and three that named one person's home directory
+
+`35e2527`. **Runtime impact: no.** Scripts, a helper and a guard. Nothing the site serves changed.
+
+`verify-account-styles.mjs` is a real verifier with its own positive-control suite — the sibling of
+`verify-manage-styles.mjs`, which its own header says *"has caught real, user-visible colour bugs in
+`manage.css` that every other gate in the project passed"*. Running it in this container produced an
+`ENOENT` naming `/Users/billyribeiro/Desktop/new-room/…` — a stack trace whose most prominent detail
+is a directory the reader does not have. Two more scripts held the same literal, and **four
+verifiers were invoked by no `package.json` script at all**: that one, its controls, and the two
+deployed smokes.
+
+**The fix already existed in the other half of the repository.**
+`src/lib/reference-capture.ts` solved this on 2026-08-15, and its header records the identical
+failure in almost the same words: *"Five test files held the absolute path as a literal. They passed
+on the owner's machine and threw `ENOENT` anywhere else — two at module scope, which fails the whole
+SUITE rather than a test, so the reason was buried in a stack trace instead of being stated."* The
+test suites adopted it; the scripts never did. **A fix that lands in one half of a repository is a
+fix the other half will re-earn.**
+
+`scripts/capture-root.mjs` is the `.mjs` half — a deliberate second copy, for the reason
+`extract-manage-schema.mjs` gives when it duplicates `ROOM_VISIBLE_SETTINGS`: these are plain `node`
+invocations with no build step and cannot import the `.ts` module. It carries BOTH roots, because
+the captures live in two places and one variable would have been wrong for whichever half it did not
+describe. And it EXITS rather than throws — a builder with no capture has nothing to build, so the
+honest outcome is a sentence naming the file, the root, the override, and why the captures are
+absent from this repository at all.
+
+**The guard is the part that lasts.** `capture-root-contract.test.ts` sweeps every `.mjs` under the
+controller's `scripts/` and the room's `gate/` and `e2e/` for an absolute home path, so the fourth
+one cannot arrive quietly. It checks the instrument first — a glob matching nothing would pass over
+an empty universe, the vacuity failure this repository has now met five times — and it pins the
+duplicated default against the `.ts` module's, reading it from SOURCE rather than importing it,
+because an import would compare two overrides instead of two defaults.
+
+The four orphaned verifiers are **named but deliberately not gated**: two need a live host, two need
+a capture that is not here, and adding them would break the gate for everyone — the same treatment
+`verify-room-settings-schema.mjs` gets. What changes is that an operator holding the evidence now has
+a command instead of a file path. Both halves are asserted: named, and absent from `gate`.
+
+Three negative controls seen red, and one of them came from the repository itself — a generic
+`scripts/x.mjs` I wrote in a comment was caught by `comment-path-citations-contract`, which
+correctly read it as a citation to a file that cannot be opened.
+
+`pnpm run gate` exit 0 in both apps. The controller's documented counts moved 1197 → 1204 tests and
+117 → 118 files.
+
 ### 2026-09-03 11:44 UTC — "Hard Reset and Revoke Tokens" did exactly what "Hard Reset" did
 
 `8ea026c`. **Runtime impact: yes.** Two menu entries that were one control now differ, and the one
