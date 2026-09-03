@@ -324,6 +324,72 @@ Two further things follow, and the second is the more useful:
 
 ---
 
+---
+
+## The THIRTY-ONE that this document had never mentioned — answered 2026-09-03
+
+**How this was found.** The settings side closed exactly this hole on 2026-08-30, and the note it
+left says why: *"THE LIST NAMED ITS TRACKER AND NOTHING EVER OPENED IT."*
+`setting-coverage-contract.test.ts` grew an assertion that every name on its list has a disposition
+section in this document's sibling. The COMMANDS side had no such assertion, so the same drift was
+free to happen here — and it had. Of the forty-five names
+`feature-coverage-contract.test.ts` pins as absent from our source, **thirty-one did not appear
+anywhere in this file**, as a plain substring.
+
+Every one is answered below from the bundle, with the offset that settles it.
+`feature-coverage-contract.test.ts` now asserts that each pinned name is MENTIONED here, so the list
+and its tracker cannot part company again. That assertion refuses SILENCE; it does not claim the
+answers are right.
+
+### Built here under another name — remote functions where the reference sends socket commands
+
+| reference | ours |
+| --- | --- |
+| `alertQAMsg` | `sendAlertQAReply(alertID, msg, n)`. `askQuestion` / `replyMessage` / `reactToQuestion`, `alert-questions.remote.ts` |
+| `deleteQAAlertMsg` | `deleteQAAlert(e)`. `deleteQuestion`, `alert-questions.remote.ts` |
+| `chatReactions` | `manageChatReactions(msgID, reactions, reactionDetails, type, msgIndex)`. `messageAction`, `message-actions.remote.ts` |
+| `userDeleteChatMsg` | `userDeleteMessage(e)` — the MEMBER's own delete, distinct from the admin `deleteChatMsg` beside it. `messageAction`, gated by `usersCanDeleteOwnMsgs` in `message-delete.ts` |
+| `doShowMsgToAll` | receiver: `guiEventBus.emit("doShowMsgToAll", i.msg)`. `showMsgToAll` in `message-actions.remote.ts` and `message-actions.svelte.ts` |
+| `editUsernameByUser` | receiver. `editUsername`, plus the receiver in `user-actions.svelte.ts` |
+| `getChatLog` | `send("getChatLog", {channel, page})` — main on load, offTopic when the extra column is on. `loadOlderChatMessages` and the page load |
+| `getAlertsLog` | `send("getAlertsLog", {page: 0})` on load. `loadOlderAlerts` and the page load |
+| `getScheduledAlerts` | `send("getScheduledAlerts", null)`, gated on `hasAlertScheduler`. `listScheduledAlerts` |
+| `getSessionNotes` | `send("getSessionNotes")` on load. The notes pane load; `listUserNotes` for the per-member half |
+| `getSessionFiles` | a REST `sessions/v2/cmd` with `cmd: "getSessionFiles"`, not a socket command at all. The Files pane load |
+| `privMsg` | `send("privMsg", {peerID, msg, n, recvdNick, recvdAvt, …})`. `sendPrivateMessage`, `private-chat.remote.ts` |
+| `getPCLog` / `getAllPCLogs` / `getAllUserPM` | the three PM-log receivers. `loadPrivateChatLog` and `loadPeerPrivateMessageHistory` |
+| `doPCLogSearch` | the PM-log SEARCH receiver, `globals.privChatSearchResults`. **Server-side here too** — `searchThread` in `server/private-chat.ts`, reached through `loadPrivateChatLog` with a term, into the same separate bucket the reference keeps (`private-chat.svelte.ts`, "one search's own bucket, so it cannot overwrite the thread") |
+| `updateUserPM` | `send("updateUserPM", …)` when a PM peer first appears. Folded into `sendPrivateMessage`, which creates the peer as a consequence of the send rather than as a second call |
+| `changeUserPerms` | receiver: `disconnect()` then `emit("permsChangeReload")`. `savePermissions` sends; the `permsChangeReload` receiver is in `dialogs.svelte.ts` and `user-actions.svelte.ts`. The `reAuthSessionTok` redirect stays refused — that route is confirmed absent from the bundle |
+| `resetSession` | receiver, guarded by `!globals.videoOnlyMode`. `softReset` / `hardReset` and their receivers |
+| `stopWebcam` | receiver: `emit("stopWebcam", i.muser)`. `presenterCommand('mutecam')`, carried out by the peer it names |
+
+### Not a command at all
+
+| reference | what it actually is |
+| --- | --- |
+| `chatMsg` | an INTERNAL `appEventBus` event raised when a chat message arrives, not something sent to a server. Ours is the SSE `chat` channel into `RoomChat` |
+| `getMyState` | `socket.transmit("cmd", {cmd: "getMyState"})` fired on channel subscribe — the socket transport asking for its own state. This room's page load delivers that state, which is R-12's `getSessionState` family read from the other end |
+| `userLoggedIn` | the socket LOGIN handshake, retried three times inside the connect loop. This application authenticates at the HTTP layer from the session cookie, so there is no in-band login to send |
+| `connectToRoom` | `socket.emit("cmd", {cmd: "connectToRoom", roomID, name, email, perms})` inside the mediasoup service's own `connect`. Media-plane internal; ours is the join in `lib/media/signalling.ts` |
+| `stopConsumer` | `socket.emit("cmd", {cmd: "stopConsumer", consumerId})` — a mediasoup consumer teardown, media-plane internal |
+| `callScreeen` | a `postMessage` to the screen POPOUT, not a server command. R-6 records that its receiving branch is unreachable in the shipped bundle: `((i = 'callScreeen') ? … )` is an ASSIGNMENT, so the comparison is always truthy and the sibling branch never runs |
+| `pingPopup` | `pingBack()` — `parent.postMessage({cmd: "pingPopup"})`, and R-6 records `pingBack` as **defined and bound to nothing**. Unreachable upstream |
+| `demux` | hls.js's own worker message (43 occurrences, all library). Noise, and the reason this document has a Noise section |
+
+### Blocked, and on the same thing as their neighbours
+
+| reference | blocked on |
+| --- | --- |
+| `startRecMtx` | `sendServerAdminCommand("startRecMtx", {streams: mtxStreams})`. A MediaMTX host at `STREAM_SERVER_MTX`. `recordingState` is the room's half and ships |
+| `getSessionMediaState` | `send("getSessionMediaState")`, and its MTX twin. The same media plane |
+
+### The door, and it is the one that changed this month
+
+`saveAndCloseSession` and `setSessionState` are answered in the false-gaps table above and in
+`feature-coverage-contract.test.ts`. Both are NAME absences over a feature that was genuinely not
+built until 2026-09-03 — which is exactly why a table that cites markup is not evidence.
+
 ## Method, so this can be re-run and challenged
 
 1. `audit-feature-coverage.mjs` enumerates the reference's identifiers and diffs them against `src/`.

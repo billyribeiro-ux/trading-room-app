@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { auditCoverage } from '../../gate/audit-feature-coverage.mjs';
 
@@ -286,6 +287,42 @@ describe('the reference wire vocabulary', () => {
 
   it('names exactly the commands our source does not mention', () => {
     expect(report.absentCommands).toEqual([...ABSENT_FROM_OUR_SOURCE]);
+  });
+
+  it('and every one of them is ANSWERED in the document this list calls its tracker', () => {
+    /*
+      THE SAME HOLE THE SETTINGS SIDE CLOSED ON 2026-08-30, found here on 2026-09-03 by going
+      looking for it.
+
+      That side's note says why in as many words: *"THE LIST NAMED ITS TRACKER AND NOTHING EVER
+      OPENED IT."* `setting-coverage-contract.test.ts` grew an assertion that every name it pins has
+      a disposition in `missing-settings-triage.md`. The COMMANDS side had no equivalent, so the
+      same drift was free — and it had already happened: **thirty-one of these forty-five names did
+      not appear anywhere in `missing-commands-triage.md`**, as a plain substring. Not answered
+      wrongly; not mentioned.
+
+      The failure mode this refuses is specific. When the bundle pin moves or our source stops naming
+      something, the assertion above fails with a diff, and the obvious repair is to paste the new
+      name into `ABSENT_FROM_OUR_SOURCE` and go green — at which point a command the reference sends
+      and this room does not name is pinned, counted, and answered by nobody. It would look exactly
+      like the forty-four that ARE answered.
+
+      A plain substring, deliberately. The document answers some names in tables, some in prose and
+      some inside a fenced block, and a parser that demanded one shape would refuse honest writing.
+      What this asserts is that the name is DISCUSSED, never that the answer is right — several of
+      the answers are "not a command at all" and two are "blocked", so a test demanding work would
+      be wrong about most of the list.
+    */
+    const triage = readFileSync(
+      new URL('../../../../docs/decoded/missing-commands-triage.md', import.meta.url),
+      'utf8'
+    );
+    /* The instrument first: a read that returned nothing would pass this test by having no content
+       to disagree with, which is the vacuity shape guarded four lines up for the enumeration. */
+    expect(triage.length).toBeGreaterThan(10_000);
+
+    const silent = ABSENT_FROM_OUR_SOURCE.filter((command) => !triage.includes(command));
+    expect(silent, 'every absent command needs an answer in its own tracker').toEqual([]);
   });
 
   it('names exactly the presentation-area tabs our source does not mention', () => {
