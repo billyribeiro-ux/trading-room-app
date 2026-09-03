@@ -45,6 +45,64 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 16:18 UTC — nine more capture reads, 70 more assertions, and three that asserted a bug already fixed
+
+`a0de1d3`. **Runtime impact: no.** Test partitioning and three corrected assertions.
+
+The same partition applied to nine more files. Each read a gitignored capture at MODULE SCOPE for a
+few of its cases; `gate/evidence-bound-tests.mjs` excludes by FILE.
+
+| file | cases needing NO capture |
+| --- | --- |
+| `files-gates.test.ts` | 9 of 11 |
+| `split-gutter.test.ts` | 9 of 12 |
+| `alerts-background-contract.test.ts` | 8 of 9 |
+| `focus-on-screen-contract.test.ts` | 8 of 11 |
+| `chat-popup-contract.test.ts` | 8 of 11 |
+| `stream-tabs-contract.test.ts` | 8 of 15 |
+| `ngb-tooltip-triggers-contract.test.ts` | 8 of 10 |
+| `stream-ingest.test.ts` | 7 of 8 |
+| `roster-private-chat.test.ts` | 6 of 7 |
+
+What was not running, named by what it protects: the three roster cases deciding **who may open a
+private chat with whom** — trial and user-to-presenter restrictions included; `a publish token never
+appears beside a cleartext scheme`; `the SSE payload still carries no message text`, which is the
+statement that message bodies are not shipped to everybody so a popup can be drawn; the four
+`focusOnScreen` authority cases; the three that keep `lockedStreamId`, `lockedScreenId` and the
+forced badge from being confused for one another; and `offers exactly ONE of the two for any file,
+in every configuration`.
+
+**Three assertions asserted a defect that had already been fixed.** `chat-popup-contract` pinned
+`if (prefs.doNotDisturbOn || !prefs.chatPopup) return;` — the single combined gate.
+`RoomOverlays.svelte` records the correction at the line: upstream has two SIBLING gates under one
+Do Not Disturb (byte 1,431,196), `chatSoundOn` deciding the sound and `chatPopup` the toast, so
+returning on `chatPopup` *"took the sound with it, so a member who had turned the popup off was
+never told they had been named at all."* The code was fixed; its three tests were not, because
+nothing could run them. Re-pinned by ORDER rather than as one string — Do Not Disturb returns first,
+the ring happens next, the popup gate returns last — which a re-merge of the two gates cannot
+satisfy. The negative control reintroduced the exact original defect and the assertion caught it.
+
+`roster-private-chat.test.ts` also gave up a read that would have **thrown**. Its second module-scope
+read is `mention-reply-private-chat.clean.html`, which is under no evidence root — so the gate cannot
+discover it — and is not in this repository either. It would have been `ENOENT` at module scope the
+moment the file could run, which is the exact failure `#lib/reference-capture.ts` exists to end. It
+moved with the one case that reads it.
+
+`stream-tabs-capture.test.ts` is worth naming for what it is: **four standing refusals.**
+`toggleLockScreenMTX` is a `console.error` stub upstream, `forcedScreenMTXID` and `lockedScreenIDMTX`
+have no writer anywhere in the bundle, and "Bring everyone here" broadcasts an id no recipient can
+resolve. The free file's header states the failure mode — not that somebody deletes them, but that
+somebody *"finishes"* one by inventing a protocol and ships a lock button that locks nothing on a
+multi-tenant fintech room. A refusal has to be runnable by whoever holds the dumps; it is a file now
+rather than four lines inside one.
+
+The room suite goes **6,672 → 6,742 passing, 364 → 373 files**. The excluded count is unchanged at
+42.
+
+`pnpm run gate` exit 0 in `apps/room`. `eslint` caught two now-unused `readFileSync` imports that
+`vitest` was happy with — the second time in two entries that a gate step outside `pnpm test` was
+the one that objected.
+
 ### 2026-09-03 16:02 UTC — seven capture reads were hiding 154 assertions from CI, and four of them had drifted
 
 `375ff13`. **Runtime impact: no.** Test partitioning, four corrected assertions and one corrected
