@@ -52,10 +52,7 @@
       source would make the rendered order depend on how many times this happened to run.
     */
     return matched.sort((a, b) => {
-      const compared = collator.compare(
-        key === 'uuid' ? a.shortCode : a.name,
-        key === 'uuid' ? b.shortCode : b.name
-      );
+      const compared = collator.compare(key === 'uuid' ? a.shortCode : a.name, key === 'uuid' ? b.shortCode : b.name);
       return options.sortAscending ? compared : -compared;
     });
   }
@@ -80,9 +77,14 @@
    * way a room gets created here — there is no always-visible create form.
    */
   let showNewRoom = $state(0);
-  let profileDisplayName = $state(data.user.displayName);
-  let profileChatTextSize = $state(data.profileAuthority.enabled ? data.profileAuthority.chatTextSize : 13);
+  let profileDisplayName = $state('');
+  let profileChatTextSize = $state(13);
   let showAddBadge = $state(false);
+
+  $effect(() => {
+    profileDisplayName = data.user.displayName;
+    profileChatTextSize = data.profileAuthority.enabled ? data.profileAuthority.chatTextSize : 13;
+  });
   /*
     The badge editor's own state, mirroring the reference's `badges.*` scope.
 
@@ -377,7 +379,17 @@
    * is to be interchangeable with the original's.
    */
   const BADGE_CSV_KEYS = [
-    '_id', 'userID', 'text', 'imgURL', 'color', 'bkcolor', 'type', 'name', 'uploadTime', 'onlyP', 'roles'
+    '_id',
+    'userID',
+    'text',
+    'imgURL',
+    'color',
+    'bkcolor',
+    'type',
+    'name',
+    'uploadTime',
+    'onlyP',
+    'roles'
   ] as const;
 
   function exportBadges() {
@@ -513,8 +525,8 @@
   {#if data.emailUnproved}
     <div class="acc-panel acc-mb">
       <p>
-        Confirm <strong>{data.user.email}</strong> to create rooms. Check your inbox for the link —
-        each one expires after 24 hours.
+        Confirm <strong>{data.user.email}</strong> to create rooms. Check your inbox for the link — each one expires after
+        24 hours.
       </p>
       {#if form?.verificationSent}
         <p>A new link is on its way.</p>
@@ -593,68 +605,69 @@
        below it. Leaving it off moved nothing, but it made this the only one of
        the three that was not a column, which is the sort of drift that bites
        whoever next touches the grid. -->
-  <div class="acc-row-block"><div class="col-md-12 acc-panel">
-    <div class="acc-table-responsive">
-    <table class="acc-table">
-      <thead>
-        <tr>
-          <!-- `ng-click="sortByUUID()"` / `ng-click="sortByName()"`. A <th> is not a
+  <div class="acc-row-block">
+    <div class="col-md-12 acc-panel">
+      <div class="acc-table-responsive">
+        <table class="acc-table">
+          <thead>
+            <tr>
+              <!-- `ng-click="sortByUUID()"` / `ng-click="sortByName()"`. A <th> is not a
                button in the reference either; the click handler sits on the cell. Ours
                adds keyboard access, which the reference lacks. -->
-          <!-- No `acc-th-sort` class: it had no rule in any stylesheet, and the reference's
+              <!-- No `acc-th-sort` class: it had no rule in any stylesheet, and the reference's
                sortable <th> carries no class at all. A class in the markup that styles nothing
                reads as "this is handled" to the next person to look. -->
-          <th
-            tabindex="0"
-            aria-sort={sortKey === 'uuid' ? (sortAscending ? 'ascending' : 'descending') : 'none'}
-            onclick={() => sortBy('uuid')}
-            onkeydown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                sortBy('uuid');
-              }
-            }}>Session ID <i class="fa fa-sort-alpha-asc acc-sort-icon"></i></th
-          >
-          <th
-            class="acc-th-center"
-            tabindex="0"
-            aria-sort={sortKey === 'name' ? (sortAscending ? 'ascending' : 'descending') : 'none'}
-            onclick={() => sortBy('name')}
-            onkeydown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                sortBy('name');
-              }
-            }}>Name <i class="fa fa-sort-alpha-asc acc-sort-icon"></i></th
-          >
-          <th class="acc-th-center">State</th>
-          <th class="acc-th-center">Users</th>
-          <th class="acc-th-center">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- No empty-state row. The reference's sessions <tbody> holds nothing but the ngRepeat,
+              <th
+                tabindex="0"
+                aria-sort={sortKey === 'uuid' ? (sortAscending ? 'ascending' : 'descending') : 'none'}
+                onclick={() => sortBy('uuid')}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    sortBy('uuid');
+                  }
+                }}>Session ID <i class="fa fa-sort-alpha-asc acc-sort-icon"></i></th
+              >
+              <th
+                class="acc-th-center"
+                tabindex="0"
+                aria-sort={sortKey === 'name' ? (sortAscending ? 'ascending' : 'descending') : 'none'}
+                onclick={() => sortBy('name')}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    sortBy('name');
+                  }
+                }}>Name <i class="fa fa-sort-alpha-asc acc-sort-icon"></i></th
+              >
+              <th class="acc-th-center">State</th>
+              <th class="acc-th-center">Users</th>
+              <th class="acc-th-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- No empty-state row. The reference's sessions <tbody> holds nothing but the ngRepeat,
              with no `ng-show` fallback beside it — unlike its admin and API-key tables, which both
              DO carry a colspan empty row. So the absence here is a deliberate difference in the
              reference, not an oversight, and "No rooms yet." was ours. -->
-        {#each visibleRooms as room (room.id)}
-            <tr>
-              <td>
-                <strong>{room.shortCode}</strong>
-                {#if showNewRoom}
-                  <!-- NOT muted. The reference's element here is a bare `<muted>`
+            {#each visibleRooms as room (room.id)}
+              <tr>
+                <td>
+                  <strong>{room.shortCode}</strong>
+                  {#if showNewRoom}
+                    <!-- NOT muted. The reference's element here is a bare `<muted>`
                        (#32) — an unknown tag, so an inline box with no styling of
                        its own; its only matched rule is `bootstrap|*`, and it
                        computes the inherited `color: rgb(51,51,51)` at 14px/20,
                        not `.text-muted`'s rgb(119,119,119). The class-less span
                        keeps the same inline box and the same text-node boundary,
                        with the ")" outside it exactly as the reference has it. -->
-                  <div><br /><span>( {room.id} - ownerID: {room.accountId}</span> )</div>
-                {/if}
-              </td>
-              <td>{room.name}</td>
-              <td class="acc-td-center">
-                <!-- Two chips, as captured (logged-in-page:465-466):
+                    <div><br /><span>( {room.id} - ownerID: {room.accountId}</span> )</div>
+                  {/if}
+                </td>
+                <td>{room.name}</td>
+                <td class="acc-td-center">
+                  <!-- Two chips, as captured (logged-in-page:465-466):
 
                        <div ng-hide="s.isArchivedRoom" class="label label-orange">open</div>
                        <div ng-show="s.isArchivedRoom" class="label label-warning">archived</div>
@@ -667,18 +680,18 @@
                      author rule outranks the UA's `[hidden] { display: none }`. A `hidden` chip
                      would still be on screen. Angular avoids this with `!important`; rendering one
                      branch avoids it outright. -->
-                {#if isArchivedRoom(room)}
-                  <div class="acc-label acc-label-warning">archived</div>
-                {:else}
-                  <!-- ALWAYS orange. The reference's class attribute is the literal
+                  {#if isArchivedRoom(room)}
+                    <div class="acc-label acc-label-warning">archived</div>
+                  {:else}
+                    <!-- ALWAYS orange. The reference's class attribute is the literal
                        `label label-orange` with no `ng-class` on it, so the colour does not vary
                        with the state — only the TEXT does, which is why that div carries
                        `ng-binding` and this one interpolates. Ours used to switch to `warning`
                        whenever the state was not "open", a branch with nothing behind it. -->
-                  <div class="acc-label acc-label-orange">{room.state}</div>
-                {/if}
-              </td>
-              <!--
+                    <div class="acc-label acc-label-orange">{room.state}</div>
+                  {/if}
+                </td>
+                <!--
                 `{{s.current_capacity}} / {{s.recordedMaxCapacity }}` — page.welcome.html:376. The
                 SAME pair the manage panel title uses, and the same two fields our manage header had
                 wrong until 2026-08-13.
@@ -698,33 +711,35 @@
                 the peak moves, which is what a high-water mark needs and what a live figure cannot
                 use. T5-20.
               -->
-              <td class="acc-td-center">
-                <div class="acc-muted">{room.userCount} / {room.recordedMaxCapacity}</div>
-              </td>
-              <td>
-                <!-- The reference's `ng-href`: the whole handoff URL, resolved server-side at
+                <td class="acc-td-center">
+                  <div class="acc-muted">{room.userCount} / {room.recordedMaxCapacity}</div>
+                </td>
+                <td>
+                  <!-- The reference's `ng-href`: the whole handoff URL, resolved server-side at
                      page load. `resolve()` cannot be used because this is a runtime string that is
                      CROSS-ORIGIN whenever a separate room is configured (ROOM_BASE_URL); it only
                      falls back to a same-origin path when one is not. -->
-                <!-- eslint-disable svelte/no-navigation-without-resolve -->
-                <a
-                  class="acc-btn acc-btn-sm acc-btn-info"
-                  href={room.launchUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"><i class="fa fa-external-link"></i> Launch</a
-                >
-                <!-- eslint-enable svelte/no-navigation-without-resolve -->
-                <a class="acc-btn acc-btn-sm acc-btn-inverse" href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: room.shortCode })}
-                  ><i class="fa fa-cogs"></i> Manage</a
-                >
-                {#if data.entitlements.marketplace}
+                  <!-- eslint-disable svelte/no-navigation-without-resolve -->
                   <a
-                    class="acc-btn acc-btn-sm acc-btn-default"
-                    href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: room.shortCode, tab: 'marketplace' })}
-                    ><i class="fa fa-credit-card"></i> Marketplace</a
+                    class="acc-btn acc-btn-sm acc-btn-info"
+                    href={room.launchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"><i class="fa fa-external-link"></i> Launch</a
                   >
-                {/if}
-                <!-- OURS, and stated as ours because the placement is a real divergence rather
+                  <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                  <a
+                    class="acc-btn acc-btn-sm acc-btn-inverse"
+                    href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: room.shortCode })}
+                    ><i class="fa fa-cogs"></i> Manage</a
+                  >
+                  {#if data.entitlements.marketplace}
+                    <a
+                      class="acc-btn acc-btn-sm acc-btn-default"
+                      href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: room.shortCode, tab: 'marketplace' })}
+                      ><i class="fa fa-credit-card"></i> Marketplace</a
+                    >
+                  {/if}
+                  <!-- OURS, and stated as ours because the placement is a real divergence rather
                      than an unknown.
 
                      The reference DOES have a trigger for archiving and it is not here: this
@@ -742,31 +757,27 @@
 
                      No bootbox. Archiving is reversible from the row it produces, and the project's
                      confirm is for what cannot be undone. -->
-                <form
-                  class="acc-inline-form"
-                  method="POST"
-                  action="?/setRoomArchived"
-                  use:enhance={save}
-                >
-                  <input type="hidden" name="id" value={room.id} />
-                  <input type="hidden" name="archived" value={isArchivedRoom(room) ? 'false' : 'true'} />
-                  {#if isArchivedRoom(room)}
-                    <button class="acc-btn acc-btn-sm acc-btn-default" type="submit"
-                      ><i class="fa fa-undo"></i> Unarchive</button
-                    >
-                  {:else}
-                    <button class="acc-btn acc-btn-sm acc-btn-default" type="submit"
-                      ><i class="fa fa-archive"></i> Archive</button
-                    >
-                  {/if}
-                </form>
-              </td>
-            </tr>
-        {/each}
-      </tbody>
-    </table>
+                  <form class="acc-inline-form" method="POST" action="?/setRoomArchived" use:enhance={save}>
+                    <input type="hidden" name="id" value={room.id} />
+                    <input type="hidden" name="archived" value={isArchivedRoom(room) ? 'false' : 'true'} />
+                    {#if isArchivedRoom(room)}
+                      <button class="acc-btn acc-btn-sm acc-btn-default" type="submit"
+                        ><i class="fa fa-undo"></i> Unarchive</button
+                      >
+                    {:else}
+                      <button class="acc-btn acc-btn-sm acc-btn-default" type="submit"
+                        ><i class="fa fa-archive"></i> Archive</button
+                      >
+                    {/if}
+                  </form>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div></div>
+  </div>
 
   <!-- New Room, ALWAYS VISIBLE. Deliberate divergence, decided by the owner.
 
@@ -916,10 +927,8 @@
               <!-- `addBadge(true)` against `badges.badgeID`. The id travels as a field rather than
                    in the URL so the same <form> serves both modes. -->
               <input type="hidden" name="id" value={badgeId} />
-              <button
-                class="acc-btn acc-btn-primary acc-pull-right"
-                type="submit"
-                formaction="?/updateBadge">Save Edit for {badgeText}</button
+              <button class="acc-btn acc-btn-primary acc-pull-right" type="submit" formaction="?/updateBadge"
+                >Save Edit for {badgeText}</button
               >
             {:else}
               <!--
@@ -961,9 +970,7 @@
            truthy in Angular, so it is always on screen there — measured at
            754.617, 119.078 wide, with no badges defined. Gating it on
            `.length` hid it and made the panel 6.4px short. -->
-      <button class="acc-btn acc-btn-default acc-mb" type="button" onclick={exportBadges}
-        >Export Badges</button
-      >
+      <button class="acc-btn acc-btn-default acc-mb" type="button" onclick={exportBadges}>Export Badges</button>
 
       <form
         method="POST"
@@ -997,9 +1004,7 @@
                No visible affordance in the reference either; it is deliberately obscure. -->
           <thead
             ><tr
-              ><th ondblclick={() => (showBadgeID = !showBadgeID)}>Badge</th><th
-                class="acc-th-center">Actions</th
-              ></tr
+              ><th ondblclick={() => (showBadgeID = !showBadgeID)}>Badge</th><th class="acc-th-center">Actions</th></tr
             ></thead
           >
           <tbody>
@@ -1030,9 +1035,7 @@
                          inherited from the wrapper — NOT `.acc-muted`, which is
                          the Users count's grey at 14px. The two leading nbsp and
                          the parentheses are the reference's own text. -->
-                    {#if showBadgeID}<span class="acc-room-badge-id"
-                        >&nbsp;&nbsp;({badge.id})</span
-                      >{/if}
+                    {#if showBadgeID}<span class="acc-room-badge-id">&nbsp;&nbsp;({badge.id})</span>{/if}
                   </div>
                 </td>
                 <td class="acc-td-center">
@@ -1047,8 +1050,7 @@
 
                        The `&nbsp; | &nbsp;` separators sit BETWEEN controls, never at either end. -->
                   <span class="acc-row-action"
-                    ><button class="acc-link" type="button" onclick={() => editBadge(badge)}>Edit</button
-                    ></span
+                    ><button class="acc-link" type="button" onclick={() => editBadge(badge)}>Edit</button></span
                   >
                   &nbsp; | &nbsp;
                   <span class="acc-row-action"
@@ -1089,8 +1091,7 @@
                         title={badge.darkThemeBadgeId === null
                           ? 'Set a badge to show instead of this one in the dark theme'
                           : `Shows badge ${badge.darkThemeBadgeId} in the dark theme`}
-                        onclick={(event) =>
-                          void askDarkTheme(badge, event.currentTarget.form)}>Dark Theme</button
+                        onclick={(event) => void askDarkTheme(badge, event.currentTarget.form)}>Dark Theme</button
                       >
                     </form></span
                   >
@@ -1099,7 +1100,6 @@
             {/each}
           </tbody>
         </table>
-
       </div>
     </div>
   </div>
@@ -1139,7 +1139,13 @@
               </div>
               <div class="acc-field">
                 <label for="adminPassword">Password</label>
-                <PasswordReveal id="adminPassword" name="password" placeholder="Enter password" autocomplete="new-password" required />
+                <PasswordReveal
+                  id="adminPassword"
+                  name="password"
+                  placeholder="Enter password"
+                  autocomplete="new-password"
+                  required
+                />
               </div>
               <div class="acc-field">
                 <button class="acc-btn acc-btn-primary" type="submit">Add Admin User</button>
@@ -1198,9 +1204,7 @@
                       ><form
                         method="POST"
                         action="?/deleteAdminUser"
-                        use:enhance={confirmThen(
-                          `Remove admin user "${admin.name}"? This cannot be undone.`
-                        )}
+                        use:enhance={confirmThen(`Remove admin user "${admin.name}"? This cannot be undone.`)}
                       >
                         <input type="hidden" name="id" value={admin.id} />
                         <button class="acc-link" type="submit"
@@ -1319,9 +1323,7 @@
                       ><form
                         method="POST"
                         action="?/deleteApiKey"
-                        use:enhance={confirmThen(
-                          `Delete API key "${key.id}"? This cannot be undone.`
-                        )}
+                        use:enhance={confirmThen(`Delete API key "${key.id}"? This cannot be undone.`)}
                       >
                         <input type="hidden" name="id" value={key.id} />
                         <button class="acc-link" type="submit">delete</button>
@@ -1412,10 +1414,8 @@
 
                 <div class="acc-field">
                   <button class="acc-btn acc-btn-primary" type="submit">Save restrictions</button>
-                  <button
-                    class="acc-btn acc-btn-default"
-                    type="button"
-                    onclick={() => (restrictionsFor = null)}>Close</button
+                  <button class="acc-btn acc-btn-default" type="button" onclick={() => (restrictionsFor = null)}
+                    >Close</button
                   >
                 </div>
               </div>
@@ -1425,5 +1425,4 @@
       </div>
     </div>
   </div>
-
 </div>
