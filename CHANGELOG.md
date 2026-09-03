@@ -45,6 +45,38 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 03:00 UTC — the false-gaps table cited buttons, and one of those buttons lied
+
+`852ba3c`. **Runtime impact: no.** Two documents. The reason it is an entry of its own is what the
+table was wrong about.
+
+`missing-commands-triage.md`'s *"seven false gaps — we already build these"* cited
+`ModalHost.svelte` for five of its seven rows. **At a button.** The same document draws the lesson
+two hundred lines below in as many words — *"a markup search cannot tell a wired control from an
+inert one"*, and *"NONE of the six had a command behind it when it was written"* — and the table it
+is about was never brought into line with it.
+
+The cost was not hypothetical. `saveAndCloseSession` was measured end to end this morning and it was
+the largest liar in the application: the button wrote `savePreference('sessionOpen', false)`, a key
+with zero readers anywhere in `apps/room/src`, while `rooms.state` — the column `decideRoomEntry`
+actually refuses entry on — had no writer in either application. **This table said "we already build
+this" the whole time**, and its citation was the button that did nothing.
+
+Every row now names the remote command and the date it gained one. `saveCloseMessage`'s old citation
+is the clearest case of the shape: it read *"handler: 'Message Saved' alert, modal deliberately not
+closed"* — a description of the INERT version, presented as evidence of the built one.
+
+Also recorded, in `feature-coverage-contract.test.ts`: `saveAndCloseSession` and `setSessionState`
+stay on the not-named-in-our-source list and are now NAME absences over a built feature rather than
+gaps. Read whole: upstream's `saveAndCloseSession()` at byte 2,165,132 takes the summernote body and
+sends `{closedMsg}`; `setSessionState(e) { this.send("setSessionState", e) }` at 1,026,934 is a thin
+wrapper with two occurrences in the entire bundle — its declaration and the send inside it — and its
+callers are not in the capture, so what the reference passes it cannot be read here. This room does
+both acts through `saveCloseMessage` and `closeSession`. **Until this morning that entry would have
+been right by accident**, which is why it is dated rather than simply written.
+
+`pnpm run gate` exit 0.
+
 ### 2026-09-03 02:53 UTC — openLoginLink wired: the one of nineteen unwired settings that was work
 
 `b9e0c6c`. **Runtime impact: yes.** A room whose owner has set "Open link on login?" now opens that
