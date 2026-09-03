@@ -10,18 +10,15 @@ import {
   togglePresentationSplit
 } from './split-gutter';
 
-const ROOM_FULL = readFileSync(
-  new URL('../../docs/source/components/app-room.full.js', import.meta.url),
-  'utf8'
-);
-const ROOM_HELPERS = readFileSync(
-  new URL('../../docs/source/components/app-room.render-helpers.js', import.meta.url),
-  'utf8'
-);
-const ROOM_COMPILED = readFileSync(
-  new URL('../../docs/source/components/app-room.compiled.js', import.meta.url),
-  'utf8'
-);
+/*
+  THE THREE CAPTURE READS THAT SAT HERE ARE IN `split-gutter-capture.test.ts`.
+
+  They were MODULE-SCOPE reads of the gitignored `docs/source`, and `gate/evidence-bound-tests.mjs`
+  excludes by FILE, so four cases took all TWELVE here out of every checkout without the dumps —
+  this container, and CI. The eight that stayed EXECUTE the double-click rule: that a single click
+  does nothing, that the fourth restores, that a drag pair is not a double-click, and that three
+  clicks are one double-click and a leftover. Those are the assertions a regression would break.
+*/
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
   THE ROOM'S LAYOUT MOVED TO `RoomShell.svelte` on 2026-08-17 (Phase 5, S4+S8) — the `as-split`
@@ -33,7 +30,6 @@ const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'u
   because the shell takes the RESOLVED booleans as props instead of reaching into the gates object.
 */
 const SHELL = readFileSync(new URL('./components/RoomShell.svelte', import.meta.url), 'utf8');
-const compact = (source: string) => source.replace(/\s+/g, '');
 
 /**
  * A gutter, clicked.
@@ -139,25 +135,14 @@ describe('the gutter double-click collapses and restores the presentation area',
   });
 });
 
-describe('it is the reference’s handler, its number and its binding', () => {
-  it('matches hideShowPresentationArea', () => {
-    // `app-room.full.js:2693-2698`.
-    expect(compact(ROOM_FULL)).toContain(
-      'hideShowPresentationArea(){(this.presAreaSize>0?((this.presAreaSize=0),(this.chatAlertsSize=100)):((this.presAreaSize=70),(this.chatAlertsSize=30)),this.printSizes());}'
-    );
-  });
-
-  it('is bound to gutterDblClick on the outer split in BOTH layouts', () => {
-    // `render-helpers.js:1622-1623` (desktop `j4e`) and `:1787-1788` (mobile `K4e`).
-    const bindings = compact(ROOM_HELPERS).match(
-      /\('gutterDblClick',function\(\){return\(D\(e\),E\(g\(\)\.hideShowPresentationArea\(\)\)\);}\)/g
-    );
-    expect(bindings?.length, 'both splits bind it').toBe(2);
-  });
-
+describe('the number and the binding are the reference’s', () => {
+  /*
+    The three cases that read the reference itself — its `hideShowPresentationArea` body, the
+    `gutterDblClick` binding on BOTH splits, and const 8 carrying the 400 — are
+    `split-gutter-capture.test.ts`. They read `docs/source`, which is gitignored.
+  */
   it('takes 400 from the const table rather than choosing it', () => {
-    // Const 8 of `app-room.compiled.js:1294-1304`.
-    expect(compact(ROOM_COMPILED)).toContain("'gutterDblClickDuration','400'");
+    // Const 8 of `app-room.compiled.js:1294-1304`, anchored in `split-gutter-capture.test.ts`.
     expect(GUTTER_DOUBLE_CLICK_MS).toBe(400);
     // And the room still renders the attribute the number came from.
     expect(SHELL).toContain('gutterdblclickduration="400"');
@@ -199,10 +184,5 @@ describe('it is the reference’s handler, its number and its binding', () => {
     // The binding is still on the page — a drag ends anywhere in the window, so it must be a
     // `<svelte:window>` listener; only the BODY moved to the class that owns window handlers.
     expect(PAGE).toContain('onpointerup={() => windowHandlers.pointerUp()}');
-  });
-
-  it('does not persist, because printSizes only logs', () => {
-    // `:2708-2712` — a console.log. `dragEnd` writes; this does not.
-    expect(compact(ROOM_FULL)).toContain('printSizes(){console.log(');
   });
 });

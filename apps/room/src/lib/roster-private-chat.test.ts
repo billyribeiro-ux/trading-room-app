@@ -6,14 +6,20 @@ import {
   resolveRosterPrivateChatStart
 } from './roster-private-chat';
 
-const decodedRosterSource = readFileSync(
-  new URL('../../docs/source/components/app-room-roster.full.js', import.meta.url),
-  'utf8'
-);
-const cleanRosterContract = readFileSync(
-  new URL('../../mention-reply-private-chat.clean.html', import.meta.url),
-  'utf8'
-);
+/*
+  THE TWO EVIDENCE READS THAT SAT HERE ARE IN `roster-private-chat-capture.test.ts`.
+
+  `app-room-roster.full.js` is under the gitignored `docs/source`, and it was read at MODULE SCOPE —
+  `gate/evidence-bound-tests.mjs` excludes by FILE, so it took all SEVEN cases here out of every
+  checkout without the dumps, this container and CI included. One case used it.
+  `mention-reply-private-chat.clean.html` is not in this repository either and is not under any
+  evidence root, so it would have thrown `ENOENT` here the moment the file could run; it went with
+  the case that reads it.
+
+  The six that stayed execute `canShowRosterPrivateChat` and `resolveRosterPrivateChatStart` and
+  read `RoomSidebar.svelte` and `+page.svelte` — among them the three that decide who may open a
+  private chat with whom, which is an authority question on a multi-tenant application.
+*/
 const pageSource = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 
 /*
@@ -23,14 +29,6 @@ const pageSource = readFileSync(new URL('../routes/+page.svelte', import.meta.ur
 const SIDEBAR = readFileSync(new URL('./components/RoomSidebar.svelte', import.meta.url), 'utf8');
 
 describe('roster private-chat evidence contract', () => {
-  it('keeps the decoded source and clean root contract as gates', () => {
-    expect(decodedRosterSource).toContain('(this.canPM =');
-    expect(decodedRosterSource).toContain("bootbox.alert('Chatting with yourself again???')");
-    expect(cleanRosterContract).toContain(
-      '<i class="fas fa-comments"></i>&nbsp;&nbsp;Private Chat '
-    );
-  });
-
   it('renders the exact third roster item and captured open-menu attribute', () => {
     /*
       The per-row menu id moved into `RoomMenus` with the other ten floating menus, so the read is

@@ -29,10 +29,15 @@ import { describe, expect, it } from 'vitest';
   there shows nobody anything they were not entitled to see.
 */
 
-const BUNDLE = readFileSync(
-  new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-  'utf8'
-);
+/*
+  THE BUNDLE READ THAT SAT HERE, AND THE `the reference` BLOCK THAT USED IT, ARE IN
+  `chat-popup-capture.test.ts`.
+
+  It was a MODULE-SCOPE read of the gitignored `docs/source`, and `gate/evidence-bound-tests.mjs`
+  excludes by FILE, so three cases took all ELEVEN here out of every checkout without the dumps —
+  this container, and CI. The eight that stayed are `ours`, and the first of them is
+  `the SSE payload still carries no message text`: a privacy assertion about what leaves the server.
+*/
 const PAGE = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
 /*
   THE MENTION POPUP LIVES IN `RoomOverlays.svelte` as of 2026-08-17 (Phase 5, S3).
@@ -58,27 +63,6 @@ const pageCode = stripComments(PAGE);
 const overlaysCode = stripComments(OVERLAYS);
 // `serverCode` is gone: everything this file asserted about the server moved to the remote
 // modules, and a reader that nothing reads is the next person's dead end.
-
-describe('the reference', () => {
-  it('gates the popup on doNotDisturbOn AND chatPopup, beside the sound', () => {
-    const flat = BUNDLE.replace(/\s+/g, '');
-    expect(flat).toContain(
-      'preferences.doNotDisturbOn||(this.appService.globals.preferences.chatSoundOn'
-    );
-    expect(flat).toContain('preferences.chatPopup&&(this.alertService.info');
-  });
-
-  it('titles it "Mention from @"', () => {
-    expect(BUNDLE).toContain('Mention from @');
-  });
-
-  it('asks permission when the preference is ENABLED, not only when one fires', () => {
-    // `chatPopupChange()` ends with `chatPopup && window.Notification && requestPermission()`.
-    expect(BUNDLE.replace(/\s+/g, '')).toContain(
-      'preferences.chatPopup&&window.Notification&&Notification.requestPermission()'
-    );
-  });
-});
 
 describe('ours', () => {
   it('the SSE payload still carries no message text', () => {
@@ -138,17 +122,45 @@ describe('ours', () => {
     expect(pageCode, 'the mention popup left the page in S3').not.toContain('isMentionOf(');
   });
 
-  it('honours BOTH gates, do-not-disturb first', () => {
-    expect(overlaysCode).toContain('if (prefs.doNotDisturbOn || !prefs.chatPopup) return;');
+  it('honours BOTH gates, and the popup gate does NOT take the sound with it', () => {
+    /*
+      RE-POINTED 2026-09-03, and the drift is the interesting part: the CODE was fixed and this
+      assertion was not, because a module-scope capture read had taken the whole file out of every
+      run. It asserted `if (prefs.doNotDisturbOn || !prefs.chatPopup) return;` — the single combined
+      gate, which is the DEFECT. `RoomOverlays.svelte` records the correction at the line: upstream
+      has two SIBLING gates under one Do Not Disturb (byte 1,431,196), `chatSoundOn` deciding the
+      sound and `chatPopup` deciding the toast, so returning on `chatPopup` *"took the sound with
+      it, so a member who had turned the popup off was never told they had been named at all."*
+
+      Asserted by ORDER rather than as one string, because that is the property the fix established
+      and a re-merge of the two gates cannot satisfy it: Do Not Disturb returns first, the ring
+      happens next, and only then does the popup gate return.
+    */
+    const dnd = overlaysCode.indexOf('if (prefs.doNotDisturbOn) return;');
+    expect(dnd, 'the Do Not Disturb gate must be findable').toBeGreaterThan(-1);
+    const sound = overlaysCode.indexOf("if (prefs.chatSoundOn) playSoundEffect('pling');", dnd);
+    const popup = overlaysCode.indexOf('if (!prefs.chatPopup) return;', dnd);
+    expect(sound, 'the mention ring must follow the Do Not Disturb gate').toBeGreaterThan(dnd);
+    expect(popup, 'the popup gate must exist').toBeGreaterThan(dnd);
+    expect(popup, 'the ring must happen BEFORE the popup gate returns').toBeGreaterThan(sound);
+
+    // ...and the two are never re-merged into the one gate that was the bug.
+    expect(overlaysCode).not.toContain('prefs.doNotDisturbOn || !prefs.chatPopup');
   });
 
   it('never announces your own message', () => {
-    expect(overlaysCode).toContain('if (item.senderId === data.user.id) continue;');
+    /*
+      RE-POINTED with the case above. This read `if (item.senderId === data.user.id) continue;` from
+      a `for` loop that became a `.filter` in the same correction — the two conditions are one
+      predicate now, evaluated before the batch is counted, which is what lets `mentions.length === 0`
+      return early rather than looping over messages that were never mentions.
+    */
+    expect(overlaysCode).toContain('item.senderId !== data.user.id');
   });
 
   it('uses the shared mention rule, with the admin flag for @all', () => {
     expect(overlaysCode).toContain(
-      'if (!isMentionOf(item.body, data.user.displayName, item.isAdmin === true)) continue;'
+      'isMentionOf(item.body, data.user.displayName, item.isAdmin === true)'
     );
   });
 

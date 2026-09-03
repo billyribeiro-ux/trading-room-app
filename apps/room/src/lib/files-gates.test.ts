@@ -8,7 +8,7 @@ import {
 } from './files-gates';
 
 /*
-  The Files pane's two gates, tested against the bundle they were transcribed from.
+  The Files pane's two gates, EXECUTED here and anchored in `files-gates-capture.test.ts`.
 
   Both used to be unbuildable for the same reason: the settings that feed them were not on the
   controller's `ROOM_VISIBLE_SETTINGS` allow-list, so the room never received them. The gate for
@@ -16,13 +16,16 @@ import {
   a missing input does not hide both buttons, it shows both at once.
 */
 
-const bundle = readFileSync(
-  new URL('../../docs/source/components/app-presentationarea.full.js', import.meta.url),
-  'utf8'
-);
+/*
+  THE CAPTURE READ THAT SAT HERE IS IN `files-gates-capture.test.ts`.
 
-/** The flattened const table and update block — see `files-pane-contract.test.ts` for why. */
-const flat = bundle.replace(/\n\s*/g, '');
+  It was a MODULE-SCOPE read of the gitignored `docs/source`, and `gate/evidence-bound-tests.mjs`
+  excludes by FILE, so four anchors took all ELEVEN cases here out of every checkout without the
+  dumps — this container, and CI. The seven that stayed EXECUTE the two gates, and one of them is
+  `offers exactly ONE of the two for any file, in every configuration`: the property this file was
+  written for, because these branches are complements and a missing input shows both buttons rather
+  than neither.
+*/
 
 /*
   `FP-13` — the fixtures carry `kind`, because that is what the gate reads now.
@@ -39,16 +42,10 @@ const presenter = { isPresenter: true };
 const member = { isPresenter: false };
 
 describe('hideFiles', () => {
-  it('is still bound to both elements in the bundle', () => {
-    // If this vanishes the assertions below are pinned to nothing and must be re-derived.
-    // The main-tab `li`, at 5375 — one line, so it survives the flatten unchanged.
-    expect(bundle).toContain("z('hidden', o.hideFiles)");
-    // The `#files` pane, at 5410-5413 — broken across four lines, so only the flattened text has it.
-    expect(flat).toContain(
-      "z('ngClass', ut(61, Hr, 'presAreaTabs-files' == o.selectedMainTab))('hidden',o.hideFiles)"
-    );
-  });
-
+  /*
+    The anchor — that `hideFiles` is still bound to BOTH the main-tab `li` and the `#files` pane
+    upstream — is `files-gates-capture.test.ts`, which reads a gitignored capture.
+  */
   it('hides the section when the owner has ticked it', () => {
     expect(filesSectionHidden({ hideFiles: true })).toBe(true);
   });
@@ -65,7 +62,7 @@ describe('hideFiles', () => {
       setting: `main.d6d3c112b59b7d0d.js` sets it from the `r` query parameter — the recording-bot
       mode — which this room has no equivalent of. Recorded as an absent term rather than invented.
     */
-    expect(bundle).toContain('this.appService.globals.videoOnlyMode');
+    // That upstream really does OR it in is anchored in `files-gates-capture.test.ts`.
     const gate = readFileSync(new URL('files-gates.ts', import.meta.url), 'utf8');
     // The function body, not the file: the docblock above it names the term it does not implement.
     const body = gate.slice(gate.indexOf('export function filesSectionHidden'));
@@ -74,15 +71,11 @@ describe('hideFiles', () => {
 });
 
 describe('the alert-sound row buttons', () => {
-  it('still reads the captured gating out of the bundle', () => {
-    expect(flat).toContain(
-      "O(22,i.isP &&e.contentType.indexOf('audio/') >= 0 &&(!i.appService.globals.sessData.overwriteCashRegisterSound ||"
-    );
-    expect(flat).toContain(
-      "O(23,i.isP &&e.contentType.indexOf('audio/') >= 0 &&i.appService.globals.sessData.overwriteCashRegisterSound &&"
-    );
-  });
-
+  /*
+    The anchor — consts 22 and 23, whose two conditions are exact complements — is
+    `files-gates-capture.test.ts`. That complementarity is the whole reason this gate has a test:
+    a missing input does not hide both buttons, it shows both at once.
+  */
   it('offers "Set as alert sound" on a sound with no override configured', () => {
     expect(alertSoundButtonFor(presenter, {}, mp3)).toBe('set');
     // `''` is what REMOVING stores, and the controller keeps it as null. Both mean no override.
@@ -140,10 +133,7 @@ describe('the alert-sound row buttons', () => {
   });
 
   it('sends the EMPTY STRING to remove, not the url being removed', () => {
-    // `{ url: i ? e : '' }` — full.js:3084-3086.
-    expect(bundle).toContain(
-      "sendServerAdminCommand('overwriteCashRegisterSound', { url: i ? e : '' })"
-    );
+    // `{ url: i ? e : '' }` — full.js:3084-3086, anchored in `files-gates-capture.test.ts`.
     expect(alertSoundCommandValue(mp3.url, true)).toBe(mp3.url);
     expect(alertSoundCommandValue(mp3.url, false)).toBe('');
   });

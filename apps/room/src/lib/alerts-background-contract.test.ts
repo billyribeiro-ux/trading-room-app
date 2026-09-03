@@ -106,17 +106,16 @@ describe('alerts background contract', () => {
   the capture. One function was serving both roles and returning the follow default for both.
 */
 describe('chat message background', () => {
-  const main = readFileSync(
-    new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-    'utf8'
-  );
+  /*
+    THE BUNDLE READ THAT SAT HERE, AND THE ONE CASE THAT USED IT, ARE IN
+    `alerts-background-capture.test.ts`.
 
-  it('reads both captured defaults, so neither can be quietly dropped', () => {
-    expect(main).toContain(
-      'chatStyle={lightTheme:{color:"#1a1a1a",tickerColor:"#1a1a1a",usernameColor:"#365d7d",bgColor:"#e8e8e8",fontSize:"13"}'
-    );
-    expect(main).toContain('bgColor:"#ffffff",fontSize:14,playSound:!0');
-  });
+    `docs/source` is gitignored and `gate/evidence-bound-tests.mjs` excludes by FILE, so this one
+    read took all NINE cases here out of every checkout without the dumps — this container, and CI.
+    The other eight read `app.css`, `styles/tokens.css`, `css/complete-app-styles.css` and
+    `#lib/chat-style.ts`, every one of them committed; among them the case this whole file exists
+    for, `proves the two are not the same colour`.
+  */
 
   /*
     RE-POINTED 2026-08-17: both functions moved from `+page.svelte` to `#lib/chat-style.ts`, where

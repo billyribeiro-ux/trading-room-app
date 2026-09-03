@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import StreamTabs from './components/StreamTabs.svelte';
@@ -47,10 +46,18 @@ import type { MtxStream } from './mtx-streams';
   that locks nothing on a multi-tenant fintech room.
 */
 
-const bundle = readFileSync(
-  new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-  'utf8'
-);
+/*
+  THE BUNDLE READ THAT SAT HERE, AND THE SEVEN CASES THAT USED IT, ARE IN
+  `stream-tabs-capture.test.ts`.
+
+  It was a MODULE-SCOPE read of the gitignored `docs/source`, and `gate/evidence-bound-tests.mjs`
+  excludes by FILE, so those seven took all FIFTEEN cases here out of every checkout without the
+  dumps — this container, and CI. The eight that stayed RENDER `StreamTabs` and read its output,
+  including the three that keep the two id fields apart: `lockedStreamId` drives the badge and not
+  the menu label, `lockedScreenId` drives the menu label and not the badge, and the forced badge is
+  its own third field. Those are exactly the confusions the capture block refuses to let anybody
+  "finish" by inventing a protocol.
+*/
 const stream = (id: string, name: string): MtxStream => ({
   _id: id,
   sessionID: '652882112ad80b3e7c5132d5',
@@ -59,91 +66,6 @@ const stream = (id: string, name: string): MtxStream => ({
 });
 
 const STREAMS = [stream('aaa111', 'Dana Vero'), stream('bbb222', 'Kit Marlow')];
-
-describe('the reference markup is decoded, not inferred', () => {
-  it('pins the whole update block in one string', () => {
-    /*
-      This single assertion carries most of the transcription. Reading left to right it fixes: the
-      anchor id (`${_id}-tab`), the `active` class map, `aria-controls`, BOTH dead badges, the label
-      being `mediaValue.name` and nothing else, the `isP` gate on the first menu item, and the
-      lockedScreenID/lockedScreenIDMTX asymmetry that the last two clauses disagree about.
-    */
-    expect(bundle).toContain(
-      'm(),ei("id","",e._id,"-tab"),z("ngClass",ut(9,Go,i.selectedMTXStreamTab==e._id)),' +
-        'Dt("aria-controls",e._id),m(),O(2,i.forcedScreenMTXID==e._id?2:-1),m(),' +
-        'O(3,i.appService.globals.lockedScreenIDMTX===e._id?3:-1),m(2),Ze(e.mediaValue.name),' +
-        'm(5),O(10,i.isP?10:-1),m(3),O(13,i.appService.globals.lockedScreenID!==e._id?13:14)'
-    );
-  });
-
-  it('pins the const entries for the bar and its pane', () => {
-    // The bar is `id="streamsTabs"` but wears the SCREENSHARE bar's `screens-tabs` class.
-    expect(bundle).toContain(
-      '"id","streamsTabs","role","tablist",1,"nav","nav-tabs","screens-tabs"'
-    );
-    expect(bundle).toContain('"id","streamsTabsContent",1,"tab-content"');
-    // There is no `streams-tabs` class anywhere. Inventing one would look right and style nothing.
-    expect(bundle).not.toContain('"streams-tabs"');
-  });
-
-  it('pins the two menu items and the class map', () => {
-    expect(bundle).toContain('["href","#",1,"dropdown-item"]');
-    expect(bundle).toContain('["aria-labelledby","dropdownMenuButton",1,"dropdown-menu"]');
-    // `Go` is what `ut(9,Go,…)` above resolves to — the `active` class, not `show active`.
-    expect(bundle).toContain('Go=t=>({active:t})');
-  });
-});
-
-describe('the four controls that are INERT upstream', () => {
-  /*
-    Each `it` below is a standing refusal. If one starts failing because the reference changed, the
-    feature became real and can be built from the new evidence. Until then, none of them may be
-    "implemented" from imagination.
-  */
-
-  it('"Lock Screen" calls a console.error stub', () => {
-    expect(bundle).toContain('toggleLockScreenMTX(e){console.error("TODO: toggleLockScreenMTX")');
-    // And it sits directly beside a REAL implementation for screenshares, so it is not that the
-    // feature is unimplementable — it is that this half of it was never written.
-    expect(bundle).toContain('toggleLockScreen(e){this.appService.globals.lockedScreenID=');
-  });
-
-  it('the forced (eye) badge has no writer in the entire bundle', () => {
-    const hits = bundle.split('forcedScreenMTXID').length - 1;
-    expect(hits, 'exactly one read in the template, one init in the constructor').toBe(2);
-    expect(bundle).toContain('forcedScreenMTXID=""');
-  });
-
-  it('the lock badge has no writer either', () => {
-    /*
-      FOUR, not three. The `selectStreamTabOfId` guard names the field TWICE in one expression, and
-      the first attempt at this count said three because it came from a `grep -o` whose match window
-      swallowed the second occurrence. The count is done here by splitting the whole file precisely
-      so that a miscount fails the build instead of becoming a comment nobody rechecks.
-    */
-    const hits = bundle.split('lockedScreenIDMTX').length - 1;
-    expect(hits, 'one globals init, one template read, two in the selectStreamTabOfId guard').toBe(
-      4
-    );
-    expect(bundle).toContain('lockedScreenIDMTX=""');
-    // The only READ outside the template is the guard, which is why the field looks load-bearing.
-    expect(bundle).toContain(
-      '!this.appService.globals.lockedScreenIDMTX||this.appService.globals.lockedScreenIDMTX===e._id'
-    );
-  });
-
-  it('"Bring everyone here" broadcasts an id no recipient can resolve', () => {
-    // It sends the same command the screenshare menu sends...
-    expect(bundle).toContain(
-      'bringFocusToScreen(e){e&&this.appService.sendServerAdminCommand("focusOnScreen",{id:e})}'
-    );
-    // ...but every receiver scans the SCREENSHARE list only, never mtxHandlerService.mtxStreams.
-    expect(bundle).toContain(
-      'guiEventBus.subscribe("focusOnScreen",e=>{const i=this.mediaService.screenSharingUsers'
-    );
-    expect(bundle).not.toContain('focusOnScreen",e=>{const i=this.mtxHandlerService.mtxStreams');
-  });
-});
 
 describe('what the tab renders', () => {
   const body = (props: Record<string, unknown>) =>
