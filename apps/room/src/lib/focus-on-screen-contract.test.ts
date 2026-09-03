@@ -24,10 +24,17 @@ import { describe, expect, it } from 'vitest';
   forgetting an argument.
 */
 
-const BUNDLE = readFileSync(
-  new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-  'utf8'
-);
+/*
+  THE BUNDLE READ THAT SAT HERE, AND THE `the reference` BLOCK THAT USED IT, ARE IN
+  `focus-on-screen-capture.test.ts`.
+
+  It was a MODULE-SCOPE read of the gitignored `docs/source`, and `gate/evidence-bound-tests.mjs`
+  excludes by FILE, so three cases took all ELEVEN here out of every checkout without the dumps —
+  this container, and CI. The eight that stayed include every authority assertion on this command:
+  that it refuses a non-presenter, that it is scoped to the caller's own room, that it rejects an
+  empty screen id rather than broadcasting one, and that `presenterCommand` was not loosened to
+  admit it.
+*/
 const SERVER = readFileSync(new URL('../routes/+page.server.ts', import.meta.url), 'utf8');
 const EVENTS = readFileSync(new URL('./room/events.svelte.ts', import.meta.url), 'utf8');
 /*
@@ -147,22 +154,6 @@ const commandSlice = (start: string, end: string) => {
 const focusCommand = () => commandSlice('export const focusOnScreen = command(', '');
 const presenterCommandBody = () =>
   commandSlice('export const presenterCommand = command(', 'export const focusOnScreen = command(');
-
-describe('the reference', () => {
-  it('sends it as a SERVER command, not over the media channel', () => {
-    expect(BUNDLE).toContain('sendServerAdminCommand("focusOnScreen",{id:e}');
-  });
-
-  it('the presenter tab change is what triggers it, gated on the preference', () => {
-    expect(BUNDLE.replace(/\s+/g, '')).toContain(
-      'i&&this.appService.globals.isPresenter&&this.appService.globals.preferences.makeUsersFollowMyScreens&&this.bringFocusToScreen('
-    );
-  });
-
-  it('and the preference ships OFF', () => {
-    expect(BUNDLE).toContain('makeUsersFollowMyScreens:!1');
-  });
-});
 
 describe('the server owns the authority', () => {
   it('refuses a non-presenter', () => {

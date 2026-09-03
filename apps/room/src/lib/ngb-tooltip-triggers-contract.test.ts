@@ -10,7 +10,14 @@ import { describe, expect, it } from 'vitest';
  */
 
 const cwd = process.cwd();
-const BUNDLE = readFileSync(resolve(cwd, 'docs/source/main.d6d3c112b59b7d0d.js'), 'utf8');
+/*
+  THE BUNDLE READ THAT SAT HERE IS IN `ngb-tooltip-triggers-capture.test.ts`.
+
+  It was a MODULE-SCOPE read of the gitignored `docs/source`, and `gate/evidence-bound-tests.mjs`
+  excludes by FILE, so three cases took all TEN here out of every checkout without the dumps — this
+  container, and CI. The seven that stayed read the collector's own JSON, which is COMMITTED, and
+  our `ngb-tooltip.ts`: what the live page actually rendered, and what this application binds.
+*/
 const CAPTURE = JSON.parse(
   readFileSync(resolve(cwd, 'evidence-tooltips-presenter-2026-08-12.json'), 'utf8')
 );
@@ -27,27 +34,6 @@ describe('the capture is of the room, as a presenter', () => {
 
   it('records the room Bootstrap version, which had never been read off the live page', () => {
     expect(CAPTURE.meta.libraries.bootstrapVersion).toBe('5.3.3');
-  });
-});
-
-describe('triggers is an NgbTooltip input, not a popover-only one', () => {
-  it('the directive declares it', () => {
-    /*
-      THE fact the whole change rests on. Read out of the bundle rather than transcribed, so if the
-      reference ever drops the input this test fails instead of quietly describing something gone.
-    */
-    const at = BUNDLE.indexOf('selectors:[["","ngbTooltip",""]]');
-    expect(at).toBeGreaterThan(-1);
-    const def = BUNDLE.slice(at, at + 300);
-    expect(def).toContain('triggers:"triggers"');
-    expect(def).toContain('placement:"placement"');
-  });
-
-  it('there is no separate [tooltip] directive for it to belong to instead', () => {
-    // `tooltip="Unlock this screen?"` on the screen tabs binds to nothing. Inert markup, not a
-    // second tooltip system — which is why no run while sharing a screen could ever capture it.
-    expect(BUNDLE).not.toContain('"","tooltip",""');
-    expect((BUNDLE.match(/selectors:\[\["","ngbTooltip",""\]\]/g) ?? []).length).toBe(1);
   });
 });
 
@@ -79,11 +65,11 @@ describe('the GIF control never opens on hover, in the reference or here', () =>
 describe('placement="auto" on that host is what the reference renders, not a collapse of ours', () => {
   it('the DOM carries one placement, and it is auto', () => {
     /*
-      The template declares `placement` TWICE — `["ngbTooltip","Search for GIFs","placement","top",
-      "placement","auto",…]`. Only one attribute survives into the DOM and it is the later one, so
-      `top` is dead in the reference too. Our markup matching `auto` is correctness, not a defect.
+      The template declares `placement` TWICE and only the later one survives into the DOM, so `top`
+      is dead in the reference too and our markup matching `auto` is correctness rather than a
+      defect. That template line is anchored in `ngb-tooltip-triggers-capture.test.ts`; what is
+      asserted here is the CAPTURED DOM, which is committed.
     */
-    expect(BUNDLE).toContain('"ngbTooltip","Search for GIFs","placement","top","placement","auto"');
     expect(gif.host.attrs.placement).toBe('auto');
     expect(gif.host.outerHTML.match(/placement=/g)?.length).toBe(1);
   });

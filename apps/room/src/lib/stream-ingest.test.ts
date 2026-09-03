@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   MEDIAMTX_RTMPS_PORT,
@@ -19,15 +18,15 @@ import {
  * e.streamingLink     = `http://${streamServerMTX}:8889/room__${sessionID}__${yourName}/whip`;
  * ```
  *
- * **Everything about those two is reproduced except the SCHEME**, and this file asserts both halves:
- * that the reference really does use cleartext (so the divergence is a decision and not a
- * misreading), and that we really do not.
+ * **Everything about those two is reproduced except the SCHEME**, and both halves are asserted:
+ * that the reference really does use cleartext — `stream-ingest-capture.test.ts`, because the bundle
+ * is gitignored — and that we really do not, which is this file.
+ *
+ * Split on 2026-09-03. The bundle read was at MODULE SCOPE and `gate/evidence-bound-tests.mjs`
+ * excludes by FILE, so one line for one case took all eight out of every run without the dumps,
+ * CI included — including `a publish token never appears beside a cleartext scheme`, which is the
+ * assertion that a stream credential is never carried in the clear.
  */
-const BUNDLE = readFileSync(
-  new URL('../../docs/source/main.d6d3c112b59b7d0d.js', import.meta.url),
-  'utf8'
-);
-
 describe('the OBS / XSplit ingest URLs', () => {
   const HOST = 'media.example.com';
   const PATH = 'room__7f3a__Dana_Vero';
@@ -104,13 +103,12 @@ describe('the ONE deliberate divergence: transport encryption', () => {
   const PATH = 'room__7f3a__Dana_Vero';
   const TOKEN = 'tok';
 
-  it('the REFERENCE really does use cleartext, so this is a decision and not a misreading', () => {
-    expect(BUNDLE).toContain('streamingLinkRTMP=`rtmp://');
-    expect(BUNDLE).toContain(':8889/');
-    // And it carries no TLS scheme anywhere near those builders.
-    expect(BUNDLE).not.toContain('streamingLinkRTMP=`rtmps://');
-  });
-
+  /*
+    The half that says the reference really does use cleartext — so this divergence is a DECISION
+    and not a misreading — is `stream-ingest-capture.test.ts`. It reads a gitignored bundle; the
+    seven cases here build the URLs and assert what THIS application emits, which is the half that
+    can regress.
+  */
   it('ours never emits a cleartext scheme', () => {
     const whip = whipIngestUrl(HOST, PATH);
     const rtmp = rtmpIngestUrl(HOST, PATH, TOKEN);
