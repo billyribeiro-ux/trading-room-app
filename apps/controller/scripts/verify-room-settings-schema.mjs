@@ -28,11 +28,22 @@ const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
 
 /*
-  Eleven consumed by this repository's room-login page, NINETY-TWO by the room application
+  Eleven consumed by this repository's room-login page, NINETY-THREE by the room application
   through `internal/room-config/[code]`, ONE by the room but only for a presenter, and six by the
   WordPress SSO door at `(public)/sso/[code]`. `allowUsersToChangeUsername` is on the first two
   lists, and so now are `showPasswordField`, `usernameInstructions` and `hasRequiredPhoneInLogin`,
-  so the union is 112.
+  so the union is 113.
+
+  112 -> 113 on 2026-09-03: openLoginLink, the operator's own page opened once as a member enters
+  (bundle bytes 1,437,913 and 2,384,175). It came off `audit-setting-coverage.mjs`'s own list of
+  nineteen settings the reference reads in its browser and this room did not, and it was the ONLY
+  one of the nineteen that was work. Of the other eighteen: seven are the credentials that stay on
+  the controller by design, four are blocked on a host or a service that does not exist here, three
+  are answered by another mechanism, one is blocked on an owner answer, and THREE ARE UNREACHABLE
+  UPSTREAM - advancedSearchAlerts is gated on a hardcoded owner id, h264Enabled is read as
+  `sessData.h264Enabled || !0` so the setting cannot change the value it feeds, and
+  playChatMessageSoundFor is a declared refusal (hashing happens server-side upstream, and shipping
+  raw member emails to every browser to decide a sound is the wrong trade).
 
   111 -> 112 on 2026-09-02: isLocked, and it is a LIAR closed rather than a feature added. The room's
   Lock Session tab has three buttons that wrote sessionLocked and sessionLockKick into the clicking
@@ -331,6 +342,9 @@ const EXPECTED_WIRED_SETTINGS = [
   'loginErrorURL',
   'nickFilter',
   'onlyPresentersVisibleToViewers',
+  /* 2026-09-03 — the operator's own page, opened once as a member enters. Bundle bytes 1,437,913
+     and 2,384,175; one consumer, `lib/room/open-login-link.ts`, from the page's onMount. */
+  'openLoginLink',
   'overwriteCashRegisterSound',
   'ptrMobileAppEnabled',
   'rosterCountVisibleToViewers',

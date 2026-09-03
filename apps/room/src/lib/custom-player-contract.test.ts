@@ -104,7 +104,7 @@ describe('the screens pane', () => {
 });
 
 /**
- * `openLoginLink` — NOT A GAP, and the reason is worth a test rather than only a triage row.
+ * `openLoginLink` — **BUILT 2026-09-03, reversing the decision this block used to enforce.**
  *
  * ```js
  * sessData.openLoginLink &&
@@ -115,28 +115,47 @@ describe('the screens pane', () => {
  * Bytes 1,437,913 (main chat) and 2,384,175 (extra chat) — the SAME statement in both, at the end of
  * the chat component's init beside `chatEnabled` and `webinarMode`.
  *
- * **Two things make it a defect rather than a feature.** It runs during component initialisation
- * rather than from a click, and the options string it passes is precisely the popup shape browsers
- * block without a user gesture — the reference does not check the `null` return, so a blocked open
- * is silent. And because the statement exists in BOTH chat components, a member with the extra chat
- * column enabled gets it twice.
+ * ## What stood here, and why it does not stand
  *
- * The room does not reproduce it. This assertion is what stops somebody adding it later on the
- * strength of the triage list alone.
+ * This described the setting as *"NOT A GAP"* and asserted it stayed unbuilt, on two grounds. Both
+ * are answered rather than dismissed, and the second one turned out to be a real finding that
+ * shaped the implementation:
+ *
+ * **"It runs during component initialisation rather than from a click, and the options string is
+ * precisely the popup shape browsers block without a user gesture."** True, and not a reason to
+ * refuse a feature an operator configured on purpose. Every popup this room already opens is
+ * subject to the same policy — the transcript window, the detached chat, the screen popout, the
+ * recording preview — and an operator who wants this tells their members to allow popups, which is
+ * a thing they can do. Refusing on this ground is the *"it would reproduce an upstream defect"*
+ * argument, which is the one escape this repository's standing method explicitly does not accept.
+ *
+ * **"Because the statement exists in BOTH chat components, a member with the extra chat column
+ * enabled gets it twice."** That one is a genuine upstream defect, and it is measured correctly.
+ * **Ours fires ONCE** — the call is in the page's `onMount`, not in a chat component, so the extra
+ * column cannot double it. That is a divergence, it is deliberate, and it is recorded here because
+ * this block is where somebody would come looking.
+ *
+ * The reversal is left visible rather than deleted. A decision overturned quietly reads to the next
+ * person as a decision nobody made.
  */
-describe('openLoginLink stays unbuilt', () => {
-  it('opens no window on load, anywhere in the room', () => {
-    for (const file of [page, area]) {
-      expect(codeOf(file)).not.toContain('openLoginLink');
-    }
+describe('openLoginLink is built, and fires ONCE where upstream fires twice', () => {
+  it('the page opens it, and no chat component does', () => {
+    /*
+      The half that keeps the divergence: `PresentationArea` stands in for the chat components here
+      — if the call ever migrates into a component that the extra column also mounts, upstream's
+      double-open comes with it. `open-login-link-contract.test.ts` owns the rule and the three
+      divergences at the module.
+    */
+    expect(codeOf(page)).toContain('openLoginLink(data.sessData?.openLoginLink, {');
+    expect(codeOf(area)).not.toContain('openLoginLink');
   });
 
-  it('and the setting does not cross the boundary', () => {
+  it('and the setting crosses the boundary deliberately, with its consumer named', () => {
     const boundary = readFileSync(
       new URL('../../../controller/src/lib/room-config.ts', import.meta.url),
       'utf8'
     );
-    expect(boundary.replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('openLoginLink');
+    expect(boundary).toContain("'openLoginLink'");
   });
 });
 

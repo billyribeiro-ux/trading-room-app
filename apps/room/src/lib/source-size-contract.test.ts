@@ -810,7 +810,21 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
       divergences ALREADY left — the module is 145 lines to this call's seven. What is here is the
       wiring, which is what the composition root is for.
     */
-    max: 1944,
+    /*
+      1944 -> 1960, 2026-09-03, for `openLoginLink`. SIXTEEN lines, of which the code is five: the
+      import, and the call with its one dep.
+
+      The eleven are the paragraph saying WHY this is `onMount` and not a `$effect` — `window.open`
+      does not exist during SSR — and pointing at the three divergences that live at the module
+      rather than restating them here. That split is deliberate: the argument for `noopener`, for the
+      trimmed empty check, and for a blocked popup being silent is 30 lines, and it belongs beside
+      the rule it governs, not beside the wiring.
+
+      Not extracted further by this entry's own standard: the rule and every divergence ALREADY left
+      — the module is 101 lines to this call's five. What is here is the composition root doing what
+      a composition root is for.
+    */
+    max: 1960,
     why: 'the room page - the script block is the extraction target; 13,663 before the MTX slice'
   },
   /*
@@ -6508,6 +6522,34 @@ const CEILINGS: readonly { file: string; max: number; why: string }[] = [
     */
     max: 254,
     why: 'the recording and media-reset frames - setRecPreview, stopRecMsg, softResetDone'
+  },
+  {
+    file: 'lib/room/open-login-link.ts',
+    /*
+      THE OPERATOR'S OWN PAGE, opened once as a member enters. Built 2026-09-03 and capped in the
+      same commit, at the size it landed.
+
+      102 lines carrying about 12 of code — a type guard, a trim, and one call. The ratio is the
+      module rather than an accident of it, and the prose is three DIVERGENCES that a reader would
+      otherwise reverse in the belief they were tidying:
+
+        `noopener`      added, and upstream passes nothing. Without it the operator's page holds a
+                        live `window.opener` back into a fintech room. It is not invented here —
+                        `alerts-pane.ts` and `RoomSidebar.svelte`'s tip button already make this
+                        exact call the same way, and the module names both
+        the TRIM        upstream's guard is bare truthiness, so a textarea holding one newline opens
+                        `about:blank` for every member of that room. Reproducing that has no upside:
+                        no operator MEANT to publish a blank window
+        the SILENCE     a blocked popup says nothing, where `alerts-pane.detach` raises a dialog for
+                        its own. The difference is that a member PRESSED "Detach" and is owed an
+                        answer; nobody asked for this one, and it fires on entry
+
+      If this climbs, the question is whether a second entry-time hook arrived — in which case the
+      file is about entry hooks and the name is wrong — not whether the three notes can be trimmed.
+      They are the whole reason the module exists rather than five lines in `onMount`.
+    */
+    max: 102,
+    why: 'opens the operator s configured page once on entry; three divergences argued at the code'
   },
   {
     file: 'lib/room/iframe-breakout.ts',

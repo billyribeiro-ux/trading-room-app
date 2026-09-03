@@ -83,8 +83,8 @@ measurement plus a rule is not the same thing as a disposition.**
 
 ---
 
-**`openLoginLink` — DECIDED 2026-08-28 and it is NOT A GAP.** The row used to say *"a popup on page
-load; decide whether to reproduce it before building"*, and the decision is: no.
+**`openLoginLink` — BUILT 2026-09-03, reversing the 2026-08-28 decision. The reversal is recorded in
+full because the earlier reasoning was careful and half of it was right.**
 
 ```js
 sessData.openLoginLink &&
@@ -92,18 +92,35 @@ sessData.openLoginLink &&
 ```
 
 Bytes 1,437,913 and 2,384,175 — the same statement at the end of BOTH chat components' init, beside
-`chatEnabled` and `webinarMode`. Two things make it a defect rather than a feature:
+`chatEnabled` and `webinarMode`. The row read NOT A GAP on two grounds:
 
-* It runs during component INITIALISATION, not from a click, and the options string it passes is
+* *"It runs during component INITIALISATION, not from a click, and the options string it passes is
   exactly the popup shape browsers block without a user gesture. The reference does not check
-  `window.open`'s `null` return, so a blocked open is silent — there is no fallback and no message.
-* Because the statement is in both chat components, a member with the extra chat column enabled
-  gets it **twice**.
+  `window.open`'s `null` return, so a blocked open is silent."*
+* *"Because the statement is in both chat components, a member with the extra chat column enabled
+  gets it **twice**."*
 
-Building it faithfully would ship a blocked popup and a browser warning bar; building it "safely" —
-as a link the member can click — would be inventing a control the capture does not have.
-`custom-player-contract.test.ts` asserts the room opens no window on load, so this decision cannot be
-quietly reversed by somebody reading the settings list alone.
+**The first is not a reason to refuse a feature an operator configured on purpose.** Every popup this
+room already opens is under the same browser policy — the transcript window, the detached chat, the
+screen popout, the recording preview — and an operator who wants this can tell their members to allow
+popups. "It would reproduce an upstream defect" is the one escape this repository's standing method
+explicitly does not accept, and that is what this ground amounts to.
+
+**The second is a real upstream defect, and it shaped the build rather than blocking it.** Ours fires
+ONCE: the call is in the room page's `onMount`, not in a chat component, so the extra column cannot
+double it. That is a deliberate divergence and it is recorded at the code.
+
+The third sentence — *"building it 'safely', as a link the member can click, would be inventing a
+control the capture does not have"* — was right and is honoured: there is no link. The window opens,
+at the capture's size, with the capture's feature string.
+
+**Where it lives:** `apps/room/src/lib/room/open-login-link.ts` (the rule, pure, with three
+divergences argued: `noopener` — this room's own precedent from `alerts-pane.ts` and
+`RoomSidebar.svelte` — the trimmed empty check, and why a blocked popup is silent HERE while
+`alerts-pane.detach` raises a dialog for its own), the call in `routes/+page.svelte`'s `onMount`, and
+`open-login-link-contract.test.ts` with twelve cases and five negative controls seen red.
+`custom-player-contract.test.ts` used to assert the room opened no window on load; that block now
+asserts the divergence instead — the page opens it and no chat component does.
 
 ---
 

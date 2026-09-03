@@ -254,6 +254,20 @@ describe('the allow-list itself', () => {
     */
     const consumers: Record<string, string> = {
       /*
+        Added 2026-09-03, and it is the ONE of nineteen that was work.
+
+        `audit-setting-coverage.mjs` lists the settings the reference reads in its own browser and
+        this room does not. Nineteen, of which seven are the credentials that stay on the controller
+        by design, four are blocked on a host or a service, three are answered by another mechanism,
+        one waits on an owner answer, and three are UNREACHABLE UPSTREAM — `advancedSearchAlerts` is
+        gated on a hardcoded owner id, `h264Enabled` is read as `|| !0` so the setting cannot change
+        the value it feeds, and `playChatMessageSoundFor` is a declared refusal.
+
+        This one is a plain feature: the operator's own page, opened once as a member enters.
+      */
+      openLoginLink:
+        'open-login-link.ts `openLoginLink` — the operator page opened once on entry, from the page onMount',
+      /*
         Added 2026-08-31, and it is a defect closed rather than a setting wired. Only `main` is
         unconditional in the reference's tab builder; this room shipped Off Topic to every room
         including those whose owners had switched it off. Absence means TRUE — `chat-tabs.ts` carries

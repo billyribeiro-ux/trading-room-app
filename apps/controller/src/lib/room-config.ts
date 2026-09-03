@@ -132,6 +132,24 @@ export function resolveRoomConfig(room: Partial<RoomSettings>, user: UserPrefere
  */
 export const ROOM_VISIBLE_SETTINGS = [
   /*
+    "Open link on login?" — the operator's own page, opened once as a member enters the room.
+
+    Bundle bytes 1,437,913 and 2,384,175, in the room component's post-login setup, beside the
+    statement that applies `chatDisabledForTrials`:
+    `sessData.openLoginLink && window.open(sessData.openLoginLink, "_blank",
+    "resizable=yes,top=0,left=0,width=800,height=400")`.
+
+    ONE consumer, `lib/room/open-login-link.ts`, called from the page's `onMount` — which is this
+    list's rule met before the entry was added rather than after.
+
+    It crosses to EVERY member and not to a presenter alone, which is a decision rather than a
+    default. It is a destination the operator publishes to the people entering their room, so every
+    member is the audience; it is not a credential and it is not a capability. The contrast is
+    `restreamToURL` two lists over, which is presenter-only precisely because an rtmp destination
+    usually carries its own stream key inline.
+  */
+  'openLoginLink',
+  /*
     `presenterMsgsOnTheRight` — presenter messages align right, and their reactions with them.
 
     TWO consumers in `RoomMessage.svelte`, which is why it earns a place on a list whose rule is

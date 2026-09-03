@@ -318,10 +318,21 @@ export const UNENFORCED_SETTINGS: ReadonlyArray<{ name: string; needs: string }>
     needs:
       'The same finding as its sibling above. Reconnect timing within a short window is what this asks the room to observe, and a reconnect cannot present as a second login here: the previous session is already gone by the time the new one exists.'
   },
-  {
-    name: 'openLoginLink',
-    needs: 'A client-side hook: "it will open the link set in this setting on a new tab" on success.'
-  },
+  /*
+    `openLoginLink` WAS HERE and is gone, 2026-09-03, because it was BUILT.
+
+    Its reason read *"a client-side hook: it will open the link set in this setting on a new tab on
+    success"*, which was an accurate description of what it needed and is now a description of what
+    exists: `apps/room/src/lib/room/open-login-link.ts`, called from the room page's `onMount`.
+
+    Recorded as a deletion rather than left as an absence, because this list's whole job is that
+    nobody believes a gate exists when it does not — and the inverse mistake, believing a built
+    thing is still pending, is what the last two days of re-measurement have mostly been about.
+
+    It never belonged to `decideRoomEntry` in the first place, which is the second half of why it
+    left rather than being reworded: nothing about it decides who gets IN. It is a page the operator
+    publishes to the people who already did.
+  */
   {
     name: 'login_webhook_url',
     needs: 'An outbound HTTP call on success, with its own timeout and failure policy.'

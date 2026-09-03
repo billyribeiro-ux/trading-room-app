@@ -78,6 +78,19 @@ export interface RoomSessionSettings {
    * regardless of the other three gates. That coupling is upstream's, not ours.
    */
   presenterMsgsOnTheRight?: boolean;
+  /**
+   * *"Open link on login?"* — the operator's own page, opened once as a member enters the room.
+   *
+   * Bundle bytes 1,437,913 and 2,384,175, in the room component's post-login setup:
+   * `sessData.openLoginLink && window.open(sessData.openLoginLink, "_blank",
+   * "resizable=yes,top=0,left=0,width=800,height=400")`.
+   *
+   * A STRING and not a boolean, deliberately: the manage control is a textarea, and the truthiness
+   * of the value is the whole gate — an empty one is how an operator turns it off. There is no
+   * separate enable flag anywhere in the capture. `lib/room/open-login-link.ts` carries the rule and
+   * its three recorded divergences.
+   */
+  openLoginLink?: string;
   /** The owner's master switch for chat badges — the second term of the reference's gate chain. */
   enableBadges?: boolean;
   /** Narrows badges to presenters. The fourth term. */
