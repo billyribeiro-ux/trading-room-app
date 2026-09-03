@@ -45,6 +45,55 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-03 01:58 UTC — the five P-rows re-measured, and one of them had been built
+
+`2f04a74`. **Runtime impact: no.** Reasons, tracker rows and three documented counts. What changed
+is what a reader would BUILD from.
+
+`todo-next.md` calls itself the authority for the manage-side P-items, so they were put against the
+tree rather than inherited:
+
+**P-2 is built, and stricter than the row asks for.** It reads *"extend `disalowMultiLogins` to be
+account-scoped and device-class-aware; enforce server-side"*. `createSessionFor` deletes every prior
+session for the account inside one transaction, newest-wins, and every entry to every room runs
+through it (`session/+page.server.ts:449`). Account-scoped and server-side is the row; **global
+rather than per-room** is more than the row. `session-limit-contract.test.ts` has covered it in
+eight cases for weeks — including that a presenter gets no exemption, and that the account is never
+left with no session even for an instant.
+
+**P-1 is blocked, on something larger than its recorded reason.** The row said the server ordering
+needs `POST_ROUTE_API_DOCUMENTATION.md`; that file is in no corpus this repository holds, looked for
+and absent. The decisive blocker is that **there is no mobile client** — `mobile-app/` holds one
+file, `PROMPT.md`. The controller's FCM half IS built (`server/fcm.ts`, and the admin actions refuse
+rather than answer "nothing to do" when the service account is unset), and both mobile internal
+routes ship. What does not exist is anything that pushes an ALERT: `post-alert.remote.ts:45` already
+records `dontPush` as having no consumer, and the server refuses the field rather than accept one
+nothing reads. Registration tokens come only from an app on a phone, so wiring the fan-out now would
+build a subsystem whose only observable behaviour is a log line.
+
+**P-3** is unchanged and both its gaps are evidence-absent. **P-4** (a drawing tool, "no evidence in
+any corpus") and **P-5** (Spotify, where the reference has SoundCloud) are ADDITIONS rather than
+divergences — there is nothing to match, and building either from the row would be inventing
+product. Both are recorded as the owner's to specify or choose.
+
+**The correction P-2 forced.** `room-entry.ts`'s `UNENFORCED_SETTINGS` gave `disalowMultiLogins` and
+`disalowSporadicMultiLogins` the reason *"a live per-room presence count. The room owns connections,
+not the controller"* — a missing capability. It is not missing, and the truth is the opposite shape:
+nothing blocks these, and honouring the checkbox would mean **relaxing** a control the room already
+applies unconditionally, on an operator's say-so, for a setting with no third state meaning
+"stricter than the default". Both reasons say that now. Both stay on the list, because the list
+exists so that nobody can believe a gate exists when it does not — an operator who ticks the box
+still gets no per-ROOM count out of it, and one who leaves it clear does not get multi-login back.
+
+A prose correction with nothing holding it goes stale exactly the way the sentence it replaced did,
+and that sentence is the reason this repository re-measures rather than inherits. What holds this
+one is a POINTER: the reason must name `createSessionFor`, so a reader who doubts it can go and read
+the enforcement. A rewrite that drops the name, or restores "presence count", fails — run as a
+negative control and seen red.
+
+`pnpm run gate` exit 0 in both apps. The controller's documented Vitest count moved 1196 → 1197
+across the three documents that state it.
+
 ### 2026-09-03 01:48 UTC — a presenter inside somebody's iframe, and eleven of thirteen already built
 
 `7831887`. **Runtime impact: yes**, for one control — a presenter who opened the room inside an
