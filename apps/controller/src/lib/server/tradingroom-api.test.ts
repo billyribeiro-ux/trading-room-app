@@ -7,13 +7,18 @@ import {
   apiCookieHeader,
   applyApiCookies,
   clearApiCookies,
+  createAccountRoom,
   getAccountBootstrap,
+  isArchiveAccountRoomRequest,
+  isCreateAccountRoomRequest,
   isLoginRequest,
   isPreferenceRequest,
   isPreferencesRequest,
   isProfileUpdateRequest,
+  listAccountRooms,
   login,
   logout,
+  setAccountRoomArchived,
   updateAccountProfile
 } from './tradingroom-api';
 
@@ -143,18 +148,49 @@ describe('typed Rust API transport', () => {
   });
 
   it('accepts only the exact login request shape', () => {
-    expect(isLoginRequest({ email: 'owner@example.test', password: 'test-password' })).toBe(true);
+    expect(
+      isLoginRequest({
+        email: 'owner@example.test',
+        password: 'test-password'
+      })
+    ).toBe(true);
   });
 
   it('accepts only exact profile and preference request envelopes', () => {
-    expect(isProfileUpdateRequest({ displayName: 'Ada', preferences: { chatTextSize: 16 } })).toBe(true);
-    expect(isProfileUpdateRequest({ displayName: 'Ada', preferences: {}, isPlatformAdmin: true })).toBe(false);
+    expect(
+      isProfileUpdateRequest({
+        displayName: 'Ada',
+        preferences: { chatTextSize: 16 }
+      })
+    ).toBe(true);
+    expect(
+      isProfileUpdateRequest({
+        displayName: 'Ada',
+        preferences: {},
+        isPlatformAdmin: true
+      })
+    ).toBe(false);
     expect(isProfileUpdateRequest({ displayName: 'Ada', preferences: [] })).toBe(false);
     expect(isPreferenceRequest({ key: 'chatTextSize', value: 16 })).toBe(true);
     expect(isPreferenceRequest({ key: 'chatTextSize' })).toBe(false);
     expect(isPreferenceRequest({ key: 'x', value: true, userId: USER_ID })).toBe(false);
     expect(isPreferencesRequest({ theme: 'darkTheme' })).toBe(true);
     expect(isPreferencesRequest([])).toBe(false);
+  });
+
+  it('accepts only exact room lifecycle request envelopes', () => {
+    expect(isCreateAccountRoomRequest({ requestId: ROOM_ID, name: 'Main' })).toBe(true);
+    expect(isCreateAccountRoomRequest({ requestId: 'not-a-uuid', name: 'Main' })).toBe(false);
+    expect(
+      isCreateAccountRoomRequest({
+        requestId: ROOM_ID,
+        name: 'Main',
+        owner: USER_ID
+      })
+    ).toBe(false);
+    expect(isArchiveAccountRoomRequest({ archived: true })).toBe(true);
+    expect(isArchiveAccountRoomRequest({ archived: 'true' })).toBe(false);
+    expect(isArchiveAccountRoomRequest({ archived: true, roomId: ROOM_ID })).toBe(false);
   });
 
   it('validates login before applying both host-only cookies', async () => {
@@ -224,7 +260,11 @@ describe('typed Rust API transport', () => {
       { email: 'owner@example.test', password: 'test-password' }
     );
 
-    expect(result).toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamResponse' });
+    expect(result).toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamResponse'
+    });
     expect(jar.set).not.toHaveBeenCalled();
   });
 
@@ -249,15 +289,28 @@ describe('typed Rust API transport', () => {
         { cookies: jar.cookies, origin: 'https://www.example.test', fetch },
         { email: 'owner@example.test', password: 'test-password' }
       )
-    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamCookie' });
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamCookie'
+    });
     expect(jar.set).not.toHaveBeenCalled();
   });
 
   it('requires logout to return both expired cookies, never live replacements', async () => {
-    const jar = cookieJar({ [ACCESS_COOKIE]: 'access', [REFRESH_COOKIE]: 'refresh' });
+    const jar = cookieJar({
+      [ACCESS_COOKIE]: 'access',
+      [REFRESH_COOKIE]: 'refresh'
+    });
     const fetch = vi.fn(async () => new Response(null, { status: 204, headers: sessionHeaders() }));
 
-    await expect(logout({ cookies: jar.cookies, origin: 'https://www.example.test', fetch })).resolves.toMatchObject({
+    await expect(
+      logout({
+        cookies: jar.cookies,
+        origin: 'https://www.example.test',
+        fetch
+      })
+    ).resolves.toMatchObject({
       ok: false,
       status: 502,
       code: 'invalidUpstreamCookie'
@@ -266,10 +319,19 @@ describe('typed Rust API transport', () => {
   });
 
   it('accepts the complete expired-cookie contract on logout', async () => {
-    const jar = cookieJar({ [ACCESS_COOKIE]: 'access', [REFRESH_COOKIE]: 'refresh' });
+    const jar = cookieJar({
+      [ACCESS_COOKIE]: 'access',
+      [REFRESH_COOKIE]: 'refresh'
+    });
     const fetch = vi.fn(async () => new Response(null, { status: 204, headers: expiredSessionHeaders() }));
 
-    await expect(logout({ cookies: jar.cookies, origin: 'https://www.example.test', fetch })).resolves.toEqual({
+    await expect(
+      logout({
+        cookies: jar.cookies,
+        origin: 'https://www.example.test',
+        fetch
+      })
+    ).resolves.toEqual({
       ok: true,
       status: 204,
       data: null
@@ -305,7 +367,15 @@ describe('typed Rust API transport', () => {
           name: 'Acme Trading',
           slug: 'acme-trading',
           role: 'owner',
-          rooms: [{ id: ROOM_ID, name: 'Main Room', state: 'open', memberId: MEMBER_ID, role: 'owner' }]
+          rooms: [
+            {
+              id: ROOM_ID,
+              name: 'Main Room',
+              state: 'open',
+              memberId: MEMBER_ID,
+              role: 'owner'
+            }
+          ]
         }
       ]
     };
@@ -319,19 +389,37 @@ describe('typed Rust API transport', () => {
     });
 
     await expect(
-      getAccountBootstrap({ cookies: jar.cookies, origin: 'https://www.example.test', fetch: validFetch })
+      getAccountBootstrap({
+        cookies: jar.cookies,
+        origin: 'https://www.example.test',
+        fetch: validFetch
+      })
     ).resolves.toEqual({ ok: true, status: 200, data: body });
 
     const leakingFetch = vi.fn(
       async () =>
-        new Response(JSON.stringify({ ...body, user: { ...body.user, email: 'leaked@example.test' } }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        })
+        new Response(
+          JSON.stringify({
+            ...body,
+            user: { ...body.user, email: 'leaked@example.test' }
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        )
     );
     await expect(
-      getAccountBootstrap({ cookies: jar.cookies, origin: 'https://www.example.test', fetch: leakingFetch })
-    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamResponse' });
+      getAccountBootstrap({
+        cookies: jar.cookies,
+        origin: 'https://www.example.test',
+        fetch: leakingFetch
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamResponse'
+    });
   });
 
   it('refuses session mutation on the read-only account bootstrap', async () => {
@@ -354,8 +442,16 @@ describe('typed Rust API transport', () => {
     );
 
     await expect(
-      getAccountBootstrap({ cookies: jar.cookies, origin: 'https://www.example.test', fetch })
-    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamCookie' });
+      getAccountBootstrap({
+        cookies: jar.cookies,
+        origin: 'https://www.example.test',
+        fetch
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamCookie'
+    });
     expect(jar.set).not.toHaveBeenCalled();
   });
 
@@ -400,10 +496,18 @@ describe('typed Rust API transport', () => {
     );
     await expect(
       updateAccountProfile(
-        { cookies: jar.cookies, origin: 'https://www.example.test', fetch: leakingFetch },
+        {
+          cookies: jar.cookies,
+          origin: 'https://www.example.test',
+          fetch: leakingFetch
+        },
         { displayName: 'Canonical Name', preferences: {} }
       )
-    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamResponse' });
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamResponse'
+    });
   });
 
   it('refuses cookies on profile and preference data operations', async () => {
@@ -426,7 +530,144 @@ describe('typed Rust API transport', () => {
         { cookies: jar.cookies, origin: 'https://www.example.test', fetch },
         { displayName: 'Canonical', preferences: {} }
       )
-    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamCookie' });
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamCookie'
+    });
+  });
+
+  it('substitutes only UUID path variables and validates exact canonical room responses', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const managed = {
+      id: ROOM_ID,
+      shortCode: '3627',
+      name: 'Main Room',
+      state: 'open' as const,
+      maxCapacity: 100,
+      memberCount: 2,
+      archivedAt: null,
+      createdAt: '2026-01-01T00:00:00Z'
+    };
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(`http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/rooms`);
+      expect(init?.method).toBe('GET');
+      return new Response(JSON.stringify([managed]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+    await expect(
+      listAccountRooms({ cookies: jar.cookies, origin: 'https://www.example.test', fetch }, ACCOUNT_ID)
+    ).resolves.toEqual({ ok: true, status: 200, data: [managed] });
+
+    const leakingFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify([{ ...managed, integrations: { secret: true } }]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    await expect(
+      listAccountRooms(
+        {
+          cookies: jar.cookies,
+          origin: 'https://www.example.test',
+          fetch: leakingFetch
+        },
+        ACCOUNT_ID
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamResponse'
+    });
+
+    const invalidTimestampFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify([{ ...managed, createdAt: 'January 1, 2026' }]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    await expect(
+      listAccountRooms(
+        {
+          cookies: jar.cookies,
+          origin: 'https://www.example.test',
+          fetch: invalidTimestampFetch
+        },
+        ACCOUNT_ID
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamResponse'
+    });
+
+    const unreachable = vi.fn();
+    await expect(
+      listAccountRooms(
+        {
+          cookies: jar.cookies,
+          origin: 'https://www.example.test',
+          fetch: unreachable
+        },
+        'not-a-uuid'
+      )
+    ).resolves.toEqual({
+      ok: false,
+      status: 400,
+      code: 'invalid',
+      message: 'Invalid API resource identifier.'
+    });
+    expect(unreachable).not.toHaveBeenCalled();
+  });
+
+  it('sends idempotent create and absolute archive requests to the addressed room only', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const managed = {
+      id: ROOM_ID,
+      shortCode: '3627',
+      name: 'Main Room',
+      state: 'open' as const,
+      maxCapacity: 100,
+      memberCount: 1,
+      archivedAt: null,
+      createdAt: '2026-01-01T00:00:00Z'
+    };
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get('origin')).toBe('https://www.example.test');
+      if (init?.method === 'POST') {
+        expect(String(input)).toBe(`http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/rooms`);
+        expect(JSON.parse(String(init.body))).toEqual({
+          requestId: ROOM_ID,
+          name: 'Main Room'
+        });
+      } else {
+        expect(init?.method).toBe('PATCH');
+        expect(String(input)).toBe(`http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/rooms/${ROOM_ID}`);
+        expect(JSON.parse(String(init?.body))).toEqual({ archived: true });
+      }
+      return new Response(JSON.stringify(managed), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+
+    await expect(
+      createAccountRoom({ cookies: jar.cookies, origin: 'https://www.example.test', fetch }, ACCOUNT_ID, {
+        requestId: ROOM_ID,
+        name: 'Main Room'
+      })
+    ).resolves.toEqual({ ok: true, status: 200, data: managed });
+    await expect(
+      setAccountRoomArchived({ cookies: jar.cookies, origin: 'https://www.example.test', fetch }, ACCOUNT_ID, ROOM_ID, {
+        archived: true
+      })
+    ).resolves.toEqual({ ok: true, status: 200, data: managed });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(jar.set).not.toHaveBeenCalled();
   });
 
   it('preserves the API stable error without accepting response cookies', async () => {
@@ -434,14 +675,28 @@ describe('typed Rust API transport', () => {
     const headers = sessionHeaders();
     const fetch = vi.fn(
       async () =>
-        new Response(JSON.stringify({ error: { code: 'unauthorized', message: 'unauthorized' } }), {
-          status: 401,
-          headers
-        })
+        new Response(
+          JSON.stringify({
+            error: { code: 'unauthorized', message: 'unauthorized' }
+          }),
+          {
+            status: 401,
+            headers
+          }
+        )
     );
     await expect(
-      getAccountBootstrap({ cookies: jar.cookies, origin: 'https://www.example.test', fetch })
-    ).resolves.toEqual({ ok: false, status: 401, code: 'unauthorized', message: 'unauthorized' });
+      getAccountBootstrap({
+        cookies: jar.cookies,
+        origin: 'https://www.example.test',
+        fetch
+      })
+    ).resolves.toEqual({
+      ok: false,
+      status: 401,
+      code: 'unauthorized',
+      message: 'unauthorized'
+    });
     expect(jar.set).not.toHaveBeenCalled();
   });
 });

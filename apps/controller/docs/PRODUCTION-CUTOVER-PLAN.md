@@ -95,7 +95,7 @@ permit real signup, login, account, room, API-key, or payment traffic.
       and `api/fixtures/seed.sql` loaded. 413 passed, 0 failed — 155 API library,
       126 API PostgreSQL integration, 9 release-attestor, 112 media library, 11
       media binary — plus full-workspace Clippy with warnings denied and
-      `pnpm quality` locally with 1280
+      `pnpm quality` locally with 1294
       Vitest tests, 9 Playwright tests in Chromium, and the Vercel production
       build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
@@ -104,6 +104,12 @@ permit real signup, login, account, room, API-key, or payment traffic.
       Rust tests (163 API library, 138 PostgreSQL integration, 19 attestor, 114
       media library, 11 media binary), plus 1,280 controller Vitest assertions,
       all 9 Chromium journeys, and the Vercel production build.
+      A fresh-database rerun on 2026-09-04 passed all 450 Rust tests (164 API
+      library, 142 PostgreSQL integration, 19 attestor, 114 media library, 11
+      media binary), strict Clippy, and the live 15-migration PostgreSQL
+      attestation. The controller passed 1,294 Vitest assertions across 129
+      files, 63 PostgreSQL assertions across 10 files, all 9 Chromium journeys,
+      and the Vercel production build.
 - [x] Obtain the first successful default-branch backend workflow result. Run
       [`30767258722`](https://github.com/billyribeiro-ux/trading-app-main/actions/runs/30767258722)
       passed for exact revision
@@ -176,10 +182,25 @@ No Svelte route may directly reproduce authorization policy.
       controller database runs all forward migrations, then proves ownership refusal, plan,
       apply, independent reconciliation, source-drift refusal, guarded rollback, and absence of
       source/target residue. Output contains only counts, digests, status, and run id.
-- [ ] Profile: make canonical profile reads/writes and per-user preferences flow through the Rust
-      contract, typed SvelteKit BFF, and visible authenticated UI; deploy behind a fail-closed
-      authority switch and prove rollback/read-after-write behavior.
-- [ ] Rooms.
+- [x] Profile repository slice: canonical profile reads/writes and per-user preferences flow through
+      the exact Rust contract, generated server-only SvelteKit transport, and authenticated UI.
+      Migration `0013` grants only the required display-name write. The fail-closed
+      `PROFILE_AUTHORITY_MODE` switch, bounded refresh, exact UUID/membership proof, scrypt-to-
+      Argon2id credential bridge, converter plan/apply/verify/guarded rollback, real PostgreSQL HTTP
+      negative controls, and `ops/PROFILE-AUTHORITY-CUTOVER.md` are implemented. Staging activation
+      remains an operator action and is not implied by this repository checkmark.
+- [x] Rooms repository slice: migrations `0014`/`0015` add lifecycle/idempotency fields and
+      transaction-scoped account-authority locking; Rust owns account-scoped list/create/archive
+      with simultaneous-retry convergence and audit-on-change;
+      the scoped OpenAPI/client/BFF boundary rejects extra fields and tenant disclosure; controller
+      migration `0019` maps temporary legacy projections; and the room converter proves
+      plan/apply/verify, no-overwrite drift refusal, post-use rollback refusal, and crash-resumable
+      source-first rollback on real PostgreSQL. `ROOM_AUTHORITY_MODE` depends on canonical profile
+      authority and preserves a one-switch request-path rollback. See
+      `ops/ROOM-AUTHORITY-CUTOVER.md`. Staging activation is
+      separately operator-owned.
+- [ ] Activate and observe the profile and room switches in staging against the selected managed
+      PostgreSQL/API deployment, then record backup restore and request-path rollback evidence.
 - [ ] Room settings.
 - [ ] Membership.
 - [ ] Badges.

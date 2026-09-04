@@ -9,7 +9,11 @@
    */
 
   /** Only the fields the filter and the sort actually read. */
-  export type SessionRow = { name: string; shortCode: string; archivedAt: Date | null };
+  export type SessionRow = {
+    name: string;
+    shortCode: string;
+    archivedAt: Date | null;
+  };
 
   /**
    * The reference's `s.isArchivedRoom`.
@@ -25,7 +29,10 @@
    * Comparison is numeric-aware: the Session ID column holds short codes like `3625`, and a lexical
    * sort puts `3625` before `999`.
    */
-  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+  const collator = new Intl.Collator(undefined, {
+    numeric: true,
+    sensitivity: 'base'
+  });
 
   /**
    * `login.sessions | filter: sessSearch`, plus the reference's
@@ -37,7 +44,12 @@
    */
   export function selectVisibleRooms<T extends SessionRow>(
     rooms: readonly T[],
-    options: { search: string; showArchived: boolean; sortKey: 'uuid' | 'name' | null; sortAscending: boolean }
+    options: {
+      search: string;
+      showArchived: boolean;
+      sortKey: 'uuid' | 'name' | null;
+      sortAscending: boolean;
+    }
   ): T[] {
     const needle = options.search.toLowerCase();
     const matched = rooms.filter(
@@ -591,7 +603,8 @@
       type="button"
       onclick={() => (showArchivedRooms = !showArchivedRooms)}
     >
-      <span hidden={showArchivedRooms}>Show</span> <span hidden={!showArchivedRooms}>Hide</span> Archived
+      <span hidden={showArchivedRooms}>Show</span>
+      <span hidden={!showArchivedRooms}>Hide</span> Archived
     </button>
   </div>
 
@@ -662,7 +675,9 @@
                        not `.text-muted`'s rgb(119,119,119). The class-less span
                        keeps the same inline box and the same text-node boundary,
                        with the ")" outside it exactly as the reference has it. -->
-                    <div><br /><span>( {room.id} - ownerID: {room.accountId}</span> )</div>
+                    <div>
+                      <br /><span>( {room.id} - ownerID: {room.accountId}</span> )
+                    </div>
                   {/if}
                 </td>
                 <td>{room.name}</td>
@@ -712,7 +727,9 @@
                 use. T5-20.
               -->
                 <td class="acc-td-center">
-                  <div class="acc-muted">{room.userCount} / {room.recordedMaxCapacity}</div>
+                  <div class="acc-muted">
+                    {room.userCount} / {room.recordedMaxCapacity}
+                  </div>
                 </td>
                 <td>
                   <!-- The reference's `ng-href`: the whole handoff URL, resolved server-side at
@@ -729,14 +746,17 @@
                   <!-- eslint-enable svelte/no-navigation-without-resolve -->
                   <a
                     class="acc-btn acc-btn-sm acc-btn-inverse"
-                    href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: room.shortCode })}
-                    ><i class="fa fa-cogs"></i> Manage</a
+                    href={resolve('/(app)/account/rooms/[id]/[[tab]]', {
+                      id: room.shortCode
+                    })}><i class="fa fa-cogs"></i> Manage</a
                   >
                   {#if data.entitlements.marketplace}
                     <a
                       class="acc-btn acc-btn-sm acc-btn-default"
-                      href={resolve('/(app)/account/rooms/[id]/[[tab]]', { id: room.shortCode, tab: 'marketplace' })}
-                      ><i class="fa fa-credit-card"></i> Marketplace</a
+                      href={resolve('/(app)/account/rooms/[id]/[[tab]]', {
+                        id: room.shortCode,
+                        tab: 'marketplace'
+                      })}><i class="fa fa-credit-card"></i> Marketplace</a
                     >
                   {/if}
                   <!-- OURS, and stated as ours because the placement is a real divergence rather
@@ -805,6 +825,7 @@
        modal or default was recorded — so nothing is invented here. That remains
        an open evidence gap. -->
   <form method="POST" action="?/createRoom" class="acc-toolbar" use:enhance={save}>
+    <input type="hidden" name="requestId" value={data.roomCreateRequestId} />
     <input class="acc-input" name="name" placeholder="New room name" required />
     <button class="acc-btn acc-btn-warning acc-mb acc-btn-block" type="submit">New Room</button>
   </form>
@@ -1126,7 +1147,9 @@
 
       {#if showAddAdminUser}
         <div class="acc-panel-default">
-          <div class="acc-panel-heading"><h3 class="acc-panel-title">Add Admin User</h3></div>
+          <div class="acc-panel-heading">
+            <h3 class="acc-panel-title">Add Admin User</h3>
+          </div>
           <div class="acc-panel-body">
             <form method="POST" action="?/addAdminUser" use:enhance={save}>
               <div class="acc-field">

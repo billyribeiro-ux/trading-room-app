@@ -45,7 +45,11 @@ function referenceShape(nodes: DumpNode[], from: number) {
     if (classes.includes('ng-hide')) continue;
     if (node.rect && node.rect.w === 0 && node.rect.h === 0) continue;
     if (node.style?.display === 'none') continue;
-    out.push({ kind: 'el', tag: node.tag, classes: classes.filter((c) => !FRAMEWORK.test(c)) });
+    out.push({
+      kind: 'el',
+      tag: node.tag,
+      classes: classes.filter((c) => !FRAMEWORK.test(c))
+    });
   }
   return out;
 }
@@ -86,9 +90,20 @@ function ourPage() {
         admins: [],
         apiKeys: [],
         apiScopes: [],
-        entitlements: { marketplace: true, 'text-list': true, sso: true, mobile: true },
-        user: { id: 1, displayName: 'Ada Lovelace', email: 'ada@example.com', emailVerifiedAt: new Date() },
+        entitlements: {
+          marketplace: true,
+          'text-list': true,
+          sso: true,
+          mobile: true
+        },
+        user: {
+          id: 1,
+          displayName: 'Ada Lovelace',
+          email: 'ada@example.com',
+          emailVerifiedAt: new Date()
+        },
         profileAuthority: { enabled: false },
+        roomCreateRequestId: '90000000-0000-4000-8000-000000000001',
         verificationEnforced: false
       },
       form: null

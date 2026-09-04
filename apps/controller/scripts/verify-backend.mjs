@@ -162,6 +162,27 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0013_profile_write_privilege.sql',
     sha256: 'ee8eea163f4d9fb5aa4786313c48ed85ae30d1fc4bd5925ef1129aef99ff7549'
+  }),
+  /*
+    Authored and reviewed 2026-09-04 for the canonical room-lifecycle slice. It adds an absolute
+    archive timestamp and an enterprise-scoped creation idempotency key without widening runtime
+    privileges. Real PostgreSQL migration and HTTP tests prove duplicate-request convergence,
+    stable archive timestamps, tenant omission, exact request envelopes, and audit-on-change only.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0014_room_lifecycle_authority.sql',
+    sha256: '21932f0090dee30ab5c6cb3dce380ddaf4408283803e3871cdb2c18b27f626ed'
+  }),
+  /*
+    Authored and reviewed 2026-09-04 after the room slice's concurrency audit. The tenant-bound,
+    user-bounded SECURITY DEFINER function locks matching owner/admin authority for the caller's
+    transaction. Runtime still has no direct enterprise_memberships privilege; PUBLIC cannot call
+    the function. Live PostgreSQL tests prove fail-closed tenant omission and a blocked concurrent
+    revocation by its exact SQLSTATE.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0015_lock_account_authority.sql',
+    sha256: '35cd20f21d2f4fbfd00cdf3fdb0b4e02f1a86db120a1344022c95d2cf5f3f199'
   })
 ]);
 

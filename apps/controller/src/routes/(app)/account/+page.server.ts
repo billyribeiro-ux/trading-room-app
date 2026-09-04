@@ -1,6 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import { API_KEY_ENCRYPTION_KEY, ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
 import { adminUsers, apiKeys, badges, rooms, roomUsers } from '#lib/server/db/schema.js';
@@ -10,11 +10,18 @@ import { resolveAccountEntitlements } from '#lib/server/account-entitlements.js'
 import { decryptApiKeySecret, encryptApiKeySecret } from '#lib/server/api-key-secret.js';
 import { API_SCOPES, parseIpList, readRestrictions } from '#lib/server/rooms.js';
 import { launchHref } from '#lib/server/room-handoff.js';
-import { NoRoomCodeAvailable, provisionRoom } from '#lib/server/provision-room.js';
-import { profileAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import {
+  NoRoomCodeAvailable,
+  RoomAuthorityProjectionError,
+  projectAuthorityRooms,
+  provisionRoom
+} from '#lib/server/provision-room.js';
+import { profileAuthorityMode, roomAuthorityMode } from '#lib/server/control-plane-runtime.js';
 import { authorityBindingFailure } from '#lib/server/profile-authority-policy.js';
 import { readProfileAuthority } from '#lib/server/profile-authority.js';
 import { apiRequestContext, updateAccountProfile } from '#lib/server/tradingroom-api.js';
+import { archiveRoomInAuthority, createRoomInAuthority, readRoomAuthority } from '#lib/server/room-authority.js';
+import type { ManagedRoom } from '#lib/server/tradingroom-api.generated.js';
 import type { Actions, PageServerLoad } from './$types';
 
 function apiKeyEncryptionMaster() {
@@ -76,14 +83,29 @@ function readRowId(form: FormData, field: string): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
+async function readOwnedRoomAuthorityMapping(accountId: number, roomId: number) {
+  const [room] = await getDb()
+    .select({ authorityRoomId: rooms.authorityRoomId, authorityReconciledAt: rooms.authorityReconciledAt })
+    .from(rooms)
+    .where(and(eq(rooms.id, roomId), eq(rooms.accountId, accountId)))
+    .limit(1);
+  return room;
+}
+
 export const load: PageServerLoad = async (event) => {
   const { locals, setHeaders } = event;
   const localUser = requireUser(locals);
   let user = localUser;
   let profileAuthority:
-    { enabled: false } | { enabled: true; chatTextSize: number; preferences: Readonly<Record<string, unknown>> } = {
+    | { enabled: false }
+    | {
+        enabled: true;
+        chatTextSize: number;
+        preferences: Readonly<Record<string, unknown>>;
+      } = {
     enabled: false
   };
+  let canonicalRooms: readonly ManagedRoom[] | null = null;
 
   if (profileAuthorityMode === 'rust' && localUser.impersonatedBy === undefined) {
     const canonical = await readProfileAuthority(apiRequestContext(event));
@@ -120,6 +142,35 @@ export const load: PageServerLoad = async (event) => {
     };
   }
   const accountId = user.accountId;
+
+  if (roomAuthorityMode === 'rust') {
+    if (user.impersonatedBy !== undefined || !user.authorityEnterpriseId) {
+      error(503, 'The room authority could not verify this account.');
+    }
+    const canonical = await readRoomAuthority(apiRequestContext(event), user.authorityEnterpriseId);
+    if (!canonical.ok) {
+      console.error('[room-authority] canonical room read failed', {
+        localUserId: user.id,
+        status: canonical.status,
+        code: canonical.code
+      });
+      error(503, 'The room authority is temporarily unavailable.');
+    }
+    canonicalRooms = canonical.data;
+    try {
+      await projectAuthorityRooms(getDb(), {
+        accountId,
+        ownerUserId: user.id,
+        rooms: canonicalRooms
+      });
+    } catch (cause) {
+      console.error('[room-authority] controller projection refused', {
+        localUserId: user.id,
+        code: cause instanceof RoomAuthorityProjectionError ? cause.code : 'database'
+      });
+      error(503, 'The room authority projection is not reconciled.');
+    }
+  }
 
   // Complete API credentials are owner-visible by product contract. Do not let
   // browsers or intermediaries retain the authenticated account response.
@@ -174,15 +225,29 @@ export const load: PageServerLoad = async (event) => {
       `/session?id=…&jwtSite=…` into the anchor's `ng-href` rather than redirecting through a
       route. One token per room per render, exactly as there.
     */
-    rooms: roomRows.map((r) => ({
-      ...r,
-      userCount: counts.get(r.id) ?? 0,
-      launchUrl: launchHref(ROOM_BASE_URL, ROOM_JWT_SECRET, r.shortCode, {
-        name: user.displayName,
-        email: user.email,
-        id: String(user.id)
-      })
-    })),
+    rooms: (canonicalRooms ?? roomRows).map((canonicalOrLegacy) => {
+      const r =
+        canonicalRooms === null
+          ? (canonicalOrLegacy as (typeof roomRows)[number])
+          : roomRows.find((candidate) => candidate.authorityRoomId === canonicalOrLegacy.id);
+      if (!r) error(503, 'The room authority projection is not reconciled.');
+      const canonical = canonicalRooms === null ? null : (canonicalOrLegacy as ManagedRoom);
+      return {
+        ...r,
+        name: canonical?.name ?? r.name,
+        shortCode: canonical?.shortCode ?? r.shortCode,
+        state: canonical?.state ?? r.state,
+        maxUsers: canonical?.maxCapacity ?? r.maxUsers,
+        archivedAt: canonical?.archivedAt ? new Date(canonical.archivedAt) : canonical ? null : r.archivedAt,
+        userCount: canonical?.memberCount ?? counts.get(r.id) ?? 0,
+        launchUrl: launchHref(ROOM_BASE_URL, ROOM_JWT_SECRET, canonical?.shortCode ?? r.shortCode, {
+          name: user.displayName,
+          email: user.email,
+          id: String(user.id)
+        })
+      };
+    }),
+    roomCreateRequestId: randomUUID(),
     badges: await getDb().select().from(badges).where(eq(badges.accountId, accountId)),
     admins: await getDb()
       /* `createdAt` feeds the Added column — `{{au.created | date:'short'}}` in the reference
@@ -214,11 +279,15 @@ export const load: PageServerLoad = async (event) => {
 export const actions: Actions = {
   saveProfile: async (event) => {
     if (profileAuthorityMode !== 'rust') {
-      return fail(409, { message: 'Canonical profile editing is not enabled on this deployment.' });
+      return fail(409, {
+        message: 'Canonical profile editing is not enabled on this deployment.'
+      });
     }
     const user = requireUser(event.locals);
     if (user.impersonatedBy !== undefined) {
-      return fail(403, { message: 'End impersonation before changing a canonical profile.' });
+      return fail(403, {
+        message: 'End impersonation before changing a canonical profile.'
+      });
     }
 
     // Direct action posts do not pass through the page loader. Re-prove both immutable mappings
@@ -226,7 +295,9 @@ export const actions: Actions = {
     const context = apiRequestContext(event);
     const canonical = await readProfileAuthority(context);
     if (!canonical.ok) {
-      return fail(503, { message: 'The profile authority is temporarily unavailable.' });
+      return fail(503, {
+        message: 'The profile authority is temporarily unavailable.'
+      });
     }
     const bindingFailure = authorityBindingFailure(user, canonical.data);
     if (bindingFailure) {
@@ -234,21 +305,29 @@ export const actions: Actions = {
         localUserId: user.id,
         reason: bindingFailure
       });
-      return fail(503, { message: 'The profile authority could not verify this account.' });
+      return fail(503, {
+        message: 'The profile authority could not verify this account.'
+      });
     }
 
     const form = await event.request.formData();
     const displayName = String(form.get('displayName') ?? '').trim();
     if (!displayName || new TextEncoder().encode(displayName).byteLength > 80) {
-      return fail(400, { message: 'Display name must be between 1 and 80 bytes.' });
+      return fail(400, {
+        message: 'Display name must be between 1 and 80 bytes.'
+      });
     }
     const rawTextSize = String(form.get('chatTextSize') ?? '');
     if (!/^\d{2}$/u.test(rawTextSize)) {
-      return fail(400, { message: 'Chat text size must be a whole number from 10 to 32.' });
+      return fail(400, {
+        message: 'Chat text size must be a whole number from 10 to 32.'
+      });
     }
     const chatTextSize = Number(rawTextSize);
     if (chatTextSize < 10 || chatTextSize > 32) {
-      return fail(400, { message: 'Chat text size must be a whole number from 10 to 32.' });
+      return fail(400, {
+        message: 'Chat text size must be a whole number from 10 to 32.'
+      });
     }
 
     const updated = await updateAccountProfile(context, {
@@ -264,13 +343,16 @@ export const actions: Actions = {
       console.error('[profile-authority] profile write returned a different identity', {
         localUserId: user.id
       });
-      return fail(503, { message: 'The profile authority returned an invalid identity.' });
+      return fail(503, {
+        message: 'The profile authority returned an invalid identity.'
+      });
     }
 
     return { profileSaved: true };
   },
 
-  createRoom: async ({ request, locals }) => {
+  createRoom: async (event) => {
+    const { request, locals } = event;
     const owner = requireUser(locals);
     const { accountId } = owner;
 
@@ -291,6 +373,54 @@ export const actions: Actions = {
     const form = await request.formData();
     const name = String(form.get('name') ?? '').trim();
     if (!name) return fail(400, { message: 'A room needs a name.' });
+    if (new TextEncoder().encode(name).byteLength > 160) {
+      return fail(400, { message: 'A room name may be at most 160 bytes.' });
+    }
+
+    if (roomAuthorityMode === 'rust') {
+      if (owner.impersonatedBy !== undefined || !owner.authorityEnterpriseId || !owner.authorityUserId) {
+        return fail(503, {
+          message: 'The room authority could not verify this account.'
+        });
+      }
+      const requestId = String(form.get('requestId') ?? '');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(requestId)) {
+        return fail(400, {
+          message: 'The room creation request id is invalid. Reload and try again.'
+        });
+      }
+      const context = apiRequestContext(event);
+      const binding = await readProfileAuthority(context);
+      if (!binding.ok || authorityBindingFailure(owner, binding.data)) {
+        return fail(503, {
+          message: 'The room authority could not verify this account.'
+        });
+      }
+      const created = await createRoomInAuthority(context, owner.authorityEnterpriseId, { requestId, name });
+      if (!created.ok) {
+        return fail(created.status === 400 ? 400 : 503, {
+          message: created.status === 400 ? created.message : 'The room authority could not create this room.'
+        });
+      }
+      try {
+        await projectAuthorityRooms(getDb(), {
+          accountId,
+          ownerUserId: owner.id,
+          rooms: [created.data],
+          complete: false
+        });
+      } catch (cause) {
+        console.error('[room-authority] created room projection failed', {
+          localUserId: owner.id,
+          canonicalRoomId: created.data.id,
+          code: cause instanceof RoomAuthorityProjectionError ? cause.code : 'database'
+        });
+        return fail(503, {
+          message: 'The room was committed and will be reconciled on the next account load.'
+        });
+      }
+      return { created: true };
+    }
 
     /*
       The same three rows registration writes, through the same helper. Written by hand here twice
@@ -300,7 +430,9 @@ export const actions: Actions = {
       await provisionRoom(getDb(), { accountId, ownerUserId: owner.id, name });
     } catch (cause) {
       if (cause instanceof NoRoomCodeAvailable) {
-        return fail(409, { message: 'Could not allocate a room code. Try again.' });
+        return fail(409, {
+          message: 'Could not allocate a room code. Try again.'
+        });
       }
       throw cause;
     }
@@ -327,15 +459,67 @@ export const actions: Actions = {
    * this action directly — the row renders Archive or Unarchive, never both — and restamping is the
    * honest outcome of "make it archived, now" rather than silently ignoring the request.
    */
-  setRoomArchived: async ({ request, locals }) => {
-    const { accountId } = requireUser(locals);
+  setRoomArchived: async (event) => {
+    const { request, locals } = event;
+    const owner = requireUser(locals);
+    const { accountId } = owner;
     const form = await request.formData();
     const id = readRowId(form, 'id');
     if (id === null) return fail(400, { message: 'That room id is not a row id.' });
 
     const wanted = form.get('archived');
     if (wanted !== 'true' && wanted !== 'false') {
-      return fail(400, { message: `"archived" must be "true" or "false", not ${JSON.stringify(wanted)}.` });
+      return fail(400, {
+        message: `"archived" must be "true" or "false", not ${JSON.stringify(wanted)}.`
+      });
+    }
+
+    if (roomAuthorityMode === 'rust') {
+      if (owner.impersonatedBy !== undefined || !owner.authorityEnterpriseId || !owner.authorityUserId) {
+        return fail(503, {
+          message: 'The room authority could not verify this account.'
+        });
+      }
+      const localRoom = await readOwnedRoomAuthorityMapping(accountId, id);
+      if (!localRoom) return fail(404, { message: 'No such room.' });
+      if (!localRoom.authorityRoomId || !localRoom.authorityReconciledAt) {
+        return fail(503, {
+          message: 'That room is not reconciled with room authority.'
+        });
+      }
+      const context = apiRequestContext(event);
+      const binding = await readProfileAuthority(context);
+      if (!binding.ok || authorityBindingFailure(owner, binding.data)) {
+        return fail(503, {
+          message: 'The room authority could not verify this account.'
+        });
+      }
+      const updated = await archiveRoomInAuthority(context, owner.authorityEnterpriseId, localRoom.authorityRoomId, {
+        archived: wanted === 'true'
+      });
+      if (!updated.ok) {
+        return fail(updated.status === 404 ? 404 : 503, {
+          message: updated.status === 404 ? 'No such room.' : 'The room authority could not update this room.'
+        });
+      }
+      try {
+        await projectAuthorityRooms(getDb(), {
+          accountId,
+          ownerUserId: owner.id,
+          rooms: [updated.data],
+          complete: false
+        });
+      } catch (cause) {
+        console.error('[room-authority] archive projection failed', {
+          localUserId: owner.id,
+          canonicalRoomId: updated.data.id,
+          code: cause instanceof RoomAuthorityProjectionError ? cause.code : 'database'
+        });
+        return fail(503, {
+          message: 'The room state was committed and will be reconciled on the next account load.'
+        });
+      }
+      return { archived: updated.data.archivedAt !== null };
     }
 
     const changed = await getDb()
@@ -389,7 +573,9 @@ export const actions: Actions = {
     }
     const ALLOWED = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
     if (!ALLOWED.includes(file.type)) {
-      return fail(415, { message: `${file.type || 'That file'} is not a PNG, JPEG, GIF or WebP.` });
+      return fail(415, {
+        message: `${file.type || 'That file'} is not a PNG, JPEG, GIF or WebP.`
+      });
     }
 
     const MAX_BYTES = 256 * 1024;
@@ -558,10 +744,19 @@ export const actions: Actions = {
       .trim()
       .toLowerCase();
     const password = String(form.get('password') ?? '');
-    if (!name || !email || !password) return fail(400, { message: 'Name, email and password are all required.' });
+    if (!name || !email || !password)
+      return fail(400, {
+        message: 'Name, email and password are all required.'
+      });
     await getDb()
       .insert(adminUsers)
-      .values({ accountId, name, email, passwordHash: hashPassword(password), createdAt: new Date() });
+      .values({
+        accountId,
+        name,
+        email,
+        passwordHash: hashPassword(password),
+        createdAt: new Date()
+      });
     return { created: true };
   },
 
@@ -636,7 +831,9 @@ export const actions: Actions = {
     try {
       ips = parseIpList(String(form.get('ips') ?? ''));
     } catch (e) {
-      return fail(400, { message: e instanceof Error ? e.message : 'Invalid IP list.' });
+      return fail(400, {
+        message: e instanceof Error ? e.message : 'Invalid IP list.'
+      });
     }
     const scopes = form
       .getAll('scopes')
@@ -684,14 +881,20 @@ export const actions: Actions = {
   resendVerification: async ({ locals, url }) => {
     const user = requireUser(locals);
     if (!verificationEnforced()) {
-      return fail(400, { message: 'Email is not configured on this deployment, so there is nothing to send.' });
+      return fail(400, {
+        message: 'Email is not configured on this deployment, so there is nothing to send.'
+      });
     }
     // Reachable only by posting directly — the banner that offers this hides once verified. Says so
     // rather than reporting a send that did not happen.
     if (user.emailVerifiedAt) return fail(400, { message: 'That address is already confirmed.' });
 
     try {
-      const token = await issueToken({ userId: user.id, email: user.email, purpose: 'verify-email' });
+      const token = await issueToken({
+        userId: user.id,
+        email: user.email,
+        purpose: 'verify-email'
+      });
       await sendVerificationEmail({
         email: user.email,
         displayName: user.displayName,
@@ -699,8 +902,13 @@ export const actions: Actions = {
         origin: url.origin
       });
     } catch (cause) {
-      console.error('[account] resend of the verification email failed', { email: user.email, cause });
-      return fail(502, { message: 'We could not send that email just now. Try again in a minute.' });
+      console.error('[account] resend of the verification email failed', {
+        email: user.email,
+        cause
+      });
+      return fail(502, {
+        message: 'We could not send that email just now. Try again in a minute.'
+      });
     }
     return { verificationSent: true };
   },

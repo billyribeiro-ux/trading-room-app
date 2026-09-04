@@ -1104,7 +1104,17 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// Slot 13 is `0013_profile_write_privilege.sql`. It adds only column-level UPDATE on
 /// `users.display_name`, asserts that relation-wide UPDATE remains absent, and explicitly refuses
 /// an accidental `is_platform_admin` write grant.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 13] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+///
+/// Slot 14 is `0014_room_lifecycle_authority.sql`. It adds canonical archive time and a nullable,
+/// enterprise-scoped creation idempotency key to `rooms`, plus the exact uniqueness and list
+/// indexes. It grants nothing: the existing tenant-scoped room privileges remain the whole
+/// request-path surface, and the catalog-driven ACL attestation covers both new columns.
+///
+/// Slot 15 is `0015_lock_account_authority.sql`. It exposes one user-bounded, tenant-GUC-bound
+/// SECURITY DEFINER authorization function. Its `FOR SHARE` lock lasts for the caller's tenant
+/// transaction, so a concurrent account-role revocation cannot interleave between authorization
+/// and a room read or mutation. Direct runtime access to `enterprise_memberships` remains denied.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 15] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 /// The two human-facing error messages that name that chain's range in PROSE, as named constants
 /// so `the_prose_ranges_track_the_attested_chain` can hold them against
@@ -1115,9 +1125,9 @@ const ATTESTED_MIGRATION_VERSIONS: [i64; 13] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1
 /// refused release. The embedded-contract message beside it was moved by hand both times;
 /// hand-moving is the convention that failed here, so the test moves the burden.
 const EMBEDDED_MIGRATION_CONTRACT_MESSAGE: &str =
-    "the attestor is pinned to repository migration versions 0001 through 0013";
+    "the attestor is pinned to repository migration versions 0001 through 0015";
 const MIGRATION_LEDGER_MISMATCH_MESSAGE: &str = "the SQLx ledger must contain only successful \
-     repository migrations 0001 through 0013 with exact descriptions and checksums";
+     repository migrations 0001 through 0015 with exact descriptions and checksums";
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -1677,7 +1687,7 @@ fn expected_column_privileges(table_name: &str, column_name: &str) -> Vec<String
 const fn acl_mismatch() -> AttestationError {
     AttestationError::new(
         "runtime_acl_mismatch",
-        "effective table and column privileges do not match the reviewed runtime matrix through migration 0013",
+        "effective table and column privileges do not match the reviewed runtime matrix through migration 0015",
     )
 }
 

@@ -87,6 +87,7 @@ console.log(`Verifying ${file}\n`);
 const REQUIRED = [
   'CONTROL_PLANE_MODE',
   'PROFILE_AUTHORITY_MODE',
+  'ROOM_AUTHORITY_MODE',
   'DATABASE_URL',
   'ROOM_JWT_SECRET',
   'ROOM_BASE_URL',
@@ -126,6 +127,19 @@ if (readable(env.PROFILE_AUTHORITY_MODE) && !['legacy', 'rust'].includes(env.PRO
   fail('TRADINGROOM_API_URL', 'required when PROFILE_AUTHORITY_MODE=rust — profile requests fail closed');
 } else if (env.PROFILE_AUTHORITY_MODE === 'rust') {
   ok('TRADINGROOM_API_URL', 'present for Rust profile authority');
+}
+
+if (readable(env.ROOM_AUTHORITY_MODE) && !['legacy', 'rust'].includes(env.ROOM_AUTHORITY_MODE)) {
+  fail('ROOM_AUTHORITY_MODE', `must be legacy or rust, not ${env.ROOM_AUTHORITY_MODE}`);
+} else if (env.ROOM_AUTHORITY_MODE === 'rust' && env.PROFILE_AUTHORITY_MODE !== 'rust') {
+  fail(
+    'ROOM_AUTHORITY_MODE',
+    'rust requires PROFILE_AUTHORITY_MODE=rust — room ownership must bind to canonical identity'
+  );
+} else if (env.ROOM_AUTHORITY_MODE === 'rust' && !readable(env.TRADINGROOM_API_URL)) {
+  fail('TRADINGROOM_API_URL', 'required when ROOM_AUTHORITY_MODE=rust — room lifecycle requests fail closed');
+} else if (env.ROOM_AUTHORITY_MODE === 'rust') {
+  ok('ROOM_AUTHORITY_MODE', 'Rust room lifecycle authority is consistently configured');
 }
 
 /* ---- 4. Secrets are actually secret --------------------------------------------------------- */

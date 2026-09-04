@@ -383,7 +383,14 @@ function testReport(findings) {
       }
     },
     matches: findings.map(({ id, severity, fixState, name = 'demo', version = '1.0.0', type = 'rust' }) => ({
-      vulnerability: { id, severity, fix: { state: fixState, versions: fixState === 'fixed' ? ['2.0.0'] : [] } },
+      vulnerability: {
+        id,
+        severity,
+        fix: {
+          state: fixState,
+          versions: fixState === 'fixed' ? ['2.0.0'] : []
+        }
+      },
       artifact: { name, version, type }
     }))
   };
@@ -432,7 +439,12 @@ function runSelfTest() {
   );
 
   const emptyFixState = evaluateReports(
-    [{ source: 'fixture', report: testReport([{ id: 'CVE-EMPTY-FIX', severity: 'Low', fixState: '' }]) }],
+    [
+      {
+        source: 'fixture',
+        report: testReport([{ id: 'CVE-EMPTY-FIX', severity: 'Low', fixState: '' }])
+      }
+    ],
     basePolicy,
     now
   );
@@ -458,25 +470,49 @@ function runSelfTest() {
   };
   const exceptionPolicy = validatePolicy({ ...EXPECTED_POLICY, reviewedExceptions: [exception] }, now);
   const excepted = evaluateReports(
-    [{ source: 'fixture', report: testReport([{ id: 'CVE-HIGH-FIXED', severity: 'High', fixState: 'fixed' }]) }],
+    [
+      {
+        source: 'fixture',
+        report: testReport([{ id: 'CVE-HIGH-FIXED', severity: 'High', fixState: 'fixed' }])
+      }
+    ],
     exceptionPolicy,
     now
   );
   expect(excepted.passed && excepted.excepted.length === 1, 'an exact unexpired exception must be honored');
 
   expectThrows(
-    () => validatePolicy({ ...EXPECTED_POLICY, reviewedExceptions: [{ ...exception, expiresOn: '2026-08-01' }] }, now),
+    () =>
+      validatePolicy(
+        {
+          ...EXPECTED_POLICY,
+          reviewedExceptions: [{ ...exception, expiresOn: '2026-08-01' }]
+        },
+        now
+      ),
     'expired exceptions must fail closed'
   );
   expectThrows(
-    () => validatePolicy({ ...EXPECTED_POLICY, reviewedExceptions: [{ ...exception, fixState: 'available' }] }, now),
+    () =>
+      validatePolicy(
+        {
+          ...EXPECTED_POLICY,
+          reviewedExceptions: [{ ...exception, fixState: 'available' }]
+        },
+        now
+      ),
     'unrecognized exception fix states must fail closed'
   );
 
   expectThrows(
     () =>
       evaluateReports(
-        [{ source: 'fixture', report: testReport([{ id: 'CVE-SCHEMA', severity: 'Important', fixState: 'fixed' }]) }],
+        [
+          {
+            source: 'fixture',
+            report: testReport([{ id: 'CVE-SCHEMA', severity: 'Important', fixState: 'fixed' }])
+          }
+        ],
         basePolicy,
         now
       ),
@@ -485,7 +521,12 @@ function runSelfTest() {
   expectThrows(
     () =>
       evaluateReports(
-        [{ source: 'fixture', report: testReport([{ id: 'CVE-SCHEMA', severity: 'High', fixState: 'available' }]) }],
+        [
+          {
+            source: 'fixture',
+            report: testReport([{ id: 'CVE-SCHEMA', severity: 'High', fixState: 'available' }])
+          }
+        ],
         basePolicy,
         now
       ),
@@ -500,14 +541,22 @@ function runSelfTest() {
   );
 
   const renamedFixState = testReport([{ id: 'CVE-SCHEMA', severity: 'High', fixState: 'fixed' }]);
-  renamedFixState.matches[0].vulnerability.fix = { status: 'fixed', versions: ['2.0.0'] };
+  renamedFixState.matches[0].vulnerability.fix = {
+    status: 'fixed',
+    versions: ['2.0.0']
+  };
   expectThrows(
     () => evaluateReports([{ source: 'fixture', report: renamedFixState }], basePolicy, now),
     'scanner fix-state schema drift must fail closed'
   );
 
   const severityMismatch = evaluateReports(
-    [{ source: 'fixture', report: testReport([{ id: 'CVE-HIGH-FIXED', severity: 'Critical', fixState: 'fixed' }]) }],
+    [
+      {
+        source: 'fixture',
+        report: testReport([{ id: 'CVE-HIGH-FIXED', severity: 'Critical', fixState: 'fixed' }])
+      }
+    ],
     exceptionPolicy,
     now
   );
@@ -539,8 +588,14 @@ function runSelfTest() {
 
   const deduplicated = evaluateReports(
     [
-      { source: 'oci', report: testReport([{ id: 'CVE-DUPLICATE', severity: 'Low', fixState: 'unknown' }]) },
-      { source: 'native', report: testReport([{ id: 'CVE-DUPLICATE', severity: 'Low', fixState: 'unknown' }]) }
+      {
+        source: 'oci',
+        report: testReport([{ id: 'CVE-DUPLICATE', severity: 'Low', fixState: 'unknown' }])
+      },
+      {
+        source: 'native',
+        report: testReport([{ id: 'CVE-DUPLICATE', severity: 'Low', fixState: 'unknown' }])
+      }
     ],
     basePolicy,
     now
@@ -550,8 +605,14 @@ function runSelfTest() {
 
   const severityMerged = evaluateReports(
     [
-      { source: 'oci', report: testReport([{ id: 'CVE-SEVERITY-MERGE', severity: 'Low', fixState: 'fixed' }]) },
-      { source: 'native', report: testReport([{ id: 'CVE-SEVERITY-MERGE', severity: 'High', fixState: 'fixed' }]) }
+      {
+        source: 'oci',
+        report: testReport([{ id: 'CVE-SEVERITY-MERGE', severity: 'Low', fixState: 'fixed' }])
+      },
+      {
+        source: 'native',
+        report: testReport([{ id: 'CVE-SEVERITY-MERGE', severity: 'High', fixState: 'fixed' }])
+      }
     ],
     basePolicy,
     now
@@ -618,7 +679,11 @@ async function verifyContract() {
   }
 
   const requiredDockerfileFragments = [
-    'FROM rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS builder',
+    'FROM rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS builder-security',
+    'apk add --no-cache libcrypto3=3.5.8-r0 libssl3=3.5.8-r0',
+    "apk info --exists 'libcrypto3=3.5.8-r0'",
+    "apk info --exists 'libssl3=3.5.8-r0'",
+    'FROM builder-security AS builder',
     'ENV RUSTUP_TOOLCHAIN=1.98.0',
     'ARG TARGETARCH',
     "cargo install --locked cargo-auditable --version '=0.7.5'",
@@ -723,6 +788,7 @@ async function verifyContract() {
     'BUILDKIT_VERSION="v0.32.2"',
     'BUILDX_BUILDER="api-release-builder"',
     'BUILDER_IMAGE="rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce"',
+    'builder_evidence_reference="tradingroom-api-builder-security:${source_revision}"',
     'RUNTIME_BASE_IMAGE="gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7"',
     'RCRT1_SHA256="5e93abc3f181bdb1b177e8725dbad7c08ddf2dc5d94d47d593a34a7a4cba1df5"',
     'CRTI_SHA256="a0af2446e5bce05119163883c5d522c3c44e3a9d1aa5014f468c1feb8dc2cb54"',
@@ -765,6 +831,14 @@ async function verifyContract() {
     '$1 == "BuildKit" && $2 == "version:" && $3 == expected_buildkit',
     'linux\\/amd64',
     'docker buildx build --builder "${BUILDX_BUILDER}" --pull --platform linux/amd64',
+    '--target builder-security',
+    'docker image inspect "${BUILDER_IMAGE}" >"${evidence_root}/builder-base-image-inspect.json"',
+    'docker image inspect "${builder_evidence_reference}" >"${evidence_root}/builder-image-inspect.json"',
+    'run_syft scan "docker:${builder_evidence_reference}" --scope squashed',
+    'assert_builder_apk "libcrypto3" "3.5.8-r0"',
+    'assert_builder_apk "libssl3" "3.5.8-r0"',
+    'effectiveSecurityImage: $builderEvidenceImage',
+    'builderEvidenceImage: $builderEvidenceImage',
     '--metadata-file "${evidence_root}/native-link-build-metadata.json"',
     '--metadata-file "${evidence_root}/runtime-build-metadata.json"',
     '--load',
@@ -949,12 +1023,18 @@ async function evaluateFromCli(args) {
     if (reportSources.has(source)) fail(`duplicate report source basename: ${source}`);
     reportSources.add(source);
     reports.push({ source, report: report.value });
-    inputs.push({ path: path.relative(REPOSITORY_ROOT, absolutePath), sha256: sha256(report.bytes) });
+    inputs.push({
+      path: path.relative(REPOSITORY_ROOT, absolutePath),
+      sha256: sha256(report.bytes)
+    });
   }
   const result = evaluateReports(reports, policy);
   const evidence = {
     ...result,
-    policy: { path: path.relative(REPOSITORY_ROOT, policyPath), sha256: sha256(policyFile.bytes) },
+    policy: {
+      path: path.relative(REPOSITORY_ROOT, policyPath),
+      sha256: sha256(policyFile.bytes)
+    },
     inputs
   };
   await writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);

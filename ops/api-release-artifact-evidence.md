@@ -8,6 +8,16 @@ whose retained bundle
 expires 2026-09-02T17:21:47Z. Signature and provenance attestation, publishing,
 and deployment remain out of scope.**
 
+Current-revision note (2026-09-04): protected run
+[`33825502347`](https://github.com/billyribeiro-ux/trading-room-app/actions/runs/33825502347)
+proved migration, profile conversion, formatting, strict Clippy, all 445 Rust tests, and the live
+PostgreSQL attestation for revision `7618fbf…`, then correctly refused its builder supply chain.
+The retained policy result identified 18 fixed High/Critical findings: `libcrypto3` and `libssl3`
+were 3.5.7-r0 in the immutable upstream builder while Alpine 3.24 supplied fixed 3.5.8-r0. The
+working source now installs those exact signed package versions into a separate effective security
+stage and scans that stage. This is not called protected proof until the corrected revision passes
+the hosted artifact job.
+
 ## Authority and scope
 
 The protected backend workflow builds the exact checked-out
@@ -38,7 +48,7 @@ a build reference under that builder. For the loaded runtime image,
 `containerimage.config.digest` in Buildx metadata must equal the Docker image
 ID.
 
-The builder and final base are immutable:
+The upstream builder and final base are immutable:
 
 - builder:
   `rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce`;
@@ -46,6 +56,14 @@ The builder and final base are immutable:
   `gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7`;
 - platform: `linux/amd64`; and
 - runtime user: numeric uid/gid `65532:65532`.
+
+The Dockerfile derives a named `builder-security` stage from that exact Rust digest, installs only
+`libcrypto3 3.5.8-r0` and `libssl3 3.5.8-r0` from Alpine 3.24's signed repository, asserts both
+installed identities, and then derives the compiler stage from it. The evidence job loads this
+effective stage as `tradingroom-api-builder-security:<revision>`, retains inspections of both the
+upstream digest and effective stage, executes its networkless toolchain/package probes there, and
+uses that effective stage—not the known-stale upstream filesystem—as the builder Syft/Grype input.
+The overlay is absent from the static-distroless runtime.
 
 The Dockerfile explicitly selects the builder's installed Rust `1.98.0`
 toolchain. Developer-only rustfmt, Clippy, and rust-analyzer component requests
@@ -76,8 +94,9 @@ hashes:
 
 The build also records and independently recovers through the builder SBOM the
 reviewed package set: `binutils 2.45.1-r1`, `ca-certificates 20260611-r0`,
-`gcc 15.2.0-r5`, `libgcc-static 15.2.0-r5`, `musl 1.2.6-r2`, and
-`musl-dev 1.2.6-r2`. It rejects any Rust self-contained CRT, libc, or
+`gcc 15.2.0-r5`, `libcrypto3 3.5.8-r0`, `libgcc-static 15.2.0-r5`,
+`libssl3 3.5.8-r0`, `musl 1.2.6-r2`, and `musl-dev 1.2.6-r2`. It rejects any
+Rust self-contained CRT, libc, or
 `libunwind` path in either linker map and rejects any extra file in the isolated
 `/rust-native` directory.
 
@@ -171,7 +190,7 @@ ambient `SYFT_*`/`GRYPE_*` settings from silently changing the scan.
 
 Syft emits native JSON and SPDX for four independent subjects:
 
-1. the exact builder image;
+1. the exact effective builder-security image, with its upstream digest retained separately;
 2. the loaded effective runtime image;
 3. the extracted `tradingroom-api` ELF; and
 4. the extracted `migrate` ELF.
