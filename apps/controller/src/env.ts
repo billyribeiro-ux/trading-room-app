@@ -4,6 +4,7 @@ import * as v from 'valibot';
 const optionalText = v.optional(v.string());
 const optionalUrl = v.optional(v.union([v.literal(''), v.pipe(v.string(), v.url())]));
 const optionalControlPlaneMode = v.optional(v.union([v.literal(''), v.picklist(['marketing-only', 'postgres'])]));
+const optionalProfileAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 
 /**
  * The application environment contract.
@@ -27,6 +28,11 @@ export const variables = defineEnvVars({
     description:
       'Private origin of the Rust authority service. Browser requests stay same-origin and reach it only through the reviewed SvelteKit proxy endpoints.',
     schema: optionalUrl
+  },
+  PROFILE_AUTHORITY_MODE: {
+    description:
+      'Reversible Gate 3 profile authority switch. legacy is the safe default; rust requires reconciled UUID mappings and TRADINGROOM_API_URL and refuses mismatches.',
+    schema: optionalProfileAuthorityMode
   },
   SUPERADMIN_EMAILS: {
     description:

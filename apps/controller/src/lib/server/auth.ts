@@ -161,6 +161,8 @@ export async function readUser(cookies: Cookies) {
       displayName: users.displayName,
       accountId: users.accountId,
       emailVerifiedAt: users.emailVerifiedAt,
+      authorityUserId: users.authorityUserId,
+      authorityEnterpriseId: accounts.authorityEnterpriseId,
       accountStatus: accounts.status
     })
     .from(loginSessions)
@@ -209,6 +211,8 @@ export async function readUser(cookies: Cookies) {
       displayName: users.displayName,
       accountId: users.accountId,
       emailVerifiedAt: users.emailVerifiedAt,
+      authorityUserId: users.authorityUserId,
+      authorityEnterpriseId: accounts.authorityEnterpriseId,
       accountStatus: accounts.status
     })
     .from(users)

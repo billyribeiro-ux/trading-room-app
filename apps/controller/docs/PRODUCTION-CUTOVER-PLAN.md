@@ -95,11 +95,15 @@ permit real signup, login, account, room, API-key, or payment traffic.
       and `api/fixtures/seed.sql` loaded. 413 passed, 0 failed — 155 API library,
       126 API PostgreSQL integration, 9 release-attestor, 112 media library, 11
       media binary — plus full-workspace Clippy with warnings denied and
-      `pnpm quality` locally with 1265
+      `pnpm quality` locally with 1280
       Vitest tests, 9 Playwright tests in Chromium, and the Vercel production
       build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
       for the complete current-revision database suite.
+      A current-tree local rerun on 2026-09-03 passed strict Clippy and all 445
+      Rust tests (163 API library, 138 PostgreSQL integration, 19 attestor, 114
+      media library, 11 media binary), plus 1,280 controller Vitest assertions,
+      all 9 Chromium journeys, and the Vercel production build.
 - [x] Obtain the first successful default-branch backend workflow result. Run
       [`30767258722`](https://github.com/billyribeiro-ux/trading-app-main/actions/runs/30767258722)
       passed for exact revision

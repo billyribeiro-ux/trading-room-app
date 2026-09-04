@@ -67,6 +67,7 @@ function html(rooms: unknown[], badges: unknown[]) {
           emailVerifiedAt: new Date()
         },
         emailUnproved: false,
+        profileAuthority: { enabled: false },
         entitlements: { marketplace: false },
         rooms,
         badges,

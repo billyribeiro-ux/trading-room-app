@@ -111,7 +111,7 @@ const SESSION_SETUP_SQL: &str = "SET statement_timeout = 5000; \
      SET lock_timeout = 2000; \
      SET idle_in_transaction_session_timeout = 10000;";
 
-/// Exact effective ACL contract installed by migration 0006.
+/// Exact effective ACL contract installed by migration 0006 and extended by migration 0013.
 ///
 /// `has_*_privilege` evaluates direct, membership-derived and `PUBLIC` grants together.
 /// Memberships are independently forbidden, but checking effective privileges keeps a future
@@ -146,6 +146,7 @@ allowed_columns(table_name, column_name, privilege_type) AS (
         ('users', 'is_guest', 'INSERT'),
         ('users', 'guest_created_in_room_id', 'INSERT'),
         ('users', 'password_hash', 'UPDATE'),
+        ('users', 'display_name', 'UPDATE'),
         ('users', 'last_login_at', 'UPDATE'),
         ('users', 'updated_at', 'UPDATE'),
         ('users', 'preferences', 'UPDATE'),

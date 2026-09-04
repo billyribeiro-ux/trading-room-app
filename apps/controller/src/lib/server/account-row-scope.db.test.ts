@@ -41,6 +41,8 @@ vi.mock('$app/env/private', () => ({
   ROOM_JWT_SECRET: 'test-secret-not-a-real-one',
   RECAPTCHA_SECRET_KEY: '',
   CONTROL_PLANE_MODE: '',
+  PROFILE_AUTHORITY_MODE: '',
+  TRADINGROOM_API_URL: '',
   FCM_SERVICE_ACCOUNT_JSON: ''
 }));
 

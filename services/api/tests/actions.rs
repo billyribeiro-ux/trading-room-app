@@ -993,6 +993,107 @@ async fn account_bootstrap_requires_a_current_database_identity() {
 }
 
 #[tokio::test]
+async fn profile_update_is_atomic_user_scoped_and_read_after_write() {
+    let h = Harness::start().await;
+    let user_id = h
+        .create_profile_identity(
+            "Before",
+            &serde_json::json!({ "existing": "retained", "chatTextSize": 13 }),
+            false,
+        )
+        .await;
+    let stale_cookie = h.cookie_for(user_id, "Stale Token Name");
+
+    let updated = h
+        .patch_json(
+            "/api/v1/account",
+            &stale_cookie,
+            &serde_json::json!({
+                "displayName": "  Canonical Name  ",
+                "preferences": { "chatTextSize": 18, "ptrProfileKey": true }
+            }),
+        )
+        .await
+        .ok();
+
+    assert_eq!(updated["id"], user_id.to_string());
+    assert_eq!(updated["displayName"], "Canonical Name");
+    assert_eq!(updated["isGuest"], false);
+    assert_eq!(updated["preferences"]["existing"], "retained");
+    assert_eq!(updated["preferences"]["chatTextSize"], 18);
+    assert_eq!(updated["preferences"]["ptrProfileKey"], true);
+    assert_eq!(updated.as_object().expect("profile object").len(), 5);
+
+    // A second request is the end-to-end read-after-write proof. The token still carries the stale
+    // name, so only a committed database read can produce the value above.
+    let bootstrap = h.get("/api/v1/account", Some(&stale_cookie)).await.ok();
+    assert_eq!(bootstrap["user"], updated);
+    assert_eq!(bootstrap["accounts"], serde_json::json!([]));
+
+    h.drop_profile_identity(user_id).await;
+}
+
+#[tokio::test]
+async fn profile_update_fails_closed_for_guests_missing_sessions_and_bad_shapes() {
+    let h = Harness::start().await;
+    let user_id = h
+        .create_profile_identity("Validation Profile", &serde_json::json!({}), false)
+        .await;
+    let cookie = h.cookie_for(user_id, "Validation Profile");
+    let valid = serde_json::json!({ "displayName": "Valid", "preferences": {} });
+
+    assert_eq!(
+        h.patch_json("/api/v1/account", "", &valid).await.status,
+        401
+    );
+    assert_eq!(
+        h.patch_json(
+            "/api/v1/account",
+            &cookie,
+            &serde_json::json!({ "displayName": "Valid", "preferences": {}, "isPlatformAdmin": true }),
+        )
+        .await
+        .status,
+        422,
+        "over-posted authority fields must be rejected by deserialization"
+    );
+    assert_eq!(
+        h.patch_json(
+            "/api/v1/account",
+            &cookie,
+            &serde_json::json!({ "displayName": "x".repeat(81), "preferences": {} }),
+        )
+        .await
+        .status,
+        400
+    );
+    assert_eq!(
+        h.patch_json(
+            "/api/v1/account",
+            &cookie,
+            &serde_json::json!({ "displayName": "Valid", "preferences": [] }),
+        )
+        .await
+        .status,
+        400
+    );
+
+    let guest_id = h
+        .create_profile_identity("Guest", &serde_json::json!({}), true)
+        .await;
+    let guest_cookie = h.cookie_for(guest_id, "Guest");
+    assert_eq!(
+        h.patch_json("/api/v1/account", &guest_cookie, &valid)
+            .await
+            .status,
+        403
+    );
+
+    h.drop_profile_identity(user_id).await;
+    h.drop_profile_identity(guest_id).await;
+}
+
+#[tokio::test]
 async fn a_preference_is_merged_rather_than_replacing_the_object() {
     let h = Harness::start().await;
     let owner = h.cookie_for(ACME_OWNER, "Ada Owner");

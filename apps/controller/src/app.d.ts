@@ -20,6 +20,9 @@ declare global {
          * deployment that cannot send mail.
          */
         emailVerifiedAt: Date | null;
+        /** Stable ids written only by the offline authority converter. */
+        authorityUserId: string | null;
+        authorityEnterpriseId: string | null;
         /**
          * Set ONLY while an operator is impersonating this identity — the operator's own user id.
          *

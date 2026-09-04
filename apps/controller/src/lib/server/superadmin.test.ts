@@ -21,7 +21,19 @@ async function withAllowList(value: string | undefined) {
 
 /** A `locals` shaped like the real one. */
 const localsFor = (email?: string): App.Locals =>
-  email ? { user: { id: 7, email, displayName: 'Operator', accountId: 1, emailVerifiedAt: null } } : {};
+  email
+    ? {
+        user: {
+          id: 7,
+          email,
+          displayName: 'Operator',
+          accountId: 1,
+          emailVerifiedAt: null,
+          authorityUserId: null,
+          authorityEnterpriseId: null
+        }
+      }
+    : {};
 
 describe('who is a superadmin', () => {
   it('nobody, when the list is unset or blank', async () => {

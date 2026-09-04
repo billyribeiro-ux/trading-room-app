@@ -64,6 +64,10 @@ describe('control-plane deployment policy', () => {
     ['/api/auth/refresh', 'POST'],
     ['/api/auth/logout', 'POST'],
     ['/api/v1/account', 'GET'],
+    ['/api/v1/account', 'PATCH'],
+    ['/api/v1/account/preferences', 'GET'],
+    ['/api/v1/account/preferences', 'PATCH'],
+    ['/api/v1/account/theme', 'PUT'],
     ['/(public)/session/[code]', 'GET'],
     ['/(public)/session/[code]/joined', 'GET'],
     ['/(future)', 'GET']

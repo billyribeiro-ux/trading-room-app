@@ -373,7 +373,7 @@ library, 126 API PostgreSQL integration across ten binaries, 9 release-attestor,
 112 media library, and 11 media binary. Compilation was never the claim worth
 making; this is. Its `pnpm quality` also passed: lint and formatting,
 zero-error/zero-warning Svelte diagnostics,
-all quality-gate source contracts and the fail-closed runtime HTTP contract, 1265
+all quality-gate source contracts and the fail-closed runtime HTTP contract, 1280
 Vitest tests, 9 Playwright tests in Chromium with flaky-test rejection enabled,
 and the Vercel production build.
 The count rose from 116 to 129 when reCAPTCHA gained the server-side verification it
@@ -388,6 +388,13 @@ exists, and the runtime HTTP contract now proves the schema bootstrap instead.
 These are precisely scoped local source-tree results; the protected hosted
 PostgreSQL workflow remains the current-branch full-suite authority and is not
 inferred from the earlier baseline or deployed-Vercel evidence.
+
+On 2026-09-03 the current tree was re-run against a freshly migrated PostgreSQL
+17 database through migration `0013`: strict full-workspace Clippy passed and all
+445 tests passed — 163 API library, 138 API PostgreSQL integration across eleven
+integration targets, 19 release-attestor, 114 media library, and 11 media binary.
+The controller independently passed 1,280 Vitest assertions across 126 files,
+all 9 Chromium journeys, and its Vercel production build.
 `.github/workflows/backend-quality.yml` recreates that database boundary and runs
 Clippy with warnings denied plus the full Rust suite. Hosted run
 [`30767258722`](https://github.com/billyribeiro-ux/trading-app-main/actions/runs/30767258722)

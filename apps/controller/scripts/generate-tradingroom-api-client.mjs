@@ -16,6 +16,7 @@ function referenceName(reference) {
 }
 
 function schemaType(schema) {
+  if (Object.keys(schema).length === 0) return 'unknown';
   if (schema.$ref) return referenceName(schema.$ref);
   if (Array.isArray(schema.enum)) return schema.enum.map((value) => JSON.stringify(value)).join(' | ');
   if (schema.type === 'array') return `Array<${schemaType(schema.items)}>`;

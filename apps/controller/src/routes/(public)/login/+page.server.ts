@@ -3,8 +3,17 @@ import { eq, lt } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, loginAttempts, users } from '#lib/server/db/schema.js';
 import { createLoginSession, verifyPassword } from '#lib/server/auth.js';
+import { profileAuthorityMode } from '#lib/server/control-plane-runtime.js';
 import { LOGIN_ATTEMPT_RETENTION_MS, loginIdentity, nextLoginAttempt } from '#lib/server/login-attempts.js';
+import { authorityBindingFailure } from '#lib/server/profile-authority-policy.js';
+import { readProfileAuthority } from '#lib/server/profile-authority.js';
 import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '#lib/server/recaptcha.js';
+import {
+  apiRequestContext,
+  clearApiCookies,
+  login as loginToAuthority,
+  logout as logoutFromAuthority
+} from '#lib/server/tradingroom-api.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -46,7 +55,8 @@ export const load: PageServerLoad = ({ locals }) => {
 };
 
 export const actions: Actions = {
-  default: async ({ request, cookies, getClientAddress }) => {
+  default: async (event) => {
+    const { request, cookies, getClientAddress } = event;
     const form = await request.formData();
     const email = String(form.get('email') ?? '')
       .trim()
@@ -108,7 +118,7 @@ export const actions: Actions = {
       suspended account.
     */
     const [account] = await getDb()
-      .select({ status: accounts.status })
+      .select({ status: accounts.status, authorityEnterpriseId: accounts.authorityEnterpriseId })
       .from(accounts)
       .where(eq(accounts.id, user.accountId))
       .limit(1);
@@ -119,10 +129,72 @@ export const actions: Actions = {
       });
     }
 
+    if (profileAuthorityMode === 'rust') {
+      if (!user.authorityUserId || !account.authorityEnterpriseId) {
+        return fail(503, {
+          email,
+          message: 'This account has not completed the profile-authority migration. Contact support.'
+        });
+      }
+
+      const context = apiRequestContext(event);
+      const authorityLogin = await loginToAuthority(context, { email, password });
+      if (!authorityLogin.ok) {
+        clearApiCookies(cookies);
+        return fail(503, {
+          email,
+          message: 'The profile authority could not verify this account. Contact support.'
+        });
+      }
+      if (authorityLogin.data.userId !== user.authorityUserId) {
+        const cleanup = await logoutFromAuthority(context);
+        if (!cleanup.ok) clearApiCookies(cookies);
+        console.error('[profile-authority] authority login returned a different identity', {
+          localUserId: user.id
+        });
+        return fail(503, {
+          email,
+          message: 'The profile authority could not verify this account. Contact support.'
+        });
+      }
+
+      const canonical = await readProfileAuthority(context);
+      const bindingFailure = canonical.ok
+        ? authorityBindingFailure(
+            {
+              authorityUserId: user.authorityUserId,
+              authorityEnterpriseId: account.authorityEnterpriseId
+            },
+            canonical.data
+          )
+        : `canonical bootstrap failed with ${canonical.code}`;
+      if (!canonical.ok || bindingFailure) {
+        const cleanup = await logoutFromAuthority(context);
+        if (!cleanup.ok) clearApiCookies(cookies);
+        console.error('[profile-authority] refused login binding', {
+          localUserId: user.id,
+          reason: bindingFailure
+        });
+        return fail(503, {
+          email,
+          message: 'The profile authority could not verify this account. Contact support.'
+        });
+      }
+    }
+
     await getDb()
       .delete(loginAttempts)
       .where(eq(loginAttempts.identityHash, loginIdentity(email)));
-    await createLoginSession(user.id, cookies);
+    try {
+      await createLoginSession(user.id, cookies);
+    } catch (cause) {
+      if (profileAuthorityMode === 'rust') {
+        const context = apiRequestContext(event);
+        const cleanup = await logoutFromAuthority(context);
+        if (!cleanup.ok) clearApiCookies(cookies);
+      }
+      throw cause;
+    }
     redirect(303, '/account');
   }
 };

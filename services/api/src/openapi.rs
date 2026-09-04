@@ -1,4 +1,4 @@
-//! OpenAPI 3.1 contract for the account-bootstrap boundary.
+//! OpenAPI 3.1 contract for the account-authority boundary.
 //!
 //! This document is generated from Rust-owned constants and served by the same binary as the
 //! handlers. The committed JSON snapshot feeds the SvelteKit type generator; the equality test
@@ -12,9 +12,9 @@ pub fn document() -> Value {
         "openapi": "3.1.1",
         "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
         "info": {
-            "title": "Trading Room Account Bootstrap API",
+            "title": "Trading Room Account Authority API",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "Authoritative authentication and account-bootstrap contract. This intentionally does not claim to describe the remaining room-runtime routes. Cookies are issued only through the same-origin SvelteKit boundary."
+            "description": "Authoritative authentication, profile, preference, and account-bootstrap contract. This intentionally does not claim to describe the remaining room-runtime routes. Cookies are issued only through the same-origin SvelteKit boundary."
         },
         "tags": [
             { "name": "Authentication" },
@@ -110,6 +110,106 @@ pub fn document() -> Value {
                         "401": { "$ref": "#/components/responses/Unauthorized" },
                         "503": { "$ref": "#/components/responses/Unavailable" }
                     }
+                },
+                "patch": {
+                    "operationId": "updateAccountProfile",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ProfileUpdateRequest" }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Committed canonical profile after the atomic update.",
+                            "content": {
+                                "application/json": {
+                                    "schema": { "$ref": "#/components/schemas/CurrentUser" }
+                                }
+                            }
+                        },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "403": { "$ref": "#/components/responses/Forbidden" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/account/preferences": {
+                "get": {
+                    "operationId": "getAccountPreferences",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "responses": {
+                        "200": {
+                            "description": "Current canonical preferences.",
+                            "content": {
+                                "application/json": {
+                                    "schema": { "$ref": "#/components/schemas/Preferences" }
+                                }
+                            }
+                        },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                },
+                "patch": {
+                    "operationId": "setAccountPreference",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/PreferenceRequest" }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Preferences after the atomic key update.",
+                            "content": {
+                                "application/json": {
+                                    "schema": { "$ref": "#/components/schemas/Preferences" }
+                                }
+                            }
+                        },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/account/theme": {
+                "put": {
+                    "operationId": "updateAccountTheme",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/Preferences" }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Preferences after the shallow theme merge.",
+                            "content": {
+                                "application/json": {
+                                    "schema": { "$ref": "#/components/schemas/Preferences" }
+                                }
+                            }
+                        },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
                 }
             }
         },
@@ -177,6 +277,28 @@ pub fn document() -> Value {
                         "isGuest": { "type": "boolean" },
                         "preferences": { "type": "object", "additionalProperties": true }
                     }
+                },
+                "ProfileUpdateRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["displayName", "preferences"],
+                    "properties": {
+                        "displayName": { "type": "string", "minLength": 1, "maxLength": crate::limits::DISPLAY_NAME_MAX_BYTES },
+                        "preferences": { "$ref": "#/components/schemas/Preferences" }
+                    }
+                },
+                "PreferenceRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["key", "value"],
+                    "properties": {
+                        "key": { "type": "string", "minLength": 1, "maxLength": crate::limits::PREFERENCE_KEY_MAX_BYTES },
+                        "value": {}
+                    }
+                },
+                "Preferences": {
+                    "type": "object",
+                    "additionalProperties": true
                 },
                 "Account": {
                     "type": "object",

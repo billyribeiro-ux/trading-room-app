@@ -41,6 +41,41 @@ pub async fn current_profile(db: &Db, user_id: Uuid) -> Result<Option<CurrentPro
     .map_err(DbError::from)
 }
 
+/// Atomically changes the mutable profile fields owned by one authenticated identity.
+///
+/// The preferences object is shallow-merged in the same statement as the display name change.
+/// Returning the row from that statement is the read-after-write guarantee: a successful HTTP
+/// response can never contain a profile read before the committed mutation, and two tabs changing
+/// distinct preference keys cannot erase one another.
+pub async fn update_profile(
+    db: &Db,
+    user_id: Uuid,
+    display_name: &str,
+    preferences: &Value,
+    now: OffsetDateTime,
+) -> Result<CurrentProfile, DbError> {
+    if !preferences.is_object() {
+        return Err(DbError::CheckViolation {
+            constraint: "users_preferences_object_check".into(),
+        });
+    }
+
+    sqlx::query_as(
+        "UPDATE users \
+         SET display_name = $2, preferences = preferences || $3, updated_at = $4 \
+         WHERE id = $1 AND is_guest = false \
+         RETURNING id, display_name, is_platform_admin, is_guest, preferences",
+    )
+    .bind(user_id)
+    .bind(display_name)
+    .bind(sqlx::types::Json(preferences))
+    .bind(now)
+    .fetch_optional(db.identity_pool())
+    .await
+    .map_err(DbError::from)?
+    .ok_or(DbError::NotFound)
+}
+
 /// Replaces one key inside `users.preferences`.
 ///
 /// `jsonb_set` rather than reading the object, editing it in Rust and writing it back: the
