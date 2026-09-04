@@ -141,6 +141,16 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0011_enterprise_memberships.sql',
     sha256: '37f96aad9a4451848bbad3733edfdab52d05b173a0d00f1c20d2a0f6c15592d1'
+  }),
+  /*
+    Authored and reviewed 2026-09-03 for cutover Gate 3. The migration adds explicit enterprise
+    suspension state plus owner-only, resumable cross-database conversion runs and one-to-one
+    legacy entity mappings. Runtime receives no privilege on either ledger table; PostgreSQL
+    integration tests prove uniqueness, digest constraints, and denied runtime access.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0012_legacy_cutover_ledger.sql',
+    sha256: '0a9d0946b47a3f4f92959155587687828d785c69e4224a413be5f461ac01e695'
   })
 ]);
 

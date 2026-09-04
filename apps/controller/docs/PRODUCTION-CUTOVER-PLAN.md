@@ -95,7 +95,7 @@ permit real signup, login, account, room, API-key, or payment traffic.
       and `api/fixtures/seed.sql` loaded. 413 passed, 0 failed — 155 API library,
       126 API PostgreSQL integration, 9 release-attestor, 112 media library, 11
       media binary — plus full-workspace Clippy with warnings denied and
-      `pnpm quality` locally with 1261
+      `pnpm quality` locally with 1265
       Vitest tests, 9 Playwright tests in Chromium, and the Vercel production
       build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
@@ -154,6 +154,34 @@ permit real signup, login, account, room, API-key, or payment traffic.
 Move one fully authorized slice at a time: profile, rooms, room settings,
 membership, badges, account administrators, customer API keys, then room launch.
 No Svelte route may directly reproduce authorization policy.
+
+- [x] Establish a stable, resumable identity conversion boundary before moving a feature writer.
+      Controller migration `0018` adds nullable one-to-one account/user UUID mappings; Rust
+      migration `0012` adds enterprise suspension parity and owner-only conversion run/mapping
+      ledgers. The importer fingerprints the named source, captures counts and SHA-256 source-row
+      digests, allocates stable UUIDs, commits the target first, resumes the cross-database failure
+      window from its ledger, and reconciles the source mappings second. It refuses ambiguous
+      owners, malformed legacy credentials, case-folded email collisions, mapping disagreement,
+      source drift, and adoption of an existing target without target-ledger ownership evidence.
+      Rollback is allowed only while every imported credential is byte-identical and unused.
+- [x] Prove the controller credential bridge. Rust accepts only the exact historic Node scrypt
+      envelope (16-byte hex salt, 64-byte hex key, N=16384/r=8/p=1), compares it in constant time,
+      and uses the existing compare-and-swap login upgrade to replace it with the canonical
+      Argon2id profile. No Rust path writes a new legacy credential.
+- [x] Put the database conversion proof in the protected backend workflow. A random isolated
+      controller database runs all forward migrations, then proves ownership refusal, plan,
+      apply, independent reconciliation, source-drift refusal, guarded rollback, and absence of
+      source/target residue. Output contains only counts, digests, status, and run id.
+- [ ] Profile: make canonical profile reads/writes and per-user preferences flow through the Rust
+      contract, typed SvelteKit BFF, and visible authenticated UI; deploy behind a fail-closed
+      authority switch and prove rollback/read-after-write behavior.
+- [ ] Rooms.
+- [ ] Room settings.
+- [ ] Membership.
+- [ ] Badges.
+- [ ] Account administrators.
+- [ ] Customer API keys.
+- [ ] Room launch.
 
 ## Gate 4 — signup, payment, and entitlements
 

@@ -1,0 +1,14 @@
+import { describe, expect, it } from 'vitest';
+import { MIGRATIONS } from './migrations/index.js';
+
+describe('Gate 3 authority identity mapping', () => {
+  it('is a forward-only migration with one-to-one nullable UUID mappings', () => {
+    const migration = MIGRATIONS.find(({ version }) => version === 18);
+    expect(migration?.name).toBe('authority_identity_mappings');
+    expect(migration?.sql).toContain('ADD COLUMN authority_enterprise_id UUID');
+    expect(migration?.sql).toContain('accounts_authority_enterprise_id_unique');
+    expect(migration?.sql).toContain('ADD COLUMN authority_user_id UUID');
+    expect(migration?.sql).toContain('users_authority_user_id_unique');
+    expect(migration?.sql).not.toMatch(/NOT NULL/);
+  });
+});

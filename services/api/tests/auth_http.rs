@@ -21,6 +21,11 @@ const TEST_PASSWORD: &str = "correct horse battery staple";
 // Keeping the PHC fixture immutable prevents 21 parallel HTTP harnesses from consuming the
 // production hash-admission queue before the behavior under test has even started.
 const TEST_PASSWORD_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$EJefu4A54Tj4roAXD4Kb1A$8+GlUVmckUtC8wxfwv4THjJBiJYsUOfMfLMLygms2VM";
+const LEGACY_CONTROLLER_PASSWORD_HASH: &str = concat!(
+    "00112233445566778899aabbccddeeff:",
+    "5699cfee2c5c280e66678242092f368ce88ff05305af2c75a9e629d473deb2165",
+    "b3797e0e31ec3cda30414573befb697f928384c38b187e8c176107e5be20f01"
+);
 
 fn database_url() -> String {
     std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -362,6 +367,41 @@ async fn a_wrong_password_is_refused_with_no_cookies() {
         cookie_value(&response, ACCESS_COOKIE).is_none(),
         "{response}"
     );
+    harness.cleanup().await;
+}
+
+#[tokio::test]
+async fn a_legacy_controller_login_is_atomically_upgraded_to_argon2id() {
+    let harness = Harness::start().await;
+    sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
+        .bind(harness.user_id)
+        .bind(LEGACY_CONTROLLER_PASSWORD_HASH)
+        .execute(&harness.admin)
+        .await
+        .expect("install the imported controller hash");
+
+    let response = harness
+        .post_json(
+            "/api/auth/login",
+            &serde_json::json!({ "email": harness.email, "password": harness.password })
+                .to_string(),
+        )
+        .await;
+    assert!(status_line(&response).contains("200"), "{response}");
+
+    let upgraded: String = sqlx::query_scalar("SELECT password_hash FROM users WHERE id = $1")
+        .bind(harness.user_id)
+        .fetch_one(&harness.admin)
+        .await
+        .expect("read the upgraded hash");
+    assert!(upgraded.starts_with("$argon2id$"), "{upgraded}");
+    assert_ne!(upgraded, LEGACY_CONTROLLER_PASSWORD_HASH);
+    assert!(
+        tradingroom_api::auth::password::verify_password(harness.password.clone(), Some(upgraded))
+            .await
+            .expect("the upgraded hash must remain usable")
+    );
+
     harness.cleanup().await;
 }
 

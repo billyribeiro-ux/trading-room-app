@@ -137,6 +137,13 @@ const LOCALLY_AUTHORED = new Map([
     '37f96aad9a4451848bbad3733edfdab52d05b173a0d00f1c20d2a0f6c15592d1'
   ],
   [
+    // Authored here on 2026-09-03 for cutover Gate 3. This is offline conversion authority:
+    // enterprise suspension fields, resumable run evidence, and one-to-one source/target ids.
+    // The runtime role cannot read either ledger table; CHANGELOG.md records the live proof.
+    'services/api/migrations/0012_legacy_cutover_ledger.sql',
+    '0a9d0946b47a3f4f92959155587687828d785c69e4224a413be5f461ac01e695'
+  ],
+  [
     // Rust owns this scoped contract. The committed snapshot is equality-tested against
     // `openapi::document`, so the generator input cannot silently lag the handlers.
     'services/api/openapi/v1.json',
@@ -223,8 +230,12 @@ const DIVERGED_FROM_IMPORT = new Map([
     Re-pinned 2026-08-30 by the dependency-currency update: `cargo update` after raising the
     workspace requirements to the crates.io latest of that day. The registry evidence for every
     line is in the CHANGELOG entry of the same date.
+
+    Re-pinned 2026-09-03 for the Gate 3 credential bridge. The only new package graph is RustCrypto
+    `scrypt` and its audited low-level dependencies; it exists solely to verify the controller's
+    fixed Node scrypt envelope during one-way login upgrades to the existing Argon2id profile.
   */
-  ['services/Cargo.lock', '08bcc15f03d68664e643b30830bcec7f2589c2d9c72f0938381969a1a2d33aa0'],
+  ['services/Cargo.lock', '844237627e1ee263201af0fd83353788f9ee8676341b458ee594e44668c835f5'],
   /*
     Diverged 2026-08-30, all seven by that same update, each leaving the aggregate for its own pin:
 
@@ -236,6 +247,10 @@ const DIVERGED_FROM_IMPORT = new Map([
                                 split: argon2 0.6.0 declares `password-hash ^0.6`. The `std` feature
                                 both carried at 0.5 no longer exists at 0.6, so the feature list is
                                 now alloc/getrandom/phc. rand 0.9 -> 0.10.
+
+                                RE-PINNED 2026-09-03: adds `scrypt` 0.12 with default features off
+                                for the reviewed low-level Node-envelope verifier. It is not a new
+                                credential writer; Argon2id remains the only output format.
       media/Cargo.toml          mediasoup 0.24 -> 0.27, tower-http 0.6 -> 0.7, ed25519-dalek 2 -> 3
                                 (unified with the workspace), base64 0.22 -> 0.23. Zero source
                                 changes; the 125-test service surface passes against it.
@@ -264,7 +279,7 @@ const DIVERGED_FROM_IMPORT = new Map([
       rust-toolchain.toml       channel 1.97.1 -> 1.98.0 (stable of 2026-08-18).
   */
   ['services/Cargo.toml', '0d155ff4b1d976fa5b0eb675c71a26f4e2a23c77abacf5b28d45d02aa06a2b1a'],
-  ['services/api/Cargo.toml', '1756786fe07a5e2efddbba28b6c75514dcd14c52862daf057ef978f2b69d37d5'],
+  ['services/api/Cargo.toml', 'df51b64d04bbd2c3e9ad3b760a2192c7debd97e3c8eb50ecf9df34a322532ca3'],
   ['services/api/Dockerfile', '23bb473a3f8f0b4478e3b9232405f19b7debb1be734b5ca2159c320f29fd841c'],
   /*
     FOUR READ-THEN-WRITE RACES, all four pinned 2026-09-02, all four PROVED on a throwaway
@@ -312,7 +327,13 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/src/db/repo/alert.rs', '91955afd31c383c9ea31665c4291c41f57dc6f3c6370d19ec0dbdf7e1bbfe574'],
   ['services/api/src/db/repo/note.rs', 'af6f4ea2685a9fd2d6866ca53cee76be2e8cb43db6259f0acf61472b5c0ab8e2'],
   ['services/api/src/db/repo/poll.rs', 'e65832470b7249aceaa4a63c9836022c29db6e6bf339b92ae5dcb17719e98ecd'],
-  ['services/api/src/auth/password.rs', 'c6b6ce785e1dd22477e1927819c451554baf90291bacb34366cf83502ccd4bb1'],
+  /*
+    Re-pinned 2026-09-03 for the bounded legacy credential reader. PHC strings still take the
+    Argon2id path; the only alternate accepted shape is exactly 16-byte hex salt plus 64-byte hex
+    key using Node's fixed N=16384/r=8/p=1 parameters, compared in constant time and always marked
+    for compare-and-swap Argon2id upgrade after a successful login.
+  */
+  ['services/api/src/auth/password.rs', '6fe7a08232afa2bdf4beb2ac42210079767603547deea6318ce36d63f2187dfb'],
   ['services/api/src/auth/refresh.rs', '1dfee4a4f31c85ffe68189482bbf072703e83a9292b487c1e0c751cf94e30eb2'],
   ['services/media/Cargo.toml', 'e386a431215a4ebedb958f35ca2bc52ac760b1910fdb4f83663a3e9110179b7d'],
   ['services/rust-toolchain.toml', 'c006532ab2e9ff938d021819684751cd16c130aad10fffe5c788c00d09b23231'],
@@ -384,10 +405,15 @@ const DIVERGED_FROM_IMPORT = new Map([
     the attestation fails. Both range-naming messages are now named constants held against
     `ATTESTED_MIGRATION_VERSIONS` by `the_prose_ranges_track_the_attested_chain`, whose negative
     control was run red-then-green, so the next extension moves the prose or goes red.
+
+    Re-pinned 2026-09-03: Gate 3 extends the attested immutable chain through 0012 and adds the
+    enterprise suspension columns to the exact catalogue contract. The two conversion-ledger
+    tables remain owner-only operational evidence and therefore do not inflate the RLS-policy
+    count or receive runtime grants.
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '4a4142ea710fd0df67adf96fba30e6684e8262da0cdd087587b1b6bcedc20ce4'
+    '81246f75decc66f02d0b6d34f4fd5aa6ce6c819b88fc14b9a5d967345d2e17a3'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -446,8 +472,13 @@ const DIVERGED_FROM_IMPORT = new Map([
     `migrate::ACCEPTED_MIGRATOR_ROLES.join(" or ")`, the same bound-not-literal treatment the two
     assertions beside it already had; the two `preflight_for_tests` cases keep their literal
     correctly, because that entry point takes ONE name and echoes it back.
+
+    Re-pinned 2026-09-03: the live Gate 3 test now proves the enterprise-status constraint,
+    mapping one-to-one constraints, and that the runtime role cannot select or mutate either
+    offline conversion ledger. The test uses all required fingerprint columns so it exercises the
+    intended uniqueness constraints rather than failing earlier on NOT NULL.
   */
-  ['services/api/tests/migrations.rs', 'ab5f7fa1a7f359f4be8e986a2518a65708438b26f34a7a7019eed2809730fe2e'],
+  ['services/api/tests/migrations.rs', 'c4be5c801c3fefb4d095a9db7d608b55d2af257d3605e94f90c2fcb526627e85'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
@@ -525,12 +556,16 @@ const DIVERGED_FROM_IMPORT = new Map([
   ],
   [
     'services/api/tests/auth_http.rs',
-    'babcc644cc4873b0beb22023416412ad2db4cb75d4bb66d19ffa4ac600b3aecc'
+    '573a22f3629628466dfc5695acbce0163e0fa63cf10e756fa3a26813fa9e2d7c'
     /*
       Re-pinned 2026-09-03 with the Gate 2 cookie boundary. The end-to-end login assertion now
       isolates the refresh Set-Cookie header and requires Path=/, because RFC 10025 requires that
       exact path for a __Host- name. Its red run captured Path=/api/auth from the live Axum server;
       a conformant browser rejects that header rather than accepting a more narrowly scoped cookie.
+
+      Re-pinned 2026-09-03 for Gate 3: a real HTTP login begins with a controller-format scrypt
+      credential, proves authentication succeeds, and reads the database back to require an
+      Argon2id replacement that still verifies the password.
     */
   ],
   ['services/api/tests/realtime.rs', '62c6629bed604164b3f9709220f737da51708c794e1b0062210a18d7ee7d0056'],

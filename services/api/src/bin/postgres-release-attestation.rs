@@ -95,7 +95,18 @@ const TABLE_PRIVILEGE_TYPES: &[&str] = &[
 ];
 const COLUMN_PRIVILEGE_TYPES: &[&str] = &["SELECT", "INSERT", "UPDATE", "REFERENCES"];
 
-const ENTERPRISE_COLUMNS: &[&str] = &["id", "name", "slug", "settings", "created_at", "updated_at"];
+const ENTERPRISE_COLUMNS: &[&str] = &[
+    "id",
+    "name",
+    "slug",
+    "settings",
+    "created_at",
+    "updated_at",
+    "status",
+    "suspended_at",
+    "suspended_by",
+    "suspended_reason",
+];
 const USER_COLUMNS: &[&str] = &[
     "id",
     "email",
@@ -1084,7 +1095,11 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// owners; applies ENABLE+FORCE RLS with the reviewed tenant predicate; grants no direct table
 /// access to the runtime role; and exposes only a user-bounded, pinned-search-path SECURITY
 /// DEFINER resolver whose PUBLIC execute privilege is revoked.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 11] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+///
+/// Slot 12 is `0012_legacy_cutover_ledger.sql`. It adds explicit enterprise suspension state and
+/// two owner-only conversion evidence tables. Neither ledger table is a request-path tenant table,
+/// and the runtime role has no privilege on either; live migration tests assert that denial.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 /// The two human-facing error messages that name that chain's range in PROSE, as named constants
 /// so `the_prose_ranges_track_the_attested_chain` can hold them against
@@ -1095,9 +1110,9 @@ const ATTESTED_MIGRATION_VERSIONS: [i64; 11] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1
 /// refused release. The embedded-contract message beside it was moved by hand both times;
 /// hand-moving is the convention that failed here, so the test moves the burden.
 const EMBEDDED_MIGRATION_CONTRACT_MESSAGE: &str =
-    "the attestor is pinned to repository migration versions 0001 through 0011";
+    "the attestor is pinned to repository migration versions 0001 through 0012";
 const MIGRATION_LEDGER_MISMATCH_MESSAGE: &str = "the SQLx ledger must contain only successful \
-     repository migrations 0001 through 0011 with exact descriptions and checksums";
+     repository migrations 0001 through 0012 with exact descriptions and checksums";
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -2790,7 +2805,8 @@ mod tests {
        The predicates were first measured off a database built from the shipped chain on
        2026-08-28. Migration 0011 adds one table carrying the same general tenant predicate, so the
        post-0011 shape is 26 tables, 23 with row-level security forced, 23 policies, and still two
-       distinct `USING` expressions.
+       distinct `USING` expressions. Migration 0012 adds two owner-only conversion-ledger tables;
+       neither is a tenant request-path relation, so the forced/policy counts remain 23.
     */
     fn tenant_policy(table: &str, using: &str) -> TenantPolicyRow {
         TenantPolicyRow {

@@ -5,6 +5,17 @@ import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users, type User } from '#lib/server/db/schema.js';
 import { subscribeToRoom, type RoomEvent } from '#lib/server/room-events.js';
 
+/*
+  The real write client stays in this contract: its successful HTTP response is the commit boundary
+  whose order the first test measures. Supply its configuration through Kit's declared environment
+  module, however, rather than borrowing a developer's ignored `.env`. A clean checkout has no
+  secret by design; without this fixture CI fails closed before the stub controller is reached.
+*/
+vi.mock('$app/env/private', () => ({
+  CONTROL_BASE_URL: 'https://controller.permission-refresh.test',
+  ROOM_JWT_SECRET: 'permission-refresh-contract-secret'
+}));
+
 const ROOM = 'permission-refresh';
 let presenter: User;
 let member: User;

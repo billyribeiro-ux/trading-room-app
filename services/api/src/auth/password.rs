@@ -21,6 +21,7 @@ use argon2::{Algorithm, Argon2, Params, Version};
 // rand_core type crosses this boundary any more.
 use password_hash::phc::PasswordHash;
 use password_hash::{PasswordHasher, PasswordVerifier};
+use subtle::ConstantTimeEq;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use crate::limits;
@@ -113,7 +114,7 @@ pub async fn verify_password(plain: String, stored: Option<String>) -> Result<bo
 
     // Absent hash (a guest row, or no such user) still performs a full verification
     // against the dummy, then returns false. Same work, same time, no oracle.
-    let (phc, is_real) = match stored {
+    let (encoded, is_real) = match stored {
         Some(hash) => (hash, true),
         None => (DUMMY_HASH.clone(), false),
     };
@@ -122,12 +123,44 @@ pub async fn verify_password(plain: String, stored: Option<String>) -> Result<bo
 
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let parsed = PasswordHash::new(&phc).map_err(|_| PasswordError::MalformedHash)?;
-        let matched = hasher().verify_password(plain.as_bytes(), &parsed).is_ok();
+        let matched = if encoded.starts_with('$') {
+            let parsed = PasswordHash::new(&encoded).map_err(|_| PasswordError::MalformedHash)?;
+            hasher().verify_password(plain.as_bytes(), &parsed).is_ok()
+        } else {
+            verify_controller_scrypt(plain.as_bytes(), &encoded)?
+        };
         Ok(matched && is_real)
     })
     .await
     .map_err(|_| PasswordError::HashingFailed)?
+}
+
+/// Verifies the controller's temporary `saltHex:keyHex` envelope.
+///
+/// Node receives the hexadecimal salt as a *string*, so the KDF salt is the 32 ASCII bytes, not
+/// the 16 decoded bytes. The output is decoded and compared in constant time. This function is
+/// intentionally verification-only: every successful legacy login is compare-and-swapped to an
+/// Argon2id PHC string by `auth::login`, and no Rust writer can create another legacy hash.
+fn verify_controller_scrypt(plain: &[u8], encoded: &str) -> Result<bool, PasswordError> {
+    let (salt, expected_hex) = encoded
+        .split_once(':')
+        .ok_or(PasswordError::MalformedHash)?;
+    if salt.len() != 32
+        || !salt.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || expected_hex.len() != 128
+        || !expected_hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || expected_hex.contains(':')
+    {
+        return Err(PasswordError::MalformedHash);
+    }
+
+    let expected = hex::decode(expected_hex).map_err(|_| PasswordError::MalformedHash)?;
+    let params = scrypt::Params::new(14, 8, 1).map_err(|_| PasswordError::HashingFailed)?;
+    let mut derived = [0_u8; 64];
+    scrypt::scrypt(plain, salt.as_bytes(), &params, &mut derived)
+        .map_err(|_| PasswordError::HashingFailed)?;
+
+    Ok(bool::from(derived.as_slice().ct_eq(expected.as_slice())))
 }
 
 /// True when a stored hash was produced with weaker parameters than we now require, so the
@@ -164,6 +197,45 @@ mod tests {
                 .unwrap()
         );
         assert!(!verify_password("wrong".into(), Some(hash)).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn a_controller_scrypt_hash_verifies_during_the_cutover_window() {
+        // Produced by Node's crypto.scryptSync with its documented defaults
+        // (N=16384, r=8, p=1) and the controller's exact `salt:keyHex` envelope.
+        let legacy = concat!(
+            "00112233445566778899aabbccddeeff:",
+            "5699cfee2c5c280e66678242092f368ce88ff05305af2c75a9e629d473deb2165",
+            "b3797e0e31ec3cda30414573befb697f928384c38b187e8c176107e5be20f01"
+        );
+
+        assert!(
+            verify_password("correct horse battery staple".into(), Some(legacy.into()))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !verify_password("wrong password".into(), Some(legacy.into()))
+                .await
+                .unwrap()
+        );
+        assert!(needs_rehash(legacy));
+    }
+
+    #[tokio::test]
+    async fn malformed_controller_scrypt_envelopes_are_refused() {
+        for malformed in [
+            "not-hex:00",
+            "00112233445566778899aabbccddeeff:not-hex",
+            "00112233445566778899aabbccddeeff:00",
+            "00112233445566778899aabbccddeeff:00:extra",
+        ] {
+            assert_eq!(
+                verify_password("password".into(), Some(malformed.into())).await,
+                Err(PasswordError::MalformedHash),
+                "accepted malformed legacy envelope {malformed:?}"
+            );
+        }
     }
 
     #[tokio::test]
