@@ -260,11 +260,11 @@ Measured on the final working tree:
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,184 tests, production build            |
 | Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
-| Controller `pnpm quality`         | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, production build                   |
+| Controller quality boundaries     | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, Vercel production build            |
 | Controller Vitest                 | 126 files / 1,280 tests; documented totals independently verified at four sites                                                                 |
 | Controller Playwright             | 9/9 Chromium journeys against the adapter-node production artifact                                                                              |
 | Controller PostgreSQL integration | 9 files / 59 tests against disposable provisioned PostgreSQL                                                                                    |
-| Rust non-database gate            | format/check green; 114/114 media tests; every API test target compiled with `testing`                                                          |
+| Rust workspace gate               | format and strict Clippy green; 445/445 tests: 163 API library, 138 PostgreSQL integration, 19 attestor, 114 media library, 11 media binary      |
 | JavaScript advisories             | `pnpm audit --audit-level high`: no known vulnerabilities                                                                                       |
 | Rust advisories                   | policy green: one exact reviewed lockfile advisory proved unreachable from the build graph; six exact reviewed mediasoup informational warnings |
 | Svelte 5 review                   | modified components checked with the official Svelte autofixer; no reported issues; both apps have zero Svelte diagnostics                      |

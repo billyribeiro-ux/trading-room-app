@@ -82,6 +82,16 @@ mode explicitly. The migration remains byte-immutable after application; its sin
 exemption documents why owner-only conversion ledgers revoke that historic role instead of erasing
 sqlx checksum history.
 
+Final clean-checkout verification is green at every locally reproducible boundary. Controller lint,
+formatting, generated-client/schema/provenance/evidence/privacy/runtime contracts, and Svelte
+diagnostics passed with 0 errors and 0 warnings; all 1,280 Vitest assertions across 126 files passed;
+all 9 Chromium journeys passed against the adapter-node production artifact and a freshly migrated
+disposable PostgreSQL database; and the Vercel production build passed. Rust formatting and strict
+full-workspace Clippy passed, followed by all 445 workspace tests: 163 API library, 138 PostgreSQL
+integration, 19 release-attestor, 114 media library, and 11 media binary. The first browser and Rust
+database invocations were denied localhost access by the execution sandbox (`EPERM`); the identical
+commands passed outside it, so no application failure is hidden by those infrastructure attempts.
+
 ### 2026-09-03 19:17 EDT — clean-checkout contracts stopped borrowing workstation state
 
 **Runtime impact: no; this changes test fixtures, comments, and CI contracts only.** Two hosted

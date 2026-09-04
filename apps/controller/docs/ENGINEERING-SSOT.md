@@ -388,6 +388,13 @@ exists, and the runtime HTTP contract now proves the schema bootstrap instead.
 These are precisely scoped local source-tree results; the protected hosted
 PostgreSQL workflow remains the current-branch full-suite authority and is not
 inferred from the earlier baseline or deployed-Vercel evidence.
+
+On 2026-09-03 the current tree was re-run against a freshly migrated PostgreSQL
+17 database through migration `0013`: strict full-workspace Clippy passed and all
+445 tests passed — 163 API library, 138 API PostgreSQL integration across eleven
+integration targets, 19 release-attestor, 114 media library, and 11 media binary.
+The controller independently passed 1,280 Vitest assertions across 126 files,
+all 9 Chromium journeys, and its Vercel production build.
 `.github/workflows/backend-quality.yml` recreates that database boundary and runs
 Clippy with warnings denied plus the full Rust suite. Hosted run
 [`30767258722`](https://github.com/billyribeiro-ux/trading-app-main/actions/runs/30767258722)

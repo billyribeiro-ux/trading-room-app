@@ -100,6 +100,10 @@ permit real signup, login, account, room, API-key, or payment traffic.
       build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
       for the complete current-revision database suite.
+      A current-tree local rerun on 2026-09-03 passed strict Clippy and all 445
+      Rust tests (163 API library, 138 PostgreSQL integration, 19 attestor, 114
+      media library, 11 media binary), plus 1,280 controller Vitest assertions,
+      all 9 Chromium journeys, and the Vercel production build.
 - [x] Obtain the first successful default-branch backend workflow result. Run
       [`30767258722`](https://github.com/billyribeiro-ux/trading-app-main/actions/runs/30767258722)
       passed for exact revision
