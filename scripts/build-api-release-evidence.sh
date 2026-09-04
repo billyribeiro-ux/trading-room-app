@@ -69,6 +69,7 @@ native_link_root="${evidence_root}/native-link"
 scanner_config_root="${evidence_root}/scanner-config"
 scanner_home="${tool_root}/home"
 image_reference="tradingroom-api:${source_revision}"
+builder_evidence_reference="tradingroom-api-builder-security:${source_revision}"
 postgres_attestation="${evidence_root}/postgres-release-attestation.json"
 
 [[ -d "${evidence_root}" && ! -L "${evidence_root}" ]] ||
@@ -251,17 +252,25 @@ awk -v expected_buildkit="${BUILDKIT_VERSION}" '
 ' "${evidence_root}/docker-buildx-builder.txt" ||
 	fail "Buildx builder must use the running docker-container driver, ${BUILDKIT_VERSION}, and linux/amd64"
 
-# Pull and retain the two immutable base manifests independently of BuildKit's
-# cache. The builder probe is read-only and networkless; it records the native
-# libc/toolchain that becomes embedded in the static ELFs, a boundary an
-# effective-runtime-filesystem scan cannot reconstruct by itself.
+# Pull and retain the two immutable base manifests independently of BuildKit's cache. The upstream
+# Rust digest is retained separately from the effective builder-security stage: the latter applies
+# only exact, signed Alpine security packages and is the image all probes and vulnerability policy
+# evaluate. Scanning the stale upstream base after a fixed overlay is both a false failure and not a
+# statement about the bytes that compile the release.
 docker pull --platform linux/amd64 "${BUILDER_IMAGE}" >/dev/null
 docker pull --platform linux/amd64 "${RUNTIME_BASE_IMAGE}" >/dev/null
-docker image inspect "${BUILDER_IMAGE}" >"${evidence_root}/builder-image-inspect.json"
+docker image inspect "${BUILDER_IMAGE}" >"${evidence_root}/builder-base-image-inspect.json"
 docker image inspect "${RUNTIME_BASE_IMAGE}" >"${evidence_root}/runtime-base-image-inspect.json"
 
+docker buildx build --builder "${BUILDX_BUILDER}" --pull --platform linux/amd64 --load \
+	--file "${repository_root}/services/api/Dockerfile" \
+	--target builder-security \
+	--tag "${builder_evidence_reference}" \
+	"${repository_root}/services"
+docker image inspect "${builder_evidence_reference}" >"${evidence_root}/builder-image-inspect.json"
+
 docker run --rm --platform linux/amd64 --network none --read-only --cap-drop ALL \
-	--security-opt no-new-privileges --entrypoint /bin/sh "${BUILDER_IMAGE}" -ec '
+	--security-opt no-new-privileges --entrypoint /bin/sh "${builder_evidence_reference}" -ec '
 		rustc --version --verbose
 		cargo --version --verbose
 		cc --version
@@ -269,9 +278,9 @@ docker run --rm --platform linux/amd64 --network none --read-only --cap-drop ALL
 	' >"${evidence_root}/builder-toolchain.txt"
 
 docker run --rm --platform linux/amd64 --network none --read-only --cap-drop ALL \
-	--security-opt no-new-privileges --entrypoint /sbin/apk "${BUILDER_IMAGE}" \
+	--security-opt no-new-privileges --entrypoint /sbin/apk "${builder_evidence_reference}" \
 	info --from installed --format json --fields name,version \
-	musl musl-dev gcc libgcc-static binutils ca-certificates \
+	musl musl-dev gcc libgcc-static binutils ca-certificates libcrypto3 libssl3 \
 	>"${evidence_root}/builder-packages.json"
 
 grep --fixed-strings --line-regexp 'release: 1.98.0' "${evidence_root}/builder-toolchain.txt" >/dev/null ||
@@ -283,7 +292,9 @@ jq --exit-status '
 		{ "name": "binutils", "version": "2.45.1-r1" },
 		{ "name": "ca-certificates", "version": "20260611-r0" },
 		{ "name": "gcc", "version": "15.2.0-r5" },
+		{ "name": "libcrypto3", "version": "3.5.8-r0" },
 		{ "name": "libgcc-static", "version": "15.2.0-r5" },
+		{ "name": "libssl3", "version": "3.5.8-r0" },
 		{ "name": "musl", "version": "1.2.6-r2" },
 		{ "name": "musl-dev", "version": "1.2.6-r2" }
 	]
@@ -743,7 +754,7 @@ assert_static_elf "${native_root}/migrate" "migrator"
 [[ "$(<"${native_link_root}/builder-native-binary-sha256.txt")" == "$(<"${evidence_root}/native-binary-sha256.txt")" ]] ||
 	fail "runtime image binaries differ from the builder result that produced the linker evidence"
 
-run_syft scan "docker:${BUILDER_IMAGE}" --scope squashed \
+run_syft scan "docker:${builder_evidence_reference}" --scope squashed \
 	--output "syft-json=${evidence_root}/builder-image.syft.json" \
 	--output "spdx-json=${evidence_root}/builder-image.spdx.json"
 run_syft scan "docker:${image_reference}" --scope squashed \
@@ -771,7 +782,9 @@ assert_builder_apk() {
 assert_builder_apk "binutils" "2.45.1-r1"
 assert_builder_apk "ca-certificates" "20260611-r0"
 assert_builder_apk "gcc" "15.2.0-r5"
+assert_builder_apk "libcrypto3" "3.5.8-r0"
 assert_builder_apk "libgcc-static" "15.2.0-r5"
+assert_builder_apk "libssl3" "3.5.8-r0"
 assert_builder_apk "musl" "1.2.6-r2"
 assert_builder_apk "musl-dev" "1.2.6-r2"
 jq --exit-status \
@@ -826,6 +839,7 @@ migrator_embedded_native_count="$(
 )"
 jq --null-input \
 	--arg builderImage "${BUILDER_IMAGE}" \
+	--arg builderEvidenceImage "${builder_evidence_reference}" \
 	--arg libcSha256 "${LIBC_SHA256}" \
 	--arg libunwindSha256 "${LIBUNWIND_SHA256}" \
 	--argjson apiEmbeddedNativeArtifacts "${api_embedded_native_count}" \
@@ -833,11 +847,14 @@ jq --null-input \
 	'{
 		schemaVersion: 1,
 		builder: {
-			image: $builderImage,
+			upstreamImage: $builderImage,
+			effectiveSecurityImage: $builderEvidenceImage,
 			systemNativePackages: {
 				musl: "1.2.6-r2",
 				muslDev: "1.2.6-r2",
-				libgccStatic: "15.2.0-r5"
+				libgccStatic: "15.2.0-r5",
+				libcrypto3: "3.5.8-r0",
+				libssl3: "3.5.8-r0"
 			},
 			libcArchiveSha256: $libcSha256,
 			pinnedToolchainLibunwindSha256: $libunwindSha256,
@@ -953,6 +970,7 @@ jq --null-input \
 	--arg imageReference "${image_reference}" \
 	--arg imageId "${image_id}" \
 	--arg builderImage "${BUILDER_IMAGE}" \
+	--arg builderEvidenceImage "${builder_evidence_reference}" \
 	--arg runtimeBaseImage "${RUNTIME_BASE_IMAGE}" \
 	--arg configuredUser "${configured_user}" \
 	--arg runtimeUid "${runtime_uid}" \
@@ -973,6 +991,7 @@ jq --null-input \
 		imageReference: $imageReference,
 		imageId: $imageId,
 		builderImage: $builderImage,
+		builderEvidenceImage: $builderEvidenceImage,
 		runtimeBaseImage: $runtimeBaseImage,
 		configuredUser: $configuredUser,
 		runtimeUid: ($runtimeUid | tonumber),

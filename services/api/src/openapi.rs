@@ -14,7 +14,7 @@ pub fn document() -> Value {
         "info": {
             "title": "Trading Room Account Authority API",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "Authoritative authentication, profile, preference, and account-bootstrap contract. This intentionally does not claim to describe the remaining room-runtime routes. Cookies are issued only through the same-origin SvelteKit boundary."
+            "description": "Authoritative authentication, profile, preference, account-bootstrap, and account room-lifecycle contract. This intentionally does not claim to describe the remaining live-room runtime routes. Cookies are issued only through the same-origin SvelteKit boundary."
         },
         "tags": [
             { "name": "Authentication" },
@@ -211,6 +211,82 @@ pub fn document() -> Value {
                         "503": { "$ref": "#/components/responses/Unavailable" }
                     }
                 }
+            },
+            "/api/v1/accounts/{enterprise_id}/rooms": {
+                "parameters": [{
+                    "name": "enterprise_id",
+                    "in": "path",
+                    "required": true,
+                    "schema": uuid_schema()
+                }],
+                "get": {
+                    "operationId": "listAccountRooms",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "responses": {
+                        "200": {
+                            "description": "Canonical lifecycle data for every room in an administered account.",
+                            "content": { "application/json": { "schema": {
+                                "type": "array", "items": { "$ref": "#/components/schemas/ManagedRoom" }
+                            } } }
+                        },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                },
+                "post": {
+                    "operationId": "createAccountRoom",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": {
+                            "$ref": "#/components/schemas/CreateAccountRoomRequest"
+                        } } }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "The created room, or the original room on an idempotent retry.",
+                            "content": { "application/json": { "schema": {
+                                "$ref": "#/components/schemas/ManagedRoom"
+                            } } }
+                        },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/accounts/{enterprise_id}/rooms/{room_id}": {
+                "parameters": [
+                    { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() },
+                    { "name": "room_id", "in": "path", "required": true, "schema": uuid_schema() }
+                ],
+                "patch": {
+                    "operationId": "setAccountRoomArchived",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": {
+                            "$ref": "#/components/schemas/ArchiveAccountRoomRequest"
+                        } } }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Canonical room state after the idempotent archive transition.",
+                            "content": { "application/json": { "schema": {
+                                "$ref": "#/components/schemas/ManagedRoom"
+                            } } }
+                        },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
             }
         },
         "components": {
@@ -230,6 +306,7 @@ pub fn document() -> Value {
                 "BadRequest": error_response("Invalid request."),
                 "Unauthorized": error_response("Authentication is absent, expired, or invalid."),
                 "Forbidden": error_response("The exact browser origin was not accepted."),
+                "NotFound": error_response("The resource does not exist or is outside the caller's authority."),
                 "RateLimited": error_response("The request budget is exhausted."),
                 "Unavailable": error_response("A required dependency is unavailable.")
             },
@@ -334,6 +411,42 @@ pub fn document() -> Value {
                         }
                     }
                 },
+                "ManagedRoom": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "shortCode", "name", "state", "maxCapacity", "memberCount", "archivedAt", "createdAt"],
+                    "properties": {
+                        "id": uuid_schema(),
+                        "shortCode": { "type": "string" },
+                        "name": { "type": "string" },
+                        "state": { "type": "string", "enum": ["open", "closed", "locked"] },
+                        "maxCapacity": { "type": "integer" },
+                        "memberCount": { "type": "integer" },
+                        "archivedAt": { "type": ["string", "null"], "format": "date-time" },
+                        "createdAt": { "type": "string", "format": "date-time" }
+                    }
+                },
+                "CreateAccountRoomRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "name"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": crate::limits::ROOM_NAME_MAX_BYTES,
+                            "description": "After trimming, the UTF-8 encoding must contain at most 160 bytes.",
+                            "x-maxBytes": crate::limits::ROOM_NAME_MAX_BYTES
+                        }
+                    }
+                },
+                "ArchiveAccountRoomRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["archived"],
+                    "properties": { "archived": { "type": "boolean" } }
+                },
                 "Error": {
                     "type": "object",
                     "additionalProperties": false,
@@ -387,7 +500,14 @@ mod tests {
         let mut operation_ids = std::collections::BTreeSet::new();
         let paths = document["paths"].as_object().expect("OpenAPI paths object");
         for path in paths.values() {
-            for operation in path.as_object().expect("path item").values() {
+            for (member, operation) in path.as_object().expect("path item") {
+                if ![
+                    "get", "put", "post", "delete", "options", "head", "patch", "trace",
+                ]
+                .contains(&member.as_str())
+                {
+                    continue;
+                }
                 let operation_id = operation["operationId"]
                     .as_str()
                     .expect("every operation has an operationId");
@@ -397,5 +517,36 @@ mod tests {
                 );
             }
         }
+        assert_eq!(
+            operation_ids,
+            std::collections::BTreeSet::from([
+                "createAccountRoom",
+                "getAccountBootstrap",
+                "getAccountPreferences",
+                "listAccountRooms",
+                "login",
+                "logout",
+                "refreshSession",
+                "setAccountPreference",
+                "setAccountRoomArchived",
+                "updateAccountProfile",
+                "updateAccountTheme",
+            ])
+        );
+    }
+
+    #[test]
+    fn room_name_contract_names_its_utf8_byte_limit() {
+        let document = document();
+        let name =
+            &document["components"]["schemas"]["CreateAccountRoomRequest"]["properties"]["name"];
+        assert_eq!(name["maxLength"], crate::limits::ROOM_NAME_MAX_BYTES);
+        assert_eq!(name["x-maxBytes"], crate::limits::ROOM_NAME_MAX_BYTES);
+        assert!(
+            name["description"]
+                .as_str()
+                .is_some_and(|description| description.contains("UTF-8")),
+            "the interoperable extension must explain that the server enforces encoded bytes"
+        );
     }
 }

@@ -76,7 +76,9 @@ export const accounts = pgTable('accounts', {
    * unmapped identity; it never guesses from a display name, email domain, or coincident row id.
    */
   authorityEnterpriseId: uuid('authority_enterprise_id').unique(),
-  authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true }),
+  authorityReconciledAt: timestamp('authority_reconciled_at', {
+    withTimezone: true
+  }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull()
 });
 
@@ -108,7 +110,9 @@ export const users = pgTable(
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     /** Canonical Rust identity id; populated and verified by the offline Gate 3 importer. */
     authorityUserId: uuid('authority_user_id').unique(),
-    authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true }),
+    authorityReconciledAt: timestamp('authority_reconciled_at', {
+      withTimezone: true
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull()
   },
   (t) => [uniqueIndex('users_email_idx').on(t.email)]
@@ -175,7 +179,9 @@ export const loginSessions = pgTable(
 export const loginAttempts = pgTable('login_attempts', {
   identityHash: text('identity_hash').primaryKey(),
   failureCount: integer('failure_count').notNull().default(0),
-  windowStartedAt: timestamp('window_started_at', { withTimezone: true }).notNull(),
+  windowStartedAt: timestamp('window_started_at', {
+    withTimezone: true
+  }).notNull(),
   lastFailedAt: timestamp('last_failed_at', { withTimezone: true }).notNull()
 });
 
@@ -277,6 +283,11 @@ export const rooms = pgTable(
      * `isArchivedRoom`. Until then that setting key stays unwired, exactly as it was before.
      */
     archivedAt: timestamp('archived_at', { withTimezone: true }),
+    /** Canonical Rust room id; populated and verified by the offline Gate 3 room importer. */
+    authorityRoomId: uuid('authority_room_id').unique(),
+    authorityReconciledAt: timestamp('authority_reconciled_at', {
+      withTimezone: true
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull()
   },
   (t) => [uniqueIndex('rooms_short_code_idx').on(t.shortCode)]
@@ -387,7 +398,9 @@ export const roomUsers = pgTable(
      * `ptrMobileAppExpirePairCodeDays` as the room's own expiry setting.
      */
     mobilePairCode: text('mobile_pair_code'),
-    mobilePairCodeExpiresAt: timestamp('mobile_pair_code_expires_at', { withTimezone: true }),
+    mobilePairCodeExpiresAt: timestamp('mobile_pair_code_expires_at', {
+      withTimezone: true
+    }),
     /**
      * Failed pairing attempts against the current code.
      *
@@ -441,8 +454,12 @@ export const roomUsers = pgTable(
     isMarketplaceUser: boolean('is_marketplace_user').notNull().default(false),
     stripeSubscriptionStatus: text('stripe_subscription_status'),
     stripeLastPaidAt: timestamp('stripe_last_paid_at', { withTimezone: true }),
-    stripeCurrentPeriodEnd: timestamp('stripe_current_period_end', { withTimezone: true }),
-    stripeLastPaymentFailureAt: timestamp('stripe_last_payment_failure_at', { withTimezone: true }),
+    stripeCurrentPeriodEnd: timestamp('stripe_current_period_end', {
+      withTimezone: true
+    }),
+    stripeLastPaymentFailureAt: timestamp('stripe_last_payment_failure_at', {
+      withTimezone: true
+    }),
     /**
      * Money in MINOR UNITS, `bigint` end to end — never `i32`, never a float.
      *
@@ -830,7 +847,9 @@ export const alertDeliveryAttempts = pgTable(
     dispatchId: integer('dispatch_id')
       .notNull()
       .references(() => alertDispatches.id, { onDelete: 'cascade' }),
-    roomUserId: integer('room_user_id').references(() => roomUsers.id, { onDelete: 'set null' }),
+    roomUserId: integer('room_user_id').references(() => roomUsers.id, {
+      onDelete: 'set null'
+    }),
     recipientKey: text('recipient_key').notNull(),
     recipientName: text('recipient_name').notNull(),
     recipientEmail: text('recipient_email').notNull(),

@@ -78,9 +78,14 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   `db/repo/poll.rs`, `db/repo/alert.rs`, `db/repo/note.rs` and `auth/login.rs` each take their own
   pin below with the measurement beside the hash. Nothing became unsealed; four seals moved from the
   aggregate onto their own lines.
+
+  Moved 2026-09-04, 53 -> 50: the canonical room-lifecycle slice changed `db/repo/room.rs`,
+  `http/v1/rooms.rs`, and `limits.rs`. Each is individually pinned below with the exact measured
+  behavior. The intervening count changes remain recorded in Git history; this paragraph names the
+  current reviewed move rather than duplicating every prior ledger entry.
 */
-const EXPECTED_UNTOUCHED_COUNT = 53;
-const EXPECTED_MANIFEST_SHA256 = '4c554f85848d0c40d56d4de9375a3b6e1672b1fa0b7d67796f380a379ee181ee';
+const EXPECTED_UNTOUCHED_COUNT = 50;
+const EXPECTED_MANIFEST_SHA256 = 'c14c2068144414d9e62c95c36b80437e440e940c899f371d5dcf77256ad83e62';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -151,14 +156,36 @@ const LOCALLY_AUTHORED = new Map([
     'ee8eea163f4d9fb5aa4786313c48ed85ae30d1fc4bd5925ef1129aef99ff7549'
   ],
   [
+    // Authored here on 2026-09-04 for canonical room lifecycle authority. Nullable archive time
+    // preserves the transition timestamp; the enterprise-scoped request id makes controller
+    // retries converge on one target. No new privilege is granted.
+    'services/api/migrations/0014_room_lifecycle_authority.sql',
+    '21932f0090dee30ab5c6cb3dce380ddaf4408283803e3871cdb2c18b27f626ed'
+  ],
+  [
+    // Authored here on 2026-09-04 after the room slice's final concurrency audit. This bounded
+    // SECURITY DEFINER resolver requires a tenant GUC and locks the matching owner/admin row for
+    // the caller's transaction, while preserving the runtime role's direct-table denial.
+    'services/api/migrations/0015_lock_account_authority.sql',
+    '35cd20f21d2f4fbfd00cdf3fdb0b4e02f1a86db120a1344022c95d2cf5f3f199'
+  ],
+  [
+    // Authored here with the room-lifecycle slice. These are real Axum/PostgreSQL negative
+    // controls for exact JSON, transaction-locked account authority, cross-tenant omission,
+    // simultaneous idempotent create, timestamp-preserving absolute archive, and audit-on-change.
+    'services/api/tests/account_rooms.rs',
+    '0420aa264d2d612d187e7a1f2af05ede237f55c3c40c14361ac14e0f4a745816'
+  ],
+  [
     // Rust owns this scoped contract. The committed snapshot is equality-tested against
     // `openapi::document`, so the generator input cannot silently lag the handlers. Re-pinned
-    // 2026-09-03 when the profile and preference operations joined that same typed boundary.
+    // 2026-09-04 when room lifecycle joined that boundary and the room-name schema explicitly
+    // named its UTF-8 byte ceiling rather than implying `maxLength` alone carried that meaning.
     'services/api/openapi/v1.json',
-    'ce678f561ffc424331061138b1ee79bedda585e416a742c7448207d9b2e86a06'
+    '2ed7a83c0be5daa802b1611cebf730ade63f51af44b3a029626f1a2fe3a15bbb'
   ],
   ['services/api/src/bin/openapi.rs', '41d74030069228e6b42cd1259f22b05c10f58a665ccfec4dce3830082bf3923e'],
-  ['services/api/src/openapi.rs', '6a14730a47a95ca7fc84383feafbe05c8673508360425d9ab5c86b114dd9a4e3']
+  ['services/api/src/openapi.rs', 'c65081c93549435a5e9830f598031a7279502a340facf515f2feb2b31dd27fed']
 ]);
 
 /*
@@ -217,6 +244,11 @@ const DIVERGED_FROM_IMPORT = new Map([
     `account.rs` validates the exact, bounded request and refuses guests; `v1/mod.rs` registers the
     PATCH beside bootstrap; and `actions.rs` proves stale-token read-after-write plus anonymous,
     guest, oversized, non-object, and over-posted refusals over real HTTP and PostgreSQL.
+
+    Re-pinned 2026-09-04 for the room-lifecycle slice. `v1/mod.rs` registers the account-scoped
+    list/create/archive boundary; the three room implementation files below hold canonical query,
+    transaction, authorization, input-bound, and audit behavior. They left the untouched aggregate
+    for individual seals in this same reviewed change.
   */
   ['services/api/fixtures/seed.sql', '2aec9c9e3e5a7d0833142a76ae6f8df74d8e9b845180f0cc667e301f8569c0b6'],
   ['services/api/src/provision.rs', '55b989398f3c7443ecaca8efb99db1ac1d564b0862594a514dc84c85410d50fb'],
@@ -225,8 +257,24 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/src/db/repo/identity.rs', '5dbeb02a354f6d7910943c9c179c23b84858c065efb248afdc620ec81aceecef'],
   ['services/api/src/http/mod.rs', '6b9290757ab752310fb6a8e42324cb13b144d6a68c5bb773391057f1083c4aed'],
   ['services/api/src/http/v1/account.rs', 'c13b4636538fabd6598ce82603761e3a2c43bb9c563e771f9b7dfbbac5c58334'],
-  ['services/api/src/http/v1/mod.rs', 'bfa3ea9062f0a581f5ff34524e27e31a0c92cb93e417b7c240c72df9caa990f1'],
+  ['services/api/src/http/v1/mod.rs', 'c4fbf72719cf6902008bc0b1bd56b6e105398a9da6f14248c6ab187ba8067824'],
   ['services/api/src/lib.rs', '5f0e652995ddd924a56b366aa5e5be41048b879ceb2ec43cb2ca0b71070cec4a'],
+  /*
+    Diverged 2026-09-04 for the canonical room-lifecycle slice, with the end-to-end evidence in
+    CHANGELOG.md and `services/api/tests/account_rooms.rs`.
+
+      db/repo/room.rs   lists account rooms and owns conflict-aware idempotent create plus absolute
+                        archive inside tenant transactions; it also invokes the transaction-scoped
+                        account-authority lock. Creation writes room, owner membership, room state,
+                        and audit atomically even for two simultaneous copies of one request id.
+      http/v1/rooms.rs  begins the tenant transaction before locking and checking explicit account
+                        owner/admin authority, returns 404 across that boundary, rejects malformed
+                        and over-posted JSON as the stable 400 envelope, and audits only commits.
+      limits.rs         names the shared 160-byte room-name ceiling used by the handler.
+  */
+  ['services/api/src/db/repo/room.rs', 'b2f1ccbe5da2ce3e8333e60833c5812ffe45a1132c7e0d4355ae3cdf6f367e4c'],
+  ['services/api/src/http/v1/rooms.rs', '6497a3b61a3ba9059f36e843c1be9e6c9095fae4cad3a41a588c40b20190ee94'],
+  ['services/api/src/limits.rs', 'e7ebdb136f96bf3be86a39376d15fc1f9f7569f4f092e3105390428289c4c284'],
   /*
     Diverged 2026-08-15 21:40. Three prose claims in `services/README.md` still named
     `ptr_clone_app` as the RUNTIME role, which stopped being true when `0009` provisioned
@@ -290,11 +338,18 @@ const DIVERGED_FROM_IMPORT = new Map([
                                 0 on replay, and the neighbouring family untouched.
       api/Dockerfile            builder image rust:1.97.1-alpine3.24 -> rust:1.98.0-alpine3.24 by
                                 resolved digest, and the runtime distroless digest re-resolved.
+
+                                RE-PINNED 2026-09-04 from retained protected-run evidence. The
+                                immutable upstream builder carried libcrypto3/libssl3 3.5.7-r0 and
+                                18 fixed High/Critical findings. A separately named security stage
+                                installs exact signed Alpine 3.5.8-r0 packages; the release gate
+                                loads and scans that effective stage rather than claiming a stale
+                                base scan describes the compiler environment.
       rust-toolchain.toml       channel 1.97.1 -> 1.98.0 (stable of 2026-08-18).
   */
   ['services/Cargo.toml', '0d155ff4b1d976fa5b0eb675c71a26f4e2a23c77abacf5b28d45d02aa06a2b1a'],
   ['services/api/Cargo.toml', 'df51b64d04bbd2c3e9ad3b760a2192c7debd97e3c8eb50ecf9df34a322532ca3'],
-  ['services/api/Dockerfile', '23bb473a3f8f0b4478e3b9232405f19b7debb1be734b5ca2159c320f29fd841c'],
+  ['services/api/Dockerfile', 'c59550ac838ed9880016d7c50531d7f1f3ca89a514d087d15064c43bd5f9bd23'],
   /*
     FOUR READ-THEN-WRITE RACES, all four pinned 2026-09-02, all four PROVED on a throwaway
     PostgreSQL 16 rather than reasoned — `sqlx::query` is not compile-checked, and three of these
@@ -428,10 +483,18 @@ const DIVERGED_FROM_IMPORT = new Map([
     Re-pinned again 2026-09-03 for migration 0013. The attested chain now ends at 0013 and the exact
     ACL matrix admits UPDATE on users.display_name while continuing to refuse relation-wide UPDATE
     and is_platform_admin mutation.
+
+    Re-pinned 2026-09-04 for migration 0014. The attested chain and every range-bearing diagnostic
+    now end at 0014; the catalog-driven ACL matrix still admits no surface beyond the reviewed room
+    table grants and therefore automatically inventories both new columns.
+
+    Re-pinned again for migration 0015. The chain and diagnostics now end at 0015; the exact table
+    and column matrix is deliberately unchanged because transaction-scoped account authorization
+    is exposed only through a PUBLIC-denied, runtime-executable function whose checksum is pinned.
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '79f77f757b2627f7d4faaeb6df6fde524f5bd82b3649e7203f857591de756f45'
+    '0f02f9aa5e62236fc21ab09f52856bf473dd2de79566aca796aba9d218d4fb26'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -503,8 +566,16 @@ const DIVERGED_FROM_IMPORT = new Map([
     Re-pinned 2026-09-03: the live runtime-privilege proof now executes an allowed display-name
     update and includes it in the exact column matrix while retaining the platform-admin and delete
     negative controls.
+
+    Re-pinned 2026-09-04: a scratch-database proof inventories both room lifecycle columns and both
+    indexes, then proves the enterprise-scoped creation key refuses a second room with SQLSTATE
+    23505. The migrated table/RLS counts remain unchanged because 0014 adds no relation.
+
+    Re-pinned again for 0015: the same live scratch proof checks SECURITY DEFINER, pinned search
+    path, VOLATILE lock semantics, PUBLIC denial, runtime execution, tenant omission, and an actual
+    55P03 concurrent revocation timeout while the authorized tenant transaction holds FOR SHARE.
   */
-  ['services/api/tests/migrations.rs', '072e321e66deba14dae65842aa1580b17817df9a8dcd946020ccfb30597e28b4'],
+  ['services/api/tests/migrations.rs', '2f8f4e8c994de28c09699438749fdbf32615a2d336d424a90eb6c6a16fd82b53'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'

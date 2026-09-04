@@ -24,9 +24,20 @@ function emptyAccount() {
         admins: [],
         apiKeys: [],
         apiScopes: [],
-        entitlements: { marketplace: true, 'text-list': true, sso: true, mobile: true },
-        user: { id: 1, displayName: 'Ada Lovelace', email: 'ada@example.com', emailVerifiedAt: new Date() },
+        entitlements: {
+          marketplace: true,
+          'text-list': true,
+          sso: true,
+          mobile: true
+        },
+        user: {
+          id: 1,
+          displayName: 'Ada Lovelace',
+          email: 'ada@example.com',
+          emailVerifiedAt: new Date()
+        },
         profileAuthority: { enabled: false },
+        roomCreateRequestId: '90000000-0000-4000-8000-000000000001',
         verificationEnforced: false
       },
       form: null

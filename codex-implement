@@ -1,6 +1,6 @@
 # Repository completion plan and implementation evidence
 
-**Execution date:** 2026-09-03
+**Execution date:** 2026-09-04
 **Scope:** `TODO.md`, `NEW-TODO.md`, `todo-next.md`, controller, room, Rust services, evidence gates, database migrations, production builds, and browser journeys.
 **Outcome of the original TODO parity audit:** every repository-buildable gap identified in that
 parity scope is implemented. A subsequent production-architecture audit found an additional,
@@ -15,7 +15,7 @@ not represented as complete here merely because the reconstructed feature surfac
 | Gate 0 — domain containment | Mixed: code controls complete; legal, contact transport, monitoring, and optional history rewrite remain external/owner-gated | `apps/controller/docs/PRODUCTION-CUTOVER-PLAN.md` Gate 0 | Owner/vendor actions named by each unchecked row |
 | Gate 1 — backend SSOT/security drift | Local and hosted source gates exist; current immutable release publication/deployment/rollback evidence is not complete | backend CI, migration attestor, provenance seals | Registry/signing/provenance/target rollback exercise |
 | Gate 2 — account bootstrap | Repository implementation complete and pushed; staging deployment remains external | migration `0011`; `/api/v1/account`; scoped OpenAPI; generated server client; exact-cookie and negative tests | Staging database/API deploy plus backup restore proof |
-| Gate 3 — feature migration | Conversion foundation plus the profile request-path slice are implemented and locally proven; remaining product slices stay open | controller migration `0018`; Rust migrations `0012`/`0013`; converter E2E; legacy-scrypt upgrade; reversible `PROFILE_AUTHORITY_MODE`; typed profile/preferences BFF; authenticated profile UI | Rooms, settings, membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time; staging activation follows the profile runbook |
+| Gate 3 — feature migration | Conversion foundation plus profile and room-lifecycle request-path slices are implemented and locally proven; remaining product slices stay open | controller migrations `0018`/`0019`; Rust migrations `0012`–`0015`; profile/room converter E2E; legacy-scrypt upgrade; reversible profile/room switches; typed BFFs; authenticated profile and room-management UI | Settings, membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time; staging activation follows both authority runbooks |
 | Gate 4 — signup/payment/entitlements | Not production-authoritative | existing controller signup/email scaffolding and provider-independent ledgers | Verified recovery/email, idempotent billing webhooks, subscription facts, central entitlements, legal approval, provider smoke |
 | Gate 5 — media promotion | Stage 1 boundary proof only; browser is not wired to the Rust media contract | media service tests and deployment plan | session response, audience-bound grants, TURN, rotation/draining/observability, native dependency clearance, device/load/recovery evidence |
 
@@ -51,8 +51,54 @@ Hard local evidence at implementation time: generated OpenAPI equality and clien
 targets and testing features; two real-Axum profile tests passed against a fresh PostgreSQL 17
 container (atomic read-after-write plus anonymous/guest/over-post/shape/size refusal); the live ACL
 negative-control test passed; migration integrity reported 13 pinned migrations; and backend
-provenance reported 98 imported plus nine locally authored service files. Clean-checkout controller
-quality and the full Rust suite are required before this slice is pushed.
+provenance reported 98 imported plus nine locally authored service files. The slice was then pushed
+as `7618fbf…`. Hosted frontend run `33825502426` passed room quality, controller quality, and both
+production-artifact browser suites. Hosted backend run `33825502347` passed migrations, profile
+conversion, strict Clippy, all 445 Rust tests, and the live PostgreSQL attestation before its
+separate OCI builder scan correctly refused newly disclosed fixed Alpine OpenSSL findings. That
+release-artifact remediation belongs to the room-slice work below.
+
+### Gate 3 room lifecycle slice — repository implementation complete 2026-09-04
+
+Canonical Rust authority now owns account-scoped room list, idempotent create, and absolute
+archive/restore. Migration `0014` adds nullable archive time plus an enterprise-scoped creation
+request id; migration `0015` locks the tenant-bound owner/admin authority row for the protected
+transaction. Create uses the partial unique index as its concurrency arbiter, then writes the room,
+owner membership, initial room state, and one audit event atomically. Sequential and simultaneous
+replays converge on the original room, while a reused key with a different name is refused. Archive
+preserves its first timestamp on replay and audits only a real transition. Cross-tenant/non-admin ids
+are returned as indistinguishable 404s.
+
+The Rust-owned OpenAPI document now contains 11 operations and 14 schemas. The generated SvelteKit
+server transport validates exact room envelopes, strict UUID path values, and RFC 3339 timestamps,
+forwards only Rust session cookies, and normalizes invalid resource ids without transport. Same-
+origin BFF endpoints expose only the account-scoped contract. `ROOM_AUTHORITY_MODE=rust` requires
+canonical profile authority; the account page re-proves both UUID mappings, lists canonical rooms,
+and routes create/archive through Rust while maintaining a temporary three-row controller
+projection for downstream settings/membership slices. Projection proves the owner/account pair,
+repairs foundation rows, and converges simultaneous first loads. Full reconciliation refuses any
+unmapped legacy room or canonical omission; a target-committed/local-failed create is repaired on
+the next load.
+
+Controller migration `0019` adds unique room mappings. The source-fingerprinted room converter
+requires the independently verified profile conversion, commits target room/owner/state plus ledger
+before source mapping, resumes that bounded window, and verifies exact counts/digests. Rollback
+dynamically enumerates every foreign key referencing `rooms.id` and refuses any post-conversion
+activity. It refuses extra/source-orphaned ledger state and target drift without overwriting it;
+source-first rollback is session-locked, resumable after its cross-database commit boundary, and
+idempotent after completion. Profile rollback refuses active later-slice mappings. A real PostgreSQL
+E2E passed every one of those controls plus dependent profile rollback.
+
+Final local verification: clean formatting and lint pass; Svelte diagnostics are 0 errors/0
+warnings; all 1,294 controller assertions across 129 files pass; all 63 real-PostgreSQL controller
+assertions across 10 files pass; all 9 Chromium journeys pass against an adapter-node production
+artifact and an isolated migrated database; and the Vercel production build passes. Rust format,
+strict full-workspace Clippy, all 450 tests, and the live PostgreSQL release attestation pass against
+a fresh 15-migration, two-tenant database. Migration/provenance/client/evidence contracts and the
+room-converter rehearsal also pass. The protected OCI failure above is addressed by an exact Alpine
+3.5.8-r0 security overlay and by scanning the effective builder stage rather than the vulnerable
+upstream base; a local linux/amd64 stage build proved the exact installed versions. Exact-revision
+hosted proof remains required after push and no staging authority activation is claimed.
 
 ## Completion standard
 
@@ -233,7 +279,7 @@ The public `/v5` pathname is not the v5 build selector; `/v3`, `/v4`, `/v5`, and
 
 ## Database and configuration changes
 
-Controller migrations are forward-only and registered through version 18:
+Controller migrations are forward-only and registered through version 19:
 
 1. `0014-alert-delivery-ledger.js` — dispatches and per-recipient attempts.
 2. `0015-discord-oauth.js` — linked identity and expiring single-use OAuth state.
@@ -241,6 +287,8 @@ Controller migrations are forward-only and registered through version 18:
 4. `0017-alert-cross-post-suppression.js` — immutable `dontCrossPost` dispatch input.
 5. `0018-authority-identity-mappings.js` — nullable one-to-one UUID links to canonical Rust
    enterprise/user authority, with reconciliation timestamps.
+6. `0019-authority-room-mappings.js` — nullable one-to-one room UUID links plus the timestamp of
+   the last canonical reconciliation.
 
 Rust migration `0012_legacy_cutover_ledger.sql` adds enterprise suspension parity plus owner-only
 conversion run and entity-mapping ledgers. The runtime role has no access. The Gate 3 importer is
@@ -249,6 +297,13 @@ mapping columns, making that unavoidable failure window resumable without invent
 transactions. Its E2E verifier proved ownership refusal, plan, apply, independent verify,
 source-drift refusal, rollback, and cleanup on PostgreSQL 17. A real Rust HTTP login separately
 proved an imported Node scrypt credential is immediately compare-and-swap upgraded to Argon2id.
+
+Rust migrations `0013_profile_write_privilege.sql`, `0014_room_lifecycle_authority.sql`, and
+`0015_lock_account_authority.sql` complete the first two request-path slices: the first grants only
+the bounded canonical profile write; the next adds archive time and enterprise-scoped create
+idempotency without a new table grant; and the last closes account-role revocation races through a
+tenant-bound transaction lock. Profile and room activation remain separately reversible through
+explicit legacy/rust switches.
 
 The room's SQLite startup migration path upgrades existing installations in place for the alert outbox, scheduled-alert suppression, recording catalog/logs, public-player grants, and trial-bearing sessions. New deployment configuration includes Discord OAuth values, `MEDIA_CLUSTER_HOSTS_JSON`, and the existing controller/room/media signing secrets. Missing security-critical configuration fails closed or presents an explicit unconfigured state.
 
@@ -261,10 +316,10 @@ Measured on the final working tree:
 | Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,184 tests, production build            |
 | Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
 | Controller quality boundaries     | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, Vercel production build            |
-| Controller Vitest                 | 126 files / 1,280 tests; documented totals independently verified at four sites                                                                 |
+| Controller Vitest                 | 129 files / 1,294 tests; documented totals independently verified at four sites                                                                 |
 | Controller Playwright             | 9/9 Chromium journeys against the adapter-node production artifact                                                                              |
-| Controller PostgreSQL integration | 9 files / 59 tests against disposable provisioned PostgreSQL                                                                                    |
-| Rust workspace gate               | format and strict Clippy green; 445/445 tests: 163 API library, 138 PostgreSQL integration, 19 attestor, 114 media library, 11 media binary      |
+| Controller PostgreSQL integration | 10 files / 63 tests against disposable provisioned PostgreSQL                                                                                   |
+| Rust workspace gate               | format and strict Clippy green; 450/450 tests: 164 API library, 142 PostgreSQL integration, 19 attestor, 114 media library, 11 media binary      |
 | JavaScript advisories             | `pnpm audit --audit-level high`: no known vulnerabilities                                                                                       |
 | Rust advisories                   | policy green: one exact reviewed lockfile advisory proved unreachable from the build graph; six exact reviewed mediasoup informational warnings |
 | Svelte 5 review                   | modified components checked with the official Svelte autofixer; no reported issues; both apps have zero Svelte diagnostics                      |

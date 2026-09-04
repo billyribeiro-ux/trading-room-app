@@ -11,4 +11,13 @@ describe('Gate 3 authority identity mapping', () => {
     expect(migration?.sql).toContain('users_authority_user_id_unique');
     expect(migration?.sql).not.toMatch(/NOT NULL/);
   });
+
+  it('adds one-to-one nullable room mappings without rewriting the identity migration', () => {
+    const migration = MIGRATIONS.find(({ version }) => version === 19);
+    expect(migration?.name).toBe('authority_room_mappings');
+    expect(migration?.sql).toContain('ADD COLUMN authority_room_id UUID');
+    expect(migration?.sql).toContain('rooms_authority_room_id_unique');
+    expect(migration?.sql).toContain('ADD COLUMN authority_reconciled_at TIMESTAMPTZ');
+    expect(migration?.sql).not.toMatch(/NOT NULL/);
+  });
 });

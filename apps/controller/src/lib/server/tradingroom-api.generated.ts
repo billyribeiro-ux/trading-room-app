@@ -24,6 +24,10 @@ export type AccountRoom = {
   readonly state: string;
 };
 
+export type ArchiveAccountRoomRequest = { readonly archived: boolean };
+
+export type CreateAccountRoomRequest = { readonly name: string; readonly requestId: string };
+
 export type CurrentUser = {
   readonly displayName: string;
   readonly id: string;
@@ -35,6 +39,17 @@ export type CurrentUser = {
 export type Error = { readonly error: { readonly code: string; readonly message: string } };
 
 export type LoginRequest = { readonly email: string; readonly password: string };
+
+export type ManagedRoom = {
+  readonly archivedAt: string | null;
+  readonly createdAt: string;
+  readonly id: string;
+  readonly maxCapacity: number;
+  readonly memberCount: number;
+  readonly name: string;
+  readonly shortCode: string;
+  readonly state: 'open' | 'closed' | 'locked';
+};
 
 export type PreferenceRequest = { readonly key: string; readonly value: unknown };
 
@@ -104,6 +119,27 @@ export interface TradingRoomApiOperations {
     readonly path: '/api/v1/account/theme';
     readonly request: Preferences;
     readonly response: Preferences;
+    readonly successStatus: 200;
+  };
+  readonly listAccountRooms: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms';
+    readonly request: undefined;
+    readonly response: Array<ManagedRoom>;
+    readonly successStatus: 200;
+  };
+  readonly createAccountRoom: {
+    readonly method: 'POST';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms';
+    readonly request: CreateAccountRoomRequest;
+    readonly response: ManagedRoom;
+    readonly successStatus: 200;
+  };
+  readonly setAccountRoomArchived: {
+    readonly method: 'PATCH';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}';
+    readonly request: ArchiveAccountRoomRequest;
+    readonly response: ManagedRoom;
     readonly successStatus: 200;
   };
 }

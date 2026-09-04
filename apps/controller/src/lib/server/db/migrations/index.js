@@ -17,6 +17,7 @@ import { sql as discordOauth } from './0015-discord-oauth.js';
 import { sql as alertDispatchLinks } from './0016-alert-dispatch-links.js';
 import { sql as alertCrossPostSuppression } from './0017-alert-cross-post-suppression.js';
 import { sql as authorityIdentityMappings } from './0018-authority-identity-mappings.js';
+import { sql as authorityRoomMappings } from './0019-authority-room-mappings.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -161,6 +162,11 @@ export const MIGRATIONS = [
     version: 18,
     name: 'authority_identity_mappings',
     sql: authorityIdentityMappings
+  },
+  {
+    version: 19,
+    name: 'authority_room_mappings',
+    sql: authorityRoomMappings
   }
 ];
 

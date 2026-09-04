@@ -42,6 +42,7 @@ vi.mock('$app/env/private', () => ({
   RECAPTCHA_SECRET_KEY: '',
   CONTROL_PLANE_MODE: '',
   PROFILE_AUTHORITY_MODE: '',
+  ROOM_AUTHORITY_MODE: '',
   TRADINGROOM_API_URL: '',
   FCM_SERVICE_ACCOUNT_JSON: ''
 }));

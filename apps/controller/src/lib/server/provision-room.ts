@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from './db';
-import { roomSettings, roomUsers, rooms } from './db/schema';
+import { roomSettings, roomUsers, rooms, users } from './db/schema';
 import { newRoomSettings } from '#lib/room-settings-profile.js';
+import type { ManagedRoom } from './tradingroom-api.generated.js';
 
 /**
  * Everything that has to exist for a room to work, in one place.
@@ -150,7 +151,12 @@ export async function provisionRoom(
   */
   await db
     .insert(roomUsers)
-    .values({ roomId: room.id, userId: input.ownerUserId, role: 0, createdAt: now })
+    .values({
+      roomId: room.id,
+      userId: input.ownerUserId,
+      role: 0,
+      createdAt: now
+    })
     .onConflictDoNothing();
 
   /*
@@ -171,6 +177,137 @@ export async function provisionRoom(
   });
 
   return { id: room.id, shortCode, name };
+}
+
+export class RoomAuthorityProjectionError extends Error {
+  constructor(readonly code: string) {
+    super(`Canonical room projection refused: ${code}`);
+    this.name = 'RoomAuthorityProjectionError';
+  }
+}
+
+/**
+ * Converges the temporary controller projection onto an already committed canonical room.
+ *
+ * The projection exists only because settings, membership, badges, and launch migrate after the
+ * room lifecycle. Canonical fields always win. If the target commit succeeded but the controller
+ * transaction did not, the next account load safely repairs the missing projection.
+ */
+export async function projectAuthorityRooms(
+  db: Pool,
+  input: {
+    accountId: number;
+    ownerUserId: number;
+    rooms: readonly ManagedRoom[];
+    complete?: boolean;
+    now?: Date;
+  }
+): Promise<Map<string, number>> {
+  const now = input.now ?? new Date();
+  const canonicalIds = new Set(input.rooms.map((room) => room.id));
+  if (canonicalIds.size !== input.rooms.length) throw new RoomAuthorityProjectionError('duplicate-canonical-id');
+
+  return db.transaction(async (tx) => {
+    const [owner] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, input.ownerUserId), eq(users.accountId, input.accountId)))
+      .limit(1);
+    if (!owner) throw new RoomAuthorityProjectionError('owner-account-mismatch');
+
+    const local = await tx.select().from(rooms).where(eq(rooms.accountId, input.accountId));
+    if (input.complete !== false) {
+      for (const row of local) {
+        if (!row.authorityRoomId || !row.authorityReconciledAt) {
+          throw new RoomAuthorityProjectionError('unreconciled-legacy-room');
+        }
+        if (!canonicalIds.has(row.authorityRoomId)) {
+          throw new RoomAuthorityProjectionError('legacy-room-missing-from-authority');
+        }
+      }
+    }
+
+    const byAuthority = new Map(local.map((room) => [room.authorityRoomId!, room]));
+    const ensureFoundation = async (roomId: number, createdAt: Date) => {
+      await tx
+        .insert(roomUsers)
+        .values({
+          roomId,
+          userId: input.ownerUserId,
+          role: 0,
+          createdAt
+        })
+        .onConflictDoNothing();
+      await tx
+        .insert(roomSettings)
+        .values({
+          roomId,
+          settingsJson: JSON.stringify(newRoomSettings()),
+          updatedAt: now
+        })
+        .onConflictDoNothing();
+    };
+    for (const canonical of input.rooms) {
+      const archivedAt = canonical.archivedAt === null ? null : new Date(canonical.archivedAt);
+      if (archivedAt && !Number.isFinite(archivedAt.getTime())) {
+        throw new RoomAuthorityProjectionError('invalid-archive-time');
+      }
+      const createdAt = new Date(canonical.createdAt);
+      if (!Number.isFinite(createdAt.getTime())) throw new RoomAuthorityProjectionError('invalid-created-time');
+
+      const existing = byAuthority.get(canonical.id);
+      if (existing) {
+        const [updated] = await tx
+          .update(rooms)
+          .set({
+            shortCode: canonical.shortCode,
+            name: canonical.name,
+            state: canonical.state,
+            maxUsers: canonical.maxCapacity,
+            archivedAt,
+            authorityReconciledAt: now
+          })
+          .where(and(eq(rooms.id, existing.id), eq(rooms.accountId, input.accountId)))
+          .returning();
+        if (!updated) throw new RoomAuthorityProjectionError('projection-update-race');
+        await ensureFoundation(updated.id, createdAt);
+        byAuthority.set(canonical.id, updated);
+        continue;
+      }
+
+      let [inserted] = await tx
+        .insert(rooms)
+        .values({
+          accountId: input.accountId,
+          shortCode: canonical.shortCode,
+          name: canonical.name,
+          state: canonical.state,
+          maxUsers: canonical.maxCapacity,
+          recordedMaxCapacity: 0,
+          publicId: randomBytes(12).toString('hex'),
+          archivedAt,
+          authorityRoomId: canonical.id,
+          authorityReconciledAt: now,
+          createdAt
+        })
+        // No target is named deliberately: either the canonical id or the canonical short code
+        // can be the first unique arbiter observed under concurrent account-page loads. We accept
+        // neither blindly; the scoped read below proves the canonical id belongs to this account.
+        .onConflictDoNothing()
+        .returning();
+      if (!inserted) {
+        [inserted] = await tx
+          .select()
+          .from(rooms)
+          .where(and(eq(rooms.authorityRoomId, canonical.id), eq(rooms.accountId, input.accountId)))
+          .limit(1);
+      }
+      if (!inserted) throw new RoomAuthorityProjectionError('projection-identity-collision');
+      await ensureFoundation(inserted.id, createdAt);
+      byAuthority.set(canonical.id, inserted);
+    }
+    return new Map([...byAuthority].map(([authorityId, row]) => [authorityId, row.id]));
+  });
 }
 
 /*

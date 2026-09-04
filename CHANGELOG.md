@@ -45,6 +45,72 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-04 15:14 EDT — Gate 3 room lifecycle became a reversible, concurrency-safe authority slice
+
+**Runtime impact: yes only when `ROOM_AUTHORITY_MODE=rust`; legacy remains the default and
+request-path rollback.** Rust now owns account-scoped room list, idempotent create, and absolute
+archive/restore. Forward migration `0014` adds canonical archive time plus an enterprise-scoped
+creation request id. Forward migration `0015` adds a tenant-bound SECURITY DEFINER authorization
+function whose `FOR SHARE` lock is held by the room transaction, closing the role-revocation
+time-of-check/time-of-use window while direct runtime table access remains denied. Create uses one
+partial-index conflict-aware insert, so simultaneous copies of the same request id converge instead
+of racing into a unique-key 500. It commits the room, owner membership, initial room state, and one
+audit atomically; a changed payload under the same key is refused. Archive replay preserves its
+first timestamp and audits only a real transition. Cross-tenant and non-admin identifiers return the
+same 404 boundary.
+
+The Rust OpenAPI contract and deterministic SvelteKit client now cover 11 operations and 14 schemas.
+The server-only transport forwards only Rust session cookies and validates exact fields, UUID paths,
+integer counts, enums, and RFC 3339 timestamps. The room-name schema explicitly publishes the
+160-byte UTF-8 ceiling (`x-maxBytes`) instead of implying JSON Schema `maxLength` has byte semantics.
+Invalid public BFF ids return a stable 400 before
+transport; malformed and over-posted Axum JSON is normalized to the documented error envelope. The
+controller's account route re-proves exact canonical user/enterprise bindings and uses same-origin
+BFFs for list/create/archive. Controller migration `0019` stores unique room mappings. A temporary
+projection writes the legacy room, owner membership, and default settings atomically for downstream
+slices, repairs missing foundation rows, converges simultaneous first loads through conflict-then-
+scoped-read, proves the local owner belongs to the projected account, and refuses unmapped legacy
+rooms, cross-account identities, or missing canonical targets in full reconciliation.
+
+The room converter requires the profile conversion, fingerprints the source, commits target room,
+owner, state, and run ledger before source mapping, resumes that bounded cross-database window, and
+verifies exact counts/digests. A source-orphaned or extra ledger mapping is refused before mutation;
+an existing target is accepted only with matching ownership evidence and exact canonical fields,
+and target drift is never repaired by overwriting it. Rollback takes source-then-target session
+locks, locks each canonical room, clears source pointers first, and can resume after process loss
+before the target delete. It discovers every foreign key referencing `rooms.id` and refuses any
+post-conversion activity; repeated completed rollback converges, and profile rollback refuses active
+later-slice mappings.
+`ops/ROOM-AUTHORITY-CUTOVER.md` pins preconditions, activation, observation, request-path rollback,
+and the much narrower unused-conversion deletion procedure. Backend CI runs both conversion E2Es
+and scopes either converter/verifier change into the protected backend gate. Deployment tooling now
+sets and validates `ROOM_AUTHORITY_MODE`, including its profile-authority dependency.
+
+Final local evidence: clean formatting/lint and Svelte diagnostics (0 errors, 0 warnings) passed;
+all 1,294 controller assertions across 129 files and all 63 real-PostgreSQL assertions across 10
+files passed; all 9 Chromium journeys passed against an adapter-node production artifact and an
+isolated migrated database; and the Vercel production build passed. Rust format, strict Clippy, all
+450 workspace tests (164 API library, 142 PostgreSQL integration, 19 attestor, 114 media library,
+11 media binary), and the live PostgreSQL release attestation passed against a fresh 15-migration,
+two-tenant database. The converter passed plan/apply/verify, source-drift refusal, target-drift
+no-overwrite, post-use rollback refusal, partial-rollback resume, repeated rollback, and dependent
+profile rollback. Live PostgreSQL negative controls also measured tenant omission and SQLSTATE 55P03
+while a concurrent revocation waited on the transaction-scoped authority lock. A full-suite run
+also found and corrected
+the OpenAPI operation-id test: legal path-level parameters are no longer mistaken for operations,
+and the complete 11-id set is now pinned against silent renames.
+
+This change also repairs a current hosted release failure rather than treating green source tests as
+the whole release. Exact revision `7618fbf…` passed every frontend job plus migrations, conversion,
+Clippy, all 445 Rust tests, and live PostgreSQL attestation, but protected backend run `33825502347`
+then correctly blocked its builder: the retained Grype result found 18 fixed High/Critical findings
+across Alpine `libcrypto3`/`libssl3` 3.5.7-r0. The Dockerfile now installs exact signed 3.5.8-r0
+packages into a named `builder-security` stage. Release evidence retains the immutable upstream
+inspection, loads and inspects the effective stage, probes it without network/capabilities, and
+scans that effective compiler environment. A local linux/amd64 build proved both exact installed
+versions; protected proof remains pending until this revision is pushed. No staging or production
+authority switch is claimed.
+
 ### 2026-09-03 19:42 EDT — Gate 3 profile authority became a reversible request-path slice
 
 **Runtime impact: yes when `PROFILE_AUTHORITY_MODE=rust`; legacy remains the default and rollback.**

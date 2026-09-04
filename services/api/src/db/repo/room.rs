@@ -128,6 +128,202 @@ pub struct Overview {
     pub global_mute_non_staff: bool,
 }
 
+/// Canonical room lifecycle data rendered by the account application.
+///
+/// This deliberately excludes `config`, branding, integrations, and member PII. Those belong to
+/// later, separately authorized Gate 3 slices and must not hitchhike on a room-list response.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountRoom {
+    pub id: Uuid,
+    pub short_code: String,
+    pub name: String,
+    pub state: String,
+    pub max_capacity: i32,
+    pub member_count: i32,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub archived_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug)]
+pub struct CreateRoomOutcome {
+    pub room: AccountRoom,
+    pub replayed: bool,
+    pub stored_name: String,
+    pub stored_owner_id: Uuid,
+}
+
+#[derive(Debug)]
+pub struct UpdateRoomOutcome {
+    pub room: AccountRoom,
+    pub changed: bool,
+}
+
+/// Locks and validates the caller's account authority inside the tenant transaction.
+///
+/// The bounded `SECURITY DEFINER` function is necessary because request-time role discovery runs
+/// before a tenant is known and the runtime role intentionally has no direct table privilege on
+/// `enterprise_memberships`. Its `FOR SHARE` lock is held until this [`TenantTx`] ends, closing the
+/// revocation race between authorization and the protected room operation.
+pub async fn lock_account_admin(tx: &mut TenantTx<'_>, user_id: Uuid) -> Result<bool, DbError> {
+    sqlx::query_scalar("SELECT auth_lock_enterprise_admin($1)")
+        .bind(user_id)
+        .fetch_one(tx.conn())
+        .await
+        .map_err(DbError::from)
+}
+
+/// Every room in the selected enterprise, including archived and zero-member rooms.
+pub async fn list_for_account(tx: &mut TenantTx<'_>) -> Result<Vec<AccountRoom>, DbError> {
+    sqlx::query_as(
+        "SELECT r.id, r.uuid_short AS short_code, r.name, r.state, r.max_capacity, \
+                count(m.id)::integer AS member_count, r.archived_at, r.created_at \
+           FROM rooms r \
+           LEFT JOIN room_members m ON m.room_id = r.id AND m.enterprise_id = r.enterprise_id \
+         GROUP BY r.id \
+         ORDER BY r.name ASC, r.id ASC",
+    )
+    .fetch_all(tx.conn())
+    .await
+    .map_err(DbError::from)
+}
+
+async fn account_room(tx: &mut TenantTx<'_>, room_id: Uuid) -> Result<AccountRoom, DbError> {
+    sqlx::query_as(
+        "SELECT r.id, r.uuid_short AS short_code, r.name, r.state, r.max_capacity, \
+                count(m.id)::integer AS member_count, r.archived_at, r.created_at \
+           FROM rooms r \
+           LEFT JOIN room_members m ON m.room_id = r.id AND m.enterprise_id = r.enterprise_id \
+         WHERE r.id = $1 \
+         GROUP BY r.id",
+    )
+    .bind(room_id)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?
+    .ok_or(DbError::NotFound)
+}
+
+/// Idempotently creates a room and its owner membership/state in one tenant transaction.
+pub async fn create_for_account(
+    tx: &mut TenantTx<'_>,
+    owner_id: Uuid,
+    request_id: Uuid,
+    name: &str,
+    now: OffsetDateTime,
+) -> Result<CreateRoomOutcome, DbError> {
+    let room_id = Uuid::new_v4();
+    let short_code = room_id.simple().to_string()[..12].to_owned();
+    let inserted = sqlx::query_scalar::<_, Uuid>(
+        "INSERT INTO rooms \
+           (id, enterprise_id, owner_id, uuid_short, name, config, creation_request_id, created_at, updated_at) \
+         VALUES ($1, $2, $3, $4, $5, '{\"access\":{\"tiers\":[]}}'::jsonb, $6, $7, $7) \
+         ON CONFLICT (enterprise_id, creation_request_id) \
+           WHERE creation_request_id IS NOT NULL \
+         DO NOTHING \
+         RETURNING id",
+    )
+    .bind(room_id)
+    .bind(tx.ctx().enterprise_id)
+    .bind(owner_id)
+    .bind(short_code)
+    .bind(name)
+    .bind(request_id)
+    .bind(now)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+
+    if inserted.is_none() {
+        use sqlx::Row;
+        // PostgreSQL waits for the winning insert before deciding the partial-unique conflict, so
+        // this read sees a fully committed room graph even under simultaneous transport retries.
+        let existing = sqlx::query(
+            "SELECT id, name, owner_id FROM rooms \
+             WHERE enterprise_id = $1 AND creation_request_id = $2",
+        )
+        .bind(tx.ctx().enterprise_id)
+        .bind(request_id)
+        .fetch_one(tx.conn())
+        .await
+        .map_err(DbError::from)?;
+        let existing_room_id: Uuid = existing.get("id");
+        return Ok(CreateRoomOutcome {
+            room: account_room(tx, existing_room_id).await?,
+            replayed: true,
+            stored_name: existing.get("name"),
+            stored_owner_id: existing.get("owner_id"),
+        });
+    }
+    let owner_membership = sqlx::query(
+        "INSERT INTO room_members \
+           (enterprise_id, room_id, user_id, role, display_name, joined_at, created_at, updated_at) \
+         SELECT $1, $2, user_row.id, 'owner', user_row.display_name, $3, $3, $3 \
+           FROM users AS user_row WHERE user_row.id = $4",
+    )
+    .bind(tx.ctx().enterprise_id)
+    .bind(room_id)
+    .bind(now)
+    .bind(owner_id)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    if owner_membership.rows_affected() != 1 {
+        return Err(DbError::NotFound);
+    }
+
+    sqlx::query(
+        "INSERT INTO room_state (enterprise_id, room_id, created_at, updated_at) \
+         VALUES ($1, $2, $3, $3)",
+    )
+    .bind(tx.ctx().enterprise_id)
+    .bind(room_id)
+    .bind(now)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+
+    Ok(CreateRoomOutcome {
+        room: account_room(tx, room_id).await?,
+        replayed: false,
+        stored_name: name.to_owned(),
+        stored_owner_id: owner_id,
+    })
+}
+
+/// Sets the requested archive state; repeated calls converge without restamping the timestamp.
+pub async fn set_archived(
+    tx: &mut TenantTx<'_>,
+    room_id: Uuid,
+    archived: bool,
+    now: OffsetDateTime,
+) -> Result<UpdateRoomOutcome, DbError> {
+    let current = sqlx::query_scalar::<_, Option<OffsetDateTime>>(
+        "SELECT archived_at FROM rooms WHERE id = $1 FOR UPDATE",
+    )
+    .bind(room_id)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?
+    .ok_or(DbError::NotFound)?;
+    let changed = current.is_some() != archived;
+    if changed {
+        sqlx::query("UPDATE rooms SET archived_at = $2, updated_at = $3 WHERE id = $1")
+            .bind(room_id)
+            .bind(archived.then_some(now))
+            .bind(now)
+            .execute(tx.conn())
+            .await
+            .map_err(DbError::from)?;
+    }
+    Ok(UpdateRoomOutcome {
+        room: account_room(tx, room_id).await?,
+        changed,
+    })
+}
+
 /// The room itself, joined to its live state.
 ///
 /// # Errors

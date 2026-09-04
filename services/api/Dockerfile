@@ -22,7 +22,19 @@
 # multi-platform manifest fixes Rust, Alpine, musl, GCC, and Cargo's build
 # environment; the release-evidence job records the resolved x86-64 image and
 # exact installed toolchain/package identities.
-FROM rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS builder
+FROM rust:1.98.0-alpine3.24@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS builder-security
+
+# The immutable upstream image contains OpenSSL 3.5.7-r0. The 2026-09-04 protected scan proved
+# that Alpine has fixed CVE-2026-14456, -14457, -18798, -54874, -63072, -63073, -63075, -63076,
+# and -75803 in 3.5.8-r0. Upgrade exactly the two affected packages from Alpine 3.24's signed
+# repository, leave no package index behind, and make the effective security stage independently
+# loadable/scannable by the evidence job. These libraries are build tools only and are not copied
+# to the static-distroless runtime.
+RUN apk add --no-cache libcrypto3=3.5.8-r0 libssl3=3.5.8-r0 \
+    && apk info --exists 'libcrypto3=3.5.8-r0' \
+    && apk info --exists 'libssl3=3.5.8-r0'
+
+FROM builder-security AS builder
 
 # The repository toolchain file also requests developer-only rustfmt, Clippy,
 # and rust-analyzer components. The official image already contains the exact

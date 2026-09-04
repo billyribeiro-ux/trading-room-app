@@ -21,6 +21,16 @@
         },
         "description": "The exact browser origin was not accepted."
       },
+      "NotFound": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "The resource does not exist or is outside the caller's authority."
+      },
       "RateLimited": {
         "content": {
           "application/json": {
@@ -148,6 +158,39 @@
         ],
         "type": "object"
       },
+      "ArchiveAccountRoomRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archived"
+        ],
+        "type": "object"
+      },
+      "CreateAccountRoomRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "After trimming, the UTF-8 encoding must contain at most 160 bytes.",
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string",
+            "x-maxBytes": 160
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "name"
+        ],
+        "type": "object"
+      },
       "CurrentUser": {
         "additionalProperties": false,
         "properties": {
@@ -216,6 +259,57 @@
         "required": [
           "email",
           "password"
+        ],
+        "type": "object"
+      },
+      "ManagedRoom": {
+        "additionalProperties": false,
+        "properties": {
+          "archivedAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxCapacity": {
+            "type": "integer"
+          },
+          "memberCount": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "open",
+              "closed",
+              "locked"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "shortCode",
+          "name",
+          "state",
+          "maxCapacity",
+          "memberCount",
+          "archivedAt",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -298,7 +392,7 @@
     }
   },
   "info": {
-    "description": "Authoritative authentication, profile, preference, and account-bootstrap contract. This intentionally does not claim to describe the remaining room-runtime routes. Cookies are issued only through the same-origin SvelteKit boundary.",
+    "description": "Authoritative authentication, profile, preference, account-bootstrap, and account room-lifecycle contract. This intentionally does not claim to describe the remaining live-room runtime routes. Cookies are issued only through the same-origin SvelteKit boundary.",
     "title": "Trading Room Account Authority API",
     "version": "0.1.0"
   },
@@ -607,6 +701,166 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/rooms": {
+      "get": {
+        "operationId": "listAccountRooms",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManagedRoom"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Canonical lifecycle data for every room in an administered account."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "createAccountRoom",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRoomRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedRoom"
+                }
+              }
+            },
+            "description": "The created room, or the original room on an idempotent retry."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/rooms/{room_id}": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "room_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "patch": {
+        "operationId": "setAccountRoomArchived",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveAccountRoomRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedRoom"
+                }
+              }
+            },
+            "description": "Canonical room state after the idempotent archive transition."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"

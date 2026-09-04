@@ -151,6 +151,9 @@ pub const REACTION_MAX_BYTES: usize = 64;
 /// A per-room display name.
 pub const DISPLAY_NAME_MAX_BYTES: usize = 80;
 
+/// A room title shown in navigation, tables, and browser titles; not a document field.
+pub const ROOM_NAME_MAX_BYTES: usize = 160;
+
 /// `users.preferences` is jsonb on a table with **no RLS and no other ceiling**, so without
 /// these it is an unbounded per-user store that any signed-in caller can grow.
 pub const PREFERENCE_KEY_MAX_BYTES: usize = 64;

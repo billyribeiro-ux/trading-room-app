@@ -10,9 +10,12 @@ import type { Cookies } from '@sveltejs/kit';
 import { TRADINGROOM_API_URL } from '$app/env/private';
 import type {
   AccountBootstrap,
+  ArchiveAccountRoomRequest,
+  CreateAccountRoomRequest,
   CurrentUser,
   Error as ApiErrorBody,
   LoginRequest,
+  ManagedRoom,
   PreferenceRequest,
   Preferences,
   ProfileUpdateRequest,
@@ -23,8 +26,11 @@ import type {
 
 export type {
   AccountBootstrap,
+  ArchiveAccountRoomRequest,
+  CreateAccountRoomRequest,
   CurrentUser,
   LoginRequest,
+  ManagedRoom,
   PreferenceRequest,
   Preferences,
   ProfileUpdateRequest,
@@ -46,12 +52,51 @@ const OPERATIONS: {
 } = {
   login: { method: 'POST', path: '/api/auth/login', successStatus: 200 },
   logout: { method: 'POST', path: '/api/auth/logout', successStatus: 204 },
-  refreshSession: { method: 'POST', path: '/api/auth/refresh', successStatus: 200 },
-  getAccountBootstrap: { method: 'GET', path: '/api/v1/account', successStatus: 200 },
-  updateAccountProfile: { method: 'PATCH', path: '/api/v1/account', successStatus: 200 },
-  getAccountPreferences: { method: 'GET', path: '/api/v1/account/preferences', successStatus: 200 },
-  setAccountPreference: { method: 'PATCH', path: '/api/v1/account/preferences', successStatus: 200 },
-  updateAccountTheme: { method: 'PUT', path: '/api/v1/account/theme', successStatus: 200 }
+  refreshSession: {
+    method: 'POST',
+    path: '/api/auth/refresh',
+    successStatus: 200
+  },
+  getAccountBootstrap: {
+    method: 'GET',
+    path: '/api/v1/account',
+    successStatus: 200
+  },
+  updateAccountProfile: {
+    method: 'PATCH',
+    path: '/api/v1/account',
+    successStatus: 200
+  },
+  getAccountPreferences: {
+    method: 'GET',
+    path: '/api/v1/account/preferences',
+    successStatus: 200
+  },
+  setAccountPreference: {
+    method: 'PATCH',
+    path: '/api/v1/account/preferences',
+    successStatus: 200
+  },
+  updateAccountTheme: {
+    method: 'PUT',
+    path: '/api/v1/account/theme',
+    successStatus: 200
+  },
+  listAccountRooms: {
+    method: 'GET',
+    path: '/api/v1/accounts/{enterprise_id}/rooms',
+    successStatus: 200
+  },
+  createAccountRoom: {
+    method: 'POST',
+    path: '/api/v1/accounts/{enterprise_id}/rooms',
+    successStatus: 200
+  },
+  setAccountRoomArchived: {
+    method: 'PATCH',
+    path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}',
+    successStatus: 200
+  }
 };
 
 export interface RequestContext {
@@ -210,6 +255,53 @@ function isAccountBootstrap(value: unknown): value is AccountBootstrap {
   });
 }
 
+function isIsoDateTime(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+function isManagedRoom(value: unknown): value is ManagedRoom {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'id',
+      'shortCode',
+      'name',
+      'state',
+      'maxCapacity',
+      'memberCount',
+      'archivedAt',
+      'createdAt'
+    ]) &&
+    isUuid(value.id) &&
+    typeof value.shortCode === 'string' &&
+    typeof value.name === 'string' &&
+    ['open', 'closed', 'locked'].includes(String(value.state)) &&
+    Number.isSafeInteger(value.maxCapacity) &&
+    Number(value.maxCapacity) >= 0 &&
+    Number.isSafeInteger(value.memberCount) &&
+    Number(value.memberCount) >= 0 &&
+    (value.archivedAt === null || isIsoDateTime(value.archivedAt)) &&
+    isIsoDateTime(value.createdAt)
+  );
+}
+
+export function isCreateAccountRoomRequest(value: unknown): value is CreateAccountRoomRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'name']) &&
+    isUuid(value.requestId) &&
+    typeof value.name === 'string'
+  );
+}
+
+export function isArchiveAccountRoomRequest(value: unknown): value is ArchiveAccountRoomRequest {
+  return isRecord(value) && hasExactKeys(value, ['archived']) && typeof value.archived === 'boolean';
+}
+
 function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, parsed: unknown): boolean {
   switch (operation) {
     case 'logout':
@@ -225,6 +317,11 @@ function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, par
     case 'setAccountPreference':
     case 'updateAccountTheme':
       return isPreferences(parsed);
+    case 'listAccountRooms':
+      return Array.isArray(parsed) && parsed.every(isManagedRoom);
+    case 'createAccountRoom':
+    case 'setAccountRoomArchived':
+      return isManagedRoom(parsed);
   }
 }
 
@@ -364,9 +461,27 @@ export function clearApiCookies(cookies: Pick<Cookies, 'set'>): void {
 async function call<Operation extends TradingRoomApiOperation>(
   operation: Operation,
   context: RequestContext,
-  request: TradingRoomApiOperations[Operation]['request']
+  request: TradingRoomApiOperations[Operation]['request'],
+  pathVariables: Readonly<Record<string, string>> = {}
 ): Promise<ApiResult<TradingRoomApiOperations[Operation]['response']>> {
   const contract = OPERATIONS[operation];
+  let validPath = true;
+  const path = contract.path.replace(/\{([^}]+)\}/g, (_match, name: string) => {
+    const value = pathVariables[name];
+    if (!value || !isUuid(value)) {
+      validPath = false;
+      return '';
+    }
+    return encodeURIComponent(value);
+  });
+  if (!validPath || path.includes('{')) {
+    return {
+      ok: false,
+      status: 400,
+      code: 'invalid',
+      message: 'Invalid API resource identifier.'
+    };
+  }
   const headers = new Headers({ accept: 'application/json' });
   const cookie = apiCookieHeader(context.cookies);
   if (cookie) headers.set('cookie', cookie);
@@ -380,7 +495,7 @@ async function call<Operation extends TradingRoomApiOperation>(
 
   let response: Response;
   try {
-    response = await (context.fetch ?? globalThis.fetch)(`${baseUrl()}${contract.path}`, {
+    response = await (context.fetch ?? globalThis.fetch)(`${baseUrl()}${path}`, {
       method: contract.method,
       headers,
       body: request === undefined ? undefined : JSON.stringify(request),
@@ -420,7 +535,10 @@ async function call<Operation extends TradingRoomApiOperation>(
         message: parsed.error.message
       };
     }
-    console.error('[tradingroom-api] invalid error response', { operation, status: response.status });
+    console.error('[tradingroom-api] invalid error response', {
+      operation,
+      status: response.status
+    });
     return {
       ok: false,
       status: 502,
@@ -431,7 +549,10 @@ async function call<Operation extends TradingRoomApiOperation>(
 
   const valid = response.status === contract.successStatus && isOperationSuccess(operation, raw, parsed);
   if (!valid) {
-    console.error('[tradingroom-api] invalid success response', { operation, status: response.status });
+    console.error('[tradingroom-api] invalid success response', {
+      operation,
+      status: response.status
+    });
     return {
       ok: false,
       status: 502,
@@ -505,6 +626,34 @@ export function setAccountPreference(
 
 export function updateAccountTheme(context: RequestContext, request: Preferences): Promise<ApiResult<Preferences>> {
   return call('updateAccountTheme', context, request);
+}
+
+export function listAccountRooms(context: RequestContext, enterpriseId: string): Promise<ApiResult<ManagedRoom[]>> {
+  return call('listAccountRooms', context, undefined, {
+    enterprise_id: enterpriseId
+  });
+}
+
+export function createAccountRoom(
+  context: RequestContext,
+  enterpriseId: string,
+  request: CreateAccountRoomRequest
+): Promise<ApiResult<ManagedRoom>> {
+  return call('createAccountRoom', context, request, {
+    enterprise_id: enterpriseId
+  });
+}
+
+export function setAccountRoomArchived(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string,
+  request: ArchiveAccountRoomRequest
+): Promise<ApiResult<ManagedRoom>> {
+  return call('setAccountRoomArchived', context, request, {
+    enterprise_id: enterpriseId,
+    room_id: roomId
+  });
 }
 
 export function apiResultResponse<T>(result: ApiResult<T>): Response {

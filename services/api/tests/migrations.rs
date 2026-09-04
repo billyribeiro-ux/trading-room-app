@@ -759,9 +759,9 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
         .await
         .expect("the baseline should apply");
 
-    // `migrate::run` applies the whole set, so this is the post-migration shape: the 23
-    // tables the schema artifacts pin, plus `room_events`, `saved_polls`, and
-    // `enterprise_memberships`.
+    // `migrate::run` applies the whole set, so this is the post-migration shape: the 23 tables
+    // pinned by the baseline plus the three request-path additions and two owner-only conversion
+    // ledgers. Migrations 0014 and 0015 add room columns/indexes and a bounded function, not tables.
     assert_eq!(
         public_table_count(&pool).await,
         MIGRATED_PUBLIC_TABLES,
@@ -858,6 +858,103 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
     );
 
     scratch.finish(pool).await;
+}
+
+#[tokio::test]
+async fn room_lifecycle_columns_are_nullable_indexed_and_enterprise_idempotent() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    let columns: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT column_name::text, is_nullable::text, data_type::text \
+         FROM information_schema.columns \
+         WHERE table_schema = 'public' AND table_name = 'rooms' \
+           AND column_name IN ('archived_at', 'creation_request_id') \
+         ORDER BY column_name",
+    )
+    .fetch_all(&owner)
+    .await
+    .expect("inspect canonical room lifecycle columns");
+    assert_eq!(
+        columns,
+        [
+            (
+                "archived_at".into(),
+                "YES".into(),
+                "timestamp with time zone".into(),
+            ),
+            ("creation_request_id".into(), "YES".into(), "uuid".into()),
+        ]
+    );
+
+    let indexes: Vec<String> = sqlx::query_scalar(
+        "SELECT indexname::text FROM pg_indexes \
+         WHERE schemaname = 'public' AND tablename = 'rooms' \
+           AND indexname IN (\
+             'rooms_enterprise_creation_request_unique',\
+             'rooms_enterprise_archived_name_idx'\
+           ) ORDER BY indexname",
+    )
+    .fetch_all(&owner)
+    .await
+    .expect("inspect canonical room lifecycle indexes");
+    assert_eq!(
+        indexes,
+        [
+            "rooms_enterprise_archived_name_idx",
+            "rooms_enterprise_creation_request_unique",
+        ]
+    );
+
+    let enterprise: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Room Idempotency', 'room-idempotency') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create room-idempotency account");
+    let user: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) \
+         VALUES ('room-idempotency@example.test', md5('room-idempotency@example.test'), 'Owner') \
+         RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create room-idempotency owner");
+    let request_id = Uuid::new_v4();
+
+    sqlx::query(
+        "INSERT INTO rooms \
+           (enterprise_id, owner_id, uuid_short, name, config, creation_request_id) \
+         VALUES ($1, $2, 'idem-a', 'First', '{\"access\":{\"tiers\":[]}}'::jsonb, $3)",
+    )
+    .bind(enterprise)
+    .bind(user)
+    .bind(request_id)
+    .execute(&owner)
+    .await
+    .expect("create the first room for an idempotency key");
+
+    let duplicate = sqlx::query(
+        "INSERT INTO rooms \
+           (enterprise_id, owner_id, uuid_short, name, config, creation_request_id) \
+         VALUES ($1, $2, 'idem-b', 'Duplicate', '{\"access\":{\"tiers\":[]}}'::jsonb, $3)",
+    )
+    .bind(enterprise)
+    .bind(user)
+    .bind(request_id)
+    .execute(&owner)
+    .await
+    .expect_err("one enterprise creation request must identify only one room");
+    assert_eq!(
+        duplicate
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("23505")
+    );
+
+    scratch.finish(owner).await;
 }
 
 #[tokio::test]
@@ -964,7 +1061,7 @@ async fn enterprise_memberships_are_explicit_bounded_and_tenant_hardened() {
         assert_ne!(expression.trim(), "(true)", "widened tenant policy");
     }
 
-    let function_contract: (bool, Vec<String>, bool, i64) = sqlx::query_as(
+    let discovery_contract: (bool, Vec<String>, bool, i64) = sqlx::query_as(
         "SELECT routine.prosecdef, routine.proconfig, \
                 has_function_privilege('tradingroom_app', routine.oid, 'EXECUTE'), \
                 (SELECT count(*) FROM aclexplode(routine.proacl) acl WHERE acl.grantee = 0)::bigint \
@@ -973,10 +1070,35 @@ async fn enterprise_memberships_are_explicit_bounded_and_tenant_hardened() {
     )
     .fetch_one(&owner)
     .await
-    .expect("read account resolver contract");
+    .expect("read account discovery resolver contract");
+    assert!(
+        discovery_contract.0,
+        "account discovery must be SECURITY DEFINER"
+    );
+    assert_eq!(discovery_contract.1, ["search_path=pg_catalog, public"]);
+    assert!(
+        discovery_contract.2,
+        "the runtime role must execute account discovery"
+    );
+    assert_eq!(
+        discovery_contract.3, 0,
+        "PUBLIC must not execute account discovery"
+    );
+
+    let function_contract: (bool, Vec<String>, bool, i64, String) = sqlx::query_as(
+        "SELECT routine.prosecdef, routine.proconfig, \
+                has_function_privilege('tradingroom_app', routine.oid, 'EXECUTE'), \
+                (SELECT count(*) FROM aclexplode(routine.proacl) acl WHERE acl.grantee = 0)::bigint, \
+                routine.provolatile::text \
+         FROM pg_catalog.pg_proc AS routine \
+         WHERE routine.oid = 'public.auth_lock_enterprise_admin(uuid)'::regprocedure",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("read transaction-scoped account resolver contract");
     assert!(
         function_contract.0,
-        "account discovery must be SECURITY DEFINER"
+        "transaction-scoped account authorization must be SECURITY DEFINER"
     );
     assert_eq!(
         function_contract.1,
@@ -985,11 +1107,15 @@ async fn enterprise_memberships_are_explicit_bounded_and_tenant_hardened() {
     );
     assert!(
         function_contract.2,
-        "the runtime role must execute the resolver"
+        "the runtime role must execute the transaction-scoped resolver"
     );
     assert_eq!(
         function_contract.3, 0,
-        "PUBLIC must not execute the definer function"
+        "PUBLIC must not execute the transaction-scoped definer function"
+    );
+    assert_eq!(
+        function_contract.4, "v",
+        "the lock-taking resolver must remain VOLATILE"
     );
 
     let runtime = PgPoolOptions::new()
@@ -1009,6 +1135,66 @@ async fn enterprise_memberships_are_explicit_bounded_and_tenant_hardened() {
         resolved,
         [(enterprise_a, "Account A".into(), "owner".into())]
     );
+
+    let unlocked: bool = sqlx::query_scalar("SELECT auth_lock_enterprise_admin($1)")
+        .bind(user_a)
+        .fetch_one(&runtime)
+        .await
+        .expect("a missing tenant context must fail closed without raising");
+    assert!(!unlocked);
+
+    let mut runtime_tx = runtime
+        .begin()
+        .await
+        .expect("begin tenant authorization probe");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *runtime_tx)
+        .await
+        .expect("set tenant context");
+    let authorized: bool = sqlx::query_scalar("SELECT auth_lock_enterprise_admin($1)")
+        .bind(user_a)
+        .fetch_one(&mut *runtime_tx)
+        .await
+        .expect("lock matching account authority");
+    assert!(authorized);
+    let cross_tenant: bool = sqlx::query_scalar("SELECT auth_lock_enterprise_admin($1)")
+        .bind(user_b)
+        .fetch_one(&mut *runtime_tx)
+        .await
+        .expect("cross-tenant account authority must be indistinguishable from absence");
+    assert!(!cross_tenant);
+
+    let mut revocation = owner
+        .begin()
+        .await
+        .expect("begin authority revocation probe");
+    revocation
+        .execute("SET LOCAL lock_timeout = '100ms'")
+        .await
+        .expect("bound lock wait");
+    let blocked =
+        sqlx::query("DELETE FROM enterprise_memberships WHERE enterprise_id = $1 AND user_id = $2")
+            .bind(enterprise_a)
+            .bind(user_a)
+            .execute(&mut *revocation)
+            .await
+            .expect_err("the authorization row must remain locked through the tenant transaction");
+    assert_eq!(
+        blocked
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("55P03")
+    );
+    revocation
+        .rollback()
+        .await
+        .expect("rollback timed-out revocation");
+    runtime_tx
+        .commit()
+        .await
+        .expect("commit authorization probe");
 
     let direct_read = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM enterprise_memberships")
         .fetch_one(&runtime)

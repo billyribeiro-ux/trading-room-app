@@ -312,8 +312,9 @@ async function readMappings(sql, fingerprint) {
     await sql`
     SELECT entity_type AS "entityType", legacy_id AS "legacyId", target_id::text AS "targetId",
            run_id::text AS "runId", source_digest AS "sourceDigest", verified_at AS "verifiedAt"
-      FROM legacy_entity_mappings
+     FROM legacy_entity_mappings
      WHERE source_system = ${SOURCE_SYSTEM} AND source_fingerprint = ${fingerprint}
+       AND entity_type IN ('enterprise', 'user')
      ORDER BY entity_type, legacy_id
   `
   );
@@ -354,7 +355,10 @@ export function resolvePlan(source, mappingRows, allocate = () => randomUUID()) 
   }
 
   return {
-    accounts: source.accounts.map((row) => ({ row, mapping: resolve('enterprise', row) })),
+    accounts: source.accounts.map((row) => ({
+      row,
+      mapping: resolve('enterprise', row)
+    })),
     users: source.users.map((row) => ({ row, mapping: resolve('user', row) }))
   };
 }
@@ -675,6 +679,7 @@ async function verifyState(sourceSql, targetSql, fingerprint, expectedRunId = nu
   await targetSql`
     UPDATE legacy_entity_mappings SET verified_at = now()
      WHERE source_system = ${SOURCE_SYSTEM} AND source_fingerprint = ${fingerprint}
+       AND entity_type IN ('enterprise', 'user')
   `;
   await targetSql`
     UPDATE legacy_cutover_runs
@@ -683,7 +688,13 @@ async function verifyState(sourceSql, targetSql, fingerprint, expectedRunId = nu
            failure_code = NULL
      WHERE id = ${runId}::uuid
   `;
-  return { runId, status: 'verified', counts: snapshot.counts, sourceDigest: snapshot.digest, targetDigest: digest };
+  return {
+    runId,
+    status: 'verified',
+    counts: snapshot.counts,
+    sourceDigest: snapshot.digest,
+    targetDigest: digest
+  };
 }
 
 /** @param {Sql} sourceSql @param {Sql} targetSql @param {string} fingerprint */
@@ -753,6 +764,21 @@ async function rollbackCommand(sourceSql, targetSql, fingerprint) {
   const mappings = await readMappings(targetSql, fingerprint);
   const plan = resolvePlan(source, mappings, () => refuse('missing-target-mapping', 'A source row is not mapped.'));
 
+  const dependentSlices = await targetSql`
+    SELECT EXISTS (
+      SELECT 1
+        FROM legacy_entity_mappings AS mapping
+        INNER JOIN legacy_cutover_runs AS run ON run.id = mapping.run_id
+       WHERE mapping.source_system = ${SOURCE_SYSTEM}
+         AND mapping.source_fingerprint = ${fingerprint}
+         AND mapping.entity_type NOT IN ('enterprise', 'user')
+         AND run.status IN ('running', 'target-committed', 'verified')
+    ) AS found
+  `;
+  if (dependentSlices[0].found) {
+    refuse('dependent-cutover-slice', 'Rollback later Gate 3 slices before profile authority.');
+  }
+
   // Any upgraded credential or successful Rust login proves the target has carried live traffic.
   // Automated rollback would then destroy newer authority, so it must refuse.
   for (const { row, mapping } of plan.users) {
@@ -784,6 +810,7 @@ async function rollbackCommand(sourceSql, targetSql, fingerprint) {
     await targetTx`
       UPDATE legacy_entity_mappings SET verified_at = NULL
        WHERE source_system = ${SOURCE_SYSTEM} AND source_fingerprint = ${fingerprint}
+         AND entity_type IN ('enterprise', 'user')
     `;
   });
 
@@ -818,7 +845,12 @@ export async function runCutover({ command, sourceUrl, targetUrl, sourceLabel })
   const fingerprint = sourceFingerprint(sourceLabel);
   if (!SHA256.test(fingerprint)) refuse('invalid-source-fingerprint', 'Could not derive the source fingerprint.');
 
-  const options = { max: 1, prepare: false, idle_timeout: 5, connect_timeout: 10 };
+  const options = {
+    max: 1,
+    prepare: false,
+    idle_timeout: 5,
+    connect_timeout: 10
+  };
   const sourceSql = postgres(sourceUrl, options);
   const targetSql = postgres(targetUrl, options);
   try {
