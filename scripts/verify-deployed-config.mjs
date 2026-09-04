@@ -88,6 +88,7 @@ const REQUIRED = [
   'CONTROL_PLANE_MODE',
   'PROFILE_AUTHORITY_MODE',
   'ROOM_AUTHORITY_MODE',
+  'ROOM_SETTINGS_AUTHORITY_MODE',
   'DATABASE_URL',
   'ROOM_JWT_SECRET',
   'ROOM_BASE_URL',
@@ -140,6 +141,22 @@ if (readable(env.ROOM_AUTHORITY_MODE) && !['legacy', 'rust'].includes(env.ROOM_A
   fail('TRADINGROOM_API_URL', 'required when ROOM_AUTHORITY_MODE=rust — room lifecycle requests fail closed');
 } else if (env.ROOM_AUTHORITY_MODE === 'rust') {
   ok('ROOM_AUTHORITY_MODE', 'Rust room lifecycle authority is consistently configured');
+}
+
+if (readable(env.ROOM_SETTINGS_AUTHORITY_MODE) && !['legacy', 'rust'].includes(env.ROOM_SETTINGS_AUTHORITY_MODE)) {
+  fail('ROOM_SETTINGS_AUTHORITY_MODE', `must be legacy or rust, not ${env.ROOM_SETTINGS_AUTHORITY_MODE}`);
+} else if (
+  env.ROOM_SETTINGS_AUTHORITY_MODE === 'rust' &&
+  (env.PROFILE_AUTHORITY_MODE !== 'rust' || env.ROOM_AUTHORITY_MODE !== 'rust')
+) {
+  fail(
+    'ROOM_SETTINGS_AUTHORITY_MODE',
+    'rust requires PROFILE_AUTHORITY_MODE=rust and ROOM_AUTHORITY_MODE=rust'
+  );
+} else if (env.ROOM_SETTINGS_AUTHORITY_MODE === 'rust' && !readable(env.TRADINGROOM_API_URL)) {
+  fail('TRADINGROOM_API_URL', 'required when ROOM_SETTINGS_AUTHORITY_MODE=rust — settings requests fail closed');
+} else if (env.ROOM_SETTINGS_AUTHORITY_MODE === 'rust') {
+  ok('ROOM_SETTINGS_AUTHORITY_MODE', 'Rust room-settings authority is consistently configured');
 }
 
 /* ---- 4. Secrets are actually secret --------------------------------------------------------- */

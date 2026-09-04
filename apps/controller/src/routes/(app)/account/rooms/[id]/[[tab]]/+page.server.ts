@@ -1,5 +1,5 @@
-import { error, fail, redirect } from '@sveltejs/kit';
-import { randomBytes } from 'node:crypto';
+import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { count, desc, eq } from 'drizzle-orm';
 import { PUBLIC_SITE_ORIGIN } from '$app/env/public';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
@@ -18,6 +18,9 @@ import {
   isMemberGrant,
   setMemberGrant,
   readSettings,
+  readSettingsProjection,
+  projectAuthoritySettings,
+  coerceSettingValue,
   savePermissions,
   saveSetting,
   saveTextList,
@@ -56,6 +59,11 @@ import { isRoomPresenter, isRoomTrial } from '#lib/room-member-role.js';
 import { FEATURES, resolveFeatureReadiness, type FeatureId } from '#lib/features.js';
 import { resolveAccountEntitlements } from '#lib/server/account-entitlements.js';
 import { sanitizeHtml } from '#lib/server/sanitize-html.js';
+import { roomAuthorityMode, roomSettingsAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import { apiRequestContext } from '#lib/server/tradingroom-api.js';
+import { patchRoomSettingsAuthority, readRoomSettingsAuthority } from '#lib/server/room-settings-authority.js';
+import { createRoomInAuthority } from '#lib/server/room-authority.js';
+import { projectAuthorityRooms, RoomAuthorityProjectionError } from '#lib/server/provision-room.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -93,6 +101,132 @@ const ALL_TABS = [
 ] as const;
 
 type Settings = Record<string, string | number | boolean | null | undefined>;
+type LocalRoom = typeof rooms.$inferSelect;
+
+class RoomSettingsAuthorityError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'RoomSettingsAuthorityError';
+  }
+}
+
+function authorityCoordinates(event: RequestEvent, room: LocalRoom): { enterpriseId: string; roomId: string } {
+  const actor = requireUser(event.locals);
+  if (
+    actor.impersonatedBy !== undefined ||
+    !actor.authorityEnterpriseId ||
+    !room.authorityRoomId ||
+    !room.authorityReconciledAt
+  ) {
+    throw new RoomSettingsAuthorityError(
+      409,
+      'unreconciledAuthority',
+      'This room is not reconciled to settings authority.'
+    );
+  }
+  return { enterpriseId: actor.authorityEnterpriseId, roomId: room.authorityRoomId };
+}
+
+async function managedSettings(
+  event: RequestEvent,
+  room: LocalRoom
+): Promise<{
+  settings: Settings;
+  revision: number | null;
+}> {
+  if (roomSettingsAuthorityMode === 'legacy') {
+    const projection = await readSettingsProjection(room.id);
+    return { settings: projection.settings as Settings, revision: null };
+  }
+  const coordinates = authorityCoordinates(event, room);
+  const result = await readRoomSettingsAuthority(
+    apiRequestContext(event),
+    coordinates.enterpriseId,
+    coordinates.roomId
+  );
+  if (!result.ok) throw new RoomSettingsAuthorityError(result.status, result.code, result.message);
+  await projectAuthoritySettings(room.id, coordinates.roomId, result.data.revision, result.data.settings as Settings);
+  return { settings: result.data.settings as Settings, revision: result.data.revision };
+}
+
+async function patchManagedSettings(
+  event: RequestEvent,
+  room: LocalRoom,
+  input: {
+    expectedRevision: number | null;
+    base: Settings;
+    updates: Settings;
+    requestId?: string;
+  }
+): Promise<{ settings: Settings; revision: number | null }> {
+  if (roomSettingsAuthorityMode === 'legacy') {
+    for (const [name, value] of Object.entries(input.updates)) await saveSetting(room.id, name, value);
+    return { settings: (await readSettings(room.id)) as Settings, revision: null };
+  }
+  if (input.expectedRevision === null) {
+    throw new RoomSettingsAuthorityError(409, 'missingRevision', 'Reload this page before changing room settings.');
+  }
+  const coordinates = authorityCoordinates(event, room);
+  const result = await patchRoomSettingsAuthority(
+    apiRequestContext(event),
+    coordinates.enterpriseId,
+    coordinates.roomId,
+    {
+      requestId: input.requestId ?? randomUUID(),
+      expectedRevision: input.expectedRevision,
+      base: input.base,
+      updates: input.updates
+    }
+  );
+  if (!result.ok) throw new RoomSettingsAuthorityError(result.status, result.code, result.message);
+  await projectAuthoritySettings(room.id, coordinates.roomId, result.data.revision, result.data.settings as Settings);
+  return { settings: result.data.settings as Settings, revision: result.data.revision };
+}
+
+async function patchCurrentManagedSettings(
+  event: RequestEvent,
+  room: LocalRoom,
+  updates: Settings,
+  requestId?: string
+): Promise<{ settings: Settings; revision: number | null }> {
+  const current = await managedSettings(event, room);
+  const base = Object.fromEntries(
+    Object.keys(updates).map((name) => [name, Object.hasOwn(current.settings, name) ? current.settings[name] : null])
+  ) as Settings;
+  return patchManagedSettings(event, room, {
+    expectedRevision: current.revision,
+    base,
+    updates,
+    requestId
+  });
+}
+
+function authorityFailure(reason: unknown) {
+  if (reason instanceof RoomSettingsAuthorityError) {
+    return fail(reason.status, { message: reason.message, code: reason.code });
+  }
+  throw reason;
+}
+
+function derivedCloneSettingsRequestId(cloneRequestId: string): string {
+  const bytes = createHash('sha256').update(`room-clone-settings:${cloneRequestId}`).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function settingsEqual(left: Settings, right: Settings): boolean {
+  const entries = (settings: Settings) =>
+    Object.entries(settings)
+      .filter(([, value]) => value !== undefined)
+      .sort(([leftName], [rightName]) => leftName.localeCompare(rightName));
+  return JSON.stringify(entries(left)) === JSON.stringify(entries(right));
+}
 
 /**
  * The origin every link on this page is built from.
@@ -110,7 +244,8 @@ function siteOrigin(url: URL): string {
   return PUBLIC_SITE_ORIGIN?.trim() || url.origin;
 }
 
-export const load: PageServerLoad = async ({ params, locals, url }) => {
+export const load: PageServerLoad = async (event) => {
+  const { params, locals, url } = event;
   const ORIGIN = siteOrigin(url);
   const user = requireUser(locals);
   // Addressed by short code, not by primary key — see `ownedRoom`.
@@ -118,7 +253,14 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
   requireOwnedRoom(locals, room);
   if (!room) error(404, 'Room not found');
 
-  const settings = (await readSettings(room.id)) as Settings;
+  let settingsState: Awaited<ReturnType<typeof managedSettings>>;
+  try {
+    settingsState = await managedSettings(event, room);
+  } catch (reason) {
+    if (reason instanceof RoomSettingsAuthorityError) error(reason.status, reason.message);
+    throw reason;
+  }
+  const { settings } = settingsState;
   const resolved = resolveRoomConfig(settings);
   const entitlements = resolveAccountEntitlements({ accountId: user.accountId });
   const features = {
@@ -388,6 +530,8 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     tabs,
     entitlements,
     settings,
+    settingsRevision: settingsState.revision,
+    cloneRequestId: randomUUID(),
     // Re-sanitize persisted HTML at the read boundary. This is the only value
     // branded for the reviewed client-side HTML sink.
     landingHtml: sanitizeHtml(String(settings.description ?? '')),
@@ -536,8 +680,9 @@ export const actions: Actions = {
    * Reveal copyable integration credentials only after current-password reauthentication.
    * Every outcome is appended to the audit trail and no credential value is written to it.
    */
-  revealIntegrationCredentials: async ({ request, params, locals, url, getClientAddress }) => {
-    const roomId = await ownedRoomId(locals, params.id);
+  revealIntegrationCredentials: async (event) => {
+    const { request, params, locals, url, getClientAddress } = event;
+    const room = await ownedRoom(locals, params.id);
     const actor = requireUser(locals);
     const [accountUser] = await getDb()
       .select({ passwordHash: accountUsers.passwordHash })
@@ -560,8 +705,12 @@ export const actions: Actions = {
       });
     if (!accepted) return fail(403, { message: 'Your current password was not accepted.' });
 
-    const [room] = await getDb().select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
-    const settings = await readSettings(roomId);
+    let settings: Settings;
+    try {
+      settings = (await managedSettings(event, room)).settings;
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
     const publicId = room.publicId ?? String(room.id);
     const ssoSecret = String(settings.ssoJWTSecret ?? '');
     const pairSecret = String(settings.pairSecretKey ?? '');
@@ -603,10 +752,81 @@ export const actions: Actions = {
    * short code, public id and empty membership. `clonedFromId` is what makes
    * Delete Room appear on the copy and stay hidden on the original.
    */
-  cloneRoom: async ({ params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const [source] = await getDb().select().from(rooms).where(eq(rooms.id, roomId)).limit(1);
+  cloneRoom: async (event) => {
+    const { params, locals } = event;
+    const source = await ownedRoom(locals, params.id);
 
+    if (roomAuthorityMode === 'rust') {
+      const owner = requireUser(locals);
+      if (owner.impersonatedBy !== undefined || !owner.authorityEnterpriseId || !owner.authorityUserId) {
+        return fail(503, { message: 'The room authority could not verify this account.' });
+      }
+      const requestId = String((await event.request.formData()).get('requestId') ?? '');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(requestId)) {
+        return fail(400, { message: 'The room clone request id is invalid. Reload and try again.' });
+      }
+      const name = `${source.name} (copy)`;
+      const created = await createRoomInAuthority(apiRequestContext(event), owner.authorityEnterpriseId, {
+        requestId,
+        name
+      });
+      if (!created.ok) {
+        return fail(created.status === 400 ? 400 : 503, {
+          message: created.status === 400 ? created.message : 'The room authority could not clone this room.'
+        });
+      }
+      let localId: number | undefined;
+      try {
+        localId = (
+          await projectAuthorityRooms(getDb(), {
+            accountId: owner.accountId,
+            ownerUserId: owner.id,
+            rooms: [created.data],
+            complete: false
+          })
+        ).get(created.data.id);
+      } catch (cause) {
+        console.error('[room-authority] cloned room projection failed', {
+          canonicalRoomId: created.data.id,
+          code: cause instanceof RoomAuthorityProjectionError ? cause.code : 'database'
+        });
+      }
+      if (!localId) {
+        return fail(503, { message: 'The room clone was committed and will be reconciled on the next account load.' });
+      }
+      const [target] = await getDb().select().from(rooms).where(eq(rooms.id, localId)).limit(1);
+      if (!target) return fail(503, { message: 'The room clone projection could not be read.' });
+      try {
+        const sourceSettings = (await managedSettings(event, source)).settings;
+        const targetSettings = await managedSettings(event, target);
+        const updates = { ...sourceSettings, name };
+        if (settingsEqual(targetSettings.settings, updates)) {
+          redirect(303, `/account/rooms/${target.shortCode}`);
+        }
+        if (targetSettings.revision !== 0 || Object.keys(targetSettings.settings).length !== 0) {
+          throw new RoomSettingsAuthorityError(
+            409,
+            'cloneSettingsChanged',
+            'The cloned room settings changed before the copy completed.'
+          );
+        }
+        const base = Object.fromEntries(
+          Object.keys(updates).map((setting) => [
+            setting,
+            Object.hasOwn(targetSettings.settings, setting) ? targetSettings.settings[setting] : null
+          ])
+        ) as Settings;
+        await patchManagedSettings(event, target, {
+          expectedRevision: targetSettings.revision,
+          base,
+          updates,
+          requestId: derivedCloneSettingsRequestId(requestId)
+        });
+      } catch (reason) {
+        return authorityFailure(reason);
+      }
+      redirect(303, `/account/rooms/${target.shortCode}`);
+    }
     let shortCode = '';
     for (let i = 0; i < 40 && !shortCode; i++) {
       const candidate = String(1000 + Math.floor(Math.random() * 9000));
@@ -763,15 +983,38 @@ export const actions: Actions = {
    * by guessing. Destructive: it replaces, it does not merge, which is what the
    * reference's name implies and what makes the result predictable.
    */
-  loadSettingsFromRoom: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
+  loadSettingsFromRoom: async (event) => {
+    const { request, params, locals } = event;
+    const target = await ownedRoom(locals, params.id);
+    const roomId = target.id;
     const fromRoomId = Number((await request.formData()).get('fromRoomId'));
     const [source] = await getDb().select().from(rooms).where(eq(rooms.id, fromRoomId)).limit(1);
     requireOwnedRoom(locals, source);
     if (!source) return fail(404, { message: 'No such room.' });
     if (source.id === roomId) return fail(400, { message: 'That is this room.' });
-    await writeSettings(roomId, await readSettings(source.id));
-    return { loadedFrom: source.shortCode };
+    try {
+      const [sourceState, targetState] = await Promise.all([
+        managedSettings(event, source),
+        managedSettings(event, target)
+      ]);
+      const names = new Set([...Object.keys(sourceState.settings), ...Object.keys(targetState.settings)]);
+      const updates = Object.fromEntries(
+        [...names].map((name) => [name, Object.hasOwn(sourceState.settings, name) ? sourceState.settings[name] : null])
+      ) as Settings;
+      const base = Object.fromEntries(
+        [...names].map((name) => [name, Object.hasOwn(targetState.settings, name) ? targetState.settings[name] : null])
+      ) as Settings;
+      if (Object.keys(updates).length > 0) {
+        await patchManagedSettings(event, target, {
+          expectedRevision: targetState.revision,
+          base,
+          updates
+        });
+      }
+      return { loadedFrom: source.shortCode };
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
   },
 
   /**
@@ -781,11 +1024,15 @@ export const actions: Actions = {
    * the documented API authenticates with `apiKey` + `apiSecret` as query
    * parameters and the room has to be able to show it again.
    */
-  generateApiSecret: async ({ params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
+  generateApiSecret: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
     const secret = randomBytes(32).toString('hex');
-    await saveSetting(roomId, 'apiSecret', secret);
-    return { apiSecret: secret };
+    try {
+      await patchCurrentManagedSettings(event, room, { apiSecret: secret });
+      return { apiSecret: secret };
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
   },
 
   removeBadgesForUsers: async ({ params, locals }) => {
@@ -890,10 +1137,17 @@ export const actions: Actions = {
   /* ── the mobile app: real actions, not a disabled menu ─────────────────── */
 
   /** `getAppPin(…)` */
-  getAppPin: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
+  getAppPin: async (event) => {
+    const { request } = event;
+    const room = await ownedRoom(event.locals, event.params.id);
+    const roomId = room.id;
     const roomUserId = Number((await request.formData()).get('roomUserId'));
-    const settings = (await readSettings(roomId)) as Settings;
+    let settings: Settings;
+    try {
+      settings = (await managedSettings(event, room)).settings;
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
     const days = Number(settings.ptrMobileAppExpirePairCodeDays ?? 1);
     try {
       const { code, expiresAt } = await issueMobilePairCode(roomId, roomUserId, days);
@@ -1023,8 +1277,10 @@ export const actions: Actions = {
   },
 
   /** The reference's saveSessField(name) — one field, read-modify-write. */
-  saveField: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
+  saveField: async (event) => {
+    const { request, params, locals } = event;
+    const room = await ownedRoom(locals, params.id);
+    const roomId = room.id;
     const form = await request.formData();
     const name = String(form.get('name') ?? '');
     const raw = form.get('value');
@@ -1057,9 +1313,29 @@ export const actions: Actions = {
         }
         cleaned = ids.join(',');
       }
-      const value = await saveSetting(roomId, name, cleaned === null ? null : String(cleaned));
-      return { saved: name, value };
+      const definition = ROOM_SETTING_BY_NAME.get(name);
+      if (!definition) return fail(400, { message: `unknown setting: ${name}` });
+      const value = coerceSettingValue(name, definition.type === 'checkbox' && cleaned === null ? false : cleaned);
+      let baseValue: unknown;
+      try {
+        baseValue = JSON.parse(String(form.get('baseValue') ?? 'null'));
+      } catch {
+        return fail(400, { message: 'The submitted setting base value is invalid.' });
+      }
+      const expectedRevisionRaw = form.get('expectedRevision');
+      const expectedRevision =
+        expectedRevisionRaw === null || expectedRevisionRaw === '' ? null : Number(expectedRevisionRaw);
+      if (expectedRevision !== null && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) {
+        return fail(400, { message: 'The submitted settings revision is invalid.' });
+      }
+      const updated = await patchManagedSettings(event, room, {
+        expectedRevision,
+        base: { [name]: baseValue as Settings[string] },
+        updates: { [name]: value }
+      });
+      return { saved: name, value, settingsRevision: updated.revision };
     } catch (e) {
+      if (e instanceof RoomSettingsAuthorityError) return authorityFailure(e);
       return fail(400, { message: e instanceof Error ? e.message : 'Could not save that field.' });
     }
   },
@@ -1072,12 +1348,17 @@ export const actions: Actions = {
    * one `Editable.svelte` actually posts to; keeping the column update in exactly one place is
    * what stops the two disagreeing again.
    */
-  renameRoom: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
+  renameRoom: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const { request } = event;
     const name = String((await request.formData()).get('name') ?? '').trim();
     if (!name) return fail(400, { message: 'A room needs a name.' });
-    await saveSetting(roomId, 'name', name);
-    return { renamed: true };
+    try {
+      await patchCurrentManagedSettings(event, room, { name });
+      return { renamed: true };
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
   },
 
   setState: async ({ request, params, locals }) => {
@@ -1162,41 +1443,62 @@ export const actions: Actions = {
   /**
    * `swapCLusterIDs()` — this room's main and backup cluster ids, exchanged.
    *
-   * Both writes go through `saveSetting`, which owns the settings blob and rejects a key that is
-   * not in the schema; nothing here touches the JSON directly. Refuses when neither is set rather
-   * than reporting a swap that moved nothing.
+   * Both writes go through the authority-aware settings boundary, which validates the schema and
+   * applies them atomically; nothing here touches the JSON directly. Refuses when neither is set
+   * rather than reporting a swap that moved nothing.
    */
-  swapClusterIds: async ({ params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const settings = (await readSettings(roomId)) as Settings;
+  swapClusterIds: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    let current: Awaited<ReturnType<typeof managedSettings>>;
+    try {
+      current = await managedSettings(event, room);
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
+    const settings = current.settings;
     const main = settings.clusterID ?? null;
     const backup = settings.backupClusterID ?? null;
     if (main === null && backup === null) {
       return fail(400, { message: 'Neither ClusterID is set, so there is nothing to swap.' });
     }
-    await saveSetting(roomId, 'clusterID', backup);
-    await saveSetting(roomId, 'backupClusterID', main);
-    return { swappedClusterIds: true };
+    try {
+      await patchManagedSettings(event, room, {
+        expectedRevision: current.revision,
+        base: { clusterID: main, backupClusterID: backup },
+        updates: { clusterID: backup, backupClusterID: main }
+      });
+      return { swappedClusterIds: true };
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
   },
 
   /**
    * `applyToAllSessions()` — this room's ClusterID and Backup ClusterID onto EVERY room the
    * account owns, this one included.
    *
-   * Scope comes from `accountRoomIds`, which derives the account from the already-checked room.
-   * The page confirms first and names the number of rooms.
+   * Scope is derived from the account id on the already ownership-checked room. The page confirms
+   * first and names the number of rooms.
    */
-  applyToAllSessions: async ({ params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const settings = (await readSettings(roomId)) as Settings;
+  applyToAllSessions: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    let settings: Settings;
+    try {
+      settings = (await managedSettings(event, room)).settings;
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
     const clusterID = settings.clusterID ?? null;
     const backupClusterID = settings.backupClusterID ?? null;
-    const ids = await accountRoomIds(roomId);
-    for (const id of ids) {
-      await saveSetting(id, 'clusterID', clusterID);
-      await saveSetting(id, 'backupClusterID', backupClusterID);
+    const accountRooms = await getDb().select().from(rooms).where(eq(rooms.accountId, room.accountId));
+    try {
+      for (const target of accountRooms) {
+        await patchCurrentManagedSettings(event, target, { clusterID, backupClusterID });
+      }
+    } catch (reason) {
+      return authorityFailure(reason);
     }
-    return { appliedClusterIds: ids.length };
+    return { appliedClusterIds: accountRooms.length };
   },
 
   /**
@@ -1208,32 +1510,53 @@ export const actions: Actions = {
    * Guessing that "server" also meant `clusterID` would silently overwrite the cluster of every
    * room on the account, which is the one mistake here that could not be undone from this page.
    */
-  applyRepeaterToAccount: async ({ params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const settings = (await readSettings(roomId)) as Settings;
+  applyRepeaterToAccount: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    let settings: Settings;
+    try {
+      settings = (await managedSettings(event, room)).settings;
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
     const relays = settings.media_relays ?? null;
-    const ids = await accountRoomIds(roomId);
-    for (const id of ids) await saveSetting(id, 'media_relays', relays);
-    return { appliedRepeaters: ids.length };
+    const accountRooms = await getDb().select().from(rooms).where(eq(rooms.accountId, room.accountId));
+    try {
+      for (const target of accountRooms) {
+        await patchCurrentManagedSettings(event, target, { media_relays: relays });
+      }
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
+    return { appliedRepeaters: accountRooms.length };
   },
 
   /** `addLiveServer()` — one entry onto the end of this room's comma-separated Repeater List. */
-  addLiveServer: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
+  addLiveServer: async (event) => {
+    const { request } = event;
+    const room = await ownedRoom(event.locals, event.params.id);
     const entry = String((await request.formData()).get('server') ?? '').trim();
     if (!entry) return fail(400, { message: 'Type the repeater to add first.' });
     // A comma would add two entries from one box and nobody would see which.
     if (entry.includes(',')) {
       return fail(400, { message: 'One repeater at a time — the list itself is comma separated.' });
     }
-    const settings = (await readSettings(roomId)) as Settings;
+    let settings: Settings;
+    try {
+      settings = (await managedSettings(event, room)).settings;
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
     const relays = parseRelays(settings.media_relays);
     if (relays.includes(entry)) {
       return fail(409, { message: `${entry} is already in the repeater list.` });
     }
     const next = [...relays, entry];
-    await saveSetting(roomId, 'media_relays', next.join(','));
-    return { mediaRelays: next };
+    try {
+      await patchCurrentManagedSettings(event, room, { media_relays: next.join(',') });
+      return { mediaRelays: next };
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
   },
 
   /**
@@ -1242,18 +1565,28 @@ export const actions: Actions = {
    * An entry that is not there is a 404, not a silent no-op: the operator typed something, and a
    * green result for a removal that removed nothing is how a repeater stays in the list.
    */
-  removeLiveServer: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
+  removeLiveServer: async (event) => {
+    const { request } = event;
+    const room = await ownedRoom(event.locals, event.params.id);
     const entry = String((await request.formData()).get('server') ?? '').trim();
     if (!entry) return fail(400, { message: 'Type the repeater to remove first.' });
-    const settings = (await readSettings(roomId)) as Settings;
+    let settings: Settings;
+    try {
+      settings = (await managedSettings(event, room)).settings;
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
     const relays = parseRelays(settings.media_relays);
     if (!relays.includes(entry)) {
       return fail(404, { message: `${entry} is not in the repeater list.` });
     }
     const next = relays.filter((relay) => relay !== entry);
     // Emptying the list stores null, not "", so it reads back as unset like every other field.
-    await saveSetting(roomId, 'media_relays', next.length > 0 ? next.join(',') : null);
-    return { mediaRelays: next };
+    try {
+      await patchCurrentManagedSettings(event, room, { media_relays: next.length > 0 ? next.join(',') : null });
+      return { mediaRelays: next };
+    } catch (reason) {
+      return authorityFailure(reason);
+    }
   }
 };

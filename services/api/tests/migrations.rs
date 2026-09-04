@@ -42,13 +42,13 @@ const BASELINE_PUBLIC_TABLES: i64 = 23;
 /// ...and how many of those carry FORCE ROW LEVEL SECURITY.
 const BASELINE_FORCE_RLS: i64 = 20;
 
-/// What the **whole** migration set leaves behind: three tenant tables plus the two owner-only
+/// What the **whole** migration set leaves behind: four tenant tables plus the two owner-only
 /// Gate 3 conversion-ledger tables. Spelled as `BASELINE + n` rather than as a literal so a table
 /// addition is a deliberate review point instead of a count somebody updates without reading.
-const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 5;
-/// The three request-path tables are FORCE RLS. The two conversion tables deliberately are not:
+const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 6;
+/// The four request-path tables are FORCE RLS. The two conversion tables deliberately are not:
 /// they are offline owner-only operational evidence and the runtime role receives no privilege.
-const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 3;
+const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 4;
 
 async fn public_table_count(pool: &PgPool) -> i64 {
     sqlx::query_scalar(
@@ -760,8 +760,9 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
         .expect("the baseline should apply");
 
     // `migrate::run` applies the whole set, so this is the post-migration shape: the 23 tables
-    // pinned by the baseline plus the three request-path additions and two owner-only conversion
-    // ledgers. Migrations 0014 and 0015 add room columns/indexes and a bounded function, not tables.
+    // pinned by the baseline plus four request-path additions and two owner-only conversion
+    // ledgers. The fourth is 0016's append-only settings-mutation ledger; 0014 and 0015 add room
+    // columns/indexes and a bounded function, not tables.
     assert_eq!(
         public_table_count(&pool).await,
         MIGRATED_PUBLIC_TABLES,
@@ -954,6 +955,181 @@ async fn room_lifecycle_columns_are_nullable_indexed_and_enterprise_idempotent()
         Some("23505")
     );
 
+    scratch.finish(owner).await;
+}
+
+#[tokio::test]
+async fn room_settings_revision_and_mutation_ledger_are_bounded_append_only_and_tenant_hardened() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    let revision: (String, String) = sqlx::query_as(
+        "SELECT is_nullable::text, column_default::text \
+         FROM information_schema.columns \
+         WHERE table_schema = 'public' AND table_name = 'rooms' \
+           AND column_name = 'settings_revision'",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect canonical settings revision");
+    assert_eq!(revision, ("NO".into(), "0".into()));
+
+    let constraints: Vec<String> = sqlx::query_scalar(
+        "SELECT conname::text FROM pg_constraint \
+         WHERE conrelid IN ('public.rooms'::regclass, 'public.room_setting_mutations'::regclass) \
+           AND conname IN (\
+             'rooms_settings_revision_nonnegative', 'rooms_settings_object_check', \
+             'room_setting_mutations_tenant_id_unique', 'room_setting_mutations_room_fk', \
+             'room_setting_mutations_actor_fk', 'room_setting_mutations_digest_check', \
+             'room_setting_mutations_revision_check'\
+           ) ORDER BY conname",
+    )
+    .fetch_all(&owner)
+    .await
+    .expect("inspect settings constraints");
+    assert_eq!(
+        constraints.len(),
+        7,
+        "every settings invariant must be installed"
+    );
+
+    let rls: (bool, bool) = sqlx::query_as(
+        "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class \
+         WHERE oid = 'public.room_setting_mutations'::regclass",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("read settings-ledger RLS flags");
+    assert_eq!(rls, (true, true));
+    assert!(
+        has_table_privilege(
+            &owner,
+            migrate::EXPECTED_RUNTIME_ROLE,
+            "room_setting_mutations",
+            "SELECT"
+        )
+        .await
+    );
+    assert!(
+        has_table_privilege(
+            &owner,
+            migrate::EXPECTED_RUNTIME_ROLE,
+            "room_setting_mutations",
+            "INSERT"
+        )
+        .await
+    );
+    for privilege in ["UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"] {
+        assert!(
+            !has_table_privilege(
+                &owner,
+                migrate::EXPECTED_RUNTIME_ROLE,
+                "room_setting_mutations",
+                privilege
+            )
+            .await,
+            "settings mutation evidence must not grant {privilege}"
+        );
+    }
+
+    let enterprise: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Settings Ledger', 'settings-ledger') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create settings-ledger enterprise");
+    let other_enterprise: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Other Settings', 'other-settings') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create other enterprise");
+    let user: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) \
+         VALUES ('settings-ledger@example.test', md5('settings-ledger@example.test'), 'Owner') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create settings-ledger actor");
+    let room: Uuid = sqlx::query_scalar(
+        "INSERT INTO rooms (enterprise_id, owner_id, uuid_short, name, config) \
+         VALUES ($1, $2, 'settings-ledger', 'Settings Ledger', '{\"access\":{\"tiers\":[]}}'::jsonb) \
+         RETURNING id",
+    )
+    .bind(enterprise)
+    .bind(user)
+    .fetch_one(&owner)
+    .await
+    .expect("create settings-ledger room");
+    let request_id = Uuid::new_v4();
+
+    let runtime = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&scratch_url(&runtime_url(), &scratch.name))
+        .await
+        .expect("connect as runtime");
+    let mut insert = runtime.begin().await.expect("begin runtime insert");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise.to_string())
+        .execute(&mut *insert)
+        .await
+        .expect("set exact tenant");
+    sqlx::query(
+        "INSERT INTO room_setting_mutations \
+           (enterprise_id, request_id, room_id, actor_user_id, request_digest, response_revision) \
+         VALUES ($1, $2, $3, $4, repeat('a', 64), 0)",
+    )
+    .bind(enterprise)
+    .bind(request_id)
+    .bind(room)
+    .bind(user)
+    .execute(&mut *insert)
+    .await
+    .expect("runtime may append settings mutation evidence");
+    insert.commit().await.expect("commit settings evidence");
+
+    for statement in [
+        "UPDATE room_setting_mutations SET response_revision = 1",
+        "DELETE FROM room_setting_mutations",
+    ] {
+        let mut mutation = runtime.begin().await.expect("begin forbidden mutation");
+        sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+            .bind(enterprise.to_string())
+            .execute(&mut *mutation)
+            .await
+            .expect("set exact tenant");
+        let error = sqlx::query(statement)
+            .execute(&mut *mutation)
+            .await
+            .expect_err("settings evidence must be append-only");
+        assert_eq!(
+            error
+                .as_database_error()
+                .and_then(|database_error| database_error.code())
+                .as_deref(),
+            Some("42501")
+        );
+        mutation
+            .rollback()
+            .await
+            .expect("rollback forbidden mutation");
+    }
+
+    let mut hidden = runtime.begin().await.expect("begin cross-tenant read");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(other_enterprise.to_string())
+        .execute(&mut *hidden)
+        .await
+        .expect("set other tenant");
+    let visible: i64 = sqlx::query_scalar("SELECT count(*) FROM room_setting_mutations")
+        .fetch_one(&mut *hidden)
+        .await
+        .expect("RLS returns an empty cross-tenant projection");
+    assert_eq!(visible, 0);
+    hidden.rollback().await.expect("close cross-tenant read");
+
+    runtime.close().await;
     scratch.finish(owner).await;
 }
 

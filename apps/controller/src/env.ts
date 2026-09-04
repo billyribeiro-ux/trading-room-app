@@ -6,6 +6,7 @@ const optionalUrl = v.optional(v.union([v.literal(''), v.pipe(v.string(), v.url(
 const optionalControlPlaneMode = v.optional(v.union([v.literal(''), v.picklist(['marketing-only', 'postgres'])]));
 const optionalProfileAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 const optionalRoomAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
+const optionalRoomSettingsAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 
 /**
  * The application environment contract.
@@ -39,6 +40,11 @@ export const variables = defineEnvVars({
     description:
       'Reversible Gate 3 room lifecycle switch. legacy is the safe default; rust requires the profile authority bridge, reconciled room UUID mappings, and TRADINGROOM_API_URL.',
     schema: optionalRoomAuthorityMode
+  },
+  ROOM_SETTINGS_AUTHORITY_MODE: {
+    description:
+      'Reversible Gate 3 room-settings authority switch. rust requires profile and room authority, reconciled setting revisions, and TRADINGROOM_API_URL.',
+    schema: optionalRoomSettingsAuthorityMode
   },
   SUPERADMIN_EMAILS: {
     description:

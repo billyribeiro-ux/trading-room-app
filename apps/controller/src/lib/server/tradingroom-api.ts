@@ -8,14 +8,17 @@
 
 import type { Cookies } from '@sveltejs/kit';
 import { TRADINGROOM_API_URL } from '$app/env/private';
+import { ROOM_SETTINGS_BY_NAME } from '#lib/room-settings-schema.js';
 import type {
   AccountBootstrap,
+  AccountRoomSettings,
   ArchiveAccountRoomRequest,
   CreateAccountRoomRequest,
   CurrentUser,
   Error as ApiErrorBody,
   LoginRequest,
   ManagedRoom,
+  PatchAccountRoomSettingsRequest,
   PreferenceRequest,
   Preferences,
   ProfileUpdateRequest,
@@ -26,11 +29,13 @@ import type {
 
 export type {
   AccountBootstrap,
+  AccountRoomSettings,
   ArchiveAccountRoomRequest,
   CreateAccountRoomRequest,
   CurrentUser,
   LoginRequest,
   ManagedRoom,
+  PatchAccountRoomSettingsRequest,
   PreferenceRequest,
   Preferences,
   ProfileUpdateRequest,
@@ -95,6 +100,16 @@ const OPERATIONS: {
   setAccountRoomArchived: {
     method: 'PATCH',
     path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}',
+    successStatus: 200
+  },
+  getAccountRoomSettings: {
+    method: 'GET',
+    path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings',
+    successStatus: 200
+  },
+  patchAccountRoomSettings: {
+    method: 'PATCH',
+    path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings',
     successStatus: 200
   }
 };
@@ -302,6 +317,49 @@ export function isArchiveAccountRoomRequest(value: unknown): value is ArchiveAcc
   return isRecord(value) && hasExactKeys(value, ['archived']) && typeof value.archived === 'boolean';
 }
 
+function isRoomSettingValue(name: string, value: unknown, allowNull: boolean): boolean {
+  if (allowNull && value === null) return true;
+  const definition = ROOM_SETTINGS_BY_NAME.get(name);
+  if (!definition) return false;
+  if (definition.type === 'checkbox') return typeof value === 'boolean';
+  if (definition.type === 'number') return typeof value === 'number' && Number.isFinite(value);
+  return typeof value === 'string';
+}
+
+function isRoomSettings(value: unknown, allowNull = false): value is Record<string, unknown> {
+  return (
+    isRecord(value) && Object.entries(value).every(([name, setting]) => isRoomSettingValue(name, setting, allowNull))
+  );
+}
+
+function isAccountRoomSettings(value: unknown): value is AccountRoomSettings {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['roomId', 'revision', 'settings']) &&
+    isUuid(value.roomId) &&
+    Number.isSafeInteger(value.revision) &&
+    Number(value.revision) >= 0 &&
+    isRoomSettings(value.settings)
+  );
+}
+
+export function isPatchAccountRoomSettingsRequest(value: unknown): value is PatchAccountRoomSettingsRequest {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['requestId', 'expectedRevision', 'base', 'updates']) ||
+    !isUuid(value.requestId) ||
+    !Number.isSafeInteger(value.expectedRevision) ||
+    Number(value.expectedRevision) < 0 ||
+    !isRoomSettings(value.base, true) ||
+    !isRoomSettings(value.updates, true)
+  ) {
+    return false;
+  }
+  const base = Object.keys(value.base).sort();
+  const updates = Object.keys(value.updates).sort();
+  return updates.length > 0 && base.length === updates.length && base.every((name, index) => name === updates[index]);
+}
+
 function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, parsed: unknown): boolean {
   switch (operation) {
     case 'logout':
@@ -322,6 +380,9 @@ function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, par
     case 'createAccountRoom':
     case 'setAccountRoomArchived':
       return isManagedRoom(parsed);
+    case 'getAccountRoomSettings':
+    case 'patchAccountRoomSettings':
+      return isAccountRoomSettings(parsed);
   }
 }
 
@@ -651,6 +712,32 @@ export function setAccountRoomArchived(
   request: ArchiveAccountRoomRequest
 ): Promise<ApiResult<ManagedRoom>> {
   return call('setAccountRoomArchived', context, request, {
+    enterprise_id: enterpriseId,
+    room_id: roomId
+  });
+}
+
+export function getAccountRoomSettings(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string
+): Promise<ApiResult<AccountRoomSettings>> {
+  return call('getAccountRoomSettings', context, undefined, {
+    enterprise_id: enterpriseId,
+    room_id: roomId
+  });
+}
+
+export function patchAccountRoomSettings(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string,
+  request: PatchAccountRoomSettingsRequest
+): Promise<ApiResult<AccountRoomSettings>> {
+  if (!isPatchAccountRoomSettingsRequest(request)) {
+    return Promise.resolve({ ok: false, status: 400, code: 'invalid', message: 'Invalid room settings mutation.' });
+  }
+  return call('patchAccountRoomSettings', context, request, {
     enterprise_id: enterpriseId,
     room_id: roomId
   });

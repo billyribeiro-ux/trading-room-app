@@ -6,6 +6,8 @@ use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 
 use crate::auth::extract::RoomMember;
@@ -131,6 +133,55 @@ pub struct CreateAccountRoomRequest {
 #[serde(deny_unknown_fields)]
 pub struct ArchiveAccountRoomRequest {
     pub archived: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountRoomSettingsResponse {
+    pub room_id: uuid::Uuid,
+    pub revision: i64,
+    pub settings: Map<String, Value>,
+}
+
+impl From<room::SettingsSnapshot> for AccountRoomSettingsResponse {
+    fn from(snapshot: room::SettingsSnapshot) -> Self {
+        Self {
+            room_id: snapshot.room_id,
+            revision: snapshot.revision,
+            settings: snapshot.settings,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct PatchAccountRoomSettingsRequest {
+    pub request_id: uuid::Uuid,
+    pub expected_revision: i64,
+    pub base: Map<String, Value>,
+    pub updates: Map<String, Value>,
+}
+
+fn settings_mutation_error(error: room::SettingsMutationError) -> ApiError {
+    match error {
+        room::SettingsMutationError::Database(error) => error.into(),
+        room::SettingsMutationError::RequestMismatch => {
+            ApiError::Invalid("requestId was already used for a different settings mutation".into())
+        }
+        room::SettingsMutationError::Conflict => ApiError::Conflict,
+        room::SettingsMutationError::Validation(error) => ApiError::Invalid(error.to_string()),
+        invalid @ room::SettingsMutationError::InvalidStoredDocument => ApiError::internal(invalid),
+    }
+}
+
+fn mutation_digest(
+    actor_user_id: uuid::Uuid,
+    room_id: uuid::Uuid,
+    request: &PatchAccountRoomSettingsRequest,
+) -> Result<String, ApiError> {
+    let encoded =
+        serde_json::to_vec(&(actor_user_id, room_id, request)).map_err(ApiError::internal)?;
+    Ok(hex::encode(Sha256::digest(encoded)))
 }
 
 async fn require_account_admin(
@@ -267,4 +318,99 @@ pub async fn set_account_room_archived(
     }
     tx.commit().await?;
     Ok(Json(outcome.room))
+}
+
+/// Complete canonical settings for one administered room, with the revision required by writes.
+pub async fn account_room_settings(
+    State(state): State<Arc<AppState>>,
+    user: crate::auth::extract::CurrentUser,
+    Path(path): Path<AccountRoomPath>,
+) -> Result<Json<AccountRoomSettingsResponse>, ApiError> {
+    let mut tx = state
+        .db
+        .begin_tenant(TenantCtx::server(path.enterprise_id))
+        .await?;
+    require_account_admin(&mut tx, user.user_id).await?;
+    let snapshot = room::settings_for_account(&mut tx, path.room_id)
+        .await
+        .map_err(settings_mutation_error)?;
+    tx.commit().await?;
+    Ok(Json(snapshot.into()))
+}
+
+/// Atomically changes a set of room settings. Stale edits merge only when the same fields have
+/// not changed, and a request id can be retried safely after an uncertain transport result.
+pub async fn patch_account_room_settings(
+    State(state): State<Arc<AppState>>,
+    user: crate::auth::extract::CurrentUser,
+    Path(path): Path<AccountRoomPath>,
+    payload: Result<Json<PatchAccountRoomSettingsRequest>, JsonRejection>,
+) -> Result<Json<AccountRoomSettingsResponse>, ApiError> {
+    let Json(mut request) =
+        payload.map_err(|_| ApiError::Invalid("invalid room settings request".into()))?;
+    if request.expected_revision < 0 || request.updates.is_empty() {
+        return Err(ApiError::Invalid(
+            "expectedRevision must be non-negative and updates must not be empty".into(),
+        ));
+    }
+    if request.base.len() != request.updates.len()
+        || request
+            .base
+            .keys()
+            .any(|name| !request.updates.contains_key(name))
+    {
+        return Err(ApiError::Invalid(
+            "base must contain exactly the fields named by updates".into(),
+        ));
+    }
+    crate::room_settings::validate_patch(&request.base)
+        .and_then(|()| crate::room_settings::validate_updates(&request.updates))
+        .map_err(|error| ApiError::Invalid(error.to_string()))?;
+    if let Some(Value::String(title)) = request.updates.get_mut("name") {
+        *title = title.trim().to_owned();
+    }
+    let digest = mutation_digest(user.user_id, path.room_id, &request)?;
+    let now = OffsetDateTime::now_utc();
+
+    let mut tx = state
+        .db
+        .begin_tenant(TenantCtx::server(path.enterprise_id))
+        .await?;
+    require_account_admin(&mut tx, user.user_id).await?;
+    let outcome = room::patch_settings_for_account(
+        &mut tx,
+        user.user_id,
+        path.room_id,
+        request.request_id,
+        &digest,
+        request.expected_revision,
+        &request.base,
+        &request.updates,
+        now,
+    )
+    .await
+    .map_err(settings_mutation_error)?;
+    if outcome.changed {
+        crate::db::repo::moderation::audit(
+            &mut tx,
+            crate::db::repo::moderation::AuditEntry {
+                enterprise_id: path.enterprise_id,
+                room_id: path.room_id,
+                actor_user_id: user.user_id,
+                actor_name: &user.display_name,
+                event_name: "room.settings.updated",
+                event_detail: "account administrator updated room settings",
+                target_type: Some("room"),
+                target_id: Some(path.room_id),
+                metadata: serde_json::json!({
+                    "requestId": request.request_id,
+                    "settingNames": request.updates.keys().collect::<Vec<_>>(),
+                    "revision": outcome.snapshot.revision
+                }),
+            },
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(outcome.snapshot.into()))
 }

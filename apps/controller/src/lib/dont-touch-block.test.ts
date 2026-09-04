@@ -364,7 +364,7 @@ describe('the two account-wide actions are scoped to the caller’s own account'
   });
 
   for (const name of ['applyToAllSessions', 'applyRepeaterToAccount']) {
-    it(`${name} fans out through accountRoomIds and never through the form`, () => {
+    it(`${name} derives its fan-out from the already-owned room and never through the form`, () => {
       const body = bodies.get(name)!;
       /*
         Ownership first, then the fan-out — and the fan-out takes the ROOM id, so the account is
@@ -375,14 +375,10 @@ describe('the two account-wide actions are scoped to the caller’s own account'
         the ownership check went unreported by the narrower version: the id it looked for was still
         further down, so the ordering still held while an unscoped fan-out ran first.
       */
-      const scopeAt = body.indexOf('ownedRoomId(locals, params.id)');
+      const scopeAt = body.indexOf('ownedRoom(event.locals, event.params.id)');
       expect(scopeAt).toBeGreaterThan(-1);
-      const calls = [...body.matchAll(/accountRoomIds\(([^)]*)\)/g)];
-      expect(calls.length).toBeGreaterThan(0);
-      for (const call of calls) {
-        expect(call.index, `${name} fans out before checking ownership`).toBeGreaterThan(scopeAt);
-        expect(call[1], `${name} fans out from something other than the checked room`).toBe('roomId');
-      }
+      const fanOutAt = body.indexOf('eq(rooms.accountId, room.accountId)');
+      expect(fanOutAt, `${name} has no account-scoped fan-out`).toBeGreaterThan(scopeAt);
       // no room or account id may come off the request
       expect(body).not.toMatch(/get\(['"](accountId|roomId|rooms?)['"]\)/);
       expect(body).not.toContain('accountId: Number');
@@ -398,7 +394,7 @@ describe('the two account-wide actions are scoped to the caller’s own account'
     expect(body).not.toContain('request');
   });
 
-  it('every write in the five actions goes through saveSetting, never raw SQL', () => {
+  it('every write in the five actions goes through the authority-aware settings boundary', () => {
     for (const name of [
       'swapClusterIds',
       'applyToAllSessions',
@@ -407,7 +403,7 @@ describe('the two account-wide actions are scoped to the caller’s own account'
       'removeLiveServer'
     ]) {
       const body = bodies.get(name)!;
-      expect(body, `${name} writes without saveSetting`).toContain('saveSetting(');
+      expect(body, `${name} bypasses the settings authority boundary`).toMatch(/patch(?:Current)?ManagedSettings\(/);
       expect(body, `${name} writes the settings table directly`).not.toContain('roomSettings');
       expect(body, `${name} uses a raw update`).not.toMatch(/\.update\(|\.insert\(|\.delete\(/);
     }

@@ -45,6 +45,50 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-04 19:02 EDT — Gate 3 room settings became canonical, revisioned, and reversibly cut over
+
+**Runtime impact: yes only when `ROOM_SETTINGS_AUTHORITY_MODE=rust`; `legacy` remains the default
+and one-switch request-path rollback.** A generated 269-setting manifest now gives the controller
+and Rust API one exact key/type contract. Canonical account-admin `GET/PATCH` endpoints bind the
+session to a transaction-locked enterprise role under forced RLS, apply multi-field changes
+atomically, and expose a monotonic settings revision. Stale edits to different fields merge; stale
+edits to the same field return 409. An account-wide append-only request ledger makes transport
+retries converge and refuses request-id reuse with another payload. Per-value and aggregate bounds,
+unknown fields, invalid scalar types, corrupt stored documents, and deletion of the required room
+name fail closed. A name change updates `rooms.name` and the settings document in the same
+transaction, while audit metadata carries names and revision but never setting values.
+
+The Rust OpenAPI boundary now contains 13 operations and 17 schemas, and the generated SvelteKit
+client validates those exact envelopes and permits no response cookies. Controller migration
+`0020` records the canonical revision represented by each local projection. Every settings-writing
+manage action—including scalar edits, rename, API-secret generation, cluster/repeater/live-server
+lists, mobile PIN configuration, credential-backed fields, bulk changes, and clone—uses the same
+authority adapter in Rust mode. Clone derives a distinct deterministic mutation id, converges after
+an uncertain response, and refuses to overwrite a target changed in the meantime. Profile and room
+authority are explicit prerequisites, so this third slice cannot be enabled out of order.
+
+Forward Rust migration `0016` adds the settings revision/object invariant and the forced-RLS
+mutation ledger with exactly `SELECT, INSERT` runtime access. The release attestor now rejects wider
+ledger privileges. The source-fingerprinted converter validates generated-schema data and
+prerequisite mappings, commits target ownership before source proof, resumes the cross-database
+window, updates exactly one verified run, never overwrites drift, and deletes an abandoned import
+only while its revision remains zero. Source-first rollback is resumable and idempotent.
+`ops/ROOM-SETTINGS-AUTHORITY-CUTOVER.md` records activation, observation, request rollback, and the
+narrow unused-conversion rollback order.
+
+Final local evidence: controller lint and formatting passed, Svelte diagnostics reported 0 errors
+and 0 warnings, all 1,303 Vitest assertions across 132 files and all 64 PostgreSQL assertions across
+10 files passed, the fail-closed runtime HTTP contract passed, all 9 Chromium journeys passed, and
+the Vercel production build completed. The runtime verifier now pins all authority modes off and
+allows cold development-only SSR compilation without weakening the deployed 5-second probe. Rust
+format and strict full-workspace Clippy passed, followed by all 457 tests against a fresh
+16-migration PostgreSQL 17 database: 166 API library, 147 API PostgreSQL integration, 19 release
+attestor, 114 media library, and 11 media binary. A separate fresh database passed the live redacted
+PostgreSQL 17 identity, migration, RLS, ACL, and LISTEN attestation. The converter rehearsal passed
+plan/apply/verify, both drift refusals, no-overwrite, post-use rollback refusal, process-loss resume,
+repeated rollback, and prerequisite rollback ordering. Exact-revision protected proof remains
+required after push; no staging or production authority activation is claimed.
+
 ### 2026-09-04 15:14 EDT — Gate 3 room lifecycle became a reversible, concurrency-safe authority slice
 
 **Runtime impact: yes only when `ROOM_AUTHORITY_MODE=rust`; legacy remains the default and

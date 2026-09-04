@@ -34,10 +34,16 @@ const adminUrl = process.env.VERIFY_POSTGRES_ADMIN_URL ?? 'postgres://localhost:
 */
 const PINNED_ENV = Object.freeze({
   PUBLIC_RECAPTCHA_SITE_KEY: '',
-  RECAPTCHA_SECRET_KEY: ''
+  RECAPTCHA_SECRET_KEY: '',
+  PROFILE_AUTHORITY_MODE: '',
+  ROOM_AUTHORITY_MODE: '',
+  ROOM_SETTINGS_AUTHORITY_MODE: ''
 });
 const staleSessionHeaders = { cookie: 'control_session=stale-preview-session' };
-const requestTimeoutMs = 5_000;
+// This verifier intentionally drives Vite's development server so the first request to a route can
+// include cold Svelte SSR compilation. Keep the timeout above that compile cost; production latency
+// is measured by the deployed verifier, not by this deterministic source contract.
+const requestTimeoutMs = 15_000;
 
 await verifyMarketingOnlyBoundary();
 await verifyPostgresModeRequiresAConnectionString();

@@ -43,6 +43,10 @@ pub fn router() -> Router<Arc<AppState>> {
             "/api/v1/accounts/{enterprise_id}/rooms/{room_id}",
             axum::routing::patch(rooms::set_account_room_archived),
         )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings",
+            get(rooms::account_room_settings).patch(rooms::patch_account_room_settings),
+        )
         .route("/api/v1/rooms/{room_id}", get(rooms::overview))
         // Creates a membership rather than requiring one, so it takes CurrentUser not RoomMember.
         .route("/api/v1/rooms/{room_id}/join", post(join::join_room))

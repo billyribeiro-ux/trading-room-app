@@ -2,6 +2,7 @@ import { and, eq, inArray, ne } from 'drizzle-orm';
 import { getDb } from './db';
 import { hashPassword } from './auth';
 import { randomInt } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { FcmNotConfigured, FcmUnreachable, fcmConfigured, sendPush } from './fcm';
 import { roomSettings, roomUsers, rooms, users } from './db/schema';
 import { ROOM_SETTINGS_BY_NAME, type RoomSettings } from '#lib/room-settings-schema.js';
@@ -28,23 +29,87 @@ export async function readSettings(roomId: number): Promise<Partial<RoomSettings
   }
 }
 
+export async function readSettingsProjection(roomId: number): Promise<{
+  settings: Partial<RoomSettings>;
+  authorityRevision: number | null;
+}> {
+  const [row] = await getDb().select().from(roomSettings).where(eq(roomSettings.roomId, roomId)).limit(1);
+  if (!row) return { settings: {}, authorityRevision: null };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(row.settingsJson);
+  } catch {
+    throw new Error(`room_settings.settings_json for room ${roomId} is not valid JSON`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`room_settings.settings_json for room ${roomId} is not a JSON object`);
+  }
+  return { settings: parsed as Partial<RoomSettings>, authorityRevision: row.authorityRevision };
+}
+
+/**
+ * Reconciles the controller's runtime read projection after a canonical Rust read or write.
+ * A response older than the local proof is refused; equal revisions must be byte-equivalent.
+ */
+export async function projectAuthoritySettings(
+  roomId: number,
+  authorityRoomId: string,
+  revision: number,
+  settings: Partial<RoomSettings>
+): Promise<void> {
+  if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('invalid authority settings revision');
+  const serialized = JSON.stringify(settings);
+  await getDb().transaction(async (tx) => {
+    const [room] = await tx
+      .select({ authorityRoomId: rooms.authorityRoomId })
+      .from(rooms)
+      .where(eq(rooms.id, roomId))
+      .limit(1);
+    if (!room || room.authorityRoomId !== authorityRoomId) throw new Error('room authority mapping mismatch');
+    const [existing] = await tx.select().from(roomSettings).where(eq(roomSettings.roomId, roomId)).limit(1);
+    if (existing?.authorityRevision !== null && existing?.authorityRevision !== undefined) {
+      if (existing.authorityRevision > revision) throw new Error('stale authority settings response');
+      if (existing.authorityRevision === revision) {
+        let current: unknown;
+        try {
+          current = JSON.parse(existing.settingsJson);
+        } catch {
+          throw new Error(`room_settings.settings_json for room ${roomId} is not valid JSON`);
+        }
+        if (!isDeepStrictEqual(current, settings)) throw new Error('authority settings revision content mismatch');
+      }
+    }
+    const now = new Date();
+    await tx
+      .insert(roomSettings)
+      .values({
+        roomId,
+        settingsJson: serialized,
+        authorityRevision: revision,
+        authorityReconciledAt: now,
+        updatedAt: now
+      })
+      .onConflictDoUpdate({
+        target: roomSettings.roomId,
+        set: {
+          settingsJson: serialized,
+          authorityRevision: revision,
+          authorityReconciledAt: now,
+          updatedAt: now
+        }
+      });
+    const title = typeof settings.name === 'string' ? settings.name.trim() : '';
+    if (title) await tx.update(rooms).set({ name: title }).where(eq(rooms.id, roomId));
+  });
+}
+
 /**
  * The reference's `saveSessField(name)` — one field at a time, read-modify-write.
  * Unknown keys are rejected rather than silently stored: the key set is generated
  * from the capture, so anything outside it is a typo or a stale client.
  */
 export async function saveSetting(roomId: number, name: string, value: unknown) {
-  const def = ROOM_SETTINGS_BY_NAME.get(name);
-  if (!def) throw new Error(`unknown setting: ${name}`);
-
-  let coerced: string | number | boolean | null;
-  if (value === null || value === '') coerced = null;
-  else if (def.type === 'checkbox') coerced = value === true || value === 'true' || value === 'on';
-  else if (def.type === 'number') {
-    const n = Number(value);
-    if (Number.isNaN(n)) throw new Error(`${name} expects a number, got ${String(value)}`);
-    coerced = n;
-  } else coerced = String(value);
+  const coerced = coerceSettingValue(name, value);
 
   const current = await readSettings(roomId);
   const next = { ...current, [name]: coerced };
@@ -54,7 +119,12 @@ export async function saveSetting(roomId: number, name: string, value: unknown) 
     .values({ roomId, settingsJson: JSON.stringify(next), updatedAt: now })
     .onConflictDoUpdate({
       target: roomSettings.roomId,
-      set: { settingsJson: JSON.stringify(next), updatedAt: now }
+      set: {
+        settingsJson: JSON.stringify(next),
+        authorityRevision: null,
+        authorityReconciledAt: null,
+        updatedAt: now
+      }
     });
 
   /*
@@ -79,6 +149,22 @@ export async function saveSetting(roomId: number, name: string, value: unknown) 
     // the column keeps the last real title.
     if (title) await getDb().update(rooms).set({ name: title }).where(eq(rooms.id, roomId));
   }
+
+  return coerced;
+}
+
+export function coerceSettingValue(name: string, value: unknown): string | number | boolean | null {
+  const def = ROOM_SETTINGS_BY_NAME.get(name);
+  if (!def) throw new Error(`unknown setting: ${name}`);
+
+  let coerced: string | number | boolean | null;
+  if (value === null || value === '') coerced = null;
+  else if (def.type === 'checkbox') coerced = value === true || value === 'true' || value === 'on';
+  else if (def.type === 'number') {
+    const n = Number(value);
+    if (Number.isNaN(n)) throw new Error(`${name} expects a number, got ${String(value)}`);
+    coerced = n;
+  } else coerced = String(value);
 
   return coerced;
 }
@@ -427,10 +513,21 @@ export async function applyUserOpcode(roomId: number, roomUserId: number, op: Us
 export async function writeSettings(roomId: number, settings: Partial<RoomSettings>) {
   await getDb()
     .insert(roomSettings)
-    .values({ roomId, settingsJson: JSON.stringify(settings), updatedAt: new Date() })
+    .values({
+      roomId,
+      settingsJson: JSON.stringify(settings),
+      authorityRevision: null,
+      authorityReconciledAt: null,
+      updatedAt: new Date()
+    })
     .onConflictDoUpdate({
       target: roomSettings.roomId,
-      set: { settingsJson: JSON.stringify(settings), updatedAt: new Date() }
+      set: {
+        settingsJson: JSON.stringify(settings),
+        authorityRevision: null,
+        authorityReconciledAt: null,
+        updatedAt: new Date()
+      }
     });
 }
 

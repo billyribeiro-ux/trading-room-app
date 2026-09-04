@@ -26,6 +26,7 @@ const REPO_ROOT = resolve(SCRIPT_DIR, '..');
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '../../..');
 const GENERATOR = resolve(SCRIPT_DIR, 'extract-manage-schema.mjs');
 const CANONICAL_SCHEMA = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
+const CANONICAL_AUTHORITY_MANIFEST = resolve(REPOSITORY_ROOT, 'services/api/src/room-settings-manifest.json');
 
 /*
   Eleven consumed by this repository's room-login page, NINETY-THREE by the room application
@@ -496,14 +497,16 @@ const tempDirectory = mkdtempSync(join(tmpdir(), 'proroom-schema-verify-'));
 try {
   const firstPath = join(tempDirectory, 'first.ts');
   const secondPath = join(tempDirectory, 'second.ts');
+  const firstManifestPath = join(tempDirectory, 'first.json');
+  const secondManifestPath = join(tempDirectory, 'second.json');
 
-  execFileSync(process.execPath, [GENERATOR, '--out', firstPath], {
+  execFileSync(process.execPath, [GENERATOR, '--out', firstPath, '--manifest-out', firstManifestPath], {
     cwd: REPO_ROOT,
     stdio: 'pipe'
   });
   // Prove extraction is independent of the caller's working directory and of a
   // pre-existing generated output file.
-  execFileSync(process.execPath, [GENERATOR, '--out', secondPath], {
+  execFileSync(process.execPath, [GENERATOR, '--out', secondPath, '--manifest-out', secondManifestPath], {
     cwd: tempDirectory,
     stdio: 'pipe'
   });
@@ -512,6 +515,11 @@ try {
   const second = readFileSync(secondPath);
   if (!first.equals(second)) {
     fail(`schema generation is nondeterministic (${digest(first)} != ${digest(second)})`);
+  }
+  const firstManifest = readFileSync(firstManifestPath);
+  const secondManifest = readFileSync(secondManifestPath);
+  if (!firstManifest.equals(secondManifest)) {
+    fail(`authority manifest generation is nondeterministic (${digest(firstManifest)} != ${digest(secondManifest)})`);
   }
 
   const generated = first.toString('utf8');
@@ -551,6 +559,13 @@ try {
   const canonical = readFileSync(CANONICAL_SCHEMA);
   if (!canonical.equals(first)) {
     fail(`generated schema is stale (${digest(canonical)} != ${digest(first)}); run pnpm schema:extract`);
+  }
+  const canonicalManifest = readFileSync(CANONICAL_AUTHORITY_MANIFEST);
+  if (!canonicalManifest.equals(firstManifest)) {
+    fail(
+      `generated authority manifest is stale (${digest(canonicalManifest)} != ${digest(firstManifest)}); ` +
+        'run pnpm schema:extract'
+    );
   }
 
   /*

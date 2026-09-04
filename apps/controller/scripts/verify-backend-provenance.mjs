@@ -84,8 +84,8 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   behavior. The intervening count changes remain recorded in Git history; this paragraph names the
   current reviewed move rather than duplicating every prior ledger entry.
 */
-const EXPECTED_UNTOUCHED_COUNT = 50;
-const EXPECTED_MANIFEST_SHA256 = 'c14c2068144414d9e62c95c36b80437e440e940c899f371d5dcf77256ad83e62';
+const EXPECTED_UNTOUCHED_COUNT = 49;
+const EXPECTED_MANIFEST_SHA256 = '3386bc6b31525925e28e2816dac1479f703496ea708862ff5a4646e87508f750';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -170,6 +170,13 @@ const LOCALLY_AUTHORED = new Map([
     '35cd20f21d2f4fbfd00cdf3fdb0b4e02f1a86db120a1344022c95d2cf5f3f199'
   ],
   [
+    // Authored here on 2026-09-04 for canonical room settings. It adds the settings revision and
+    // object invariant, expands the offline mapping type set, and creates the forced-RLS,
+    // append-only idempotency ledger whose runtime ACL is SELECT+INSERT only.
+    'services/api/migrations/0016_room_settings_authority.sql',
+    'e785d03c9592017764c26a0bf629ba1441063f6463472fc86220de64e4bfaf9d'
+  ],
+  [
     // Authored here with the room-lifecycle slice. These are real Axum/PostgreSQL negative
     // controls for exact JSON, transaction-locked account authority, cross-tenant omission,
     // simultaneous idempotent create, timestamp-preserving absolute archive, and audit-on-change.
@@ -177,15 +184,34 @@ const LOCALLY_AUTHORED = new Map([
     '0420aa264d2d612d187e7a1f2af05ede237f55c3c40c14361ac14e0f4a745816'
   ],
   [
+    // Real Axum/PostgreSQL proof for room-settings authority: exact validation, corrupt-store
+    // refusal, idempotent audit, stale-field merge/conflict, cross-tenant omission, aggregate
+    // limits, non-deletable canonical names, and atomic name sync.
+    'services/api/tests/account_room_settings.rs',
+    '8b01eec053af0cb1482969980174f7866f8afb678b259775d0495b9d59cefd86'
+  ],
+  [
+    // Generated from the same controller evidence as room-settings-schema.ts. Rust includes and
+    // validates this file at compile time, so the 269-key authority boundary cannot be hand-copied.
+    'services/api/src/room-settings-manifest.json',
+    'f6dba4bc130ce0d0e0026a980e00c8634a96001c099e2d62c3529969700087ef'
+  ],
+  [
+    // Runtime validator for the generated setting names, scalar types, deletion operator, title,
+    // per-value bound, and aggregate document bound.
+    'services/api/src/room_settings.rs',
+    '7be8a7b9ceb5cf837536f5ff1eecbf7bead85a98f0f89cd553f066c52300207a'
+  ],
+  [
     // Rust owns this scoped contract. The committed snapshot is equality-tested against
     // `openapi::document`, so the generator input cannot silently lag the handlers. Re-pinned
     // 2026-09-04 when room lifecycle joined that boundary and the room-name schema explicitly
     // named its UTF-8 byte ceiling rather than implying `maxLength` alone carried that meaning.
     'services/api/openapi/v1.json',
-    '2ed7a83c0be5daa802b1611cebf730ade63f51af44b3a029626f1a2fe3a15bbb'
+    'b0e99c9ce7343a9f87f06c1cecdf2f3467f7590282647d0fbe011530f4cefb6f'
   ],
   ['services/api/src/bin/openapi.rs', '41d74030069228e6b42cd1259f22b05c10f58a665ccfec4dce3830082bf3923e'],
-  ['services/api/src/openapi.rs', 'c65081c93549435a5e9830f598031a7279502a340facf515f2feb2b31dd27fed']
+  ['services/api/src/openapi.rs', '4727df1c335ab0f147e81530dbcb6d6a9baea4153b15937d1407ae83643194be']
 ]);
 
 /*
@@ -257,8 +283,14 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/src/db/repo/identity.rs', '5dbeb02a354f6d7910943c9c179c23b84858c065efb248afdc620ec81aceecef'],
   ['services/api/src/http/mod.rs', '6b9290757ab752310fb6a8e42324cb13b144d6a68c5bb773391057f1083c4aed'],
   ['services/api/src/http/v1/account.rs', 'c13b4636538fabd6598ce82603761e3a2c43bb9c563e771f9b7dfbbac5c58334'],
-  ['services/api/src/http/v1/mod.rs', 'c4fbf72719cf6902008bc0b1bd56b6e105398a9da6f14248c6ab187ba8067824'],
-  ['services/api/src/lib.rs', '5f0e652995ddd924a56b366aa5e5be41048b879ceb2ec43cb2ca0b71070cec4a'],
+  ['services/api/src/http/v1/mod.rs', '448f0ae66ab0bdbf12c6fb847242547ba91b8c60fad806097d207134f8392ae2'],
+  ['services/api/src/lib.rs', '38ace2813b41619b8d633aada92e64278ed06a242448855d2e0e27c8f10fcb99'],
+  [
+    // Diverged 2026-09-04 to expose HTTP 409 as an explicit optimistic-concurrency response
+    // instead of collapsing a same-field settings conflict into an internal error.
+    'services/api/src/error.rs',
+    'e6c2710b3fdf3306400693292ee4ff7925d6246467c07edbf0eee38a5c7d8965'
+  ],
   /*
     Diverged 2026-09-04 for the canonical room-lifecycle slice, with the end-to-end evidence in
     CHANGELOG.md and `services/api/tests/account_rooms.rs`.
@@ -272,9 +304,9 @@ const DIVERGED_FROM_IMPORT = new Map([
                         and over-posted JSON as the stable 400 envelope, and audits only commits.
       limits.rs         names the shared 160-byte room-name ceiling used by the handler.
   */
-  ['services/api/src/db/repo/room.rs', 'b2f1ccbe5da2ce3e8333e60833c5812ffe45a1132c7e0d4355ae3cdf6f367e4c'],
-  ['services/api/src/http/v1/rooms.rs', '6497a3b61a3ba9059f36e843c1be9e6c9095fae4cad3a41a588c40b20190ee94'],
-  ['services/api/src/limits.rs', 'e7ebdb136f96bf3be86a39376d15fc1f9f7569f4f092e3105390428289c4c284'],
+  ['services/api/src/db/repo/room.rs', '1462c8df9025e9860ce8c0fd9f6206b4ae91fb9f641aac6cf9a4a7cc621ee826'],
+  ['services/api/src/http/v1/rooms.rs', '86511e4328359f37027cf53bfe238ef9d1f8b631b97303e688a36f343c5aaacd'],
+  ['services/api/src/limits.rs', '0d48402ef62d5c9ff25e914df97c5e93b54e36e3f61af524c6af36423ff4d4eb'],
   /*
     Diverged 2026-08-15 21:40. Three prose claims in `services/README.md` still named
     `ptr_clone_app` as the RUNTIME role, which stopped being true when `0009` provisioned
@@ -494,7 +526,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '0f02f9aa5e62236fc21ab09f52856bf473dd2de79566aca796aba9d218d4fb26'
+    '5b575d90f1078adf641f8643f81b4bcba4e83e69cc4e6d35d680474cf48d5a9a'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -575,7 +607,7 @@ const DIVERGED_FROM_IMPORT = new Map([
     path, VOLATILE lock semantics, PUBLIC denial, runtime execution, tenant omission, and an actual
     55P03 concurrent revocation timeout while the authorized tenant transaction holds FOR SHARE.
   */
-  ['services/api/tests/migrations.rs', '2f8f4e8c994de28c09699438749fdbf32615a2d336d424a90eb6c6a16fd82b53'],
+  ['services/api/tests/migrations.rs', 'c484c27195dace9ab76fa67f7d51388e9671b80286774679a0c06cdd1ed9e390'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'

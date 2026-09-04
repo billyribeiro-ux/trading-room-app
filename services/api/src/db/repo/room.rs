@@ -161,6 +161,206 @@ pub struct UpdateRoomOutcome {
     pub changed: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsSnapshot {
+    pub room_id: Uuid,
+    pub revision: i64,
+    pub settings: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug)]
+pub struct SettingsMutationOutcome {
+    pub snapshot: SettingsSnapshot,
+    pub replayed: bool,
+    pub changed: bool,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SettingsMutationError {
+    #[error(transparent)]
+    Database(#[from] DbError),
+    #[error("the request id was already used for a different mutation")]
+    RequestMismatch,
+    #[error("room settings changed after the submitted base revision")]
+    Conflict,
+    #[error(transparent)]
+    Validation(#[from] crate::room_settings::ValidationError),
+    #[error("stored room settings document is invalid")]
+    InvalidStoredDocument,
+}
+
+fn settings_from_value(
+    room_id: Uuid,
+    revision: i64,
+    value: serde_json::Value,
+) -> Result<SettingsSnapshot, SettingsMutationError> {
+    let settings = value
+        .as_object()
+        .cloned()
+        .ok_or(SettingsMutationError::InvalidStoredDocument)?;
+    crate::room_settings::validate_document(&settings)
+        .map_err(|_| SettingsMutationError::InvalidStoredDocument)?;
+    Ok(SettingsSnapshot {
+        room_id,
+        revision,
+        settings,
+    })
+}
+
+/// Reads the complete admin settings document. The handler takes the account-admin lock first.
+pub async fn settings_for_account(
+    tx: &mut TenantTx<'_>,
+    room_id: Uuid,
+) -> Result<SettingsSnapshot, SettingsMutationError> {
+    use sqlx::Row;
+    let row = sqlx::query(
+        "SELECT id, settings_revision, COALESCE(config -> 'settings', '{}'::jsonb) AS settings \
+         FROM rooms WHERE id = $1",
+    )
+    .bind(room_id)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?
+    .ok_or(DbError::NotFound)?;
+    settings_from_value(
+        row.get("id"),
+        row.get("settings_revision"),
+        row.get("settings"),
+    )
+}
+
+/// Applies one or more setting changes atomically with field-aware optimistic concurrency.
+///
+/// A stale global revision is accepted only when every field in `base` still has the value the
+/// caller read. Thus simultaneous edits to different fields merge, while two edits to the same
+/// field produce an explicit conflict. The account-scoped request ledger makes retries converge.
+#[allow(clippy::too_many_arguments)]
+pub async fn patch_settings_for_account(
+    tx: &mut TenantTx<'_>,
+    actor_user_id: Uuid,
+    room_id: Uuid,
+    request_id: Uuid,
+    request_digest: &str,
+    expected_revision: i64,
+    base: &serde_json::Map<String, serde_json::Value>,
+    updates: &serde_json::Map<String, serde_json::Value>,
+    now: OffsetDateTime,
+) -> Result<SettingsMutationOutcome, SettingsMutationError> {
+    use sqlx::Row;
+
+    // Request ids are account-wide. Serializing on their hash closes the gap between the ledger
+    // lookup and insert even when a buggy client reuses one against two different rooms at once.
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 754))")
+        .bind(request_id)
+        .execute(tx.conn())
+        .await
+        .map_err(DbError::from)?;
+
+    let replay = sqlx::query(
+        "SELECT room_id, request_digest FROM room_setting_mutations \
+         WHERE enterprise_id = $1 AND request_id = $2",
+    )
+    .bind(tx.ctx().enterprise_id)
+    .bind(request_id)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    if let Some(replay) = replay {
+        let stored_room_id: Uuid = replay.get("room_id");
+        let stored_digest: String = replay.get("request_digest");
+        if stored_room_id != room_id || stored_digest != request_digest {
+            return Err(SettingsMutationError::RequestMismatch);
+        }
+        return Ok(SettingsMutationOutcome {
+            snapshot: settings_for_account(tx, room_id).await?,
+            replayed: true,
+            changed: false,
+        });
+    }
+
+    let row = sqlx::query(
+        "SELECT settings_revision, COALESCE(config -> 'settings', '{}'::jsonb) AS settings \
+         FROM rooms WHERE id = $1 FOR UPDATE",
+    )
+    .bind(room_id)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?
+    .ok_or(DbError::NotFound)?;
+    let revision: i64 = row.get("settings_revision");
+    let current_value: serde_json::Value = row.get("settings");
+    let mut current = current_value
+        .as_object()
+        .cloned()
+        .ok_or(SettingsMutationError::InvalidStoredDocument)?;
+    crate::room_settings::validate_document(&current)
+        .map_err(|_| SettingsMutationError::InvalidStoredDocument)?;
+
+    if revision != expected_revision {
+        for (name, expected) in base {
+            let actual = current.get(name).unwrap_or(&serde_json::Value::Null);
+            if actual != expected {
+                return Err(SettingsMutationError::Conflict);
+            }
+        }
+    }
+
+    let before = current.clone();
+    crate::room_settings::apply_patch(&mut current, updates);
+    crate::room_settings::validate_document(&current)?;
+    let changed = current != before;
+    let title = updates
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim);
+
+    let resulting_revision = if changed {
+        sqlx::query_scalar::<_, i64>(
+            "UPDATE rooms \
+             SET config = jsonb_set(config, '{settings}', $2, true), \
+                 settings_revision = settings_revision + 1, \
+                 name = COALESCE($3, name), updated_at = $4 \
+             WHERE id = $1 RETURNING settings_revision",
+        )
+        .bind(room_id)
+        .bind(serde_json::Value::Object(current.clone()))
+        .bind(title)
+        .bind(now)
+        .fetch_one(tx.conn())
+        .await
+        .map_err(DbError::from)?
+    } else {
+        revision
+    };
+
+    sqlx::query(
+        "INSERT INTO room_setting_mutations \
+           (enterprise_id, request_id, room_id, actor_user_id, request_digest, response_revision, created_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    )
+    .bind(tx.ctx().enterprise_id)
+    .bind(request_id)
+    .bind(room_id)
+    .bind(actor_user_id)
+    .bind(request_digest)
+    .bind(resulting_revision)
+    .bind(now)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+
+    Ok(SettingsMutationOutcome {
+        snapshot: SettingsSnapshot {
+            room_id,
+            revision: resulting_revision,
+            settings: current,
+        },
+        replayed: false,
+        changed,
+    })
+}
+
 /// Locks and validates the caller's account authority inside the tenant transaction.
 ///
 /// The bounded `SECURITY DEFINER` function is necessary because request-time role discovery runs

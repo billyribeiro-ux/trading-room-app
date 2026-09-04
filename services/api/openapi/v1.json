@@ -11,6 +11,16 @@
         },
         "description": "Invalid request."
       },
+      "Conflict": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "description": "The resource changed after the submitted revision."
+      },
       "Forbidden": {
         "content": {
           "application/json": {
@@ -155,6 +165,28 @@
           "state",
           "memberId",
           "role"
+        ],
+        "type": "object"
+      },
+      "AccountRoomSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "roomId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/RoomSettings"
+          }
+        },
+        "required": [
+          "roomId",
+          "revision",
+          "settings"
         ],
         "type": "object"
       },
@@ -313,6 +345,32 @@
         ],
         "type": "object"
       },
+      "PatchAccountRoomSettingsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/RoomSettings"
+          },
+          "expectedRevision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "updates": {
+            "$ref": "#/components/schemas/RoomSettings"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "base",
+          "updates"
+        ],
+        "type": "object"
+      },
       "PreferenceRequest": {
         "additionalProperties": false,
         "properties": {
@@ -349,6 +407,11 @@
           "displayName",
           "preferences"
         ],
+        "type": "object"
+      },
+      "RoomSettings": {
+        "additionalProperties": true,
+        "description": "A partial object whose names and scalar types are pinned by room-settings-manifest.json.",
         "type": "object"
       },
       "Session": {
@@ -861,6 +924,108 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings": {
+      "get": {
+        "operationId": "getAccountRoomSettings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountRoomSettings"
+                }
+              }
+            },
+            "description": "The canonical settings document and its concurrency revision."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "room_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "patch": {
+        "operationId": "patchAccountRoomSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchAccountRoomSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountRoomSettings"
+                }
+              }
+            },
+            "description": "The settings document after an atomic or idempotently replayed mutation."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"

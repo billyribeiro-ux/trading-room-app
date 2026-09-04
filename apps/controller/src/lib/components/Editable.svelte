@@ -26,6 +26,8 @@
   interface Props {
     def: RoomSettingDef;
     value: string | number | boolean | null | undefined;
+    /** Canonical optimistic-concurrency token; null while the reversible legacy path is active. */
+    revision: number | null;
     /*
       `markUnwired` USED TO BE HERE, and its removal is the second half of a change that stopped
       halfway. The marker it drove was deleted for the reason recorded down in the template; the
@@ -42,7 +44,7 @@
     options?: readonly { readonly value: string; readonly text: string }[];
   }
 
-  let { def, value, options }: Props = $props();
+  let { def, value, revision, options }: Props = $props();
 
   let open = $state(false);
   let draft = $state('');
@@ -82,6 +84,10 @@
         }}
     >
       <input type="hidden" name="name" value={def.name} />
+      <input type="hidden" name="baseValue" value={JSON.stringify(value ?? null)} />
+      {#if revision !== null}
+        <input type="hidden" name="expectedRevision" value={revision} />
+      {/if}
       {#if isCheckbox}
         <label>
           <input type="checkbox" name="value" checked={!!value} value="on" />

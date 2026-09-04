@@ -2,12 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /*
-  Every form action on the manage page must resolve its room through `ownedRoomId`.
+  Every form action on the manage page must resolve its room through `ownedRoomId` or `ownedRoom`.
 
-  `ownedRoomId` is the ONLY thing standing between one account and another's room: it re-reads the
-  row by the id in the URL and hands it to `requireOwnedRoom`, which 404s when the account does not
-  match. An action that takes `params.id` and queries with it directly looks identical in review,
-  passes `svelte-check`, passes every unit test, and is a cross-tenant hole.
+  Both helpers re-read the URL id and hand it to `requireOwnedRoom`, which 404s when the account
+  does not match. `ownedRoom` returns the proved row for authority coordinates; `ownedRoomId`
+  returns only its local id. An action that queries `params.id` directly is a cross-tenant hole.
 
   Whole-file rather than only the four newest actions, because the failure is not specific to them —
   it belongs to whichever action is written next, by whoever is not thinking about tenancy that day.
@@ -23,6 +22,7 @@ const actionsBlock = server.slice(server.indexOf('export const actions: Actions 
 
 /** `name` → its body, from its own declaration to the next one. */
 const bodies = new Map<string, string>();
+const OWNED_ROOM = /ownedRoom(?:Id)?\((?:event\.)?locals,\s*(?:event\.)?params\.id\)/u;
 {
   const declarations = [...actionsBlock.matchAll(/^ {2}([A-Za-z0-9_]+): async/gm)];
   for (const [index, match] of declarations.entries()) {
@@ -53,8 +53,8 @@ describe('the manage page actions', () => {
 });
 
 describe('account scoping', () => {
-  it('resolves the room through ownedRoomId in every single action', () => {
-    const unscoped = [...bodies].filter(([, body]) => !body.includes('ownedRoomId(locals, params.id)')).map(([n]) => n);
+  it('resolves the room through an ownership-checking helper in every single action', () => {
+    const unscoped = [...bodies].filter(([, body]) => !OWNED_ROOM.test(body)).map(([n]) => n);
     expect(unscoped).toEqual([]);
   });
 
@@ -67,7 +67,7 @@ describe('account scoping', () => {
     for (const [name, body] of bodies) {
       const memberAt = body.indexOf("get('roomUserId')");
       if (memberAt === -1) continue;
-      const scopeAt = body.indexOf('ownedRoomId(locals, params.id)');
+      const scopeAt = body.search(OWNED_ROOM);
       expect(scopeAt, `${name} reads roomUserId before scoping the room`).toBeLessThan(memberAt);
     }
   });

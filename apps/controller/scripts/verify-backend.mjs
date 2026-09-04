@@ -183,6 +183,17 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0015_lock_account_authority.sql',
     sha256: '35cd20f21d2f4fbfd00cdf3fdb0b4e02f1a86db120a1344022c95d2cf5f3f199'
+  }),
+  /*
+    Authored and reviewed 2026-09-04 for canonical room-settings authority. It adds a monotonic
+    settings revision and object-only invariant to rooms, extends the owner-only conversion ledger,
+    and adds a forced-RLS append-only request ledger with only SELECT/INSERT runtime grants. Fresh
+    PostgreSQL tests prove exact ACLs, tenant omission, idempotent mutation, conflict behavior, and
+    aggregate bounds.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0016_room_settings_authority.sql',
+    sha256: 'e785d03c9592017764c26a0bf629ba1441063f6463472fc86220de64e4bfaf9d'
   })
 ]);
 

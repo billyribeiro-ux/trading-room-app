@@ -57,7 +57,7 @@ describe('the Logout Webhook row edits the LOGIN webhook — page.manageSession.
       new URL('../routes/(app)/account/rooms/[id]/[[tab]]/+page.svelte', import.meta.url),
       'utf8'
     );
-    expect(SOURCE).toContain('<Editable {def} value={settingValue(def.name)} />');
+    expect(SOURCE).toContain('<Editable {def} value={settingValue(def.name)} revision={data.settingsRevision} />');
     /* The shape that would reintroduce it: a hardcoded field name next to a different label. */
     expect(SOURCE).not.toContain("settingValue('login_webhook_url')");
   });

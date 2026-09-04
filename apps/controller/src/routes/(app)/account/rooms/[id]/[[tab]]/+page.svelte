@@ -903,7 +903,7 @@
   {const def = $derived(dontTouch(name))}
   <label class="col-sm-2 control-label" for={`mg-${def.name}`}>{def.label ?? def.name}</label>
   <span id={`mg-${def.name}`}>
-    <Editable {def} value={settingValue(def.name)} />
+    <Editable {def} value={settingValue(def.name)} revision={data.settingsRevision} />
   </span>
 {/snippet}
 
@@ -1024,6 +1024,7 @@
             style="display:inline"
             use:enhance={confirmThen(`Clone "${data.room.name}" into a new room?`)}
           >
+            <input type="hidden" name="requestId" value={data.cloneRequestId} />
             <button class="btn btn-sm pull-right btn-warning mr" type="submit">
               <i class="icon fa fa-copy" aria-hidden="true"></i>&nbsp;Clone Room
             </button>
@@ -1085,7 +1086,7 @@
           <label class="col-sm-2 control-label" for="mg-name">Room Title</label>
           <div class="col-sm-10">
             <p class="form-control-static" id="mg-name">
-              <Editable def={data.fieldByName.name} value={data.room.name} />
+              <Editable def={data.fieldByName.name} value={data.room.name} revision={data.settingsRevision} />
             </p>
           </div>
         </div>
@@ -1095,7 +1096,11 @@
           <label class="col-sm-2 control-label" for="mg-webinardate">Date:</label>
           <div class="col-sm-10">
             <p class="form-control-static" id="mg-webinardate">
-              <Editable def={data.fieldByName.webinarDate} value={settingValue('webinarDate')} />&nbsp;<br />
+              <Editable
+                def={data.fieldByName.webinarDate}
+                value={settingValue('webinarDate')}
+                revision={data.settingsRevision}
+              />&nbsp;<br />
               <!-- the reference wraps this in a bare <muted> element, which no
                    stylesheet defines; a span renders identically and is valid -->
               <span>(NOTE: use your local time. It will be converted to the user's local time)</span>
@@ -1107,7 +1112,12 @@
           <label class="col-sm-2 control-label" for="mg-authmode">Authorization Mode</label>
           <div class="col-sm-10">
             <p class="form-control-static" id="mg-authmode">
-              <Editable def={data.fieldByName.authMode} value={settingValue('authMode')} options={AUTH_MODES} />
+              <Editable
+                def={data.fieldByName.authMode}
+                value={settingValue('authMode')}
+                revision={data.settingsRevision}
+                options={AUTH_MODES}
+              />
             </p>
           </div>
         </div>
@@ -2406,7 +2416,7 @@ Please click this link to attend: ______ unique link will be here_____
                         id={`mg-${def.name}`}
                         title={data.featureReadiness.sso ? '' : featureReason('sso')}
                       >
-                        <Editable {def} value={settingValue(def.name)} />
+                        <Editable {def} value={settingValue(def.name)} revision={data.settingsRevision} />
                       </p>
                     </div>
                   </div>
@@ -2811,7 +2821,7 @@ Please click this link to attend: ______ unique link will be here_____
                           {def.label ?? def.name}
                         </label>
                         <span id={`mg-${def.name}`}>
-                          <Editable {def} value={settingValue(def.name)} />
+                          <Editable {def} value={settingValue(def.name)} revision={data.settingsRevision} />
                         </span>
                         {#if def.help}
                           <br />
@@ -2915,7 +2925,7 @@ Please click this link to attend: ______ unique link will be here_____
                       -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->
                       <label class="col-sm-2 control-label">{def.label ?? def.name}</label>
-                      <Editable {def} value={settingValue(def.name)} />
+                      <Editable {def} value={settingValue(def.name)} revision={data.settingsRevision} />
                       {#if help && !help.outside}
                         <!--
                           A `<label>`, because that is what the reference's helper copy IS:
@@ -2963,7 +2973,11 @@ Please click this link to attend: ______ unique link will be here_____
                       <!-- same bare label and unwrapped editable as the loops above -->
                       <!-- svelte-ignore a11y_label_has_associated_control -->
                       <label class="col-sm-2 control-label">API secret</label>
-                      <Editable def={apiSecretDef} value={settingValue('apiSecret')} />
+                      <Editable
+                        def={apiSecretDef}
+                        value={settingValue('apiSecret')}
+                        revision={data.settingsRevision}
+                      />
                       &nbsp;
                       <button
                         class="btn btn-sm btn-warning"
@@ -3041,7 +3055,7 @@ Please click this link to attend: ______ unique link will be here_____
                           {def.label ?? def.name}
                         {/if}
                       </label>
-                      <Editable {def} value={settingValue(def.name)} />
+                      <Editable {def} value={settingValue(def.name)} revision={data.settingsRevision} />
                       {#if help && !help.outside}
                         <!-- the reference's own helper copy again — see the loop above -->
                         {@render helpCopy(help)}

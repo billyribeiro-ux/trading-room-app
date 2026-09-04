@@ -381,6 +381,12 @@ jobs:
           CUTOVER_TARGET_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
         run: node apps/controller/scripts/verify-room-cutover-e2e.mjs
 
+      - name: Prove the room-settings authority conversion and guarded rollback
+        if: steps.scope.outputs.backend == 'true'
+        env:
+          CUTOVER_TARGET_DATABASE_URL: postgres://ptr_clone:ptr_clone_local_development_password@127.0.0.1:5432/ptr_clone
+        run: node apps/controller/scripts/verify-room-settings-cutover-e2e.mjs
+
       - name: Verify formatting
         if: steps.scope.outputs.backend == 'true'
         working-directory: services

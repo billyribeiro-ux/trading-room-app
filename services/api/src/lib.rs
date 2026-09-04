@@ -10,3 +10,4 @@ pub mod limits;
 pub mod openapi;
 pub mod provision;
 pub mod realtime;
+pub mod room_settings;

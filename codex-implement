@@ -15,7 +15,7 @@ not represented as complete here merely because the reconstructed feature surfac
 | Gate 0 — domain containment | Mixed: code controls complete; legal, contact transport, monitoring, and optional history rewrite remain external/owner-gated | `apps/controller/docs/PRODUCTION-CUTOVER-PLAN.md` Gate 0 | Owner/vendor actions named by each unchecked row |
 | Gate 1 — backend SSOT/security drift | Local and hosted source gates exist; current immutable release publication/deployment/rollback evidence is not complete | backend CI, migration attestor, provenance seals | Registry/signing/provenance/target rollback exercise |
 | Gate 2 — account bootstrap | Repository implementation complete and pushed; staging deployment remains external | migration `0011`; `/api/v1/account`; scoped OpenAPI; generated server client; exact-cookie and negative tests | Staging database/API deploy plus backup restore proof |
-| Gate 3 — feature migration | Conversion foundation plus profile and room-lifecycle request-path slices are implemented and locally proven; remaining product slices stay open | controller migrations `0018`/`0019`; Rust migrations `0012`–`0015`; profile/room converter E2E; legacy-scrypt upgrade; reversible profile/room switches; typed BFFs; authenticated profile and room-management UI | Settings, membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time; staging activation follows both authority runbooks |
+| Gate 3 — feature migration | Conversion foundation plus profile, room-lifecycle, and room-settings request-path slices are implemented and locally proven; remaining product slices stay open | controller migrations `0018`–`0020`; Rust migrations `0012`–`0016`; profile/room/settings converter E2Es; reversible dependency-ordered switches; generated OpenAPI transport; authenticated profile and room-management UI | Membership, badges, administrators, API keys, and launch moved one authorized vertical slice at a time; staging activation follows all authority runbooks |
 | Gate 4 — signup/payment/entitlements | Not production-authoritative | existing controller signup/email scaffolding and provider-independent ledgers | Verified recovery/email, idempotent billing webhooks, subscription facts, central entitlements, legal approval, provider smoke |
 | Gate 5 — media promotion | Stage 1 boundary proof only; browser is not wired to the Rust media contract | media service tests and deployment plan | session response, audience-bound grants, TURN, rotation/draining/observability, native dependency clearance, device/load/recovery evidence |
 
@@ -99,6 +99,50 @@ room-converter rehearsal also pass. The protected OCI failure above is addressed
 3.5.8-r0 security overlay and by scanning the effective builder stage rather than the vulnerable
 upstream base; a local linux/amd64 stage build proved the exact installed versions. Exact-revision
 hosted proof remains required after push and no staging authority activation is claimed.
+
+### Gate 3 room-settings slice — repository implementation complete 2026-09-04
+
+The complete 269-key settings inventory is now generated into both the controller TypeScript schema
+and a deterministic Rust manifest. Canonical `GET/PATCH` endpoints bind the authenticated actor to a
+transaction-locked account owner/admin row under tenant RLS, validate exact key/type/size bounds,
+apply multi-field changes atomically, and return a monotonic revision. Field-aware optimistic
+concurrency merges stale edits to different fields and returns 409 when the same field changed. An
+account-scoped append-only request ledger makes uncertain retries converge, while reused ids with
+different payloads fail closed. Name changes update the room row in the same transaction; audit
+metadata records request id, setting names, and revision without setting values.
+
+Controller migration `0020` records the exact canonical revision represented by the local
+projection. The generated server-only client validates the full authority envelope and refreshes an
+expired session at most once. The manage page reads canonical settings in Rust mode and routes
+editable fields, list operations, API-secret generation, rename, cluster/repeater/live-server
+operations, credential reads, mobile PIN settings, and cloning through the same authority boundary.
+Clone uses a deterministic settings mutation id distinct from room creation, converges after an
+uncertain response, and refuses an intervening target change. Same-revision projection checks are
+structural rather than JSON-key-order dependent. `ROOM_SETTINGS_AUTHORITY_MODE=rust` refuses startup
+unless profile and room authority are already Rust-backed; `legacy` remains the one-switch request
+rollback.
+
+Migration `0016` adds the settings revision/object constraint and a forced-RLS mutation ledger with
+only SELECT/INSERT runtime grants. The release attestor explicitly inventories those two grants and
+refuses UPDATE/DELETE. The source-fingerprinted converter verifies reconciled room/account mappings,
+generated-schema validity, names, counts, and digests; commits target ownership before source proof;
+resumes that cross-database window; refuses drift without overwriting it; and permits deletion only
+at revision zero. Its source-first rollback resumes after process loss and repeated rollback is
+idempotent. `ops/ROOM-SETTINGS-AUTHORITY-CUTOVER.md` pins deployment, observation, incident rollback,
+and abandoned-conversion order.
+
+Hard evidence on the final local tree: controller formatting/lint and all source contracts passed;
+Svelte diagnostics reported 0 errors and 0 warnings; all 1,303 Vitest assertions across 132 files,
+64 PostgreSQL assertions across 10 files, 9 Chromium journeys, the runtime HTTP contract, and the
+Vercel build passed. Strict full-workspace Clippy and all 457 Rust tests passed against a fresh
+16-migration PostgreSQL 17 database: 166 API library, 147 PostgreSQL integration, 19 attestor, 114
+media library, and 11 media binary. Four real-Axum settings cases cover simultaneous merge/conflict,
+cross-tenant omission, exact JSON, aggregate-size 400, idempotent audit, corrupt-store refusal,
+non-deletable and synchronized room names. A separate fresh database passed the live redacted
+PostgreSQL identity/migration/RLS/ACL/LISTEN attestation. The converter rehearsal passed
+plan/apply/verify, exact-run evidence, source drift, target no-overwrite, post-use rollback refusal,
+process-loss resume, repeated rollback, and prerequisite rollback ordering. Exact-revision hosted
+gates are still required before this slice is called pushed/released; no staging switch is claimed.
 
 ## Completion standard
 
@@ -316,10 +360,10 @@ Measured on the final working tree:
 | Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,184 tests, production build            |
 | Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
 | Controller quality boundaries     | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, Vercel production build            |
-| Controller Vitest                 | 129 files / 1,294 tests; documented totals independently verified at four sites                                                                 |
+| Controller Vitest                 | 132 files / 1,303 tests; documented totals independently verified at four sites                                                                 |
 | Controller Playwright             | 9/9 Chromium journeys against the adapter-node production artifact                                                                              |
-| Controller PostgreSQL integration | 10 files / 63 tests against disposable provisioned PostgreSQL                                                                                   |
-| Rust workspace gate               | format and strict Clippy green; 450/450 tests: 164 API library, 142 PostgreSQL integration, 19 attestor, 114 media library, 11 media binary      |
+| Controller PostgreSQL integration | 10 files / 64 tests against disposable provisioned PostgreSQL                                                                                   |
+| Rust workspace gate               | format and strict Clippy green; 457/457 tests: 166 API library, 147 PostgreSQL integration, 19 attestor, 114 media library, 11 media binary      |
 | JavaScript advisories             | `pnpm audit --audit-level high`: no known vulnerabilities                                                                                       |
 | Rust advisories                   | policy green: one exact reviewed lockfile advisory proved unreachable from the build graph; six exact reviewed mediasoup informational warnings |
 | Svelte 5 review                   | modified components checked with the official Svelte autofixer; no reported issues; both apps have zero Svelte diagnostics                      |
