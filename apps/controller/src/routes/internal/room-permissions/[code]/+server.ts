@@ -6,6 +6,8 @@ import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/d
 import { PERMISSION_KEYS, savePermissions, type PermissionKey } from '#lib/server/rooms.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { verifyConfigWriteToken } from '#lib/server/room-handoff.js';
+import { membershipAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import { applyRoomMembershipControl, RoomMembershipControlError } from '#lib/server/room-membership-control.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -127,7 +129,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
   // A suspended account's rooms stop serving, reads and writes alike. 404 for the same reason
   // `internal/room-config` gives: a suspended room is indistinguishable from one that never was.
   const [account] = await getDb()
-    .select({ status: accounts.status })
+    .select({ status: accounts.status, authorityEnterpriseId: accounts.authorityEnterpriseId })
     .from(accounts)
     .where(eq(accounts.id, room.accountId))
     .limit(1);
@@ -171,6 +173,34 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
   // See the docblock: `giveMicScreen` refuses the same self-target one control over.
   if (target.roomUser.id === caller.roomUser.id) {
     error(403, 'You cannot change your own permissions.');
+  }
+
+  if (membershipAuthorityMode === 'rust') {
+    const permissions = Object.fromEntries(PERMISSION_KEYS.map((key) => [key, granted.includes(key)])) as Record<
+      PermissionKey,
+      boolean
+    >;
+    try {
+      await applyRoomMembershipControl({
+        accountId: room.accountId,
+        authorityEnterpriseId: account.authorityEnterpriseId,
+        authorityRoomId: room.authorityRoomId,
+        actor: caller.roomUser,
+        target: target.roomUser,
+        operation: {
+          type: 'setPermissions',
+          publishMic: permissions.hasMic,
+          publishScreen: permissions.hasScreen,
+          publishCam: permissions.hasCam,
+          useAdminChat: permissions.hasAdminChat,
+          editNotes: permissions.canEditNotes
+        }
+      });
+      return json({ permissions });
+    } catch (reason) {
+      if (reason instanceof RoomMembershipControlError) error(reason.status, reason.message);
+      throw reason;
+    }
   }
 
   const stored = await savePermissions(room.id, target.roomUser.id, granted);

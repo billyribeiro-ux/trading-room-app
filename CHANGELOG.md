@@ -45,6 +45,54 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-04 21:53 EDT — membership became the fourth reversible canonical authority slice
+
+**Runtime impact: yes only when `MEMBERSHIP_AUTHORITY_MODE=rust`; legacy remains the default and
+one-switch request rollback.** Forward migration `0017` adds optimistic membership revisions,
+managed ban/pause/privacy/access state, a deferred final-owner invariant, fail-closed runtime
+membership resolvers, and a forced-RLS exactly-once mutation ledger with only `SELECT, INSERT`
+runtime access. Account-admin reads, invitations, all single/bulk/all-room mutations, password and
+name changes, and freshen-login now execute inside tenant-scoped transactions after locking explicit
+account authority. A separate service-authenticated route accepts only live-room ban, indefinite
+mute, and five permission changes; it authenticates a hashed independent controller secret, locks
+and reauthorizes the acting owner/presenter, protects owners and self-targets, checks revision, and
+replays an exact request id without a second audit.
+
+The OpenAPI document and generated SvelteKit client now cover 16 operations and 23 schemas with
+strict request/response validators. Controller migration `0021` stores a unique canonical member
+UUID plus monotonic revision, complete canonical content hash, and reconciliation time. Full-list
+projection adopts identities and room relations only inside the account, preserves badge/Discord/
+push/phone/marketplace fields for their own slices, refuses stale or equal-revision disagreement,
+and removes canonical-absent rows atomically. The manage page routes every membership-owned action
+to Rust in canonical mode. Connected-room ban/mute/permission writes commit through the narrow
+service seam and update the projection before their existing addressed refresh can be published.
+
+The source-fingerprinted converter requires the exact profile and room ledgers, adopts only the room
+converter's owner foundation, refuses inconsistent legacy role/flag states and unowned target rows,
+and records revision-zero content proofs after the canonical transaction. It resumes the bounded
+cross-database window without overwriting drift. Unused-conversion rollback refuses any revision,
+badge, or dependent activity; clears source proof first; deletes only owned non-owner rows; restores
+the owner foundation; and is idempotent after process loss. `ops/MEMBERSHIP-AUTHORITY-CUTOVER.md`
+records dependency order, two-service secret handling, activation, observation, incident rollback,
+and offline rollback. Deployment tooling validates the mode topology and secret presence/length.
+
+Measured evidence at this checkpoint: Rust formatting and strict full-workspace Clippy passed. A
+clean 17-migration PostgreSQL 17 database passed all 469 workspace assertions serially—172 API
+library, 153 API HTTP/database integration, 19 release-attestor, 114 media library, and 11 media
+binary—and the redacted release attestation reported the exact chain, 25 forced-RLS
+relations/policies, restricted runtime identity, and append-only membership-ledger ACL. All four
+dependency-ordered converters passed their complete plan/apply/verify, drift/no-overwrite,
+post-use-refusal, crash-window-resume, idempotent-rollback, and prerequisite-order matrices against
+a newly migrated isolated database.
+
+The final controller tree passed formatting, lint, all deterministic schema/provenance/evidence/
+privacy/runtime gates, zero-error/zero-warning Svelte diagnostics, 1,320 Vitest assertions across
+137 files, 66 real-PostgreSQL assertions across 10 files, all 9 Chromium journeys, and the Vercel
+production build. The backend workflow's scope regex was found to omit the settings and membership
+converter families; it now matches converters by shape, with a ratchet test covering all four
+current slices. Exact-revision protected hosted proof remains required after push; no staging or
+production activation is claimed.
+
 ### 2026-09-04 19:02 EDT — Gate 3 room settings became canonical, revisioned, and reversibly cut over
 
 **Runtime impact: yes only when `ROOM_SETTINGS_AUTHORITY_MODE=rust`; `legacy` remains the default

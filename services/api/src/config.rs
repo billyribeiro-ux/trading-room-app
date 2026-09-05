@@ -104,6 +104,10 @@ pub struct Config {
     /// an access token a structurally valid grant, leaving only the disjoint claim sets
     /// between the two systems; separate keys make the separation arithmetic.
     pub media_grant_private_key: String,
+    /// Independent controller-to-API credential for the three live-room membership controls.
+    /// Optional while membership authority is legacy; when set it is hashed before entering
+    /// application state and is never logged or returned.
+    pub controller_internal_secret: Option<String>,
 }
 
 impl Config {
@@ -135,6 +139,7 @@ impl Config {
             database_url: database_url.expect("checked above"),
             auth_token_private_key: auth_token_private_key.expect("checked above"),
             media_grant_private_key: media_grant_private_key.expect("checked above"),
+            controller_internal_secret: var("TRADINGROOM_INTERNAL_SECRET"),
             trusted_web_origin: trusted_web_origin.expect("checked above"),
             bind_address: var("BIND_ADDRESS").unwrap_or_else(|| "127.0.0.1:8080".into()),
             db_pool_max: parse(
@@ -219,6 +224,17 @@ impl Config {
                          systems removes the cryptographic separation between them",
             });
         }
+        if let Some(secret) = &self.controller_internal_secret
+            && (secret.len() < 32
+                || secret.len() > 256
+                || !secret.bytes().all(|byte| byte.is_ascii_graphic()))
+        {
+            return Err(ConfigError::Invalid {
+                key: "TRADINGROOM_INTERNAL_SECRET",
+                value: "<redacted>".into(),
+                reason: "expected 32 to 256 non-whitespace ASCII characters",
+            });
+        }
         // Trusting a header from an unknown number of hops is how client IPs get spoofed,
         // which in turn defeats every IP-keyed rate limit.
         if self.trusted_proxy_hops > 4 {
@@ -292,12 +308,31 @@ mod tests {
             request_timeout: Duration::from_secs(30),
             trusted_proxy_hops: 0,
             trusted_web_origin: "https://app.example.test".into(),
+            controller_internal_secret: None,
         }
     }
 
     #[test]
     fn a_valid_config_passes() {
         assert_eq!(valid().validate(), Ok(()));
+    }
+
+    #[test]
+    fn controller_internal_secret_is_bounded_without_echoing_it() {
+        let secret = "too-short-and-private";
+        let config = Config {
+            controller_internal_secret: Some(secret.into()),
+            ..valid()
+        };
+        let error = config.validate().unwrap_err();
+        assert!(error.to_string().contains("TRADINGROOM_INTERNAL_SECRET"));
+        assert!(!error.to_string().contains(secret));
+
+        let config = Config {
+            controller_internal_secret: Some("x".repeat(32)),
+            ..valid()
+        };
+        assert_eq!(config.validate(), Ok(()));
     }
 
     #[test]

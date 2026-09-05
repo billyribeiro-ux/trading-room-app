@@ -194,6 +194,15 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0016_room_settings_authority.sql',
     sha256: 'e785d03c9592017764c26a0bf629ba1441063f6463472fc86220de64e4bfaf9d'
+  }),
+  /*
+    Authored and reviewed 2026-09-04 for canonical membership authority. It adds optimistic
+    revisions and managed state, a deferred last-owner invariant, fail-closed runtime membership
+    resolvers, and a forced-RLS append-only mutation ledger with SELECT+INSERT-only runtime access.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0017_membership_authority.sql',
+    sha256: 'dc47c5f7f18f1c3ea86acd7248f7285d928d103a71687801fa75365d8b722ef6'
   })
 ]);
 

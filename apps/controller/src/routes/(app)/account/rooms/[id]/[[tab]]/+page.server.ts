@@ -59,11 +59,21 @@ import { isRoomPresenter, isRoomTrial } from '#lib/room-member-role.js';
 import { FEATURES, resolveFeatureReadiness, type FeatureId } from '#lib/features.js';
 import { resolveAccountEntitlements } from '#lib/server/account-entitlements.js';
 import { sanitizeHtml } from '#lib/server/sanitize-html.js';
-import { roomAuthorityMode, roomSettingsAuthorityMode } from '#lib/server/control-plane-runtime.js';
-import { apiRequestContext } from '#lib/server/tradingroom-api.js';
+import {
+  membershipAuthorityMode,
+  roomAuthorityMode,
+  roomSettingsAuthorityMode
+} from '#lib/server/control-plane-runtime.js';
+import { apiRequestContext, type ManageMemberOperation } from '#lib/server/tradingroom-api.js';
 import { patchRoomSettingsAuthority, readRoomSettingsAuthority } from '#lib/server/room-settings-authority.js';
 import { createRoomInAuthority } from '#lib/server/room-authority.js';
 import { projectAuthorityRooms, RoomAuthorityProjectionError } from '#lib/server/provision-room.js';
+import {
+  inviteMembershipAuthority,
+  mutateMembershipAuthority,
+  readMembershipAuthority
+} from '#lib/server/membership-authority.js';
+import { MembershipProjectionError, projectAuthorityMemberships } from '#lib/server/membership-projection.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -102,6 +112,7 @@ const ALL_TABS = [
 
 type Settings = Record<string, string | number | boolean | null | undefined>;
 type LocalRoom = typeof rooms.$inferSelect;
+type ManagedLocalMember = Awaited<ReturnType<typeof listRoomUsers>>[number];
 
 class RoomSettingsAuthorityError extends Error {
   constructor(
@@ -111,6 +122,17 @@ class RoomSettingsAuthorityError extends Error {
   ) {
     super(message);
     this.name = 'RoomSettingsAuthorityError';
+  }
+}
+
+class MembershipAuthorityError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'MembershipAuthorityError';
   }
 }
 
@@ -211,6 +233,164 @@ function authorityFailure(reason: unknown) {
   }
   throw reason;
 }
+
+function membershipCoordinates(event: RequestEvent, room: LocalRoom): { enterpriseId: string; roomId: string } {
+  const actor = requireUser(event.locals);
+  if (
+    actor.impersonatedBy !== undefined ||
+    !actor.authorityEnterpriseId ||
+    !room.authorityRoomId ||
+    !room.authorityReconciledAt
+  ) {
+    throw new MembershipAuthorityError(
+      409,
+      'unreconciledAuthority',
+      'This room is not reconciled to membership authority.'
+    );
+  }
+  return { enterpriseId: actor.authorityEnterpriseId, roomId: room.authorityRoomId };
+}
+
+async function managedRoomUsers(event: RequestEvent, room: LocalRoom) {
+  if (membershipAuthorityMode === 'legacy') return listRoomUsers(room.id);
+  const actor = requireUser(event.locals);
+  const coordinates = membershipCoordinates(event, room);
+  const result = await readMembershipAuthority(apiRequestContext(event), coordinates.enterpriseId, coordinates.roomId);
+  if (!result.ok) throw new MembershipAuthorityError(result.status, result.code, result.message);
+  try {
+    await projectAuthorityMemberships({
+      accountId: actor.accountId,
+      members: result.data,
+      completeAuthorityRoomId: coordinates.roomId
+    });
+  } catch (reason) {
+    if (reason instanceof MembershipProjectionError) {
+      throw new MembershipAuthorityError(409, reason.code, reason.message);
+    }
+    throw reason;
+  }
+  return listRoomUsers(room.id);
+}
+
+async function mutateManagedRoomUsers(
+  event: RequestEvent,
+  room: LocalRoom,
+  localMemberIds: readonly number[],
+  operation: ManageMemberOperation,
+  allRooms = false,
+  availableOverride?: readonly ManagedLocalMember[]
+): Promise<number> {
+  const actor = requireUser(event.locals);
+  const coordinates = membershipCoordinates(event, room);
+  const ids = [...new Set(localMemberIds)];
+  if (ids.length === 0) return 0;
+  const available = availableOverride ?? (await managedRoomUsers(event, room));
+  const selected = ids.map((id) => available.find((member) => member.id === id));
+  if (
+    selected.some(
+      (member) =>
+        !member || !member.authorityMemberId || member.authorityRevision === null || !member.authorityReconciledAt
+    )
+  ) {
+    throw new MembershipAuthorityError(
+      409,
+      'unreconciledMember',
+      'Reload this page after the membership conversion before changing that member.'
+    );
+  }
+  const targets = selected.map((member) => ({
+    memberId: member!.authorityMemberId!,
+    expectedRevision: member!.authorityRevision!
+  }));
+  const result = await mutateMembershipAuthority(
+    apiRequestContext(event),
+    coordinates.enterpriseId,
+    coordinates.roomId,
+    {
+      requestId: randomUUID(),
+      targets,
+      ...(allRooms ? { allRooms: true } : {}),
+      operation
+    }
+  );
+  if (!result.ok) throw new MembershipAuthorityError(result.status, result.code, result.message);
+  try {
+    await projectAuthorityMemberships({
+      accountId: actor.accountId,
+      members: result.data.members,
+      removedMemberIds: result.data.removedMemberIds
+    });
+  } catch (reason) {
+    if (reason instanceof MembershipProjectionError) {
+      throw new MembershipAuthorityError(409, reason.code, reason.message);
+    }
+    throw reason;
+  }
+  return result.data.changed;
+}
+
+async function inviteManagedRoomUser(
+  event: RequestEvent,
+  room: LocalRoom,
+  displayName: string,
+  email: string
+): Promise<number> {
+  const actor = requireUser(event.locals);
+  const coordinates = membershipCoordinates(event, room);
+  const result = await inviteMembershipAuthority(
+    apiRequestContext(event),
+    coordinates.enterpriseId,
+    coordinates.roomId,
+    { requestId: randomUUID(), email, displayName }
+  );
+  if (!result.ok) throw new MembershipAuthorityError(result.status, result.code, result.message);
+  try {
+    const mapping = await projectAuthorityMemberships({
+      accountId: actor.accountId,
+      members: result.data.members,
+      removedMemberIds: result.data.removedMemberIds
+    });
+    return mapping.values().next().value ?? 0;
+  } catch (reason) {
+    if (reason instanceof MembershipProjectionError) {
+      throw new MembershipAuthorityError(409, reason.code, reason.message);
+    }
+    throw reason;
+  }
+}
+
+function membershipFailure(reason: unknown) {
+  if (reason instanceof MembershipAuthorityError) {
+    return fail(reason.status, { message: reason.message, code: reason.code });
+  }
+  throw reason;
+}
+
+const AUTHORITY_USER_OPERATIONS = {
+  1: { type: 'setRole', role: 'presenter' },
+  2: { type: 'setRole', role: 'member' },
+  3: { type: 'setMuted', muted: true },
+  4: { type: 'setBanned', banned: true },
+  5: { type: 'setRole', role: 'moderator' },
+  6: { type: 'setTrial', trial: true },
+  7: { type: 'setHideUserCount', hidden: true },
+  8: { type: 'setHideUserCount', hidden: false },
+  9: { type: 'freshenLogin' },
+  10: { type: 'setHidePersonalInfo', hidden: true },
+  11: { type: 'setHidePersonalInfo', hidden: false },
+  13: { type: 'setArchiveAccess', allowed: false },
+  14: { type: 'setArchiveAccess', allowed: true }
+} satisfies Record<UserOpcode, ManageMemberOperation>;
+
+const AUTHORITY_MANY_OPERATIONS = {
+  1: { type: 'setRole', role: 'presenter' },
+  2: { type: 'setRole', role: 'member' },
+  3: { type: 'setMuted', muted: true },
+  4: { type: 'setBanned', banned: true },
+  5: { type: 'setRole', role: 'moderator' },
+  6: { type: 'setTrial', trial: true },
+  10: { type: 'remove' }
+} satisfies Record<ManyOpcode, ManageMemberOperation>;
 
 function derivedCloneSettingsRequestId(cloneRequestId: string): string {
   const bytes = createHash('sha256').update(`room-clone-settings:${cloneRequestId}`).digest().subarray(0, 16);
@@ -339,7 +519,14 @@ export const load: PageServerLoad = async (event) => {
 
   const q = (url.searchParams.get('q') ?? '').trim().toLowerCase();
   const filter = url.searchParams.get('filter');
-  let users = (await listRoomUsers(room.id)).map((u) => ({
+  let authorityUsers: Awaited<ReturnType<typeof managedRoomUsers>>;
+  try {
+    authorityUsers = await managedRoomUsers(event, room);
+  } catch (reason) {
+    if (reason instanceof MembershipAuthorityError) error(reason.status, reason.message);
+    throw reason;
+  }
+  let users = authorityUsers.map((u) => ({
     ...u,
     permissions: readPermissions(u.permissionsJson),
     /** badge ids assigned to this member, for the row's Badges submenu */
@@ -444,7 +631,16 @@ export const load: PageServerLoad = async (event) => {
     reference's own bundle, and rewriting them to use the count would edit the thing that test
     exists to protect. The filters keep reading the column server-side; the client never sees it.
   */
-  const members = users.map(({ pushTokensJson: _deviceTokens, ...member }) => member);
+  const members = users.map(
+    ({
+      pushTokensJson: _deviceTokens,
+      authorityMemberId: _authorityMemberId,
+      authorityRevision: _authorityRevision,
+      authorityContentHash: _authorityContentHash,
+      authorityReconciledAt: _authorityReconciledAt,
+      ...member
+    }) => member
+  );
 
   /*
     THE ROSTER SIZE, UNFILTERED — and it must be counted before any filter, which is why it is a
@@ -927,32 +1123,54 @@ export const actions: Actions = {
   },
 
   /** `doInvite()` — adds a member row so the room knows them before they arrive. */
-  inviteUser: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  inviteUser: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const name = String(form.get('name') ?? '').trim();
     const email = String(form.get('email') ?? '')
       .trim()
       .toLowerCase();
     if (!name || !email) return fail(400, { message: 'A name and an email are both required.' });
     try {
-      await inviteRoomUser(roomId, name, email);
+      if (membershipAuthorityMode === 'legacy') await inviteRoomUser(room.id, name, email);
+      else await inviteManagedRoomUser(event, room, name, email);
       return { invited: email };
     } catch (e) {
+      if (e instanceof MembershipAuthorityError) return membershipFailure(e);
       return fail(409, { message: e instanceof Error ? e.message : 'Could not invite that user.' });
     }
   },
 
   /** `clearUserList()` — "Remove non-presenters". */
-  clearUserList: async ({ params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    return { removed: await removeNonPresenters(roomId) };
+  clearUserList: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    if (membershipAuthorityMode === 'legacy') return { removed: await removeNonPresenters(room.id) };
+    try {
+      const available = await managedRoomUsers(event, room);
+      const ids = available
+        .filter((member) => member.role !== 0 && !isRoomPresenter(member))
+        .map((member) => member.id);
+      return {
+        removed: await mutateManagedRoomUsers(event, room, ids, { type: 'remove' }, false, available)
+      };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
   /** `removeUsersFT()` — drop every non-owner free-trial member */
-  removeFreeTrials: async ({ params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    return { removed: await removeFreeTrialUsers(roomId) };
+  removeFreeTrials: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    if (membershipAuthorityMode === 'legacy') return { removed: await removeFreeTrialUsers(room.id) };
+    try {
+      const available = await managedRoomUsers(event, room);
+      const ids = available.filter((member) => member.role !== 0 && member.isFreeTrial).map((member) => member.id);
+      return {
+        removed: await mutateManagedRoomUsers(event, room, ids, { type: 'remove' }, false, available)
+      };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
   /** `updateManyUsersBadgePrompt('add'|'remove')` applied to the selection */
@@ -1041,11 +1259,24 @@ export const actions: Actions = {
   },
 
   /** `setUserRestrictPM(bool, …)` — member-to-member DMs */
-  setUserRestrictPm: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  setUserRestrictPm: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const roomUserId = Number(form.get('roomUserId'));
-    return { restrictPm: await setUserRestrictPm(roomId, roomUserId, form.get('restrict') === 'on') };
+    const restricted = form.get('restrict') === 'on';
+    if (membershipAuthorityMode === 'legacy') {
+      return { restrictPm: await setUserRestrictPm(room.id, roomUserId, restricted) };
+    }
+    try {
+      return {
+        restrictPm: await mutateManagedRoomUsers(event, room, [roomUserId], {
+          type: 'setPmRestricted',
+          restricted
+        })
+      };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
   /**
@@ -1062,38 +1293,66 @@ export const actions: Actions = {
    * What IS enforced here is tenancy: `ownedRoomId` throws unless this account owns the room, and
    * the UPDATE is keyed on both ids, so a member belonging to someone else's room matches zero rows.
    */
-  setMemberGrant: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  setMemberGrant: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     const grant = form.get('grant');
     /* Fails loud on an unknown grant rather than defaulting to one of them. */
     if (!isMemberGrant(grant)) return fail(400, { message: 'Unknown grant.' });
-    const changed = await setMemberGrant(roomId, roomUserId, grant, form.get('granted') === 'on');
-    if (changed === 0) return fail(404, { message: 'No such member.' });
-    return { grant: changed };
+    const granted = form.get('granted') === 'on';
+    try {
+      const changed =
+        membershipAuthorityMode === 'legacy'
+          ? await setMemberGrant(room.id, roomUserId, grant, granted)
+          : await mutateManagedRoomUsers(event, room, [roomUserId], {
+              type: grant === 'mobile-app' ? 'setMobileApp' : 'setFileAccess',
+              allowed: granted
+            });
+      if (changed === 0 && membershipAuthorityMode === 'legacy') {
+        return fail(404, { message: 'No such member.' });
+      }
+      return { grant: changed };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
   /** `setNoteUser(…)` */
-  setUserNote: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  setUserNote: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     const note = String(form.get('note') ?? '');
     if (note.length > 500) return fail(400, { message: 'A note is at most 500 characters.' });
-    return { note: await setUserNote(roomId, roomUserId, note) };
+    if (membershipAuthorityMode === 'legacy') return { note: await setUserNote(room.id, roomUserId, note) };
+    try {
+      return {
+        note: await mutateManagedRoomUsers(event, room, [roomUserId], {
+          type: 'setNote',
+          note: note.trim() || null
+        })
+      };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
   /** `editUsername(…)` */
-  renameUser: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  renameUser: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     const displayName = String(form.get('displayName') ?? '').trim();
     if (!displayName) return fail(400, { message: 'A member needs a name.' });
     try {
-      return { renamed: await renameRoomUser(roomId, roomUserId, displayName) };
+      if (membershipAuthorityMode === 'legacy') {
+        return { renamed: await renameRoomUser(room.id, roomUserId, displayName) };
+      }
+      await mutateManagedRoomUsers(event, room, [roomUserId], { type: 'rename', displayName });
+      return { renamed: displayName };
     } catch (e) {
+      if (e instanceof MembershipAuthorityError) return membershipFailure(e);
       return fail(404, { message: e instanceof Error ? e.message : 'No such member.' });
     }
   },
@@ -1118,18 +1377,20 @@ export const actions: Actions = {
    * never stored and never returned. A 10-character floor is enforced on the
    * server as well as in the markup, because the markup is advisory.
    */
-  setUserPassword: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  setUserPassword: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     const password = String(form.get('password') ?? '');
     if (password.length < 10) {
       return fail(400, { message: 'A password must be at least 10 characters.' });
     }
     try {
-      await setRoomUserPassword(roomId, roomUserId, password);
+      if (membershipAuthorityMode === 'legacy') await setRoomUserPassword(room.id, roomUserId, password);
+      else await mutateManagedRoomUsers(event, room, [roomUserId], { type: 'setPassword', password });
       return { passwordSet: true };
     } catch (e) {
+      if (e instanceof MembershipAuthorityError) return membershipFailure(e);
       return fail(404, { message: e instanceof Error ? e.message : 'No such member.' });
     }
   },
@@ -1270,10 +1531,15 @@ export const actions: Actions = {
     }
   },
 
-  removeUser: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const roomUserId = Number((await request.formData()).get('roomUserId'));
-    return { removed: await removeRoomUser(roomId, roomUserId) };
+  removeUser: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const roomUserId = Number((await event.request.formData()).get('roomUserId'));
+    if (membershipAuthorityMode === 'legacy') return { removed: await removeRoomUser(room.id, roomUserId) };
+    try {
+      return { removed: await mutateManagedRoomUsers(event, room, [roomUserId], { type: 'remove' }) };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
   /** The reference's saveSessField(name) — one field, read-modify-write. */
@@ -1379,18 +1645,37 @@ export const actions: Actions = {
     return { savedTextList: true };
   },
 
-  savePermissions: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  savePermissions: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     const granted = PERMISSION_KEYS.filter((k) => form.get(k) === 'on');
-    return { permissions: await savePermissions(roomId, roomUserId, granted as PermissionKey[]) };
+    if (membershipAuthorityMode === 'legacy') {
+      return { permissions: await savePermissions(room.id, roomUserId, granted as PermissionKey[]) };
+    }
+    const permissions = Object.fromEntries(PERMISSION_KEYS.map((key) => [key, granted.includes(key)])) as Record<
+      PermissionKey,
+      boolean
+    >;
+    try {
+      await mutateManagedRoomUsers(event, room, [roomUserId], {
+        type: 'setPermissions',
+        publishMic: permissions.hasMic,
+        publishScreen: permissions.hasScreen,
+        publishCam: permissions.hasCam,
+        useAdminChat: permissions.hasAdminChat,
+        editNotes: permissions.canEditNotes
+      });
+      return { permissions };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
   /** The bulk menu. Separate enum, separate action — see MANY_OPCODES. */
-  updateManyUsers: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  updateManyUsers: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const op = Number(form.get('op')) as ManyOpcode;
     if (!(op in MANY_OPCODES)) return fail(400, { message: `Unknown bulk opcode ${op}.` });
     const ids = form
@@ -1400,8 +1685,15 @@ export const actions: Actions = {
     // "Apply to all rooms?" — widens the selection to the same people in every room
     // this account owns. Sent by the checkbox beside "Select All", not a per-action flag.
     const allRooms = form.get('applyToAllRooms') === 'on';
-    const affected = await applyManyOpcode(roomId, ids, op, { allRooms });
-    return { bulk: MANY_OPCODES[op], affected, allRooms };
+    try {
+      const affected =
+        membershipAuthorityMode === 'legacy'
+          ? await applyManyOpcode(room.id, ids, op, { allRooms })
+          : await mutateManagedRoomUsers(event, room, ids, AUTHORITY_MANY_OPERATIONS[op], allRooms);
+      return { bulk: MANY_OPCODES[op], affected, allRooms };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
   /**
@@ -1410,29 +1702,41 @@ export const actions: Actions = {
    * The row's APPROVE button sends 'approved'; the row menu's "Pause / Pending"
    * sends 'pending'. `setInviteStatus` rejects anything else and refuses role 0.
    */
-  approveUser: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  approveUser: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     const status = String(form.get('status') ?? '');
     if (status !== 'approved' && status !== 'pending') {
       return fail(400, { message: `Unknown invite status ${status}.` });
     }
     if (!Number.isFinite(roomUserId)) return fail(400, { message: 'Missing member.' });
-    await setInviteStatus(roomId, roomUserId, status);
-    return { inviteStatus: status };
+    try {
+      if (membershipAuthorityMode === 'legacy') await setInviteStatus(room.id, roomUserId, status);
+      else {
+        await mutateManagedRoomUsers(event, room, [roomUserId], {
+          type: 'setApproval',
+          status
+        });
+      }
+      return { inviteStatus: status };
+    } catch (reason) {
+      return membershipFailure(reason);
+    }
   },
 
-  updateUser: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  updateUser: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const op = Number(form.get('op')) as UserOpcode;
     const roomUserId = Number(form.get('roomUserId'));
     if (!(op in USER_OPCODES)) return fail(400, { message: `Unknown opcode ${op}.` });
     try {
-      await applyUserOpcode(roomId, roomUserId, op);
+      if (membershipAuthorityMode === 'legacy') await applyUserOpcode(room.id, roomUserId, op);
+      else await mutateManagedRoomUsers(event, room, [roomUserId], AUTHORITY_USER_OPERATIONS[op]);
       return { applied: USER_OPCODES[op] };
     } catch (e) {
+      if (e instanceof MembershipAuthorityError) return membershipFailure(e);
       return fail(400, { message: e instanceof Error ? e.message : 'Could not apply that action.' });
     }
   },

@@ -367,6 +367,11 @@ export const roomUsers = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id),
+    /** Canonical Rust membership id and exact revision represented by this runtime projection. */
+    authorityMemberId: uuid('authority_member_id'),
+    authorityRevision: bigint('authority_revision', { mode: 'number' }),
+    authorityContentHash: text('authority_content_hash'),
+    authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true }),
     role: integer('role').notNull().default(2),
     banned: boolean('banned').notNull().default(false),
     muted: boolean('muted').notNull().default(false),
@@ -512,7 +517,10 @@ export const roomUsers = pgTable(
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull()
   },
-  (t) => [uniqueIndex('room_users_unique_idx').on(t.roomId, t.userId)]
+  (t) => [
+    uniqueIndex('room_users_unique_idx').on(t.roomId, t.userId),
+    uniqueIndex('room_users_authority_member_idx').on(t.authorityMemberId)
+  ]
 );
 
 /** Single-use, hashed OAuth state for linking one presenter membership to Discord. */

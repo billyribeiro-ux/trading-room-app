@@ -44,7 +44,75 @@ export type CurrentUser = {
 
 export type Error = { readonly error: { readonly code: string; readonly message: string } };
 
+export type InviteMemberRequest = { readonly displayName: string; readonly email: string; readonly requestId: string };
+
 export type LoginRequest = { readonly email: string; readonly password: string };
+
+export type ManageMemberOperation =
+  | { readonly role: 'presenter' | 'moderator' | 'member'; readonly type: 'setRole' }
+  | { readonly muted: boolean; readonly type: 'setMuted' }
+  | { readonly banned: boolean; readonly type: 'setBanned' }
+  | { readonly trial: boolean; readonly type: 'setTrial' }
+  | { readonly hidden: boolean; readonly type: 'setHideUserCount' }
+  | { readonly hidden: boolean; readonly type: 'setHidePersonalInfo' }
+  | { readonly allowed: boolean; readonly type: 'setArchiveAccess' }
+  | { readonly restricted: boolean; readonly type: 'setPmRestricted' }
+  | { readonly status: 'approved' | 'pending'; readonly type: 'setApproval' }
+  | { readonly allowed: boolean; readonly type: 'setMobileApp' }
+  | { readonly allowed: boolean; readonly type: 'setFileAccess' }
+  | { readonly note: string | null; readonly type: 'setNote' }
+  | {
+      readonly editNotes: boolean;
+      readonly publishCam: boolean;
+      readonly publishMic: boolean;
+      readonly publishScreen: boolean;
+      readonly type: 'setPermissions';
+      readonly useAdminChat: boolean;
+    }
+  | { readonly type: 'freshenLogin' }
+  | { readonly displayName: string; readonly type: 'rename' }
+  | { readonly password: string; readonly type: 'setPassword' }
+  | { readonly type: 'remove' };
+
+export type ManageMembersRequest = {
+  readonly allRooms?: boolean;
+  readonly operation: ManageMemberOperation;
+  readonly requestId: string;
+  readonly targets: Array<MemberTarget>;
+};
+
+export type ManagedMember = {
+  readonly adminNote: string | null;
+  readonly approvalStatus: 'approved' | 'pending';
+  readonly badges: Array<string>;
+  readonly canAccessArchives: boolean;
+  readonly canAccessFiles: boolean;
+  readonly canEditNotes: boolean;
+  readonly canPublishCam: boolean;
+  readonly canPublishMic: boolean;
+  readonly canPublishScreen: boolean;
+  readonly canUseAdminChat: boolean;
+  readonly createdAt: string;
+  readonly displayName: string;
+  readonly email: string;
+  readonly hasMobileApp: boolean;
+  readonly hasPassword: boolean;
+  readonly hidePersonalInfo: boolean;
+  readonly hideUserCount: boolean;
+  readonly id: string;
+  readonly invitedAt: string | null;
+  readonly isBanned: boolean;
+  readonly isMuted: boolean;
+  readonly isPaused: boolean;
+  readonly isPmRestricted: boolean;
+  readonly isTrial: boolean;
+  readonly joinedAt: string | null;
+  readonly lastSeenAt: string | null;
+  readonly revision: number;
+  readonly role: 'owner' | 'presenter' | 'limited_presenter' | 'moderator' | 'member';
+  readonly roomId: string;
+  readonly userId: string;
+};
 
 export type ManagedRoom = {
   readonly archivedAt: string | null;
@@ -55,6 +123,14 @@ export type ManagedRoom = {
   readonly name: string;
   readonly shortCode: string;
   readonly state: 'open' | 'closed' | 'locked';
+};
+
+export type MemberTarget = { readonly expectedRevision: number; readonly memberId: string };
+
+export type MembershipMutationResponse = {
+  readonly changed: number;
+  readonly members: Array<ManagedMember>;
+  readonly removedMemberIds: Array<string>;
 };
 
 export type PatchAccountRoomSettingsRequest = {
@@ -155,6 +231,27 @@ export interface TradingRoomApiOperations {
     readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}';
     readonly request: ArchiveAccountRoomRequest;
     readonly response: ManagedRoom;
+    readonly successStatus: 200;
+  };
+  readonly listAccountRoomMembers: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/members';
+    readonly request: undefined;
+    readonly response: Array<ManagedMember>;
+    readonly successStatus: 200;
+  };
+  readonly manageAccountRoomMembers: {
+    readonly method: 'PATCH';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/members';
+    readonly request: ManageMembersRequest;
+    readonly response: MembershipMutationResponse;
+    readonly successStatus: 200;
+  };
+  readonly inviteAccountRoomMember: {
+    readonly method: 'POST';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/members';
+    readonly request: InviteMemberRequest;
+    readonly response: MembershipMutationResponse;
     readonly successStatus: 200;
   };
   readonly getAccountRoomSettings: {

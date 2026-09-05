@@ -16,8 +16,13 @@ import type {
   CreateAccountRoomRequest,
   CurrentUser,
   Error as ApiErrorBody,
+  InviteMemberRequest,
   LoginRequest,
+  ManageMemberOperation,
+  ManageMembersRequest,
+  ManagedMember,
   ManagedRoom,
+  MembershipMutationResponse,
   PatchAccountRoomSettingsRequest,
   PreferenceRequest,
   Preferences,
@@ -33,8 +38,13 @@ export type {
   ArchiveAccountRoomRequest,
   CreateAccountRoomRequest,
   CurrentUser,
+  InviteMemberRequest,
   LoginRequest,
+  ManageMemberOperation,
+  ManageMembersRequest,
+  ManagedMember,
   ManagedRoom,
+  MembershipMutationResponse,
   PatchAccountRoomSettingsRequest,
   PreferenceRequest,
   Preferences,
@@ -100,6 +110,21 @@ const OPERATIONS: {
   setAccountRoomArchived: {
     method: 'PATCH',
     path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}',
+    successStatus: 200
+  },
+  listAccountRoomMembers: {
+    method: 'GET',
+    path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/members',
+    successStatus: 200
+  },
+  manageAccountRoomMembers: {
+    method: 'PATCH',
+    path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/members',
+    successStatus: 200
+  },
+  inviteAccountRoomMember: {
+    method: 'POST',
+    path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/members',
     successStatus: 200
   },
   getAccountRoomSettings: {
@@ -304,6 +329,209 @@ function isManagedRoom(value: unknown): value is ManagedRoom {
   );
 }
 
+const MANAGED_MEMBER_KEYS = [
+  'id',
+  'roomId',
+  'userId',
+  'email',
+  'displayName',
+  'role',
+  'revision',
+  'badges',
+  'canPublishMic',
+  'canPublishScreen',
+  'canPublishCam',
+  'canUseAdminChat',
+  'canEditNotes',
+  'canAccessFiles',
+  'canAccessArchives',
+  'isMuted',
+  'isBanned',
+  'isPmRestricted',
+  'isTrial',
+  'hidePersonalInfo',
+  'hideUserCount',
+  'isPaused',
+  'adminNote',
+  'approvalStatus',
+  'hasMobileApp',
+  'hasPassword',
+  'lastSeenAt',
+  'invitedAt',
+  'joinedAt',
+  'createdAt'
+] as const;
+
+function isManagedMember(value: unknown): value is ManagedMember {
+  if (!isRecord(value) || !hasExactKeys(value, MANAGED_MEMBER_KEYS)) return false;
+  return (
+    isUuid(value.id) &&
+    isUuid(value.roomId) &&
+    isUuid(value.userId) &&
+    typeof value.email === 'string' &&
+    typeof value.displayName === 'string' &&
+    ['owner', 'presenter', 'limited_presenter', 'moderator', 'member'].includes(String(value.role)) &&
+    Number.isSafeInteger(value.revision) &&
+    Number(value.revision) >= 0 &&
+    Array.isArray(value.badges) &&
+    value.badges.every((badge) => typeof badge === 'string') &&
+    [
+      value.canPublishMic,
+      value.canPublishScreen,
+      value.canPublishCam,
+      value.canUseAdminChat,
+      value.canEditNotes,
+      value.canAccessFiles,
+      value.canAccessArchives,
+      value.isMuted,
+      value.isBanned,
+      value.isPmRestricted,
+      value.isTrial,
+      value.hidePersonalInfo,
+      value.hideUserCount,
+      value.isPaused,
+      value.hasMobileApp,
+      value.hasPassword
+    ].every((field) => typeof field === 'boolean') &&
+    (value.adminNote === null || typeof value.adminNote === 'string') &&
+    (value.approvalStatus === 'approved' || value.approvalStatus === 'pending') &&
+    [value.lastSeenAt, value.invitedAt, value.joinedAt].every((date) => date === null || isIsoDateTime(date)) &&
+    isIsoDateTime(value.createdAt)
+  );
+}
+
+export function isInviteMemberRequest(value: unknown): value is InviteMemberRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'email', 'displayName']) &&
+    isUuid(value.requestId) &&
+    typeof value.email === 'string' &&
+    isEmail(value.email) &&
+    typeof value.displayName === 'string' &&
+    isMemberDisplayName(value.displayName)
+  );
+}
+
+function utf8Bytes(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function isEmail(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (utf8Bytes(normalized) > 254 || /\s/u.test(normalized)) return false;
+  const separator = normalized.indexOf('@');
+  if (separator <= 0 || separator !== normalized.lastIndexOf('@')) return false;
+  const local = normalized.slice(0, separator);
+  const domain = normalized.slice(separator + 1);
+  return utf8Bytes(local) <= 64 && domain.includes('.') && !domain.startsWith('.') && !domain.endsWith('.');
+}
+
+function isMemberDisplayName(value: string): boolean {
+  const normalized = value.trim();
+  return normalized.length > 0 && utf8Bytes(normalized) <= 160;
+}
+
+function isManageMemberOperation(value: unknown): value is ManageMemberOperation {
+  if (!isRecord(value) || typeof value.type !== 'string') return false;
+  switch (value.type) {
+    case 'setRole':
+      return hasExactKeys(value, ['type', 'role']) && ['presenter', 'moderator', 'member'].includes(String(value.role));
+    case 'setMuted':
+      return hasExactKeys(value, ['type', 'muted']) && typeof value.muted === 'boolean';
+    case 'setBanned':
+      return hasExactKeys(value, ['type', 'banned']) && typeof value.banned === 'boolean';
+    case 'setTrial':
+      return hasExactKeys(value, ['type', 'trial']) && typeof value.trial === 'boolean';
+    case 'setHideUserCount':
+    case 'setHidePersonalInfo':
+      return hasExactKeys(value, ['type', 'hidden']) && typeof value.hidden === 'boolean';
+    case 'setArchiveAccess':
+    case 'setMobileApp':
+    case 'setFileAccess':
+      return hasExactKeys(value, ['type', 'allowed']) && typeof value.allowed === 'boolean';
+    case 'setPmRestricted':
+      return hasExactKeys(value, ['type', 'restricted']) && typeof value.restricted === 'boolean';
+    case 'setApproval':
+      return hasExactKeys(value, ['type', 'status']) && (value.status === 'approved' || value.status === 'pending');
+    case 'setNote':
+      return (
+        hasExactKeys(value, ['type', 'note']) &&
+        (value.note === null || (typeof value.note === 'string' && value.note.trim().length <= 500))
+      );
+    case 'setPermissions':
+      return (
+        hasExactKeys(value, ['type', 'publishMic', 'publishScreen', 'publishCam', 'useAdminChat', 'editNotes']) &&
+        [value.publishMic, value.publishScreen, value.publishCam, value.useAdminChat, value.editNotes].every(
+          (permission) => typeof permission === 'boolean'
+        )
+      );
+    case 'freshenLogin':
+      return hasExactKeys(value, ['type']);
+    case 'rename':
+      return (
+        hasExactKeys(value, ['type', 'displayName']) &&
+        typeof value.displayName === 'string' &&
+        isMemberDisplayName(value.displayName)
+      );
+    case 'setPassword':
+      return (
+        hasExactKeys(value, ['type', 'password']) && typeof value.password === 'string' && value.password.length >= 10
+      );
+    case 'remove':
+      return hasExactKeys(value, ['type']);
+    default:
+      return false;
+  }
+}
+
+export function isManageMembersRequest(value: unknown): value is ManageMembersRequest {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(
+      value,
+      value.allRooms === undefined
+        ? ['requestId', 'targets', 'operation']
+        : ['requestId', 'targets', 'allRooms', 'operation']
+    ) ||
+    !isUuid(value.requestId) ||
+    !Array.isArray(value.targets) ||
+    value.targets.length === 0 ||
+    value.targets.length > 1_000 ||
+    (value.allRooms !== undefined && typeof value.allRooms !== 'boolean') ||
+    !isManageMemberOperation(value.operation)
+  ) {
+    return false;
+  }
+  const ids = new Set<string>();
+  return value.targets.every((target) => {
+    if (
+      !isRecord(target) ||
+      !hasExactKeys(target, ['memberId', 'expectedRevision']) ||
+      !isUuid(target.memberId) ||
+      ids.has(target.memberId) ||
+      !Number.isSafeInteger(target.expectedRevision) ||
+      Number(target.expectedRevision) < 0
+    ) {
+      return false;
+    }
+    ids.add(target.memberId);
+    return true;
+  });
+}
+
+export function isMembershipMutationResponse(value: unknown): value is MembershipMutationResponse {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['members', 'removedMemberIds', 'changed']) &&
+    Array.isArray(value.members) &&
+    value.members.every(isManagedMember) &&
+    Array.isArray(value.removedMemberIds) &&
+    value.removedMemberIds.every(isUuid) &&
+    Number.isSafeInteger(value.changed) &&
+    Number(value.changed) >= 0
+  );
+}
+
 export function isCreateAccountRoomRequest(value: unknown): value is CreateAccountRoomRequest {
   return (
     isRecord(value) &&
@@ -380,6 +608,11 @@ function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, par
     case 'createAccountRoom':
     case 'setAccountRoomArchived':
       return isManagedRoom(parsed);
+    case 'listAccountRoomMembers':
+      return Array.isArray(parsed) && parsed.every(isManagedMember);
+    case 'manageAccountRoomMembers':
+    case 'inviteAccountRoomMember':
+      return isMembershipMutationResponse(parsed);
     case 'getAccountRoomSettings':
     case 'patchAccountRoomSettings':
       return isAccountRoomSettings(parsed);
@@ -712,6 +945,47 @@ export function setAccountRoomArchived(
   request: ArchiveAccountRoomRequest
 ): Promise<ApiResult<ManagedRoom>> {
   return call('setAccountRoomArchived', context, request, {
+    enterprise_id: enterpriseId,
+    room_id: roomId
+  });
+}
+
+export function listAccountRoomMembers(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string
+): Promise<ApiResult<ManagedMember[]>> {
+  return call('listAccountRoomMembers', context, undefined, {
+    enterprise_id: enterpriseId,
+    room_id: roomId
+  });
+}
+
+export function inviteAccountRoomMember(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string,
+  request: InviteMemberRequest
+): Promise<ApiResult<MembershipMutationResponse>> {
+  if (!isInviteMemberRequest(request)) {
+    return Promise.resolve({ ok: false, status: 400, code: 'invalid', message: 'Invalid member invitation.' });
+  }
+  return call('inviteAccountRoomMember', context, request, {
+    enterprise_id: enterpriseId,
+    room_id: roomId
+  });
+}
+
+export function manageAccountRoomMembers(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string,
+  request: ManageMembersRequest
+): Promise<ApiResult<MembershipMutationResponse>> {
+  if (!isManageMembersRequest(request)) {
+    return Promise.resolve({ ok: false, status: 400, code: 'invalid', message: 'Invalid membership mutation.' });
+  }
+  return call('manageAccountRoomMembers', context, request, {
     enterprise_id: enterpriseId,
     room_id: roomId
   });

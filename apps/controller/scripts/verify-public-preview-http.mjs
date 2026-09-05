@@ -37,7 +37,9 @@ const PINNED_ENV = Object.freeze({
   RECAPTCHA_SECRET_KEY: '',
   PROFILE_AUTHORITY_MODE: '',
   ROOM_AUTHORITY_MODE: '',
-  ROOM_SETTINGS_AUTHORITY_MODE: ''
+  ROOM_SETTINGS_AUTHORITY_MODE: '',
+  MEMBERSHIP_AUTHORITY_MODE: '',
+  TRADINGROOM_INTERNAL_SECRET: ''
 });
 const staleSessionHeaders = { cookie: 'control_session=stale-preview-session' };
 // This verifier intentionally drives Vite's development server so the first request to a route can

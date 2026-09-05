@@ -85,6 +85,7 @@ async fn run() -> Result<(), StartupError> {
         grant_key,
         config.trusted_proxy_hops,
         config.trusted_web_origin.clone(),
+        config.controller_internal_secret.as_deref(),
     ));
     let app = router(Arc::clone(&state), config.request_timeout);
 

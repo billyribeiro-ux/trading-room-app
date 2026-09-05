@@ -333,6 +333,63 @@ pub fn document() -> Value {
                         "503": { "$ref": "#/components/responses/Unavailable" }
                     }
                 }
+            },
+            "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/members": {
+                "parameters": [
+                    { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() },
+                    { "name": "room_id", "in": "path", "required": true, "schema": uuid_schema() }
+                ],
+                "get": {
+                    "operationId": "listAccountRoomMembers",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "responses": {
+                        "200": {
+                            "description": "Canonical account-managed membership projection.",
+                            "content": { "application/json": { "schema": {
+                                "type": "array", "items": { "$ref": "#/components/schemas/ManagedMember" }
+                            } } }
+                        },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                },
+                "post": {
+                    "operationId": "inviteAccountRoomMember",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "$ref": "#/components/schemas/InviteMemberRequest"
+                    } } } },
+                    "responses": {
+                        "200": { "description": "Exactly-once invitation result.", "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/MembershipMutationResponse" } }
+                        } },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                },
+                "patch": {
+                    "operationId": "manageAccountRoomMembers",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "$ref": "#/components/schemas/ManageMembersRequest"
+                    } } } },
+                    "responses": {
+                        "200": { "description": "Exactly-once committed membership mutation.", "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/MembershipMutationResponse" } }
+                        } },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "409": { "$ref": "#/components/responses/Conflict" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
             }
         },
         "components": {
@@ -520,6 +577,110 @@ pub fn document() -> Value {
                         "updates": { "$ref": "#/components/schemas/RoomSettings" }
                     }
                 },
+                "ManagedMember": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "id", "roomId", "userId", "email", "displayName", "role", "revision", "badges",
+                        "canPublishMic", "canPublishScreen", "canPublishCam", "canUseAdminChat", "canEditNotes",
+                        "canAccessFiles", "canAccessArchives", "isMuted", "isBanned", "isPmRestricted", "isTrial",
+                        "hidePersonalInfo", "hideUserCount", "isPaused", "adminNote", "approvalStatus", "hasMobileApp",
+                        "hasPassword", "lastSeenAt", "invitedAt", "joinedAt", "createdAt"
+                    ],
+                    "properties": {
+                        "id": uuid_schema(),
+                        "roomId": uuid_schema(),
+                        "userId": uuid_schema(),
+                        "email": { "type": "string", "format": "email" },
+                        "displayName": { "type": "string" },
+                        "role": { "type": "string", "enum": ["owner", "presenter", "limited_presenter", "moderator", "member"] },
+                        "revision": { "type": "integer", "minimum": 0 },
+                        "badges": { "type": "array", "items": { "type": "string" } },
+                        "canPublishMic": { "type": "boolean" },
+                        "canPublishScreen": { "type": "boolean" },
+                        "canPublishCam": { "type": "boolean" },
+                        "canUseAdminChat": { "type": "boolean" },
+                        "canEditNotes": { "type": "boolean" },
+                        "canAccessFiles": { "type": "boolean" },
+                        "canAccessArchives": { "type": "boolean" },
+                        "isMuted": { "type": "boolean" },
+                        "isBanned": { "type": "boolean" },
+                        "isPmRestricted": { "type": "boolean" },
+                        "isTrial": { "type": "boolean" },
+                        "hidePersonalInfo": { "type": "boolean" },
+                        "hideUserCount": { "type": "boolean" },
+                        "isPaused": { "type": "boolean" },
+                        "adminNote": { "type": ["string", "null"] },
+                        "approvalStatus": { "type": "string", "enum": ["approved", "pending"] },
+                        "hasMobileApp": { "type": "boolean" },
+                        "hasPassword": { "type": "boolean" },
+                        "lastSeenAt": { "type": ["string", "null"], "format": "date-time" },
+                        "invitedAt": { "type": ["string", "null"], "format": "date-time" },
+                        "joinedAt": { "type": ["string", "null"], "format": "date-time" },
+                        "createdAt": { "type": "string", "format": "date-time" }
+                    }
+                },
+                "InviteMemberRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "email", "displayName"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "email": { "type": "string", "format": "email", "maxLength": 254 },
+                        "displayName": { "type": "string", "minLength": 1, "maxLength": 160 }
+                    }
+                },
+                "MemberTarget": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["memberId", "expectedRevision"],
+                    "properties": {
+                        "memberId": uuid_schema(),
+                        "expectedRevision": { "type": "integer", "minimum": 0 }
+                    }
+                },
+                "ManageMemberOperation": {
+                    "oneOf": [
+                        { "type": "object", "additionalProperties": false, "required": ["type", "role"], "properties": { "type": { "type": "string", "enum": ["setRole"] }, "role": { "type": "string", "enum": ["presenter", "moderator", "member"] } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "muted"], "properties": { "type": { "type": "string", "enum": ["setMuted"] }, "muted": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "banned"], "properties": { "type": { "type": "string", "enum": ["setBanned"] }, "banned": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "trial"], "properties": { "type": { "type": "string", "enum": ["setTrial"] }, "trial": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "hidden"], "properties": { "type": { "type": "string", "enum": ["setHideUserCount"] }, "hidden": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "hidden"], "properties": { "type": { "type": "string", "enum": ["setHidePersonalInfo"] }, "hidden": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "allowed"], "properties": { "type": { "type": "string", "enum": ["setArchiveAccess"] }, "allowed": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "restricted"], "properties": { "type": { "type": "string", "enum": ["setPmRestricted"] }, "restricted": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "status"], "properties": { "type": { "type": "string", "enum": ["setApproval"] }, "status": { "type": "string", "enum": ["approved", "pending"] } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "allowed"], "properties": { "type": { "type": "string", "enum": ["setMobileApp"] }, "allowed": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "allowed"], "properties": { "type": { "type": "string", "enum": ["setFileAccess"] }, "allowed": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "note"], "properties": { "type": { "type": "string", "enum": ["setNote"] }, "note": { "type": ["string", "null"], "maxLength": 500 } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "publishMic", "publishScreen", "publishCam", "useAdminChat", "editNotes"], "properties": { "type": { "type": "string", "enum": ["setPermissions"] }, "publishMic": { "type": "boolean" }, "publishScreen": { "type": "boolean" }, "publishCam": { "type": "boolean" }, "useAdminChat": { "type": "boolean" }, "editNotes": { "type": "boolean" } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "type": "string", "enum": ["freshenLogin"] } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "displayName"], "properties": { "type": { "type": "string", "enum": ["rename"] }, "displayName": { "type": "string", "minLength": 1, "maxLength": 160 } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type", "password"], "properties": { "type": { "type": "string", "enum": ["setPassword"] }, "password": { "type": "string", "minLength": 10, "maxLength": crate::limits::PASSWORD_MAX_BYTES, "writeOnly": true } } },
+                        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "type": "string", "enum": ["remove"] } } }
+                    ]
+                },
+                "ManageMembersRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "targets", "operation"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "targets": { "type": "array", "minItems": 1, "maxItems": 1000, "items": { "$ref": "#/components/schemas/MemberTarget" } },
+                        "allRooms": { "type": "boolean" },
+                        "operation": { "$ref": "#/components/schemas/ManageMemberOperation" }
+                    }
+                },
+                "MembershipMutationResponse": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["members", "removedMemberIds", "changed"],
+                    "properties": {
+                        "members": { "type": "array", "items": { "$ref": "#/components/schemas/ManagedMember" } },
+                        "removedMemberIds": { "type": "array", "items": uuid_schema() },
+                        "changed": { "type": "integer", "minimum": 0 }
+                    }
+                },
                 "Error": {
                     "type": "object",
                     "additionalProperties": false,
@@ -597,9 +758,12 @@ mod tests {
                 "getAccountBootstrap",
                 "getAccountPreferences",
                 "getAccountRoomSettings",
+                "inviteAccountRoomMember",
                 "listAccountRooms",
+                "listAccountRoomMembers",
                 "login",
                 "logout",
+                "manageAccountRoomMembers",
                 "refreshSession",
                 "setAccountPreference",
                 "setAccountRoomArchived",

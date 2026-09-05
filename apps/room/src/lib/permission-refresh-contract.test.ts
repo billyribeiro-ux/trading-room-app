@@ -4,6 +4,7 @@ import { callRemote } from '#lib/server/remote-command-harness.js';
 import { db, ensureDatabase } from '#lib/server/db/index.js';
 import { users, type User } from '#lib/server/db/schema.js';
 import { subscribeToRoom, type RoomEvent } from '#lib/server/room-events.js';
+import { savePermissions } from '../routes/permissions.remote.js';
 
 /*
   The real write client stays in this contract: its successful HTTP response is the commit boundary
@@ -88,7 +89,6 @@ describe('permission changes take effect for the connected target', () => {
     );
 
     try {
-      const { savePermissions } = await import('../routes/permissions.remote.js');
       await callRemote(
         {
           user: presenter,
@@ -122,7 +122,6 @@ describe('permission changes take effect for the connected target', () => {
     });
 
     try {
-      const { savePermissions } = await import('../routes/permissions.remote.js');
       await expect(
         callRemote(
           {

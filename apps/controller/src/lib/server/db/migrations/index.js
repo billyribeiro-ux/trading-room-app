@@ -19,6 +19,7 @@ import { sql as alertCrossPostSuppression } from './0017-alert-cross-post-suppre
 import { sql as authorityIdentityMappings } from './0018-authority-identity-mappings.js';
 import { sql as authorityRoomMappings } from './0019-authority-room-mappings.js';
 import { sql as authorityRoomSettingsProjection } from './0020-authority-room-settings-projection.js';
+import { sql as authorityMembershipProjection } from './0021-authority-membership-projection.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -173,6 +174,11 @@ export const MIGRATIONS = [
     version: 20,
     name: 'authority_room_settings_projection',
     sql: authorityRoomSettingsProjection
+  },
+  {
+    version: 21,
+    name: 'authority_membership_projection',
+    sql: authorityMembershipProjection
   }
 ];
 

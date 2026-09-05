@@ -127,3 +127,25 @@ describe('CI cannot cancel the default branch out of its own verification', () =
     }
   });
 });
+
+describe('backend workflow scoping cannot omit a canonical-authority converter', () => {
+  it('runs the backend gate for every current converter and its end-to-end verifier', () => {
+    const workflow = workflows.find(({ name }) => name === 'backend-quality.yml');
+    expect(workflow, 'backend-quality.yml must remain in the workflow sweep').toBeDefined();
+
+    const scopePattern = workflow?.text.match(/grep -qE '([^']+)'/)?.[1];
+    expect(scopePattern, 'backend-quality.yml must expose its changed-path scope as an ERE').toBeDefined();
+
+    const scoped = new RegExp(scopePattern ?? '(?!)');
+    for (const authority of ['profile', 'room', 'room-settings', 'membership']) {
+      expect(
+        scoped.test(`apps/controller/scripts/cutover-${authority}-authority.mjs`),
+        `${authority} converter changes must execute the backend security gate`
+      ).toBe(true);
+      expect(
+        scoped.test(`apps/controller/scripts/verify-${authority}-cutover-e2e.mjs`),
+        `${authority} converter rehearsals must execute the backend security gate`
+      ).toBe(true);
+    }
+  });
+});

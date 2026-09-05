@@ -323,6 +323,10 @@ export function listRoomUsers(roomId: number) {
     .select({
       id: roomUsers.id,
       userId: users.id,
+      authorityMemberId: roomUsers.authorityMemberId,
+      authorityRevision: roomUsers.authorityRevision,
+      authorityContentHash: roomUsers.authorityContentHash,
+      authorityReconciledAt: roomUsers.authorityReconciledAt,
       email: users.email,
       displayName: users.displayName,
       role: roomUsers.role,

@@ -51,7 +51,10 @@ for (const line of raw.split('\n')) {
   if (!line.trim() || line.trimStart().startsWith('#')) continue;
   const at = line.indexOf('=');
   if (at === -1) continue;
-  env[line.slice(0, at).trim()] = line.slice(at + 1).trim().replace(/^["']|["']$/g, '');
+  env[line.slice(0, at).trim()] = line
+    .slice(at + 1)
+    .trim()
+    .replace(/^["']|["']$/g, '');
 }
 
 /*
@@ -89,6 +92,7 @@ const REQUIRED = [
   'PROFILE_AUTHORITY_MODE',
   'ROOM_AUTHORITY_MODE',
   'ROOM_SETTINGS_AUTHORITY_MODE',
+  'MEMBERSHIP_AUTHORITY_MODE',
   'DATABASE_URL',
   'ROOM_JWT_SECRET',
   'ROOM_BASE_URL',
@@ -149,19 +153,44 @@ if (readable(env.ROOM_SETTINGS_AUTHORITY_MODE) && !['legacy', 'rust'].includes(e
   env.ROOM_SETTINGS_AUTHORITY_MODE === 'rust' &&
   (env.PROFILE_AUTHORITY_MODE !== 'rust' || env.ROOM_AUTHORITY_MODE !== 'rust')
 ) {
-  fail(
-    'ROOM_SETTINGS_AUTHORITY_MODE',
-    'rust requires PROFILE_AUTHORITY_MODE=rust and ROOM_AUTHORITY_MODE=rust'
-  );
+  fail('ROOM_SETTINGS_AUTHORITY_MODE', 'rust requires PROFILE_AUTHORITY_MODE=rust and ROOM_AUTHORITY_MODE=rust');
 } else if (env.ROOM_SETTINGS_AUTHORITY_MODE === 'rust' && !readable(env.TRADINGROOM_API_URL)) {
   fail('TRADINGROOM_API_URL', 'required when ROOM_SETTINGS_AUTHORITY_MODE=rust — settings requests fail closed');
 } else if (env.ROOM_SETTINGS_AUTHORITY_MODE === 'rust') {
   ok('ROOM_SETTINGS_AUTHORITY_MODE', 'Rust room-settings authority is consistently configured');
 }
 
+if (readable(env.MEMBERSHIP_AUTHORITY_MODE) && !['legacy', 'rust'].includes(env.MEMBERSHIP_AUTHORITY_MODE)) {
+  fail('MEMBERSHIP_AUTHORITY_MODE', `must be legacy or rust, not ${env.MEMBERSHIP_AUTHORITY_MODE}`);
+} else if (
+  env.MEMBERSHIP_AUTHORITY_MODE === 'rust' &&
+  (env.PROFILE_AUTHORITY_MODE !== 'rust' ||
+    env.ROOM_AUTHORITY_MODE !== 'rust' ||
+    env.ROOM_SETTINGS_AUTHORITY_MODE !== 'rust')
+) {
+  fail(
+    'MEMBERSHIP_AUTHORITY_MODE',
+    'rust requires PROFILE_AUTHORITY_MODE=rust, ROOM_AUTHORITY_MODE=rust, and ROOM_SETTINGS_AUTHORITY_MODE=rust'
+  );
+} else if (env.MEMBERSHIP_AUTHORITY_MODE === 'rust' && !readable(env.TRADINGROOM_API_URL)) {
+  fail('TRADINGROOM_API_URL', 'required when MEMBERSHIP_AUTHORITY_MODE=rust — membership requests fail closed');
+} else if (
+  env.MEMBERSHIP_AUTHORITY_MODE === 'rust' &&
+  (!env.TRADINGROOM_INTERNAL_SECRET || env.TRADINGROOM_INTERNAL_SECRET === '')
+) {
+  fail('TRADINGROOM_INTERNAL_SECRET', 'required when MEMBERSHIP_AUTHORITY_MODE=rust — live-room controls fail closed');
+} else if (env.MEMBERSHIP_AUTHORITY_MODE === 'rust') {
+  ok('MEMBERSHIP_AUTHORITY_MODE', 'Rust membership authority and live-room service credential are configured');
+}
+
 /* ---- 4. Secrets are actually secret --------------------------------------------------------- */
 // `ROOM_JWT_SECRET` was 9 characters and signs 360-day handoff tokens that travel in URLs.
-const MIN = { ROOM_JWT_SECRET: 32, API_KEY_ENCRYPTION_KEY: 32, RECAPTCHA_SECRET_KEY: 20 };
+const MIN = {
+  ROOM_JWT_SECRET: 32,
+  API_KEY_ENCRYPTION_KEY: 32,
+  RECAPTCHA_SECRET_KEY: 20,
+  TRADINGROOM_INTERNAL_SECRET: 32
+};
 for (const [name, min] of Object.entries(MIN)) {
   const v = env[name];
   if (!readable(v)) {
@@ -188,7 +217,11 @@ if (readable(env.DATABASE_URL) && readable(env.API_KEY_ENCRYPTION_KEY)) {
       let bad = 0;
       for (const r of rows) {
         try {
-          decryptApiKeySecret(r.secret_ciphertext, { accountId: r.account_id, keyId: r.id }, env.API_KEY_ENCRYPTION_KEY);
+          decryptApiKeySecret(
+            r.secret_ciphertext,
+            { accountId: r.account_id, keyId: r.id },
+            env.API_KEY_ENCRYPTION_KEY
+          );
         } catch {
           bad += 1;
         }

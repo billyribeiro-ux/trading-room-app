@@ -5,23 +5,33 @@
 
 mod support;
 
-use support::{ACME_ENTERPRISE, ACME_OWNER, Harness};
+use support::{ACME_ENTERPRISE, ACME_MODERATOR, ACME_OWNER, Harness};
 use uuid::Uuid;
 
 /// A room in Acme with a given auth mode, plus whatever config it needs.
 async fn make_room(h: &Harness, auth_mode: &str, config: serde_json::Value) -> Uuid {
-    h.tenant_scalar(
-        "INSERT INTO rooms (enterprise_id, owner_id, uuid_short, name, auth_mode, config) \
+    let room_id = h
+        .tenant_scalar(
+            "INSERT INTO rooms (enterprise_id, owner_id, uuid_short, name, auth_mode, config) \
          VALUES ($1, $2, $3, 'Join Test Room', $4, $5) RETURNING id",
-        |q| {
-            q.bind(ACME_ENTERPRISE)
-                .bind(ACME_OWNER)
-                .bind(Uuid::new_v4().simple().to_string())
-                .bind(auth_mode.to_owned())
-                .bind(sqlx::types::Json(config))
-        },
+            |q| {
+                q.bind(ACME_ENTERPRISE)
+                    // The caller under test is ACME_OWNER. Seat a different existing identity as the
+                    // room owner so a join still exercises creation of a non-owner membership.
+                    .bind(ACME_MODERATOR)
+                    .bind(Uuid::new_v4().simple().to_string())
+                    .bind(auth_mode.to_owned())
+                    .bind(sqlx::types::Json(config))
+            },
+        )
+        .await;
+    h.tenant_execute(
+        "INSERT INTO room_members (enterprise_id, room_id, user_id, role, display_name) \
+         VALUES ($1, $2, $3, 'owner', 'Join Fixture Owner')",
+        |q| q.bind(ACME_ENTERPRISE).bind(room_id).bind(ACME_MODERATOR),
     )
-    .await
+    .await;
+    room_id
 }
 
 // ---------------------------------------------------------------- open rooms
@@ -405,7 +415,7 @@ async fn a_guest_may_enter_only_a_room_that_allows_anonymous() {
     // And nothing was created for the refused attempt.
     let leaked: i32 = h
         .tenant_scalar_i32(
-            "SELECT count(*)::int FROM room_members WHERE room_id = $1",
+            "SELECT count(*)::int FROM room_members WHERE room_id = $1 AND role <> 'owner'",
             |q| q.bind(closed),
         )
         .await;
@@ -448,18 +458,14 @@ async fn a_guest_gets_a_session_and_a_membership_but_no_password() {
 
     let members: i32 = h
         .tenant_scalar_i32(
-            "SELECT count(*)::int FROM room_members WHERE room_id = $1",
+            "SELECT count(*)::int FROM room_members WHERE room_id = $1 AND role <> 'owner'",
             |q| q.bind(room),
         )
         .await;
     assert_eq!(members, 1, "the guest is a member of the room they entered");
 
-    h.tenant_execute("DELETE FROM room_members WHERE room_id = $1", |q| {
-        q.bind(room)
-    })
-    .await;
-    h.purge_guests(room).await;
     h.drop_room(room).await;
+    h.purge_guests(room).await;
 }
 
 #[tokio::test]

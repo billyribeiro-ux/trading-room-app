@@ -77,6 +77,11 @@ requires both profile and room modes to already be `rust`; see
 [`ops/ROOM-AUTHORITY-CUTOVER.md`](../../ops/ROOM-AUTHORITY-CUTOVER.md) and
 [`ops/ROOM-SETTINGS-AUTHORITY-CUTOVER.md`](../../ops/ROOM-SETTINGS-AUTHORITY-CUTOVER.md).
 
+Membership authority follows those three slices. Keep `MEMBERSHIP_AUTHORITY_MODE=legacy` until its
+converter verifies. Rust membership mode requires the exact same 32–256 character printable-ASCII
+`TRADINGROOM_INTERNAL_SECRET` in the controller and API, and fails closed when any prerequisite or
+mapping is absent. See [`ops/MEMBERSHIP-AUTHORITY-CUTOVER.md`](../../ops/MEMBERSHIP-AUTHORITY-CUTOVER.md).
+
 ```bash
 createdb tradingroom_dev
 # DATABASE_URL=postgres://<user>@localhost:5432/tradingroom_dev

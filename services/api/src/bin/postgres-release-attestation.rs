@@ -1119,8 +1119,12 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// an object-only settings invariant, and a forced-RLS idempotency ledger. Runtime receives only
 /// SELECT and INSERT on that append-only ledger; UPDATE, DELETE, and every ownership capability
 /// remain absent and are asserted below.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 16] =
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+///
+/// Slot 17 is `0017_membership_authority.sql`. It adds revisioned account-managed member state,
+/// fail-closed runtime membership resolvers, a deferred final-owner invariant, and a forced-RLS
+/// append-only mutation ledger with the same SELECT+INSERT-only runtime posture.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 17] =
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 
 /// The two human-facing error messages that name that chain's range in PROSE, as named constants
 /// so `the_prose_ranges_track_the_attested_chain` can hold them against
@@ -1131,9 +1135,9 @@ const ATTESTED_MIGRATION_VERSIONS: [i64; 16] =
 /// refused release. The embedded-contract message beside it was moved by hand both times;
 /// hand-moving is the convention that failed here, so the test moves the burden.
 const EMBEDDED_MIGRATION_CONTRACT_MESSAGE: &str =
-    "the attestor is pinned to repository migration versions 0001 through 0016";
+    "the attestor is pinned to repository migration versions 0001 through 0017";
 const MIGRATION_LEDGER_MISMATCH_MESSAGE: &str = "the SQLx ledger must contain only successful \
-     repository migrations 0001 through 0016 with exact descriptions and checksums";
+     repository migrations 0001 through 0017 with exact descriptions and checksums";
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -1514,7 +1518,7 @@ async fn query_and_validate_acl(
     let table_rows: Vec<TablePrivilegeRow> = sqlx::query_as(
         "WITH protected(table_name, table_order) AS ( \
              VALUES ('enterprises'::text, 1), ('users'::text, 2), ('audit_log'::text, 3), \
-                    ('room_setting_mutations'::text, 4) \
+                    ('room_setting_mutations'::text, 4), ('membership_mutations'::text, 5) \
          ), privilege(privilege_type, privilege_order) AS ( \
              VALUES \
                  ('SELECT'::text, 1), ('INSERT'::text, 2), ('UPDATE'::text, 3), \
@@ -1659,28 +1663,30 @@ fn validate_acl_rows(
         });
     }
 
-    let settings_table_rows: Vec<&TablePrivilegeRow> = table_rows
-        .iter()
-        .filter(|row| row.table_name == "room_setting_mutations")
-        .collect();
-    if settings_table_rows.len() != TABLE_PRIVILEGE_TYPES.len()
-        || settings_table_rows
+    for ledger in ["room_setting_mutations", "membership_mutations"] {
+        let ledger_rows: Vec<&TablePrivilegeRow> = table_rows
             .iter()
-            .zip(TABLE_PRIVILEGE_TYPES)
-            .any(|(row, expected)| {
-                row.privilege_type != *expected
-                    || row.granted != matches!(*expected, "SELECT" | "INSERT")
-            })
-    {
-        return Err(acl_mismatch());
+            .filter(|row| row.table_name == ledger)
+            .collect();
+        if ledger_rows.len() != TABLE_PRIVILEGE_TYPES.len()
+            || ledger_rows
+                .iter()
+                .zip(TABLE_PRIVILEGE_TYPES)
+                .any(|(row, expected)| {
+                    row.privilege_type != *expected
+                        || row.granted != matches!(*expected, "SELECT" | "INSERT")
+                })
+        {
+            return Err(acl_mismatch());
+        }
+        objects.push(ObjectAclEvidence {
+            relation: format!("public.{ledger}"),
+            table_privileges: vec!["SELECT".into(), "INSERT".into()],
+            columns: Vec::new(),
+        });
     }
-    objects.push(ObjectAclEvidence {
-        relation: "public.room_setting_mutations".into(),
-        table_privileges: vec!["SELECT".into(), "INSERT".into()],
-        columns: Vec::new(),
-    });
 
-    if table_rows.len() != (expected_objects.len() + 1) * TABLE_PRIVILEGE_TYPES.len()
+    if table_rows.len() != (expected_objects.len() + 2) * TABLE_PRIVILEGE_TYPES.len()
         || column_rows.len()
             != (ENTERPRISE_COLUMNS.len() + USER_COLUMNS.len() + AUDIT_LOG_COLUMNS.len())
                 * COLUMN_PRIVILEGE_TYPES.len()
@@ -1715,7 +1721,7 @@ fn expected_column_privileges(table_name: &str, column_name: &str) -> Vec<String
 const fn acl_mismatch() -> AttestationError {
     AttestationError::new(
         "runtime_acl_mismatch",
-        "effective table and column privileges do not match the reviewed runtime matrix through migration 0016",
+        "effective table and column privileges do not match the reviewed runtime matrix through migration 0017",
     )
 }
 
@@ -2632,18 +2638,23 @@ mod tests {
     }
 
     #[test]
-    fn exact_acl_fixture_accepts_only_the_reviewed_matrix_through_migration_0016() {
+    fn exact_acl_fixture_accepts_only_the_reviewed_matrix_through_migration_0017() {
         let (mut table_rows, mut column_rows) = exact_acl_rows();
         let evidence = validate_acl_rows(&table_rows, &column_rows)
             .expect("the reviewed runtime ACL matrix is valid");
-        assert_eq!(evidence.objects.len(), 4);
-        let settings_ledger = evidence
-            .objects
-            .iter()
-            .find(|object| object.relation == "public.room_setting_mutations")
-            .expect("settings ledger is explicitly attested");
-        assert_eq!(settings_ledger.table_privileges, ["SELECT", "INSERT"]);
-        assert!(settings_ledger.columns.is_empty());
+        assert_eq!(evidence.objects.len(), 5);
+        for relation in [
+            "public.room_setting_mutations",
+            "public.membership_mutations",
+        ] {
+            let ledger = evidence
+                .objects
+                .iter()
+                .find(|object| object.relation == relation)
+                .expect("each append-only ledger is explicitly attested");
+            assert_eq!(ledger.table_privileges, ["SELECT", "INSERT"]);
+            assert!(ledger.columns.is_empty());
+        }
 
         let delete_index = table_rows
             .iter()
@@ -2659,6 +2670,21 @@ mod tests {
             "runtime_acl_mismatch"
         );
         table_rows[delete_index].granted = false;
+
+        let membership_delete_index = table_rows
+            .iter()
+            .position(|row| {
+                row.table_name == "membership_mutations" && row.privilege_type == "DELETE"
+            })
+            .expect("membership-ledger delete row exists");
+        table_rows[membership_delete_index].granted = true;
+        assert_eq!(
+            validate_acl_rows(&table_rows, &column_rows)
+                .expect_err("membership mutation evidence must stay append-only")
+                .code,
+            "runtime_acl_mismatch"
+        );
+        table_rows[membership_delete_index].granted = false;
 
         let promoted = column_rows
             .iter_mut()
@@ -2713,6 +2739,7 @@ mod tests {
             "users",
             "audit_log",
             "room_setting_mutations",
+            "membership_mutations",
         ];
         let table_rows = expected_tables
             .iter()
@@ -2722,8 +2749,10 @@ mod tests {
                     .map(move |privilege| TablePrivilegeRow {
                         table_name: (*table_name).to_owned(),
                         privilege_type: (*privilege).to_owned(),
-                        granted: *table_name == "room_setting_mutations"
-                            && matches!(*privilege, "SELECT" | "INSERT"),
+                        granted: matches!(
+                            *table_name,
+                            "room_setting_mutations" | "membership_mutations"
+                        ) && matches!(*privilege, "SELECT" | "INSERT"),
                     })
             })
             .collect();

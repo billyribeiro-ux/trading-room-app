@@ -101,6 +101,14 @@ fn harness_concurrency() -> Arc<Semaphore> {
 
 impl Harness {
     pub async fn start() -> Self {
+        Self::start_with_optional_controller_secret(None).await
+    }
+
+    pub async fn start_with_controller_secret(secret: &str) -> Self {
+        Self::start_with_optional_controller_secret(Some(secret)).await
+    }
+
+    async fn start_with_optional_controller_secret(controller_secret: Option<&str>) -> Self {
         let concurrency_permit = harness_concurrency()
             .acquire_owned()
             .await
@@ -111,13 +119,19 @@ impl Harness {
             .connect(&owner_url())
             .await
             .expect("connect as the fixture owner");
-        let state = Arc::new(AppState::new(
-            Db::connect(&database_url(), 2, limits::DB_ACQUIRE_TIMEOUT)
-                .await
-                .expect("connect"),
-            signing_key.clone(),
-            TEST_WEB_ORIGIN.into(),
-        ));
+        let runtime_db = Db::connect(&database_url(), 2, limits::DB_ACQUIRE_TIMEOUT)
+            .await
+            .expect("connect");
+        let state = Arc::new(if let Some(secret) = controller_secret {
+            AppState::new_with_controller_secret(
+                runtime_db,
+                signing_key.clone(),
+                TEST_WEB_ORIGIN.into(),
+                secret,
+            )
+        } else {
+            AppState::new(runtime_db, signing_key.clone(), TEST_WEB_ORIGIN.into())
+        });
         state.set_relay_ready_for_tests(true);
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -244,6 +258,22 @@ impl Harness {
         let payload = body.to_string();
         self.request(&format!(
             "POST {path} HTTP/1.1\r\nHost: localhost\r\n\
+             Content-Type: application/json\r\nContent-Length: {}\r\n\
+             Connection: close\r\n\r\n{payload}",
+            payload.len()
+        ))
+        .await
+    }
+
+    pub async fn post_bearer(
+        &self,
+        path: &str,
+        bearer: &str,
+        body: &serde_json::Value,
+    ) -> Response {
+        let payload = body.to_string();
+        self.request(&format!(
+            "POST {path} HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {bearer}\r\n\
              Content-Type: application/json\r\nContent-Length: {}\r\n\
              Connection: close\r\n\r\n{payload}",
             payload.len()

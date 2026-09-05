@@ -20,4 +20,15 @@ describe('Gate 3 authority identity mapping', () => {
     expect(migration?.sql).toContain('ADD COLUMN authority_reconciled_at TIMESTAMPTZ');
     expect(migration?.sql).not.toMatch(/NOT NULL/);
   });
+
+  it('adds nullable membership identity, revision, and content-stability proof forward-only', () => {
+    const migration = MIGRATIONS.find(({ version }) => version === 21);
+    expect(migration?.name).toBe('authority_membership_projection');
+    expect(migration?.sql).toContain('ADD COLUMN authority_member_id UUID');
+    expect(migration?.sql).toContain('ADD COLUMN authority_revision BIGINT');
+    expect(migration?.sql).toContain('ADD COLUMN authority_content_hash TEXT');
+    expect(migration?.sql).toContain('room_users_authority_member_idx');
+    expect(migration?.sql).toContain('room_users_authority_revision_nonnegative');
+    expect(migration?.sql).not.toMatch(/NOT NULL/);
+  });
 });
