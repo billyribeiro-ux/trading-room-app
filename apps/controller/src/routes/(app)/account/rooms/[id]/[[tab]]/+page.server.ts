@@ -2,7 +2,6 @@ import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { count, desc, eq } from 'drizzle-orm';
 import { PUBLIC_SITE_ORIGIN } from '$app/env/public';
-import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { getDb } from '#lib/server/db/index.js';
 import { adminAudit, badges, roomSessions, roomUsers, rooms, users as accountUsers } from '#lib/server/db/schema.js';
 import { requireOwnedRoom, requireUser, verifyPassword } from '#lib/server/auth.js';
@@ -52,7 +51,6 @@ import {
 import { FcmCredentialInvalid, FcmNotConfigured, FcmUnreachable } from '#lib/server/fcm.js';
 import { MailEnvMissing, sendWebinarReminderToRoom, sendWelcomeEmailToMember } from '#lib/server/member-email.js';
 import { MailDeliveryFailed } from '#lib/server/mail.js';
-import { launchHref } from '#lib/server/room-handoff.js';
 import { ROOM_SETTINGS, ROOM_SETTING_BY_NAME } from '#lib/room-settings-schema.js';
 import { resolveRoomConfig } from '#lib/room-config.js';
 import { isRoomPresenter, isRoomTrial } from '#lib/room-member-role.js';
@@ -863,12 +861,8 @@ export const load: PageServerLoad = async (event) => {
 
   return {
     room,
-    /** the reference's `ng-href` on Launch — the whole handoff URL, resolved at page load */
-    launchUrl: launchHref(ROOM_BASE_URL, ROOM_JWT_SECRET, room.shortCode, {
-      name: user.displayName,
-      email: user.email,
-      id: String(user.id)
-    }),
+    /** Same-origin authorization door; no room credential is embedded in this page payload. */
+    launchUrl: `/launch/${encodeURIComponent(room.shortCode)}`,
     tab,
     tabs,
     entitlements,

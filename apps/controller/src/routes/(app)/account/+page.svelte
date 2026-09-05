@@ -1180,6 +1180,7 @@
           </div>
           <div class="acc-panel-body">
             <form method="POST" action="?/addAdminUser" use:enhance={save}>
+              <input type="hidden" name="requestId" value={data.adminCreateRequestId} />
               <div class="acc-field">
                 <label for="adminName">Name</label>
                 <input class="acc-input" id="adminName" name="name" type="text" placeholder="Enter name" required />
@@ -1195,6 +1196,7 @@
                   name="password"
                   placeholder="Enter password"
                   autocomplete="new-password"
+                  minlength={12}
                   required
                 />
               </div>
@@ -1258,6 +1260,8 @@
                         use:enhance={confirmThen(`Remove admin user "${admin.name}"? This cannot be undone.`)}
                       >
                         <input type="hidden" name="id" value={admin.id} />
+                        <input type="hidden" name="requestId" value={admin.mutationRequestId} />
+                        <input type="hidden" name="expectedRevision" value={admin.authorityRevision ?? ''} />
                         <button class="acc-link" type="submit"
                           ><i class="fa fa-remove acc-text-danger" aria-hidden="true"></i> Remove</button
                         >
@@ -1283,6 +1287,7 @@
         <div class="row" style="margin-bottom: 10px">
           <div class="col-md-2">
             <form method="POST" action="?/createApiKey" use:enhance={save}>
+              <input type="hidden" name="requestId" value={data.apiKeyCreateRequestId} />
               <button class="acc-btn acc-btn-success acc-mb" type="submit">New Api key</button>
             </form>
           </div>
@@ -1357,6 +1362,8 @@
                         )}
                       >
                         <input type="hidden" name="id" value={key.id} />
+                        <input type="hidden" name="requestId" value={key.rotateRequestId} />
+                        <input type="hidden" name="expectedRevision" value={key.authorityRevision ?? ''} />
                         <button class="acc-link" type="submit">regen secret</button>
                       </form></span
                     >
@@ -1377,6 +1384,8 @@
                         use:enhance={confirmThen(`Delete API key "${key.id}"? This cannot be undone.`)}
                       >
                         <input type="hidden" name="id" value={key.id} />
+                        <input type="hidden" name="requestId" value={key.deleteRequestId} />
+                        <input type="hidden" name="expectedRevision" value={key.authorityRevision ?? ''} />
                         <button class="acc-link" type="submit">delete</button>
                       </form></span
                     >
@@ -1405,6 +1414,8 @@
               </div>
               <div class="acc-panel-body">
                 <input type="hidden" name="id" value={key.id} />
+                <input type="hidden" name="requestId" value={key.restrictionsRequestId} />
+                <input type="hidden" name="expectedRevision" value={key.authorityRevision ?? ''} />
 
                 <div class="acc-field">
                   <label for="api-ips">Allowed IP addresses</label>

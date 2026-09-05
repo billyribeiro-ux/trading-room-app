@@ -373,7 +373,7 @@ library, 126 API PostgreSQL integration across ten binaries, 9 release-attestor,
 112 media library, and 11 media binary. Compilation was never the claim worth
 making; this is. Its `pnpm quality` also passed: lint and formatting,
 zero-error/zero-warning Svelte diagnostics,
-all quality-gate source contracts and the fail-closed runtime HTTP contract, 1330
+all quality-gate source contracts and the fail-closed runtime HTTP contract, 1356
 Vitest tests, 9 Playwright tests in Chromium with flaky-test rejection enabled,
 and the Vercel production build.
 The count rose from 116 to 129 when reCAPTCHA gained the server-side verification it
@@ -415,6 +415,14 @@ integration, 19 release-attestor, 114 media library, and 11 media binary. The co
 journeys, and the Vercel production build with zero Svelte diagnostics. A separate fresh database
 passed the exact 18-migration identity/RLS/ACL/LISTEN attestation, including 28 forced-RLS
 relations and the append-only badge-mutation ledger.
+After the administrator, customer API-key, compatibility API, and room-launch slices, a fresh
+21-migration PostgreSQL 17 run passed all 486 Rust tests: 175 API library, 167 PostgreSQL/HTTP
+integration, 19 release-attestor, 114 media library, and 11 media binary. Strict Clippy and the live
+attestation also passed, with 32 forced-RLS relations. All seven dependency-ordered converters
+passed their complete plan/apply/verify, drift/no-overwrite, crash-resume, guarded rollback, and
+cleanup matrices. The controller passed 1,356 Vitest assertions across 147 files and 79 PostgreSQL
+assertions across 14 files with zero Svelte diagnostics and a production build. Those are local
+source-tree results; exact-revision hosted proof and staging activation remain separate gates.
 `.github/workflows/backend-quality.yml` recreates that database boundary and runs
 Clippy with warnings denied plus the full Rust suite. Hosted run
 [`30767258722`](https://github.com/billyribeiro-ux/trading-app-main/actions/runs/30767258722)

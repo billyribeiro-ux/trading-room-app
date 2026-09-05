@@ -137,7 +137,15 @@ describe('backend workflow scoping cannot omit a canonical-authority converter',
     expect(scopePattern, 'backend-quality.yml must expose its changed-path scope as an ERE').toBeDefined();
 
     const scoped = new RegExp(scopePattern ?? '(?!)');
-    for (const authority of ['profile', 'room', 'room-settings', 'membership']) {
+    for (const authority of [
+      'profile',
+      'room',
+      'room-settings',
+      'membership',
+      'badge',
+      'account-administrator',
+      'customer-api-key'
+    ]) {
       expect(
         scoped.test(`apps/controller/scripts/cutover-${authority}-authority.mjs`),
         `${authority} converter changes must execute the backend security gate`

@@ -92,8 +92,8 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   explicitly account- or room-scoped. `db/repo/moderation.rs` now models that nullable room and
   `http/v1/moderation.rs` marks every existing room event explicitly; both have reviewed seals.
 */
-const EXPECTED_UNTOUCHED_COUNT = 43;
-const EXPECTED_MANIFEST_SHA256 = '4e41fa0e057ad5e3343dbe87c5ea23e31f0a29a3dc16440be64ebcf042fb970e';
+const EXPECTED_UNTOUCHED_COUNT = 42;
+const EXPECTED_MANIFEST_SHA256 = '055921f375b3a8d3210c21cb0928ecfc554046b11ca3d37d8910091b322e6f21';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -216,10 +216,10 @@ const LOCALLY_AUTHORED = new Map([
     // 2026-09-04 when room lifecycle joined that boundary and the room-name schema explicitly
     // named its UTF-8 byte ceiling rather than implying `maxLength` alone carried that meaning.
     'services/api/openapi/v1.json',
-    '867975fdaa7c22afcbb8d7bd53daf70ada454dd0c9e2253792df4935ddcc7c97'
+    'fcc45b664aaf454be22a5db75f8e0f83b1294792b3191701d3ff2039506c0c1c'
   ],
   ['services/api/src/bin/openapi.rs', 'fd0f4f7fae4167c1081dda1ce757e7f0ccdf98e8169a6cd513885f876779ed42'],
-  ['services/api/src/openapi.rs', 'e0125115216a15f0f285e6458304acc925fe2e1956ad4fadaea3c615899426bd'],
+  ['services/api/src/openapi.rs', '59de1ab8264c11a446092d3ce73d73288e728b7577ac6b9c51f39e60db269627'],
   [
     // Authored 2026-09-04 for canonical membership authority: the forward-only schema,
     // repository, account/service HTTP boundary, and real PostgreSQL behavioral proof.
@@ -241,7 +241,49 @@ const LOCALLY_AUTHORED = new Map([
   ],
   ['services/api/src/db/repo/managed_badge.rs', 'c32f020769909d9c9c677b30a4034ffb98112293748e5515570eb0a4ef2c9bb1'],
   ['services/api/src/http/v1/managed_badges.rs', '5209a7b284f460077de4907a7402f039734148aad6f8ed256b2f2431474357a5'],
-  ['services/api/tests/account_badges.rs', 'ad0305587d9eee950dcb8a4a6a4a12b994bd28cdb1d7fc1ccdf37f34ad3074aa']
+  ['services/api/tests/account_badges.rs', 'ad0305587d9eee950dcb8a4a6a4a12b994bd28cdb1d7fc1ccdf37f34ad3074aa'],
+  [
+    // Authored 2026-09-05 for canonical account-administrator identity, credentials, bounded
+    // account membership, exactly-once mutations, immediate revocation, and real HTTP proof.
+    'services/api/migrations/0019_account_administrator_authority.sql',
+    'e0d4d93f30d4140171ee15c5f20cf0e2eb56c58b346a44443cb423c91aa2c1a0'
+  ],
+  [
+    'services/api/src/db/repo/managed_administrator.rs',
+    '9a04083afff8c0e00ca5d1885ce75b5e2bc0c2cf1363d4c3ac26775231a2c51b'
+  ],
+  [
+    'services/api/src/http/v1/managed_administrators.rs',
+    '83d0b5fff29ced2714734badb8cc4986f3f343cd13ddd2317446731e92902435'
+  ],
+  ['services/api/tests/account_administrators.rs', '969a83ba3b5021ff3497f16d54edf7436db4eda0fe222f8336caee9cbd13f6d8'],
+  [
+    // Authored 2026-09-05 for verifier-only customer API-key authority and its captured external
+    // API execution contract. The key table and mutation ledger are tenant-bound; discovery uses
+    // one bounded SECURITY DEFINER lookup, and activity/visit facts remain behind forced RLS.
+    'services/api/migrations/0020_customer_api_key_authority.sql',
+    'fda612f15a6e3373c1d140fdb1ef7c183056cd71c892968e8a610a6880029031'
+  ],
+  [
+    'services/api/migrations/0021_customer_api_key_execution.sql',
+    '7956543061a140abf6cffe500cc16877329eab370bba313a3bb7c119382b865c'
+  ],
+  ['services/api/src/db/repo/customer_api_key.rs', 'f142db6fbdd605b73d79c07c725208dcb0899ede0c595632c76d6e649423f533'],
+  ['services/api/src/db/repo/external_stats.rs', '1767e07ef82af8cf299d4acedcd8578df1b63c7495e8d58a8bdbe842ca5fa75e'],
+  ['services/api/src/http/stats.rs', '49a551488c7a29716fff3d68d5618c828af244d7071f1ce065a469a9b787b64d'],
+  ['services/api/src/http/v1/customer_api_keys.rs', '0779919bf490e8134b7a9167f8c9b91dcd812ad60dd91dd5082c0df5c53e0f80'],
+  [
+    'services/api/tests/account_customer_api_keys.rs',
+    '4699e0b4b4a24ae8d3b5ebbb52e950fb673450589a877737af7bfaea915d398e'
+  ],
+  [
+    // Real HTTP proof that canonical launch authorization precedes one idempotent visit, uses the
+    // database identity rather than token claims, closes stale/user/guest visits, and keeps both
+    // service seams tenant- and room-bound.
+    'services/api/tests/account_room_launch.rs',
+    '2318efa3b7918cd8c741fd76cd9ca5814a26e78e818b72883b04981ceab6ee6a'
+  ],
+  ['services/api/tests/customer_stats_api.rs', '36ab2e1b8ef8dec4b1b25187af96d63aac0de2c3a14a029de74ff57a3a399e3e']
 ]);
 
 /*
@@ -324,15 +366,15 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/provision.rs', '53970226a80c603d0df63a0bcb6ce00814dd3754e167b8a05f531fc3b246e342'],
   ['services/api/tests/actions.rs', '09f948477b318d626ad00d5b5b4b8307b3130a8f725c411ca2061b06851eb29c'],
   ['services/api/src/db/repo/identity.rs', '5dbeb02a354f6d7910943c9c179c23b84858c065efb248afdc620ec81aceecef'],
-  ['services/api/src/http/mod.rs', 'd72f90c2d5b9de1ea3ab1b2a9247614a7fa7ec63b4238e4d3dbd3bfba80ddfcd'],
+  ['services/api/src/http/mod.rs', '055c52256823c2940c729c0ee9c9d873bc5bd0feb496a6c24ca7669c31b53251'],
   ['services/api/src/http/v1/account.rs', 'c13b4636538fabd6598ce82603761e3a2c43bb9c563e771f9b7dfbbac5c58334'],
-  ['services/api/src/http/v1/mod.rs', 'ae1b41a1100ae460964fca16348d283cd337d7c0211b5596245608bb63eec08f'],
+  ['services/api/src/http/v1/mod.rs', '10b90f4290b064677fe4e1fc781facf5ea0b007bc018d95348ddb57e5508b6cd'],
   ['services/api/src/lib.rs', '167222ece8de85f86beb5fd86ec85e3cd20f86dec8c7641a951ac9faab4dd89b'],
   [
     // Diverged 2026-09-04 for membership authority module registration and propagation of the
     // controller service credential into the immutable application state.
     'services/api/src/db/repo/mod.rs',
-    'c222d1914f45785aa45ddb4bcb3bd6cacfe165d711682fad36ec0bd1060da51f'
+    '1498950f26a7480c13cfe265eee81e144f697cde91cdb95fd21e32c786740e75'
   ],
   [
     // Diverged 2026-09-05 so every new message snapshots its normalized canonical badge UUIDs;
@@ -360,9 +402,15 @@ const DIVERGED_FROM_IMPORT = new Map([
                         and over-posted JSON as the stable 400 envelope, and audits only commits.
       limits.rs         names the shared 160-byte room-name ceiling used by the handler.
   */
-  ['services/api/src/db/repo/room.rs', '1462c8df9025e9860ce8c0fd9f6206b4ae91fb9f641aac6cf9a4a7cc621ee826'],
-  ['services/api/src/http/v1/rooms.rs', '2ce8ab47bc0215646a3c9b935b2ec2369d292a813cddd813d4cfd94882e566fa'],
-  ['services/api/src/limits.rs', '0d48402ef62d5c9ff25e914df97c5e93b54e36e3f61af524c6af36423ff4d4eb'],
+  ['services/api/src/db/repo/room.rs', 'cf413e1e1d6bcdb17a5c1637495bbaab44ffb686044471c25d9f907daa604950'],
+  ['services/api/src/http/v1/rooms.rs', '482917e3e4683c8f37917924442bd4f15f762751556a48f88882b578a2415e7c'],
+  ['services/api/src/limits.rs', '1f13331ff2b47779ebb25f5f4b62981705b921ebe51c47b0dd68161fc23f24dc'],
+  [
+    // Diverged 2026-09-05 to add an independently keyed, one-request-per-second compatibility
+    // limiter. The external key id and command form the bucket; customer secrets never do.
+    'services/api/src/http/ratelimit.rs',
+    '39362c535de8ab6bd5c4085b3319b1b19daeac812c1d5728daa4ef3b0cfd83c0'
+  ],
   /*
     Diverged 2026-08-15 21:40. Three prose claims in `services/README.md` still named
     `ptr_clone_app` as the RUNTIME role, which stopped being true when `0009` provisioned
@@ -435,7 +483,7 @@ const DIVERGED_FROM_IMPORT = new Map([
                                 base scan describes the compiler environment.
       rust-toolchain.toml       channel 1.97.1 -> 1.98.0 (stable of 2026-08-18).
   */
-  ['services/Cargo.toml', '0d155ff4b1d976fa5b0eb675c71a26f4e2a23c77abacf5b28d45d02aa06a2b1a'],
+  ['services/Cargo.toml', 'eb3b83f7506f0d9ed50e9baee83a28acb19c2e5f1c433c879196807fa2cde16e'],
   ['services/api/Cargo.toml', 'df51b64d04bbd2c3e9ad3b760a2192c7debd97e3c8eb50ecf9df34a322532ca3'],
   ['services/api/Dockerfile', 'c59550ac838ed9880016d7c50531d7f1f3ca89a514d087d15064c43bd5f9bd23'],
   /*
@@ -582,7 +630,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '8ee9b569df9e5e00b7dc59e5fada06c4f0322b30e4c0d27473459d803cd329f1'
+    '51a18bf796b5369d242725dbd5389fd3678cc43e2927c5e779bf41dffdf23637'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -611,7 +659,7 @@ const DIVERGED_FROM_IMPORT = new Map([
     column privilege installed by migration 0013. Every other users column and every table-level
     privilege remains enumerated and refused.
   */
-  ['services/api/src/db/mod.rs', '80b2778b350202338e00c4c66798e1d50bf3afa07c77d14e9ad4ca0d5fb6ee61'],
+  ['services/api/src/db/mod.rs', '757a1fdaf4c5e15c7e3c9a5e26659e8e433d5d93dd1c11f3632db7ccc3f30485'],
   /*
     Diverged 2026-08-31 — ONE doc comment, and it named the role the code turns away.
 
@@ -663,7 +711,7 @@ const DIVERGED_FROM_IMPORT = new Map([
     path, VOLATILE lock semantics, PUBLIC denial, runtime execution, tenant omission, and an actual
     55P03 concurrent revocation timeout while the authorized tenant transaction holds FOR SHARE.
   */
-  ['services/api/tests/migrations.rs', '1aace321cc3db7e441868300e570e8ca30bee93569219930dbfaeb4ea50a9421'],
+  ['services/api/tests/migrations.rs', '2ab433f9893ef90e1921dfa8d8955b49d22867cff93f95f28d2dbcbc08471365'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
@@ -722,7 +770,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/tenancy.rs', 'f2f10d1e8b099d115525485e8b5b18957e0cab542e80f7bfa492a1d8c0d97ccb'],
   [
     'services/api/tests/support/mod.rs',
-    '6f0c83369f885ef7590c43e7494bf1a118d89be6f0d7e830fd14ec4d028e7cad'
+    'bee5d3e483f20b20708c11a8c3a33f4fd466f195585d997c4fe5720ed4497b8e'
     /*
       Re-pinned 2026-08-31: `Scratch::sweep` now excludes the names THIS process created.
       Its safety argument — a live database keeps a backend attached, so its DROP fails — held only

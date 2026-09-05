@@ -42,13 +42,13 @@ const BASELINE_PUBLIC_TABLES: i64 = 23;
 /// ...and how many of those carry FORCE ROW LEVEL SECURITY.
 const BASELINE_FORCE_RLS: i64 = 20;
 
-/// What the **whole** migration set leaves behind: eight tenant tables plus the two owner-only
+/// What the **whole** migration set leaves behind: twelve tenant tables plus the two owner-only
 /// Gate 3 conversion-ledger tables. Spelled as `BASELINE + n` rather than as a literal so a table
 /// addition is a deliberate review point instead of a count somebody updates without reading.
-const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 10;
-/// The eight request-path tables are FORCE RLS. The two conversion tables deliberately are not:
+const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 14;
+/// The twelve request-path tables are FORCE RLS. The two conversion tables deliberately are not:
 /// they are offline owner-only operational evidence and the runtime role receives no privilege.
-const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 8;
+const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 12;
 
 async fn public_table_count(pool: &PgPool) -> i64 {
     sqlx::query_scalar(
@@ -649,8 +649,8 @@ async fn every_room_scoped_table_pairs_its_tenant_keys() {
         );
     }
 
-    // `<table>_tenant_id_unique UNIQUE (enterprise_id, id)` is what lets a table be the TARGET of
-    // a composite tenant key. `alert_media` is the one exception, and it is a faithful one: the
+    // A UNIQUE or PRIMARY KEY over `(enterprise_id, id)` is what lets a table be the TARGET of a
+    // composite tenant key. `alert_media` is the one exception, and it is a faithful one: the
     // reference schema does not give it that constraint either - `second-dump/db/unique.tsv`
     // lists only `alert_media_alert_position_unique` and `alert_media_uploaded_file_unique`, and
     // nothing references alert_media by id.
@@ -658,7 +658,7 @@ async fn every_room_scoped_table_pairs_its_tenant_keys() {
         let has_tenant_key: bool = sqlx::query_scalar(
             "SELECT EXISTS ( \
                SELECT 1 FROM pg_constraint u \
-               WHERE u.conrelid = $1::regclass AND u.contype = 'u' \
+               WHERE u.conrelid = $1::regclass AND u.contype IN ('u', 'p') \
                  AND u.conkey = ARRAY[ \
                        (SELECT attnum FROM pg_attribute \
                          WHERE attrelid = $1::regclass AND attname = 'enterprise_id'), \
@@ -673,7 +673,7 @@ async fn every_room_scoped_table_pairs_its_tenant_keys() {
 
         assert!(
             has_tenant_key,
-            "{table} is missing UNIQUE (enterprise_id, id), so nothing can reference it \
+            "{table} is missing UNIQUE/PRIMARY KEY (enterprise_id, id), so nothing can reference it \
              tenant-safely"
         );
     }
@@ -760,9 +760,10 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
         .expect("the baseline should apply");
 
     // `migrate::run` applies the whole set, so this is the post-migration shape: the 23 tables
-    // pinned by the baseline plus eight request-path additions and two owner-only conversion
-    // ledgers. Migration 0018 adds normalized badge definitions, assignments, and its mutation
-    // ledger; 0014 and 0015 add room columns/indexes and a bounded function, not tables.
+    // pinned by the baseline plus twelve request-path additions and two owner-only conversion
+    // ledgers. Migrations 0018 through 0021 add badge, administrator, customer API-key authority,
+    // and the customer API visit ledger (including append-only mutation evidence);
+    // 0014 and 0015 add room columns/indexes and a bounded function, not tables.
     assert_eq!(
         public_table_count(&pool).await,
         MIGRATED_PUBLIC_TABLES,
@@ -1544,6 +1545,630 @@ async fn badge_authority_is_tenant_paired_referential_and_append_only() {
 }
 
 #[tokio::test]
+async fn administrator_authority_is_bounded_tenant_paired_and_append_only() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    let revision_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns \
+         WHERE table_schema = 'public' AND table_name = 'enterprise_memberships' \
+           AND column_name = 'revision' AND is_nullable = 'NO')",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect administrator revision");
+    assert!(
+        revision_exists,
+        "administrator authority needs a non-null revision"
+    );
+
+    let rls: (bool, bool) = sqlx::query_as(
+        "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class \
+         WHERE oid = 'public.administrator_mutations'::regclass",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect administrator mutation RLS");
+    assert_eq!(rls, (true, true));
+    for (privilege, expected) in [
+        ("SELECT", true),
+        ("INSERT", true),
+        ("UPDATE", false),
+        ("DELETE", false),
+        ("TRUNCATE", false),
+        ("REFERENCES", false),
+        ("TRIGGER", false),
+    ] {
+        assert_eq!(
+            has_table_privilege(
+                &owner,
+                migrate::EXPECTED_RUNTIME_ROLE,
+                "administrator_mutations",
+                privilege,
+            )
+            .await,
+            expected,
+            "unexpected administrator mutation {privilege} privilege"
+        );
+    }
+    for function in [
+        "account_list_administrators(uuid)",
+        "account_create_administrator(uuid,uuid)",
+        "account_lock_administrator(uuid,uuid)",
+        "account_delete_administrator(uuid,uuid)",
+    ] {
+        let privileges: (bool, bool) = sqlx::query_as(
+            "SELECT has_function_privilege('public', 'public.' || $1, 'EXECUTE'), \
+                    has_function_privilege($2, 'public.' || $1, 'EXECUTE')",
+        )
+        .bind(function)
+        .bind(migrate::EXPECTED_RUNTIME_ROLE)
+        .fetch_one(&owner)
+        .await
+        .unwrap_or_else(|error| panic!("inspect {function}: {error}"));
+        assert_eq!(privileges, (false, true), "{function} must be runtime-only");
+    }
+
+    let enterprise_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Administrator A', $1) RETURNING id",
+    )
+    .bind(format!("administrator-a-{}", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create enterprise A");
+    let enterprise_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Administrator B', $1) RETURNING id",
+    )
+    .bind(format!("administrator-b-{}", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create enterprise B");
+    let owner_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) VALUES ($1, md5($1), 'Owner A') RETURNING id",
+    )
+    .bind(format!("administrator-owner-a-{}@example.test", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create owner A");
+    let owner_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) VALUES ($1, md5($1), 'Owner B') RETURNING id",
+    )
+    .bind(format!("administrator-owner-b-{}@example.test", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create owner B");
+    let target: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) VALUES ($1, md5($1), 'New Admin') RETURNING id",
+    )
+    .bind(format!("administrator-target-{}@example.test", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create target identity");
+    sqlx::query(
+        "INSERT INTO enterprise_memberships (enterprise_id, user_id, role) \
+         VALUES ($1, $2, 'owner'), ($3, $4, 'owner')",
+    )
+    .bind(enterprise_a)
+    .bind(owner_a)
+    .bind(enterprise_b)
+    .bind(owner_b)
+    .execute(&owner)
+    .await
+    .expect("create owner memberships");
+
+    let runtime_database_url = scratch_url(&runtime_url(), &scratch.name);
+    let runtime = PgPool::connect(&runtime_database_url)
+        .await
+        .expect("connect runtime");
+    let mut tenant_a = runtime.begin().await.expect("begin tenant A");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *tenant_a)
+        .await
+        .expect("set tenant A");
+
+    let cross_tenant_revision: Option<i64> =
+        sqlx::query_scalar("SELECT account_create_administrator($1, $2)")
+            .bind(owner_a)
+            .bind(owner_b)
+            .fetch_one(&mut *tenant_a)
+            .await
+            .expect("cross-tenant identity is safely refused");
+    assert!(
+        cross_tenant_revision.is_none(),
+        "an existing identity cannot be enrolled as an administrator"
+    );
+    let revision: Option<i64> = sqlx::query_scalar("SELECT account_create_administrator($1, $2)")
+        .bind(owner_a)
+        .bind(target)
+        .fetch_one(&mut *tenant_a)
+        .await
+        .expect("create administrator through bounded function");
+    assert_eq!(revision, Some(0));
+    let listed: Vec<(Uuid, String)> =
+        sqlx::query_as("SELECT user_id, email::text FROM account_list_administrators($1)")
+            .bind(owner_a)
+            .fetch_all(&mut *tenant_a)
+            .await
+            .expect("list administrators");
+    assert_eq!(
+        listed.len(),
+        1,
+        "the owner must not leak into the admin list"
+    );
+    assert_eq!(listed[0].0, target);
+    let owner_revision: Option<i64> =
+        sqlx::query_scalar("SELECT account_lock_administrator($1, $2)")
+            .bind(owner_a)
+            .bind(owner_a)
+            .fetch_one(&mut *tenant_a)
+            .await
+            .expect("owner target is opaque");
+    assert!(owner_revision.is_none());
+    let owner_deleted: bool = sqlx::query_scalar("SELECT account_delete_administrator($1, $2)")
+        .bind(owner_a)
+        .bind(owner_a)
+        .fetch_one(&mut *tenant_a)
+        .await
+        .expect("owner delete is bounded");
+    assert!(
+        !owner_deleted,
+        "the admin delete capability cannot delete an owner"
+    );
+
+    sqlx::query(
+        "INSERT INTO administrator_mutations \
+         (enterprise_id, request_id, actor_user_id, mutation_kind, request_digest, response) \
+         VALUES ($1, $2, $3, 'administrator.created', repeat('a', 64), '{}'::jsonb)",
+    )
+    .bind(enterprise_a)
+    .bind(Uuid::new_v4())
+    .bind(owner_a)
+    .execute(&mut *tenant_a)
+    .await
+    .expect("append tenant-paired administrator evidence");
+    let cross_actor = sqlx::query(
+        "INSERT INTO administrator_mutations \
+         (enterprise_id, request_id, actor_user_id, mutation_kind, request_digest, response) \
+         VALUES ($1, $2, $3, 'administrator.created', repeat('b', 64), '{}'::jsonb)",
+    )
+    .bind(enterprise_a)
+    .bind(Uuid::new_v4())
+    .bind(owner_b)
+    .execute(&mut *tenant_a)
+    .await
+    .expect_err("a cross-tenant actor must fail its composite foreign key");
+    assert_eq!(
+        cross_actor
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("23503")
+    );
+    tenant_a.rollback().await.expect("rollback tenant probe");
+
+    runtime.close().await;
+    scratch.finish(owner).await;
+}
+
+#[tokio::test]
+async fn customer_api_key_authority_is_secret_free_tenant_paired_and_append_only() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    for table in ["customer_api_keys", "customer_api_key_mutations"] {
+        let rls: (bool, bool) = sqlx::query_as(
+            "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class \
+             WHERE oid = to_regclass('public.' || $1)",
+        )
+        .bind(table)
+        .fetch_one(&owner)
+        .await
+        .unwrap_or_else(|error| panic!("inspect {table} RLS: {error}"));
+        assert_eq!(rls, (true, true), "{table} must force tenant RLS");
+    }
+    for (table, privilege, expected) in [
+        ("customer_api_keys", "SELECT", true),
+        ("customer_api_keys", "INSERT", true),
+        ("customer_api_keys", "UPDATE", true),
+        ("customer_api_keys", "DELETE", true),
+        ("customer_api_keys", "TRUNCATE", false),
+        ("customer_api_keys", "REFERENCES", false),
+        ("customer_api_keys", "TRIGGER", false),
+        ("customer_api_key_mutations", "SELECT", true),
+        ("customer_api_key_mutations", "INSERT", true),
+        ("customer_api_key_mutations", "UPDATE", false),
+        ("customer_api_key_mutations", "DELETE", false),
+        ("customer_api_key_mutations", "TRUNCATE", false),
+        ("customer_api_key_mutations", "REFERENCES", false),
+        ("customer_api_key_mutations", "TRIGGER", false),
+    ] {
+        assert_eq!(
+            has_table_privilege(&owner, migrate::EXPECTED_RUNTIME_ROLE, table, privilege,).await,
+            expected,
+            "unexpected {table} {privilege} privilege"
+        );
+    }
+
+    let plaintext_columns: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM information_schema.columns \
+         WHERE table_schema = 'public' AND table_name IN \
+           ('customer_api_keys', 'customer_api_key_mutations') \
+           AND column_name IN ('secret', 'api_secret', 'secret_ciphertext')",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect canonical key columns");
+    assert_eq!(
+        plaintext_columns, 0,
+        "canonical storage must never hold a key secret"
+    );
+
+    let enterprise_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('API Key A', $1) RETURNING id",
+    )
+    .bind(format!("api-key-a-{}", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create enterprise A");
+    let enterprise_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('API Key B', $1) RETURNING id",
+    )
+    .bind(format!("api-key-b-{}", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create enterprise B");
+    let actor_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) VALUES ($1, md5($1), 'Owner A') RETURNING id",
+    )
+    .bind(format!("api-key-owner-a-{}@example.test", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create owner A");
+    let actor_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) VALUES ($1, md5($1), 'Owner B') RETURNING id",
+    )
+    .bind(format!("api-key-owner-b-{}@example.test", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create owner B");
+    sqlx::query(
+        "INSERT INTO enterprise_memberships (enterprise_id, user_id, role) \
+         VALUES ($1, $2, 'owner'), ($3, $4, 'owner')",
+    )
+    .bind(enterprise_a)
+    .bind(actor_a)
+    .bind(enterprise_b)
+    .bind(actor_b)
+    .execute(&owner)
+    .await
+    .expect("create owner memberships");
+
+    let runtime_database_url = scratch_url(&runtime_url(), &scratch.name);
+    let runtime = PgPool::connect(&runtime_database_url)
+        .await
+        .expect("connect runtime");
+    let mut tenant_a = runtime.begin().await.expect("begin tenant A");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *tenant_a)
+        .await
+        .expect("set tenant A");
+    sqlx::query(
+        "INSERT INTO customer_api_keys (enterprise_id, id, secret_hash, last_four) \
+         VALUES ($1, '0123456789abcdef01234567', repeat('a', 64), 'cdef')",
+    )
+    .bind(enterprise_a)
+    .execute(&mut *tenant_a)
+    .await
+    .expect("store verifier-only key metadata");
+    tenant_a.commit().await.expect("commit key fixture");
+
+    let mut malformed_probe = runtime.begin().await.expect("begin malformed probe");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *malformed_probe)
+        .await
+        .expect("set malformed-probe tenant");
+    let malformed = sqlx::query(
+        "UPDATE customer_api_keys SET restrictions = \
+           '{\"ips\":[7],\"scopes\":[],\"sessions\":[]}'::jsonb \
+         WHERE id = '0123456789abcdef01234567'",
+    )
+    .execute(&mut *malformed_probe)
+    .await
+    .expect_err("non-string restriction elements must fail at the database boundary");
+    assert_eq!(
+        malformed
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("23514")
+    );
+    malformed_probe
+        .rollback()
+        .await
+        .expect("rollback malformed probe");
+
+    let mut tenant_a = runtime.begin().await.expect("resume tenant A");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *tenant_a)
+        .await
+        .expect("reset tenant A");
+    sqlx::query(
+        "INSERT INTO customer_api_key_mutations \
+         (enterprise_id, request_id, actor_user_id, mutation_kind, request_digest, response) \
+         VALUES ($1, $2, $3, 'customer-api-key.created', repeat('b', 64), '{}'::jsonb)",
+    )
+    .bind(enterprise_a)
+    .bind(Uuid::new_v4())
+    .bind(actor_a)
+    .execute(&mut *tenant_a)
+    .await
+    .expect("append tenant-paired API-key evidence");
+    tenant_a.commit().await.expect("commit mutation fixture");
+
+    let mut cross_actor_probe = runtime.begin().await.expect("begin cross-actor probe");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *cross_actor_probe)
+        .await
+        .expect("set cross-actor tenant");
+    let cross_actor = sqlx::query(
+        "INSERT INTO customer_api_key_mutations \
+         (enterprise_id, request_id, actor_user_id, mutation_kind, request_digest, response) \
+         VALUES ($1, $2, $3, 'customer-api-key.created', repeat('c', 64), '{}'::jsonb)",
+    )
+    .bind(enterprise_a)
+    .bind(Uuid::new_v4())
+    .bind(actor_b)
+    .execute(&mut *cross_actor_probe)
+    .await
+    .expect_err("a cross-tenant actor must fail its composite foreign key");
+    assert_eq!(
+        cross_actor
+            .as_database_error()
+            .and_then(|error| error.code())
+            .as_deref(),
+        Some("23503")
+    );
+    cross_actor_probe
+        .rollback()
+        .await
+        .expect("rollback cross-actor probe");
+
+    let mut append_only_probe = runtime.begin().await.expect("begin append-only probe");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *append_only_probe)
+        .await
+        .expect("set append-only tenant");
+    let mutation_update =
+        sqlx::query("UPDATE customer_api_key_mutations SET response = '{\"changed\":9}'::jsonb")
+            .execute(&mut *append_only_probe)
+            .await
+            .expect_err("API-key mutation evidence must be append-only");
+    assert_insufficient_privilege(mutation_update, "update API-key mutation evidence");
+    append_only_probe
+        .rollback()
+        .await
+        .expect("rollback append-only probe");
+
+    let mut tenant_b = runtime.begin().await.expect("begin tenant B");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_b.to_string())
+        .execute(&mut *tenant_b)
+        .await
+        .expect("set tenant B");
+    let visible: (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM customer_api_keys), \
+                (SELECT count(*) FROM customer_api_key_mutations)",
+    )
+    .fetch_one(&mut *tenant_b)
+    .await
+    .expect("read tenant B projection");
+    assert_eq!(visible, (0, 0), "tenant B must not see tenant A key state");
+    tenant_b.rollback().await.expect("close tenant B read");
+
+    runtime.close().await;
+    scratch.finish(owner).await;
+}
+
+#[tokio::test]
+async fn customer_api_key_execution_is_bounded_and_visit_history_is_tenant_paired() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    let lookup_contract: (bool, Vec<String>, String, bool, i64) = sqlx::query_as(
+        "SELECT routine.prosecdef, routine.proconfig, routine.provolatile::text, \
+                has_function_privilege($1, routine.oid, 'EXECUTE'), \
+                (SELECT count(*) FROM aclexplode(routine.proacl) acl WHERE acl.grantee = 0)::bigint \
+           FROM pg_catalog.pg_proc AS routine \
+          WHERE routine.oid = 'public.customer_api_key_auth_lookup(text)'::regprocedure",
+    )
+    .bind(migrate::EXPECTED_RUNTIME_ROLE)
+    .fetch_one(&owner)
+    .await
+    .expect("inspect customer API-key authentication lookup");
+    assert!(
+        lookup_contract.0,
+        "the pre-tenant lookup must be SECURITY DEFINER"
+    );
+    assert_eq!(lookup_contract.1, ["search_path=pg_catalog, public"]);
+    assert_eq!(
+        lookup_contract.2, "s",
+        "the lookup must remain read-only STABLE"
+    );
+    assert!(
+        lookup_contract.3,
+        "the runtime role must execute the bounded lookup"
+    );
+    assert_eq!(lookup_contract.4, 0, "PUBLIC must not execute the lookup");
+
+    let visit_rls: (bool, bool) = sqlx::query_as(
+        "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class \
+          WHERE oid = 'public.room_visit_sessions'::regclass",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect visit ledger RLS");
+    assert_eq!(visit_rls, (true, true));
+    for (privilege, expected) in [
+        ("SELECT", true),
+        ("INSERT", true),
+        ("UPDATE", true),
+        ("DELETE", false),
+        ("TRUNCATE", false),
+        ("REFERENCES", false),
+        ("TRIGGER", false),
+    ] {
+        assert_eq!(
+            has_table_privilege(
+                &owner,
+                migrate::EXPECTED_RUNTIME_ROLE,
+                "room_visit_sessions",
+                privilege,
+            )
+            .await,
+            expected,
+            "unexpected visit-ledger {privilege} privilege",
+        );
+    }
+
+    let policy: (Vec<String>, Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT roles::text[], qual, with_check FROM pg_catalog.pg_policies \
+          WHERE schemaname = 'public' AND tablename = 'room_visit_sessions' \
+            AND policyname = 'tenant_isolation'",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect visit-ledger tenant policy");
+    assert_eq!(policy.0, [migrate::EXPECTED_RUNTIME_ROLE]);
+    for expression in [policy.1, policy.2] {
+        let expression = expression.expect("visit policy must constrain reads and writes");
+        assert!(expression.contains("app.enterprise_id"), "{expression}");
+        assert_ne!(expression.trim(), "true");
+        assert_ne!(expression.trim(), "(true)");
+    }
+
+    let room_fk: String = sqlx::query_scalar(
+        "SELECT pg_get_constraintdef(oid) FROM pg_catalog.pg_constraint \
+          WHERE conrelid = 'public.room_visit_sessions'::regclass \
+            AND conname = 'room_visit_sessions_room_tenant_fk'",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect visit room foreign key");
+    assert!(
+        room_fk.contains("FOREIGN KEY (enterprise_id, room_id)")
+            && room_fk.contains("REFERENCES rooms(enterprise_id, id)"),
+        "visit rows must be paired to a room in the same tenant: {room_fk}",
+    );
+
+    let launch_index: String = sqlx::query_scalar(
+        "SELECT indexdef FROM pg_catalog.pg_indexes \
+          WHERE schemaname = 'public' AND tablename = 'room_visit_sessions' \
+            AND indexname = 'room_visit_sessions_launch_request_idx'",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect visit launch idempotency index");
+    assert!(launch_index.contains("UNIQUE"), "{launch_index}");
+    assert!(
+        launch_index.contains("enterprise_id, launch_request_id"),
+        "{launch_index}"
+    );
+    assert!(
+        launch_index.contains("launch_request_id IS NOT NULL"),
+        "{launch_index}"
+    );
+    let launch_columns: Vec<String> = sqlx::query_scalar(
+        "SELECT attname::text FROM pg_catalog.pg_attribute \
+          WHERE attrelid = 'public.room_visit_sessions'::regclass \
+            AND attname = ANY(ARRAY['launch_request_id', 'user_agent', 'browser']) \
+          ORDER BY attname",
+    )
+    .fetch_all(&owner)
+    .await
+    .expect("inspect canonical launch metadata columns");
+    assert_eq!(
+        launch_columns,
+        ["browser", "launch_request_id", "user_agent"]
+    );
+
+    assert!(
+        has_column_privilege(
+            &owner,
+            migrate::EXPECTED_RUNTIME_ROLE,
+            "public.users",
+            "last_login_at",
+            "SELECT",
+        )
+        .await,
+        "the users command needs exactly the canonical last-login column",
+    );
+    assert!(
+        !has_table_privilege(
+            &owner,
+            migrate::EXPECTED_RUNTIME_ROLE,
+            "public.users",
+            "SELECT",
+        )
+        .await,
+        "migration 0021 must not restore relation-wide identity reads",
+    );
+
+    let enterprise_id: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Stats API', $1) RETURNING id",
+    )
+    .bind(format!("stats-api-{}", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create lookup tenant");
+    let key_id = Uuid::new_v4().simple().to_string()[..24].to_owned();
+    sqlx::query(
+        "INSERT INTO customer_api_keys (enterprise_id, id, secret_hash, last_four, restrictions) \
+         VALUES ($1, $2, repeat('a', 64), 'aaaa', \
+                 '{\"ips\":[],\"scopes\":[\"sessions/list\"],\"sessions\":[]}'::jsonb)",
+    )
+    .bind(enterprise_id)
+    .bind(&key_id)
+    .execute(&owner)
+    .await
+    .expect("create canonical lookup key");
+
+    let runtime = PgPool::connect(&scratch_url(&runtime_url(), &scratch.name))
+        .await
+        .expect("connect runtime");
+    let found: Option<(Uuid, String, serde_json::Value)> = sqlx::query_as(
+        "SELECT enterprise_id, secret_hash, restrictions \
+           FROM customer_api_key_auth_lookup($1)",
+    )
+    .bind(&key_id)
+    .fetch_optional(&runtime)
+    .await
+    .expect("run bounded lookup without a tenant GUC");
+    let found = found.expect("the exact key must resolve before tenant selection");
+    assert_eq!(found.0, enterprise_id);
+    assert_eq!(found.1, "a".repeat(64));
+    assert_eq!(found.2["scopes"], serde_json::json!(["sessions/list"]));
+    let missing: Option<Uuid> = sqlx::query_scalar(
+        "SELECT enterprise_id FROM customer_api_key_auth_lookup('ffffffffffffffffffffffff')",
+    )
+    .fetch_optional(&runtime)
+    .await
+    .expect("unknown key is opaque");
+    assert!(missing.is_none());
+
+    runtime.close().await;
+    scratch.finish(owner).await;
+}
+
+#[tokio::test]
 async fn enterprise_memberships_are_explicit_bounded_and_tenant_hardened() {
     let scratch = Scratch::create().await;
     let owner = scratch.pool().await;
@@ -2035,6 +2660,7 @@ async fn runtime_object_privileges_match_the_current_api_sql_surface() {
         "password_hash",
         "display_name",
         "is_platform_admin",
+        "last_login_at",
         "preferences",
         "is_guest",
     ];

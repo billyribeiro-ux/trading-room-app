@@ -248,6 +248,12 @@ export function roomStateUrl(shortCode: string): string | null {
   return origin ? `${origin}/internal/room-state/${encodeURIComponent(shortCode)}` : null;
 }
 
+/** Authenticated notification that the current room session has explicitly logged out. */
+export function roomVisitExitUrl(shortCode: string): string | null {
+  const origin = controlPlaneOrigin();
+  return origin ? `${origin}/internal/room-visit-exit/${encodeURIComponent(shortCode)}` : null;
+}
+
 /**
  * `saveCustomPerms`: `POST {control}/internal/room-permissions/{shortCode}`.
  *

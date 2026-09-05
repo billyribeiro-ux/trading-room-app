@@ -16,7 +16,9 @@
 
 pub mod account;
 pub mod alerts;
+pub mod customer_api_keys;
 pub mod join;
+pub mod managed_administrators;
 pub mod managed_badges;
 pub mod managed_members;
 pub mod media;
@@ -46,6 +48,10 @@ pub fn router() -> Router<Arc<AppState>> {
             axum::routing::patch(rooms::set_account_room_archived),
         )
         .route(
+            "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/launch",
+            post(rooms::launch_account_room),
+        )
+        .route(
             "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings",
             get(rooms::account_room_settings).patch(rooms::patch_account_room_settings),
         )
@@ -54,6 +60,30 @@ pub fn router() -> Router<Arc<AppState>> {
             get(managed_members::list)
                 .post(managed_members::invite)
                 .patch(managed_members::manage),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/administrators",
+            get(managed_administrators::list).post(managed_administrators::create),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/administrators/{user_id}",
+            delete(managed_administrators::remove),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/customer-api-keys",
+            get(customer_api_keys::list).post(customer_api_keys::create),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}/rotate",
+            post(customer_api_keys::rotate),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}/restrictions",
+            put(customer_api_keys::restrict),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}",
+            delete(customer_api_keys::remove),
         )
         .route(
             "/api/v1/accounts/{enterprise_id}/badges",
@@ -70,6 +100,14 @@ pub fn router() -> Router<Arc<AppState>> {
         .route(
             "/internal/v1/accounts/{enterprise_id}/rooms/{room_id}/members",
             axum::routing::post(managed_members::room_control),
+        )
+        .route(
+            "/internal/v1/accounts/{enterprise_id}/rooms/{room_id}/visits/close",
+            post(rooms::close_room_visit),
+        )
+        .route(
+            "/internal/v1/accounts/{enterprise_id}/rooms/{room_id}/visits/guest-launch",
+            post(rooms::launch_guest_room),
         )
         .route("/api/v1/rooms/{room_id}", get(rooms::overview))
         // Creates a membership rather than requiring one, so it takes CurrentUser not RoomMember.

@@ -87,6 +87,25 @@ Badge definition and room-member assignment authority follows membership. Keep
 assignment snapshot. Rust badge mode requires membership mode to already be `rust`; see
 [`ops/BADGE-AUTHORITY-CUTOVER.md`](../../ops/BADGE-AUTHORITY-CUTOVER.md).
 
+Account-administrator identity and authorization follows profile authority independently of room
+content slices. Keep `ADMINISTRATOR_AUTHORITY_MODE=legacy` until its converter verifies every legacy
+administrator and collision refusal. Canonical login authenticates against Rust first and stores no
+new password in the controller; see
+[`ops/ACCOUNT-ADMINISTRATOR-AUTHORITY-CUTOVER.md`](../../ops/ACCOUNT-ADMINISTRATOR-AUTHORITY-CUTOVER.md).
+
+Customer API-key management follows administrator authority. Keep
+`CUSTOMER_API_KEY_AUTHORITY_MODE=legacy` until its converter verifies every recoverable legacy
+credential, restriction, and ledger-owned target. Rust stores only SHA-256 verifier metadata; the
+controller retains the independently encrypted owner-visible secret projection. Canonical mode
+requires profile and administrator authority plus an independent `API_KEY_ENCRYPTION_KEY`; see
+[`ops/CUSTOMER-API-KEY-AUTHORITY-CUTOVER.md`](../../ops/CUSTOMER-API-KEY-AUTHORITY-CUTOVER.md).
+
+Room launch is the final Gate 3 switch. Account and manage pages expose only the same-origin launch
+door; canonical mode authorizes current account/membership state, records idempotent member and
+guest visits, and closes them from live-room logout through the service-authenticated controller
+seam. Keep `ROOM_LAUNCH_AUTHORITY_MODE=legacy` until every preceding mode and mapping is reconciled;
+see [`ops/ROOM-LAUNCH-AUTHORITY-CUTOVER.md`](../../ops/ROOM-LAUNCH-AUTHORITY-CUTOVER.md).
+
 ```bash
 createdb tradingroom_dev
 # DATABASE_URL=postgres://<user>@localhost:5432/tradingroom_dev

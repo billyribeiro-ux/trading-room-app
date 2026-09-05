@@ -213,6 +213,34 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0018_badge_authority.sql',
     sha256: '847f9b465741f86bd5a44ad7a415e5a39e0401f188452e7ba7322697ec95f9ff'
+  }),
+  /*
+    Authored and reviewed 2026-09-05 for canonical account-administrator authority. It adds a
+    revisioned admin membership boundary, tenant-paired forced-RLS exactly-once evidence, and four
+    PUBLIC-denied owner/admin functions that can create/delete only the admin role. Real PostgreSQL
+    tests prove existing/cross-tenant identity non-adoption, owner protection, exact ACLs, and RLS.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0019_account_administrator_authority.sql',
+    sha256: 'e0d4d93f30d4140171ee15c5f20cf0e2eb56c58b346a44443cb423c91aa2c1a0'
+  }),
+  /*
+    Authored and reviewed 2026-09-05 for canonical customer API-key management. It stores only
+    revisioned verifier metadata and bounded restrictions behind forced tenant RLS, plus a
+    tenant-paired append-only exactly-once ledger with SELECT+INSERT-only runtime access.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0020_customer_api_key_authority.sql',
+    sha256: 'fda612f15a6e3373c1d140fdb1ef7c183056cd71c892968e8a610a6880029031'
+  }),
+  /*
+    Authored and reviewed 2026-09-05 for external customer API-key execution. It adds one bounded,
+    PUBLIC-denied pre-tenant verifier lookup, exact-column last-login read authority, and a
+    tenant-paired forced-RLS room-visit ledger with deliberately non-destructive runtime access.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0021_customer_api_key_execution.sql',
+    sha256: '7956543061a140abf6cffe500cc16877329eab370bba313a3bb7c119382b865c'
   })
 ]);
 

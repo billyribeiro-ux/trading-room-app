@@ -9,6 +9,9 @@ const optionalRoomAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(
 const optionalRoomSettingsAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 const optionalMembershipAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 const optionalBadgeAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
+const optionalAdministratorAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
+const optionalCustomerApiKeyAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
+const optionalRoomLaunchAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 
 /**
  * The application environment contract.
@@ -62,6 +65,21 @@ export const variables = defineEnvVars({
     description:
       'Reversible Gate 3 badge authority switch. rust requires membership authority, reconciled badge UUID/revision mappings, and TRADINGROOM_API_URL.',
     schema: optionalBadgeAuthorityMode
+  },
+  ADMINISTRATOR_AUTHORITY_MODE: {
+    description:
+      'Reversible Gate 3 account-administrator authority switch. rust requires all preceding authority slices, reconciled administrator UUID/revision mappings, and TRADINGROOM_API_URL.',
+    schema: optionalAdministratorAuthorityMode
+  },
+  CUSTOMER_API_KEY_AUTHORITY_MODE: {
+    description:
+      'Reversible Gate 3 customer API-key authority switch. rust requires all preceding authority slices, reconciled key revisions, TRADINGROOM_API_URL, and API_KEY_ENCRYPTION_KEY.',
+    schema: optionalCustomerApiKeyAuthorityMode
+  },
+  ROOM_LAUNCH_AUTHORITY_MODE: {
+    description:
+      'Reversible final Gate 3 room-entry switch. rust requires every preceding authority, the Rust service credentials, a separate room origin, and a 32+ character handoff secret.',
+    schema: optionalRoomLaunchAuthorityMode
   },
   SUPERADMIN_EMAILS: {
     description:

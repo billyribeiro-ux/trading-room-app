@@ -1,11 +1,14 @@
 import { error, redirect } from '@sveltejs/kit';
+import { randomUUID } from 'node:crypto';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { eq } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
-import { rooms } from '#lib/server/db/schema.js';
+import { accounts, rooms } from '#lib/server/db/schema.js';
 import { guestHandoffToken, handoffUrl } from '#lib/server/room-handoff.js';
 import { recordVisit } from '#lib/server/room-visits.js';
 import { redirectToConfiguredLocation } from '#lib/server/configured-redirect.js';
+import { roomLaunchAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import { launchGuestRoomVisitInAuthority } from '#lib/server/room-visit-authority.js';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -42,11 +45,15 @@ export const load: PageServerLoad = async ({ params, cookies, request, getClient
   */
   let name = '';
   let email = '';
+  let launchRequestId = '';
   try {
     const parsed: unknown = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && 'name' in parsed && 'email' in parsed) {
       name = String(parsed.name).trim();
       email = String(parsed.email).trim().toLowerCase();
+      if ('launchRequestId' in parsed && typeof parsed.launchRequestId === 'string') {
+        launchRequestId = parsed.launchRequestId;
+      }
     }
   } catch {
     // A malformed cookie is not an identity; fall through to the redirect below.
@@ -66,19 +73,64 @@ export const load: PageServerLoad = async ({ params, cookies, request, getClient
   */
   if (room.state !== 'open') redirect(303, `/session/${params.code}`);
 
-  /*
-    The guest's visit. `roomUserId` is null and that is precisely true: a guest satisfied the room's
-    own login rules without holding an account here, which is why `room_sessions` copies the name
-    and email rather than only referencing a membership.
-  */
-  await recordVisit({
-    roomId: room.id,
-    roomUserId: null,
-    displayName: name,
-    email,
-    ip: getClientAddress(),
-    userAgent: request.headers.get('user-agent')
-  });
+  if (roomLaunchAuthorityMode === 'rust') {
+    const [account] = await getDb()
+      .select({ authorityEnterpriseId: accounts.authorityEnterpriseId })
+      .from(accounts)
+      .where(eq(accounts.id, room.accountId))
+      .limit(1);
+    if (!account?.authorityEnterpriseId || !room.authorityRoomId || !room.authorityReconciledAt) {
+      error(409, 'Room launch authority is not reconciled.');
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(launchRequestId)) {
+      launchRequestId = randomUUID();
+      cookies.set('room_identity', JSON.stringify({ name, email, launchRequestId }), {
+        path: '/',
+        httpOnly: false,
+        sameSite: 'lax'
+      });
+    }
+    let clientAddress: string | undefined;
+    try {
+      clientAddress = getClientAddress();
+    } catch {
+      // The Rust service treats missing attribution as unknown; an invented proxy address would be
+      // more misleading than the absence.
+    }
+    const canonical = await launchGuestRoomVisitInAuthority({
+      enterpriseId: account.authorityEnterpriseId,
+      roomId: room.authorityRoomId,
+      requestId: launchRequestId,
+      email,
+      displayName: name,
+      clientAddress,
+      userAgent: request.headers.get('user-agent')
+    });
+    if (!canonical.ok) {
+      if (canonical.status === 403 || canonical.status === 404) error(canonical.status, 'Room entry was refused.');
+      if (canonical.status === 429) error(429, 'Too many room entry attempts.');
+      if (canonical.status === 400 || canonical.status === 409) error(409, canonical.message);
+      error(503, 'Room launch authority is temporarily unavailable.');
+    }
+    if (
+      canonical.data.roomId !== room.authorityRoomId ||
+      canonical.data.shortCode !== room.shortCode ||
+      canonical.data.email !== email ||
+      canonical.data.displayName !== name
+    ) {
+      error(409, 'Room launch authority mapping is stale.');
+    }
+  } else {
+    /* Legacy projection: guests do not have a controller membership row. */
+    await recordVisit({
+      roomId: room.id,
+      roomUserId: null,
+      displayName: name,
+      email,
+      ip: getClientAddress(),
+      userAgent: request.headers.get('user-agent')
+    });
+  }
 
   if (ROOM_BASE_URL?.trim()) {
     const secret = ROOM_JWT_SECRET;

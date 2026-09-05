@@ -95,7 +95,7 @@ permit real signup, login, account, room, API-key, or payment traffic.
       and `api/fixtures/seed.sql` loaded. 413 passed, 0 failed — 155 API library,
       126 API PostgreSQL integration, 9 release-attestor, 112 media library, 11
       media binary — plus full-workspace Clippy with warnings denied and
-      `pnpm quality` locally with 1330
+      `pnpm quality` locally with 1356
       Vitest tests, 9 Playwright tests in Chromium, and the Vercel production
       build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
@@ -123,6 +123,14 @@ permit real signup, login, account, room, API-key, or payment traffic.
       controller passed 1,330 Vitest assertions across 140 files, 70 PostgreSQL
       assertions across 11 files, all 9 Chromium journeys, and the Vercel build
       with zero Svelte diagnostics.
+      After the administrator, customer API-key, compatibility API, and room-launch slices, a
+      clean 21-migration PostgreSQL 17 run passed all 486 Rust tests (175 API library, 167
+      PostgreSQL/HTTP integration, 19 attestor, 114 media library, 11 media binary), strict Clippy,
+      and the live identity/RLS/ACL/LISTEN attestation across 32 forced-RLS relations. All seven
+      dependency-ordered converters passed their real-PostgreSQL refusal/resume/rollback matrices.
+      The controller passed 1,356 Vitest assertions across 147 files and 79 PostgreSQL assertions
+      across 14 files with zero Svelte diagnostics and a production build. Exact-revision hosted
+      proof remains required after push; staging activation is still separately operator-owned.
 - [x] Obtain the first successful default-branch backend workflow result. Run
       [`30767258722`](https://github.com/billyribeiro-ux/trading-app-main/actions/runs/30767258722)
       passed for exact revision
@@ -234,9 +242,29 @@ No Svelte route may directly reproduce authorization policy.
       content proofs; and the dependency-ordered plan/apply/verify/guarded-rollback converter is
       proven on real PostgreSQL. See `ops/BADGE-AUTHORITY-CUTOVER.md`. Staging activation remains
       operator-owned.
-- [ ] Account administrators.
-- [ ] Customer API keys.
-- [ ] Room launch.
+- [x] Account-administrator repository slice: migration `0019` adds revisioned admin memberships,
+      bounded owner/admin list/create/delete functions, tenant-paired forced-RLS exactly-once
+      evidence, and atomic refresh revocation; strict Rust/OpenAPI/generated-controller routes own
+      account CRUD and canonical-first login; controller migration `0023` holds monotonic UUID/
+      revision/content proof; and the profile-dependent plan/apply/verify/guarded-rollback converter
+      is proven on real PostgreSQL. See `ops/ACCOUNT-ADMINISTRATOR-AUTHORITY-CUTOVER.md`. Staging
+      activation remains operator-owned.
+- [x] Customer API-key management slice: migration `0020` stores verifier-only, revisioned,
+      tenant-isolated keys and append-only exactly-once mutations; strict Rust/OpenAPI/generated-
+      controller routes own list/create/rotate/restrict/delete; controller migration `0024` keeps
+      monotonic content proof beside the independently encrypted display projection; and the
+      profile-dependent converter proves credential recoverability, collision refusal, exact
+      verifier/restriction transfer, drift detection, target-commit resume, and guarded rollback on
+      real PostgreSQL. Migration `0021` also implements all eleven captured external stats
+      commands with bounded query-secret authentication, IP/scope/session restriction, per-command
+      limiting, exact response shapes, canonical recording duration metadata, and visit reads. See
+      `ops/CUSTOMER-API-KEY-AUTHORITY-CUTOVER.md`. Staging activation remains operator-owned.
+- [x] Room launch: one same-origin controller door performs current canonical authorization before
+      minting a 60-second handoff; idempotent Rust transactions record account and public-guest
+      visits, repair stale opens, and snapshot identity/IP/device facts; live-room logout closes the
+      visit through separately authenticated room→controller and controller→Rust seams. The legacy
+      path remains a fail-closed rollback switch. See `ops/ROOM-LAUNCH-AUTHORITY-CUTOVER.md`.
+      Staging activation remains operator-owned.
 
 ## Gate 4 — signup, payment, and entitlements
 

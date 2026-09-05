@@ -545,7 +545,7 @@ describe('logout', () => {
       .run();
 
     const deleted: string[] = [];
-    const locals = { user: member, sessionId } as App.Locals;
+    const locals = { user: member, sessionId, roomShortCode: ROOM } as App.Locals;
     const args = {
       cookies: {
         get: () => sessionId,

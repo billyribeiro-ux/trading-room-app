@@ -1,4 +1,5 @@
 import { error, redirect } from '@sveltejs/kit';
+import { randomUUID } from 'node:crypto';
 import { ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
@@ -8,6 +9,9 @@ import { handoffUrl, siteHandoffToken } from '#lib/server/room-handoff.js';
 import { recordVisit } from '#lib/server/room-visits.js';
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { redirectToConfiguredLocation } from '#lib/server/configured-redirect.js';
+import { roomLaunchAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import { apiRequestContext } from '#lib/server/tradingroom-api.js';
+import { launchRoomInAuthority } from '#lib/server/room-authority.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -24,7 +28,7 @@ import type { RequestHandler } from './$types';
   `eq(rooms.id, Number(params.id))`, so the one door that still spoke in row ids was the one nothing
   in the UI links to. Nothing linked to it, so nothing caught it.
 */
-export const GET: RequestHandler = async ({ params, locals, request, getClientAddress }) => {
+export const GET: RequestHandler = async ({ params, locals, request, getClientAddress, cookies, url }) => {
   const user = requireUser(locals);
   const [room] = await getDb().select().from(rooms).where(eq(rooms.shortCode, params.id)).limit(1);
   requireOwnedRoom(locals, room);
@@ -42,6 +46,50 @@ export const GET: RequestHandler = async ({ params, locals, request, getClientAd
     // Failing loudly beats minting a token signed with a default nobody changed,
     // but an expected error body must not expose the private configuration name.
     error(500, 'Room launch is not configured.');
+  }
+
+  if (roomLaunchAuthorityMode === 'rust') {
+    if (!user.authorityEnterpriseId || !user.authorityUserId || !room.authorityRoomId || !room.authorityReconciledAt) {
+      error(409, 'Room launch authority is not reconciled. Reload after conversion.');
+    }
+    const canonical = await launchRoomInAuthority(
+      apiRequestContext({ cookies, url, request, getClientAddress }),
+      user.authorityEnterpriseId,
+      room.authorityRoomId,
+      { requestId: randomUUID() }
+    );
+    if (!canonical.ok) {
+      if (canonical.status === 401) error(401, 'Your canonical session is no longer authorized.');
+      if (canonical.status === 403) error(403, 'You do not have access to this room.');
+      if (canonical.status === 404) error(404, 'Room not found');
+      if (canonical.status === 400 || canonical.status === 409) error(409, canonical.message);
+      error(503, 'Room launch authority is temporarily unavailable.');
+    }
+    if (
+      canonical.data.roomId !== room.authorityRoomId ||
+      canonical.data.userId !== user.authorityUserId ||
+      canonical.data.shortCode !== room.shortCode ||
+      canonical.data.email.trim().toLowerCase() !== user.email.trim().toLowerCase()
+    ) {
+      console.error('[room-launch-authority] canonical binding mismatch', {
+        localRoomId: room.id,
+        authorityRoomId: room.authorityRoomId,
+        authorityUserId: user.authorityUserId
+      });
+      error(409, 'Room launch authority mapping is stale.');
+    }
+
+    const target = handoffUrl(
+      ROOM_BASE_URL,
+      canonical.data.shortCode,
+      siteHandoffToken(secret, {
+        name: canonical.data.displayName,
+        email: canonical.data.email,
+        id: canonical.data.userId
+      })
+    );
+    if (!target) error(500, 'Room launch is not configured.');
+    redirectToConfiguredLocation(target);
   }
 
   /*

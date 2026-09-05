@@ -145,6 +145,7 @@ const USER_SELECT_COLUMNS: &[&str] = &[
     "password_hash",
     "display_name",
     "is_platform_admin",
+    "last_login_at",
     "preferences",
     "is_guest",
 ];
@@ -1128,8 +1129,20 @@ fn validate_runtime_role(row: &RoleRow) -> Result<RuntimeRoleEvidence, Attestati
 /// normalized room-member assignments with composite tenant foreign keys, and a forced-RLS,
 /// SELECT+INSERT-only mutation ledger. The two mutable tables' exact direct DML matrices are
 /// attested alongside the append-only ledger below.
-const ATTESTED_MIGRATION_VERSIONS: [i64; 18] = [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+///
+/// Slot 19 is `0019_account_administrator_authority.sql`. It adds revisioned account-admin
+/// membership authority, four owner/admin-bounded SECURITY DEFINER operations, and a tenant-paired
+/// forced-RLS mutation ledger with the same append-only SELECT+INSERT runtime posture.
+///
+/// Slot 20 is `0020_customer_api_key_authority.sql`. It stores verifier-only customer API-key
+/// metadata and bounded restrictions under forced tenant RLS, plus an append-only exactly-once
+/// mutation ledger. Runtime receives normal CRUD on verifier metadata and SELECT+INSERT on evidence.
+///
+/// Slot 21 is `0021_customer_api_key_execution.sql`. It exposes one PUBLIC-denied, pinned-search-
+/// path verifier lookup for pre-tenant key authentication and a tenant-paired, forced-RLS room
+/// visit ledger. The runtime receives SELECT+INSERT+UPDATE but deliberately no DELETE on visits.
+const ATTESTED_MIGRATION_VERSIONS: [i64; 21] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
 ];
 
 /// The two human-facing error messages that name that chain's range in PROSE, as named constants
@@ -1141,9 +1154,9 @@ const ATTESTED_MIGRATION_VERSIONS: [i64; 18] = [
 /// refused release. The embedded-contract message beside it was moved by hand both times;
 /// hand-moving is the convention that failed here, so the test moves the burden.
 const EMBEDDED_MIGRATION_CONTRACT_MESSAGE: &str =
-    "the attestor is pinned to repository migration versions 0001 through 0018";
+    "the attestor is pinned to repository migration versions 0001 through 0021";
 const MIGRATION_LEDGER_MISMATCH_MESSAGE: &str = "the SQLx ledger must contain only successful \
-     repository migrations 0001 through 0018 with exact descriptions and checksums";
+     repository migrations 0001 through 0021 with exact descriptions and checksums";
 
 fn validate_embedded_migration_contract() -> Result<(), AttestationError> {
     let versions: Vec<i64> = MIGRATOR
@@ -1526,7 +1539,9 @@ async fn query_and_validate_acl(
              VALUES ('enterprises'::text, 1), ('users'::text, 2), ('audit_log'::text, 3), \
                     ('room_setting_mutations'::text, 4), ('membership_mutations'::text, 5), \
                     ('enterprise_badges'::text, 6), ('room_member_badges'::text, 7), \
-                    ('badge_mutations'::text, 8) \
+                    ('badge_mutations'::text, 8), ('administrator_mutations'::text, 9), \
+                    ('customer_api_keys'::text, 10), ('customer_api_key_mutations'::text, 11), \
+                    ('room_visit_sessions'::text, 12) \
          ), privilege(privilege_type, privilege_order) AS ( \
              VALUES \
                  ('SELECT'::text, 1), ('INSERT'::text, 2), ('UPDATE'::text, 3), \
@@ -1677,6 +1692,11 @@ fn validate_acl_rows(
             &["SELECT", "INSERT", "UPDATE", "DELETE"][..],
         ),
         ("room_member_badges", &["SELECT", "INSERT", "DELETE"][..]),
+        (
+            "customer_api_keys",
+            &["SELECT", "INSERT", "UPDATE", "DELETE"][..],
+        ),
+        ("room_visit_sessions", &["SELECT", "INSERT", "UPDATE"][..]),
     ] {
         let relation_rows: Vec<&TablePrivilegeRow> = table_rows
             .iter()
@@ -1703,6 +1723,8 @@ fn validate_acl_rows(
         "room_setting_mutations",
         "membership_mutations",
         "badge_mutations",
+        "administrator_mutations",
+        "customer_api_key_mutations",
     ] {
         let ledger_rows: Vec<&TablePrivilegeRow> = table_rows
             .iter()
@@ -1726,7 +1748,7 @@ fn validate_acl_rows(
         });
     }
 
-    if table_rows.len() != (expected_objects.len() + 5) * TABLE_PRIVILEGE_TYPES.len()
+    if table_rows.len() != (expected_objects.len() + 9) * TABLE_PRIVILEGE_TYPES.len()
         || column_rows.len()
             != (ENTERPRISE_COLUMNS.len() + USER_COLUMNS.len() + AUDIT_LOG_COLUMNS.len())
                 * COLUMN_PRIVILEGE_TYPES.len()
@@ -1761,7 +1783,7 @@ fn expected_column_privileges(table_name: &str, column_name: &str) -> Vec<String
 const fn acl_mismatch() -> AttestationError {
     AttestationError::new(
         "runtime_acl_mismatch",
-        "effective table and column privileges do not match the reviewed runtime matrix through migration 0018",
+        "effective table and column privileges do not match the reviewed runtime matrix through migration 0021",
     )
 }
 
@@ -2678,15 +2700,17 @@ mod tests {
     }
 
     #[test]
-    fn exact_acl_fixture_accepts_only_the_reviewed_matrix_through_migration_0018() {
+    fn exact_acl_fixture_accepts_only_the_reviewed_matrix_through_migration_0021() {
         let (mut table_rows, mut column_rows) = exact_acl_rows();
         let evidence = validate_acl_rows(&table_rows, &column_rows)
             .expect("the reviewed runtime ACL matrix is valid");
-        assert_eq!(evidence.objects.len(), 8);
+        assert_eq!(evidence.objects.len(), 12);
         for relation in [
             "public.room_setting_mutations",
             "public.membership_mutations",
             "public.badge_mutations",
+            "public.administrator_mutations",
+            "public.customer_api_key_mutations",
         ] {
             let ledger = evidence
                 .objects
@@ -2739,6 +2763,21 @@ mod tests {
             "runtime_acl_mismatch"
         );
         table_rows[badge_delete_index].granted = false;
+
+        let key_ledger_delete_index = table_rows
+            .iter()
+            .position(|row| {
+                row.table_name == "customer_api_key_mutations" && row.privilege_type == "DELETE"
+            })
+            .expect("customer API-key ledger delete row exists");
+        table_rows[key_ledger_delete_index].granted = true;
+        assert_eq!(
+            validate_acl_rows(&table_rows, &column_rows)
+                .expect_err("customer API-key mutation evidence must stay append-only")
+                .code,
+            "runtime_acl_mismatch"
+        );
+        table_rows[key_ledger_delete_index].granted = false;
 
         let assignment_update_index = table_rows
             .iter()
@@ -2812,6 +2851,10 @@ mod tests {
             "enterprise_badges",
             "room_member_badges",
             "badge_mutations",
+            "administrator_mutations",
+            "customer_api_keys",
+            "customer_api_key_mutations",
+            "room_visit_sessions",
         ];
         let table_rows = expected_tables
             .iter()
@@ -2823,12 +2866,20 @@ mod tests {
                         privilege_type: (*privilege).to_owned(),
                         granted: matches!(
                             *table_name,
-                            "room_setting_mutations" | "membership_mutations" | "badge_mutations"
+                            "room_setting_mutations"
+                                | "membership_mutations"
+                                | "badge_mutations"
+                                | "administrator_mutations"
+                                | "customer_api_key_mutations"
                         ) && matches!(*privilege, "SELECT" | "INSERT")
                             || *table_name == "enterprise_badges"
                                 && matches!(*privilege, "SELECT" | "INSERT" | "UPDATE" | "DELETE")
                             || *table_name == "room_member_badges"
-                                && matches!(*privilege, "SELECT" | "INSERT" | "DELETE"),
+                                && matches!(*privilege, "SELECT" | "INSERT" | "DELETE")
+                            || *table_name == "customer_api_keys"
+                                && matches!(*privilege, "SELECT" | "INSERT" | "UPDATE" | "DELETE")
+                            || *table_name == "room_visit_sessions"
+                                && matches!(*privilege, "SELECT" | "INSERT" | "UPDATE"),
                     })
             })
             .collect();
@@ -2927,8 +2978,8 @@ mod tests {
                general tenant predicate and `room_events`' member-scoped one.
             */
             tenant_policies: TenantPolicyEvidence {
-                forced_relations: 23,
-                policies: 23,
+                forced_relations: 32,
+                policies: 32,
                 distinct_using_expressions: vec![
                     r#"((enterprise_id = (current_setting('app.enterprise_id'::text, true))::uuid) AND ((current_setting('app.member_id'::text, true) = ''::text) OR ((sender_member_id)::text = current_setting('app.member_id'::text, true)) OR ((recipient_member_id)::text = current_setting('app.member_id'::text, true))))"#.into(),
                     r#"(enterprise_id = (NULLIF(current_setting('app.enterprise_id'::text, true), ''::text))::uuid)"#.into()

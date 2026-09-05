@@ -10,6 +10,7 @@ pub mod client_ip;
 pub mod metrics;
 pub(crate) mod origin;
 pub mod ratelimit;
+pub mod stats;
 pub mod v1;
 
 use std::net::SocketAddr;
@@ -185,6 +186,7 @@ pub fn router(state: Arc<AppState>, request_timeout: Duration) -> Router {
         .route("/api/auth/login", post(login_handler))
         .route("/api/auth/refresh", post(refresh_handler))
         .route("/api/auth/logout", post(logout_handler))
+        .merge(stats::router())
         .merge(v1::router())
         // Outermost, so it also catches a panic raised inside another layer. Without it
         // a panicking handler drops the connection with no response at all, which a
@@ -204,7 +206,20 @@ pub fn router(state: Arc<AppState>, request_timeout: Duration) -> Router {
             protect_cookie_authenticated_mutations,
         ))
         .layer(axum::middleware::from_fn(security_headers))
-        .layer(tower_http::trace::TraceLayer::new_for_http())
+        // `uri` is deliberately excluded: the compatibility stats contract authenticates with
+        // query parameters. Recording a full URI would turn ordinary access logs into a secret
+        // store. Matched-path RED metrics are recorded separately by `observe`.
+        .layer(
+            tower_http::trace::TraceLayer::new_for_http().make_span_with(
+                |request: &axum::extract::Request| {
+                    tracing::info_span!(
+                        "http_request",
+                        method = %request.method(),
+                        path = %request.uri().path()
+                    )
+                },
+            ),
+        )
         .layer(tower_http::limit::RequestBodyLimitLayer::new(
             limits::BODY_LIMIT_BYTES,
         ))

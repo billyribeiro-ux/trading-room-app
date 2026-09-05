@@ -200,6 +200,10 @@ pub const GRANTS_PER_MEMBER_PER_MINUTE: u32 = 12;
 /// difference between a chatty user and a script.
 pub const MESSAGES_PER_MEMBER_PER_MINUTE: u32 = 30;
 
+/// The captured customer API contract promises one request per second for each key/command pair.
+/// The limiter is still per instance (as documented above); it is an abuse brake, not billing.
+pub const CUSTOMER_API_COMMANDS_PER_SECOND: u32 = 1;
+
 /// Upper bound on distinct keys held by one rate limiter.
 ///
 /// Without this, every unique email or spoofed IP an attacker sends allocates a cell and

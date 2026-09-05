@@ -47,6 +47,11 @@ const operations = [];
 for (const [path, pathItem] of Object.entries(spec.paths)) {
   for (const [method, operation] of Object.entries(pathItem)) {
     if (method === 'parameters') continue;
+    // Browser-facing controller transport is cookie-authenticated. The separately authenticated
+    // legacy-compatible statistics API is documented in the same authoritative OpenAPI document,
+    // but deliberately has no controller client surface that could accept or forward its query
+    // secret. An operation must opt out explicitly; no path-name convention is trusted here.
+    if (operation['x-controller-client'] === false) continue;
     const success = Object.entries(operation.responses).find(([status]) => /^2\d\d$/.test(status));
     if (!success) throw new Error(`${operation.operationId} has no 2xx response`);
     const [status, response] = success;

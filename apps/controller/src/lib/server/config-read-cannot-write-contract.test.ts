@@ -149,6 +149,7 @@ describe('every internal route verifies the credential its job needs', () => {
     'room-permissions',
     'room-setting',
     'room-state',
+    'room-visit-exit',
     'stream-ingest'
   ];
   /*
@@ -251,7 +252,9 @@ describe('every internal route verifies the credential its job needs', () => {
     SAME row — the one the endpoint just looked up for this room, never a claim from the request.
   */
   const PRESENTER_TEST = /(\w+)\.roomUser\.role === 0 \|\| isRoomPresenter\(\1\.roomUser\)/;
-  const NO_MEMBER_NAMED = ['room-occupancy'];
+  // Both are machine-reported facts. Occupancy reports a count; visit-exit reports that the
+  // already-authenticated room session has ended. Neither is a presenter acting on another user.
+  const NO_MEMBER_NAMED = ['room-occupancy', 'room-visit-exit'];
   it.each(WRITES.filter((route) => !NO_MEMBER_NAMED.includes(route)))(
     '%s also checks that the named member is a presenter of THIS room',
     async (route) => {
@@ -261,19 +264,20 @@ describe('every internal route verifies the credential its job needs', () => {
     }
   );
 
-  it('and the one write with no member behind it says so', async () => {
+  it('machine-reported writes are not misclassified as presenter actions', async () => {
     /*
-      `room-occupancy` is the exception the list above carries, and it is asserted rather than
-      assumed: the room process reports its own subscriber count, nobody pressed anything, and
-      requiring a member would mean inventing an actor. What it must NOT have is a half-gate — a
-      membership lookup whose result is never used — so the absence is pinned both ways.
+      `room-occupancy` reports its own subscriber count, and `room-visit-exit` reports that an
+      already-authenticated live-room session ended. Nobody is exercising presenter authority in
+      either case, so requiring a presenter would invent an actor.
 
       The suspended-account refusal still applies. A suspended room stops serving, reads and writes
       alike, and that is not about who is asking.
     */
-    const source = await sourceOf('room-occupancy');
-    expect(source).not.toContain('isRoomPresenter');
-    expect(source).toContain('account.status !== ACCOUNT_ACTIVE');
+    for (const route of NO_MEMBER_NAMED) {
+      const source = await sourceOf(route);
+      expect(source).not.toContain('isRoomPresenter');
+      expect(source).toContain('account.status !== ACCOUNT_ACTIVE');
+    }
   });
 
   it('names every internal route that takes a credential', async () => {

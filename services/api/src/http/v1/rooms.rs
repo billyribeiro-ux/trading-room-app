@@ -5,6 +5,7 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
+use axum::http::{HeaderMap, header};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -16,6 +17,7 @@ use crate::db::TenantCtx;
 use crate::db::repo::room;
 use crate::error::ApiError;
 use crate::http::AppState;
+use crate::http::{ClientAddr, client_ip};
 
 /// What the caller may do, as the client needs to render it.
 ///
@@ -130,6 +132,32 @@ pub struct CreateAccountRoomRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct LaunchAccountRoomRequest {
+    pub request_id: uuid::Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct CloseRoomVisitRequest {
+    pub user_id: Option<uuid::Uuid>,
+    pub email: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct LaunchGuestRoomRequest {
+    pub request_id: uuid::Uuid,
+    pub email: String,
+    pub display_name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CloseRoomVisitResponse {
+    pub closed: bool,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArchiveAccountRoomRequest {
     pub archived: bool,
@@ -192,6 +220,79 @@ async fn require_account_admin(
         return Err(ApiError::NotFound);
     }
     Ok(())
+}
+
+fn launch_error(error: room::LaunchError) -> ApiError {
+    match error {
+        room::LaunchError::Database(error) => error.into(),
+        room::LaunchError::RequestMismatch => {
+            ApiError::Invalid("requestId was already used for a different room launch".into())
+        }
+        room::LaunchError::Denied => ApiError::Forbidden,
+    }
+}
+
+fn bounded_user_agent(headers: &HeaderMap) -> Option<String> {
+    let value = headers.get(header::USER_AGENT)?.to_str().ok()?.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let mut end = value.len().min(2_048);
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    Some(value[..end].to_owned())
+}
+
+fn visitor_agent(user_agent: Option<&str>) -> (bool, &'static str) {
+    let Some(agent) = user_agent else {
+        return (false, "unknown");
+    };
+    let lower = agent.to_ascii_lowercase();
+    let is_android_tablet = lower.contains("android") && !lower.contains("mobile");
+    let is_mobile = is_android_tablet
+        || ["mobile", "iphone", "ipod", "ipad", "tablet"]
+            .iter()
+            .any(|token| lower.contains(token));
+    let browser = if lower.contains("edg/") || lower.contains("edga/") || lower.contains("edgios/")
+    {
+        "Edge"
+    } else if lower.contains("opr/") || lower.contains("opera/") {
+        "Opera"
+    } else if lower.contains("samsungbrowser/") {
+        "Samsung Internet"
+    } else if lower.contains("firefox/") || lower.contains("fxios/") {
+        "Firefox"
+    } else if lower.contains("chrome/") || lower.contains("crios/") {
+        "Chrome"
+    } else if lower.contains("safari/") {
+        "Safari"
+    } else {
+        "unknown"
+    };
+    (is_mobile, browser)
+}
+
+fn valid_email(value: &str) -> bool {
+    let value = value.trim();
+    let Some((local, domain)) = value.split_once('@') else {
+        return false;
+    };
+    !local.is_empty()
+        && local.len() <= 64
+        && value.len() <= crate::limits::LOGIN_EMAIL_MAX_BYTES
+        && !value.chars().any(char::is_whitespace)
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+        && domain.contains('.')
+        && !domain.contains('@')
+}
+
+fn controller_bearer(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
 }
 
 /// Canonical account room list. Account authority is locked and checked inside the same
@@ -267,6 +368,178 @@ pub async fn create_account_room(
     }
     tx.commit().await?;
     Ok(Json(outcome.room))
+}
+
+/// The only canonical account-to-room entry door. Authorization, room state, current membership,
+/// identity snapshots, stale-visit repair, and idempotency are committed in one tenant transaction.
+pub async fn launch_account_room(
+    State(state): State<Arc<AppState>>,
+    user: crate::auth::extract::CurrentUser,
+    Path(path): Path<AccountRoomPath>,
+    headers: HeaderMap,
+    ClientAddr(peer): ClientAddr,
+    payload: Result<Json<LaunchAccountRoomRequest>, JsonRejection>,
+) -> Result<Json<room::LaunchVisit>, ApiError> {
+    let Json(request) =
+        payload.map_err(|_| ApiError::Invalid("invalid room launch request".into()))?;
+    let now = OffsetDateTime::now_utc();
+    let user_agent = bounded_user_agent(&headers);
+    let (is_mobile, browser) = visitor_agent(user_agent.as_deref());
+    let ip = client_ip::resolve(&headers, peer, state.trusted_proxy_hops);
+
+    let mut tx = state
+        .db
+        .begin_tenant(TenantCtx::server(path.enterprise_id))
+        .await?;
+    require_account_admin(&mut tx, user.user_id).await?;
+    let outcome = room::launch_for_account(
+        &mut tx,
+        user.user_id,
+        path.room_id,
+        room::LaunchVisitInput {
+            request_id: request.request_id,
+            ip,
+            user_agent: user_agent.as_deref(),
+            browser,
+            is_mobile,
+            now,
+        },
+    )
+    .await
+    .map_err(launch_error)?;
+    if !outcome.replayed {
+        crate::db::repo::moderation::audit(
+            &mut tx,
+            crate::db::repo::moderation::AuditEntry {
+                enterprise_id: path.enterprise_id,
+                room_id: Some(path.room_id),
+                actor_user_id: user.user_id,
+                actor_name: &outcome.visit.display_name,
+                event_name: "room.launched",
+                event_detail: "account member launched a room",
+                target_type: Some("room_visit"),
+                target_id: Some(outcome.visit.visit_id),
+                metadata: serde_json::json!({ "requestId": request.request_id }),
+            },
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(outcome.visit))
+}
+
+/// Service-authenticated exit notification from the live room through the controller. The fixed
+/// service secret authenticates the caller; tenant RLS and the room/user predicates scope the row.
+pub async fn close_room_visit(
+    State(state): State<Arc<AppState>>,
+    Path(path): Path<AccountRoomPath>,
+    headers: HeaderMap,
+    payload: Result<Json<CloseRoomVisitRequest>, JsonRejection>,
+) -> Result<Json<CloseRoomVisitResponse>, ApiError> {
+    if !state.controller_is_authorized(controller_bearer(&headers)) {
+        return Err(ApiError::Unauthorized);
+    }
+    let Json(request) =
+        payload.map_err(|_| ApiError::Invalid("invalid room visit close request".into()))?;
+    let mut tx = state
+        .db
+        .begin_tenant(TenantCtx::server(path.enterprise_id))
+        .await?;
+    let now = OffsetDateTime::now_utc();
+    let closed = match (request.user_id, request.email.as_deref()) {
+        (Some(user_id), None) => {
+            room::close_visit_from_controller(&mut tx, path.room_id, user_id, now).await?
+        }
+        (None, Some(email)) if valid_email(email) => {
+            room::close_guest_visit_from_controller(
+                &mut tx,
+                path.room_id,
+                &email.trim().to_lowercase(),
+                now,
+            )
+            .await?
+        }
+        _ => {
+            return Err(ApiError::Invalid(
+                "exactly one valid userId or email is required".into(),
+            ));
+        }
+    };
+    tx.commit().await?;
+    Ok(Json(CloseRoomVisitResponse { closed }))
+}
+
+/// Service-authenticated guest entry after the controller has enforced the room's public login
+/// rules. It creates a non-authenticating canonical guest/member and visit in one transaction.
+pub async fn launch_guest_room(
+    State(state): State<Arc<AppState>>,
+    Path(path): Path<AccountRoomPath>,
+    headers: HeaderMap,
+    ClientAddr(peer): ClientAddr,
+    payload: Result<Json<LaunchGuestRoomRequest>, JsonRejection>,
+) -> Result<Json<room::LaunchVisit>, ApiError> {
+    if !state.controller_is_authorized(controller_bearer(&headers)) {
+        return Err(ApiError::Unauthorized);
+    }
+    let Json(request) =
+        payload.map_err(|_| ApiError::Invalid("invalid guest room launch request".into()))?;
+    let email = request.email.trim().to_lowercase();
+    let display_name = request.display_name.trim();
+    if !valid_email(&email)
+        || display_name.is_empty()
+        || display_name.len() > crate::limits::DISPLAY_NAME_MAX_BYTES
+    {
+        return Err(ApiError::Invalid("invalid guest identity".into()));
+    }
+    let ip = client_ip::resolve(&headers, peer, state.trusted_proxy_hops);
+    let limiter_key = ip.map_or_else(|| "unknown".to_owned(), |value| value.to_string());
+    state
+        .limiters
+        .guest_ip
+        .check(&limiter_key)
+        .map_err(|_| ApiError::RateLimited)?;
+    let user_agent = bounded_user_agent(&headers);
+    let (is_mobile, browser) = visitor_agent(user_agent.as_deref());
+    let now = OffsetDateTime::now_utc();
+    let mut tx = state
+        .db
+        .begin_tenant(TenantCtx::server(path.enterprise_id))
+        .await?;
+    let outcome = room::launch_guest_from_controller(
+        &mut tx,
+        path.room_id,
+        &email,
+        display_name,
+        room::LaunchVisitInput {
+            request_id: request.request_id,
+            ip,
+            user_agent: user_agent.as_deref(),
+            browser,
+            is_mobile,
+            now,
+        },
+    )
+    .await
+    .map_err(launch_error)?;
+    if !outcome.replayed {
+        crate::db::repo::moderation::audit(
+            &mut tx,
+            crate::db::repo::moderation::AuditEntry {
+                enterprise_id: path.enterprise_id,
+                room_id: Some(path.room_id),
+                actor_user_id: outcome.visit.user_id,
+                actor_name: &outcome.visit.display_name,
+                event_name: "room.guest_launched",
+                event_detail: "controller-authorized guest launched a room",
+                target_type: Some("room_visit"),
+                target_id: Some(outcome.visit.visit_id),
+                metadata: serde_json::json!({ "requestId": request.request_id }),
+            },
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(outcome.visit))
 }
 
 /// Archives or restores one room using an absolute target state. Cross-tenant ids are indistinct

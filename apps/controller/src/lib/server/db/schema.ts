@@ -10,6 +10,7 @@ import {
   uuid,
   type AnyPgColumn
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 /**
  * The controller's data model, mirroring the two tiers the reference exposes:
@@ -747,16 +748,25 @@ export const badges = pgTable(
 );
 
 /** Account-level extra admins. Reference empty state: "No admin users added yet". */
-export const adminUsers = pgTable('admin_users', {
-  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-  accountId: integer('account_id')
-    .notNull()
-    .references(() => accounts.id),
-  name: text('name').notNull(),
-  email: text('email').notNull(),
-  passwordHash: text('password_hash').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull()
-});
+export const adminUsers = pgTable(
+  'admin_users',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    accountId: integer('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    /** Legacy rollback material only. Canonical credentials never enter this projection. */
+    passwordHash: text('password_hash'),
+    authorityUserId: uuid('authority_user_id').unique(),
+    authorityRevision: bigint('authority_revision', { mode: 'number' }),
+    authorityContentHash: text('authority_content_hash'),
+    authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull()
+  },
+  (t) => [uniqueIndex('admin_users_account_email_ci_idx').on(t.accountId, sql`lower(${t.email})`)]
+);
 
 /**
  * Account-level API keys. The reference's columns are the raw Mongo field names
@@ -782,7 +792,10 @@ export const apiKeys = pgTable('api_keys', {
    * `{ ips: string[], scopes: string[] }` — an empty object means unrestricted,
    * which is what an existing key keeps.
    */
-  restrictionsJson: text('restrictions_json').notNull().default('{}')
+  restrictionsJson: text('restrictions_json').notNull().default('{}'),
+  authorityRevision: bigint('authority_revision', { mode: 'number' }),
+  authorityContentHash: text('authority_content_hash'),
+  authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true })
 });
 
 /**

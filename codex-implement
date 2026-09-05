@@ -8,14 +8,14 @@ separate cutover program in `apps/controller/docs/PRODUCTION-CUTOVER-PLAN.md`: t
 controller and room stores have not yet moved onto the Rust/PostgreSQL authority. That program is
 not represented as complete here merely because the reconstructed feature surfaces work.
 
-## Production-authority implementation update — 2026-09-03
+## Production-authority implementation update — 2026-09-05
 
 | Cutover boundary | Current hard status | Repository evidence | Remaining exit condition |
 | --- | --- | --- | --- |
 | Gate 0 — domain containment | Mixed: code controls complete; legal, contact transport, monitoring, and optional history rewrite remain external/owner-gated | `apps/controller/docs/PRODUCTION-CUTOVER-PLAN.md` Gate 0 | Owner/vendor actions named by each unchecked row |
 | Gate 1 — backend SSOT/security drift | Local and hosted source gates exist; current immutable release publication/deployment/rollback evidence is not complete | backend CI, migration attestor, provenance seals | Registry/signing/provenance/target rollback exercise |
 | Gate 2 — account bootstrap | Repository implementation complete and pushed; staging deployment remains external | migration `0011`; `/api/v1/account`; scoped OpenAPI; generated server client; exact-cookie and negative tests | Staging database/API deploy plus backup restore proof |
-| Gate 3 — feature migration | Conversion foundation plus profile, room-lifecycle, room-settings, membership, and badge request-path slices are implemented and locally proven; remaining product slices stay open | controller migrations `0018`–`0022`; Rust migrations `0012`–`0018`; profile/room/settings/membership/badge converter E2Es; reversible dependency-ordered switches; generated OpenAPI transport; authenticated profile and room-management UI | Administrators, API keys, and launch moved one authorized vertical slice at a time; staging activation follows all authority runbooks |
+| Gate 3 — feature migration | All eight repository slices are implemented and locally proven: profile, room lifecycle, room settings, membership, badges, account administrators, customer API keys, and room launch/visit accounting | controller migrations `0018`–`0024`; Rust migrations `0012`–`0021`; seven dependency-ordered converter E2Es; generated OpenAPI transport; authenticated management/login/launch paths; real PostgreSQL HTTP/RLS tests | Deploy one immutable revision, execute every runbook in order in staging, and retain observation/rollback evidence |
 | Gate 4 — signup/payment/entitlements | Not production-authoritative | existing controller signup/email scaffolding and provider-independent ledgers | Verified recovery/email, idempotent billing webhooks, subscription facts, central entitlements, legal approval, provider smoke |
 | Gate 5 — media promotion | Stage 1 boundary proof only; browser is not wired to the Rust media contract | media service tests and deployment plan | session response, audience-bound grants, TURN, rotation/draining/observability, native dependency clearance, device/load/recovery evidence |
 
@@ -239,6 +239,77 @@ passed their complete plan/apply/verify, drift/no-overwrite, crash-resume, guard
 cleanup matrices on a new isolated PostgreSQL 17 database. Exact-revision hosted proof remains
 required after push; no staging or production activation is claimed.
 
+### Gate 3 account-administrator slice — repository implementation complete 2026-09-05
+
+Canonical administrator authority now owns account-scoped list/create/delete, credentials, the
+admin enterprise membership, exactly-once mutations, audit records, and refresh-family revocation.
+Rust migration `0019` uses tenant-paired forced RLS and preserves owners as a separate authority
+class. Creation refuses weak/oversized input, over-posting, email collision, and adoption of an
+unowned canonical identity. Deletion removes administrator authority and revokes its sessions in
+the same transaction. Canonical-first controller login verifies Rust before creating a local
+non-password shadow, so stale controller credentials can neither veto canonical success nor restore
+deleted authority.
+
+Controller migration `0023` records the canonical user UUID, monotonic revision, normalized content
+hash, and reconciliation timestamp. The account UI and server actions use the generated transport
+in Rust mode; projection refuses partial proof, stale/equal-revision disagreement, and an
+unexplained target identity. `ADMINISTRATOR_AUTHORITY_MODE=rust` depends on canonical profile and
+badge authority. The source-fingerprinted converter proves prerequisite, collision, plan/apply,
+independent verify, source drift, target-commit/source-proof resume, post-use rollback refusal, and
+idempotent cleanup on real PostgreSQL. Operational ordering is pinned in
+`ops/ACCOUNT-ADMINISTRATOR-AUTHORITY-CUTOVER.md`.
+
+### Gate 3 customer API-key and compatibility API slice — repository implementation complete 2026-09-05
+
+Rust migration `0020` adds verifier-only, revisioned, tenant-isolated customer keys and an
+append-only exactly-once mutation ledger. Account-scoped list/create/rotate/restrict/delete routes
+lock current administrator authority, validate exact key/revision/CIDR/scope/session bounds, reveal
+a new secret once, persist only its SHA-256 verifier, and revoke the old verifier atomically.
+Controller migration `0024` maintains a separately encrypted owner-display projection plus
+monotonic canonical proof; the account UI never receives verifier material. Rust mode depends on
+canonical profile and administrator authority and a distinct encryption key.
+
+Migration `0021` adds the bounded pre-tenant key lookup, last-use accounting, recording-duration
+metadata, and tenant-paired room-visit ledger. All eleven captured `/stats/v1/sessions/*` commands
+run through query-key authentication, constant-time secret comparison, per-command quotas, and
+normalized IP/scope/session restrictions. Result sets stop at 10,000, query strings are excluded
+from trace labels, and distinct concurrent commands advance one key's last-use timestamp without a
+lost update. The compatibility response includes FCM fields and recording metadata, but production
+activation still requires a real migrated registration/recording producer rehearsal; local tests
+seed canonical facts and do not claim controller-local device registrations or room-SQLite archive
+rows have already moved themselves into PostgreSQL.
+
+The converter preserves the source ciphertext, refuses unrecoverable hash-only keys and target
+collisions, transfers exact verifier/restriction/timestamp facts, detects drift without overwriting,
+resumes the target-commit boundary, and permits rollback only before use. Its full matrix passed on
+PostgreSQL 17. The activation and external-origin rollback sequence is in
+`ops/CUSTOMER-API-KEY-AUTHORITY-CUTOVER.md`.
+
+### Gate 3 room-launch and visit slice — repository implementation complete 2026-09-05
+
+Every account/manage launch now enters through one same-origin controller route. In canonical mode
+that route re-proves account authority, room mapping, current approved/non-paused/non-banned
+membership and room state in Rust before minting the existing 60-second room handoff. A stable
+request UUID plus transaction advisory lock makes uncertain retries converge on one visit and one
+audit event; a new genuine launch repairs an abandoned open row before inserting its successor.
+Closed rooms admit only the captured staff roles, archived rooms remain opaque, and cross-tenant
+identifiers cannot distinguish themselves from absence.
+
+The public controller login keeps its existing password/disclosure/trial decision and then calls a
+separate service-authenticated guest-launch route. Rust creates a non-authenticating synthetic guest
+identity, member row, and visit atomically without treating the self-declared report email as
+account authority. IP, bounded user agent, browser/mobile classification, identity snapshots, and
+entry time are server-derived or bounded at the trusted edge. Live-room logout sends one scoped
+HMAC request to the controller, which re-proves the local mapping and uses the independent service
+credential to close the canonical visit. The email is carried in an exact bounded JSON body—not a
+URL query—and close failure cannot trap a member; the next launch repairs a stale open row.
+
+The complete launch test covers account authorization, idempotency mismatch, membership/state/
+archive refusals, guest isolation/rate limit, visit snapshots, logout closure and stale-row repair
+against real PostgreSQL. Controller/room contracts additionally pin commit-before-handoff ordering,
+credential separation, JSON-only PII transport, and logout-before-cookie-destruction ordering. See
+`ops/ROOM-LAUNCH-AUTHORITY-CUTOVER.md`; staging activation is not claimed by local evidence.
+
 ## Completion standard
 
 A row closes only when every applicable link exists:
@@ -418,7 +489,7 @@ The public `/v5` pathname is not the v5 build selector; `/v3`, `/v4`, `/v5`, and
 
 ## Database and configuration changes
 
-Controller migrations are forward-only and registered through version 22:
+Controller migrations are forward-only and registered through version 24:
 
 1. `0014-alert-delivery-ledger.js` — dispatches and per-recipient attempts.
 2. `0015-discord-oauth.js` — linked identity and expiring single-use OAuth state.
@@ -434,6 +505,10 @@ Controller migrations are forward-only and registered through version 22:
    normalized content hash, reconciliation time, and collision-preventing constraints/indexes.
 9. `0022-authority-badge-projection.js` — canonical badge UUID, monotonic revision, normalized
    definition hash, reconciliation time, and collision-preventing constraints/indexes.
+10. `0023-authority-administrator-projection.js` — canonical administrator UUID, monotonic
+    revision/content proof, reconciliation time, and one-to-one identity constraints.
+11. `0024-authority-customer-api-key-projection.js` — canonical key revision/content proof and
+    reconciliation time beside the independently encrypted legacy display projection.
 
 Rust migration `0012_legacy_cutover_ledger.sql` adds enterprise suspension parity plus owner-only
 conversion run and entity-mapping ledgers. The runtime role has no access. The Gate 3 importer is
@@ -443,14 +518,16 @@ transactions. Its E2E verifier proved ownership refusal, plan, apply, independen
 source-drift refusal, rollback, and cleanup on PostgreSQL 17. A real Rust HTTP login separately
 proved an imported Node scrypt credential is immediately compare-and-swap upgraded to Argon2id.
 
-Rust migrations `0013_profile_write_privilege.sql` through `0018_badge_authority.sql` complete
-the first five request-path slices. They grant only the bounded profile write; add archive time and
+Rust migrations `0013_profile_write_privilege.sql` through `0021_customer_api_key_execution.sql`
+complete all Gate 3 request-path slices. They grant only the bounded profile write; add archive time and
 enterprise-scoped create idempotency; close account-role revocation races with a tenant-bound lock;
 add revisioned room settings with an append-only mutation ledger; and add revisioned managed
 membership state, a final-owner invariant, and a separately append-only membership mutation ledger.
 The badge migration adds tenant-bound canonical definitions and normalized assignments with stable
 identities, forced RLS, composite account/room/member foreign keys, optimistic revisions, and its
-own append-only exactly-once mutation ledger.
+own append-only exactly-once mutation ledger. The final three migrations add administrator identity/
+credential authority, verifier-only customer API keys, the bounded compatibility-key lookup,
+recording duration facts, and canonical visit entry/exit accounting.
 Each slice remains independently reversible through its explicit legacy/rust request-path switch.
 
 The room's SQLite startup migration path upgrades existing installations in place for the alert outbox, scheduled-alert suppression, recording catalog/logs, public-player grants, and trial-bearing sessions. New deployment configuration includes Discord OAuth values, `MEDIA_CLUSTER_HOSTS_JSON`, and the existing controller/room/media signing secrets. Missing security-critical configuration fails closed or presents an explicit unconfigured state.
@@ -461,13 +538,13 @@ Measured on the final working tree:
 
 | Boundary                          | Result                                                                                                                                          |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,184 tests, production build            |
+| Room `pnpm gate`                  | formatting, lint, privacy/schema contracts, zero-error/zero-warning `svelte-check`, 419 Vitest files / 7,194 tests, production build            |
 | Room Playwright                   | 16/16 Chromium journeys against the adapter-node production artifact                                                                            |
 | Controller quality boundaries     | formatting, lint, schema/backend/evidence/privacy/runtime contracts, zero-error/zero-warning `svelte-check`, Vercel production build            |
-| Controller Vitest                 | 140 files / 1,330 tests; documented totals independently verified at four sites                                                                 |
+| Controller Vitest                 | 147 files / 1,356 tests; documented totals independently verified at four sites                                                                 |
 | Controller Playwright             | 9/9 Chromium journeys against the adapter-node production artifact                                                                              |
-| Controller PostgreSQL integration | 11 files / 70 tests against disposable provisioned PostgreSQL                                                                                   |
-| Rust workspace gate               | format and strict Clippy green; 474/474 tests: 174 API library, 156 PostgreSQL/HTTP integration, 19 attestor, 114 media library, 11 media binary |
+| Controller PostgreSQL integration | 14 files / 79 tests against disposable provisioned PostgreSQL                                                                                   |
+| Rust workspace gate               | format and strict Clippy green; 486/486 tests: 175 API library, 167 PostgreSQL/HTTP integration, 19 attestor, 114 media library, 11 media binary |
 | JavaScript advisories             | `pnpm audit --audit-level high`: no known vulnerabilities                                                                                       |
 | Rust advisories                   | policy green: one exact reviewed lockfile advisory proved unreachable from the build graph; six exact reviewed mediasoup informational warnings |
 | Svelte 5 review                   | modified components checked with the official Svelte autofixer; no reported issues; both apps have zero Svelte diagnostics                      |

@@ -1,11 +1,10 @@
-import { fail, redirect } from '@sveltejs/kit';
-import { eq, lt } from 'drizzle-orm';
+import { fail, redirect, type RequestEvent } from '@sveltejs/kit';
+import { and, eq, lt, or } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
 import { ACCOUNT_ACTIVE, accounts, loginAttempts, users } from '#lib/server/db/schema.js';
 import { createLoginSession, verifyPassword } from '#lib/server/auth.js';
 import { profileAuthorityMode } from '#lib/server/control-plane-runtime.js';
 import { LOGIN_ATTEMPT_RETENTION_MS, loginIdentity, nextLoginAttempt } from '#lib/server/login-attempts.js';
-import { authorityBindingFailure } from '#lib/server/profile-authority-policy.js';
 import { readProfileAuthority } from '#lib/server/profile-authority.js';
 import { RECAPTCHA_FIELD, recaptchaFailureMessage, verifyRecaptcha } from '#lib/server/recaptcha.js';
 import {
@@ -21,6 +20,11 @@ import type { Actions, PageServerLoad } from './$types';
  * The same number gates the server check, so the form and the server agree on when a token exists.
  */
 const CAPTCHA_REVEAL_THRESHOLD = 3;
+
+async function endAuthoritySession(event: RequestEvent) {
+  const cleanup = await logoutFromAuthority(apiRequestContext(event));
+  if (!cleanup.ok) clearApiCookies(event.cookies);
+}
 
 /**
  * The reference reveals its CAPTCHA once `failedLoginCount >= 3`. This durable
@@ -95,15 +99,164 @@ export const actions: Actions = {
       }
     }
 
-    const [user] = await getDb().select().from(users).where(eq(users.email, email)).limit(1);
-    // Same message either way: distinguishing them tells an attacker which emails exist.
-    if (!user || !verifyPassword(password, user.passwordHash)) {
-      const count = await recordFailedLogin(email);
-      return fail(400, {
-        email,
-        failedLoginCount: count,
-        message: 'Those credentials are not valid.'
-      });
+    let user: typeof users.$inferSelect;
+    if (profileAuthorityMode === 'rust') {
+      /*
+        Rust is the credential authority in canonical mode. Requiring the controller's legacy
+        scrypt hash first made a newly provisioned canonical administrator impossible to use and
+        made every canonical password change stale here. The authority login therefore runs first;
+        only its verified UUID is allowed to select or create the compatibility identity below.
+      */
+      const context = apiRequestContext(event);
+      const authorityLogin = await loginToAuthority(context, { email, password });
+      if (!authorityLogin.ok) {
+        clearApiCookies(cookies);
+        if (authorityLogin.status === 401) {
+          const count = await recordFailedLogin(email);
+          return fail(400, {
+            email,
+            failedLoginCount: count,
+            message: 'Those credentials are not valid.'
+          });
+        }
+        return fail(503, {
+          email,
+          message: 'The profile authority could not verify this account. Contact support.'
+        });
+      }
+
+      const canonical = await readProfileAuthority(context);
+      if (
+        !canonical.ok ||
+        canonical.data.user.id !== authorityLogin.data.userId ||
+        canonical.data.user.isGuest ||
+        canonical.data.accounts.length !== 1
+      ) {
+        await endAuthoritySession(event);
+        console.error('[profile-authority] refused canonical login bootstrap', {
+          authorityUserId: authorityLogin.data.userId,
+          reason: !canonical.ok
+            ? `bootstrap-${canonical.code}`
+            : canonical.data.accounts.length !== 1
+              ? 'ambiguous-account-count'
+              : 'identity-mismatch'
+        });
+        return fail(503, {
+          email,
+          message: 'The profile authority could not verify this account. Contact support.'
+        });
+      }
+
+      const [account] = await getDb()
+        .select({ id: accounts.id, status: accounts.status })
+        .from(accounts)
+        .where(eq(accounts.authorityEnterpriseId, canonical.data.accounts[0].id))
+        .limit(1);
+      if (!account) {
+        await endAuthoritySession(event);
+        return fail(503, {
+          email,
+          message: 'This account has not completed the profile-authority migration. Contact support.'
+        });
+      }
+      if (account.status !== ACCOUNT_ACTIVE) {
+        await endAuthoritySession(event);
+        return fail(403, {
+          email,
+          message: 'This account has been suspended. Contact support if you believe this is an error.'
+        });
+      }
+
+      const candidates = await getDb()
+        .select()
+        .from(users)
+        .where(or(eq(users.authorityUserId, canonical.data.user.id), eq(users.email, email)));
+      if (candidates.length > 1) {
+        await endAuthoritySession(event);
+        console.error('[profile-authority] refused colliding controller identities', {
+          authorityUserId: canonical.data.user.id,
+          candidateCount: candidates.length
+        });
+        return fail(503, {
+          email,
+          message: 'The profile authority could not verify this account. Contact support.'
+        });
+      }
+      const existing = candidates[0];
+      if (existing) {
+        if (existing.accountId !== account.id || existing.authorityUserId !== canonical.data.user.id) {
+          await endAuthoritySession(event);
+          console.error('[profile-authority] refused controller identity binding', {
+            localUserId: existing.id,
+            authorityUserId: canonical.data.user.id
+          });
+          return fail(503, {
+            email,
+            message: 'The profile authority could not verify this account. Contact support.'
+          });
+        }
+        const [updated] = await getDb()
+          .update(users)
+          .set({
+            email,
+            displayName: canonical.data.user.displayName,
+            authorityReconciledAt: new Date()
+          })
+          .where(
+            and(
+              eq(users.id, existing.id),
+              eq(users.accountId, account.id),
+              eq(users.authorityUserId, canonical.data.user.id)
+            )
+          )
+          .returning();
+        if (!updated) {
+          await endAuthoritySession(event);
+          return fail(503, {
+            email,
+            message: 'The profile authority could not verify this account. Contact support.'
+          });
+        }
+        user = updated;
+      } else {
+        const now = new Date();
+        const [created] = await getDb()
+          .insert(users)
+          .values({
+            accountId: account.id,
+            email,
+            displayName: canonical.data.user.displayName,
+            passwordHash: null,
+            // An account administrator deliberately issued this identity. It is not an imported
+            // anonymous member and must not enter the unverified-signup dead end, where no
+            // controller verification token exists for it.
+            emailVerifiedAt: now,
+            authorityUserId: canonical.data.user.id,
+            authorityReconciledAt: now,
+            createdAt: now
+          })
+          .returning();
+        if (!created) {
+          await endAuthoritySession(event);
+          return fail(503, {
+            email,
+            message: 'The profile authority could not verify this account. Contact support.'
+          });
+        }
+        user = created;
+      }
+    } else {
+      const [legacyUser] = await getDb().select().from(users).where(eq(users.email, email)).limit(1);
+      // Same message either way: distinguishing them tells an attacker which emails exist.
+      if (!legacyUser || !verifyPassword(password, legacyUser.passwordHash)) {
+        const count = await recordFailedLogin(email);
+        return fail(400, {
+          email,
+          failedLoginCount: count,
+          message: 'Those credentials are not valid.'
+        });
+      }
+      user = legacyUser;
     }
     /*
       Suspension is checked AFTER the password, deliberately.
@@ -127,59 +280,6 @@ export const actions: Actions = {
         email,
         message: 'This account has been suspended. Contact support if you believe this is an error.'
       });
-    }
-
-    if (profileAuthorityMode === 'rust') {
-      if (!user.authorityUserId || !account.authorityEnterpriseId) {
-        return fail(503, {
-          email,
-          message: 'This account has not completed the profile-authority migration. Contact support.'
-        });
-      }
-
-      const context = apiRequestContext(event);
-      const authorityLogin = await loginToAuthority(context, { email, password });
-      if (!authorityLogin.ok) {
-        clearApiCookies(cookies);
-        return fail(503, {
-          email,
-          message: 'The profile authority could not verify this account. Contact support.'
-        });
-      }
-      if (authorityLogin.data.userId !== user.authorityUserId) {
-        const cleanup = await logoutFromAuthority(context);
-        if (!cleanup.ok) clearApiCookies(cookies);
-        console.error('[profile-authority] authority login returned a different identity', {
-          localUserId: user.id
-        });
-        return fail(503, {
-          email,
-          message: 'The profile authority could not verify this account. Contact support.'
-        });
-      }
-
-      const canonical = await readProfileAuthority(context);
-      const bindingFailure = canonical.ok
-        ? authorityBindingFailure(
-            {
-              authorityUserId: user.authorityUserId,
-              authorityEnterpriseId: account.authorityEnterpriseId
-            },
-            canonical.data
-          )
-        : `canonical bootstrap failed with ${canonical.code}`;
-      if (!canonical.ok || bindingFailure) {
-        const cleanup = await logoutFromAuthority(context);
-        if (!cleanup.ok) clearApiCookies(cookies);
-        console.error('[profile-authority] refused login binding', {
-          localUserId: user.id,
-          reason: bindingFailure
-        });
-        return fail(503, {
-          email,
-          message: 'The profile authority could not verify this account. Contact support.'
-        });
-      }
     }
 
     await getDb()

@@ -79,6 +79,14 @@ const WRITERS = [
     configuration must not reach it.
   */
   'writeRoomState',
+  /*
+    `notifyRoomVisitExit` closes the canonical visit ledger row when a member explicitly logs out.
+    It is best-effort at the logout call site, but it still changes controller-owned state and must
+    therefore mint the same narrowly-scoped WRITE capability as the canonical launch that opened
+    the visit. Classifying it here prevents a copied read credential from turning every logout into
+    a silent 401 while keeping the capability inventory exhaustive.
+  */
+  'notifyRoomVisitExit',
   'requestStreamIngestKey',
   'requestAlertDelivery',
   'requestDiscordAuthorization',

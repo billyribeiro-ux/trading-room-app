@@ -1,3 +1,5 @@
+import type { AccountBootstrap } from './lib/server/tradingroom-api.generated.js';
+
 declare global {
   namespace App {
     interface Error {
@@ -6,6 +8,8 @@ declare global {
     }
 
     interface Locals {
+      /** Request-local canonical session proof populated by the global protected-route hook. */
+      authorityBootstrap?: AccountBootstrap;
       user?: {
         id: number;
         email: string;

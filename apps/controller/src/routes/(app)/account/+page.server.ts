@@ -1,22 +1,32 @@
 import { error, fail, type RequestEvent } from '@sveltejs/kit';
-import { API_KEY_ENCRYPTION_KEY, ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
+import { API_KEY_ENCRYPTION_KEY, ROOM_JWT_SECRET } from '$app/env/private';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
 import { adminUsers, apiKeys, badges, rooms, roomUsers } from '#lib/server/db/schema.js';
-import { emailIsProved, hashPassword, requireUser } from '#lib/server/auth.js';
+import { emailIsProved, hashPassword, MIN_PASSWORD, requireUser } from '#lib/server/auth.js';
 import { issueToken, sendVerificationEmail, verificationEnforced } from '#lib/server/email-verification.js';
 import { resolveAccountEntitlements } from '#lib/server/account-entitlements.js';
-import { decryptApiKeySecret, encryptApiKeySecret } from '#lib/server/api-key-secret.js';
+import {
+  decryptApiKeySecret,
+  deriveCanonicalApiKeyId,
+  deriveCanonicalApiKeySecret,
+  encryptApiKeySecret
+} from '#lib/server/api-key-secret.js';
 import { API_SCOPES, parseIpList, readRestrictions } from '#lib/server/rooms.js';
-import { launchHref } from '#lib/server/room-handoff.js';
 import {
   NoRoomCodeAvailable,
   RoomAuthorityProjectionError,
   projectAuthorityRooms,
   provisionRoom
 } from '#lib/server/provision-room.js';
-import { badgeAuthorityMode, profileAuthorityMode, roomAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import {
+  administratorAuthorityMode,
+  badgeAuthorityMode,
+  customerApiKeyAuthorityMode,
+  profileAuthorityMode,
+  roomAuthorityMode
+} from '#lib/server/control-plane-runtime.js';
 import { authorityBindingFailure } from '#lib/server/profile-authority-policy.js';
 import { readProfileAuthority } from '#lib/server/profile-authority.js';
 import {
@@ -34,11 +44,51 @@ import {
   updateBadgeAuthority
 } from '#lib/server/badge-authority.js';
 import { BadgeProjectionError, projectAuthorityBadges } from '#lib/server/badge-projection.js';
+import { AdministratorProjectionError, projectAuthorityAdministrators } from '#lib/server/administrator-projection.js';
+import {
+  createAdministratorAuthority,
+  deleteAdministratorAuthority,
+  readAdministratorAuthority
+} from '#lib/server/administrator-authority.js';
+import {
+  createCustomerApiKeyAuthority,
+  deleteCustomerApiKeyAuthority,
+  readCustomerApiKeyAuthority,
+  restrictCustomerApiKeyAuthority,
+  rotateCustomerApiKeyAuthority
+} from '#lib/server/customer-api-key-authority.js';
+import {
+  CustomerApiKeyProjectionError,
+  projectAuthorityCustomerApiKeys,
+  type ProjectedCustomerApiKeyCredential
+} from '#lib/server/customer-api-key-projection.js';
 import { MembershipProjectionError, projectAuthorityMemberships } from '#lib/server/membership-projection.js';
 import type { Actions, PageServerLoad } from './$types';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 function apiKeyEncryptionMaster() {
   return API_KEY_ENCRYPTION_KEY ?? ROOM_JWT_SECRET ?? '';
+}
+
+function canonicalApiKeyMaster(): string {
+  if (!API_KEY_ENCRYPTION_KEY?.trim()) {
+    throw new CustomerApiKeyProjectionError('canonical-encryption-key-unavailable');
+  }
+  return API_KEY_ENCRYPTION_KEY;
+}
+
+function canonicalApiKeyCredential(
+  accountId: number,
+  keyId: string,
+  revision: number
+): ProjectedCustomerApiKeyCredential & { secret: string } {
+  const secret = deriveCanonicalApiKeySecret({ keyId, revision }, canonicalApiKeyMaster());
+  return {
+    secret,
+    secretHash: createHash('sha256').update(secret).digest('hex'),
+    secretCiphertext: encryptApiKeySecret(secret, { accountId, keyId }, canonicalApiKeyMaster())
+  };
 }
 
 /**
@@ -118,7 +168,7 @@ function storedBadgeRoles(raw: string): string[] {
 
 function badgeRequestId(form: FormData): string {
   const requestId = String(form.get('requestId') ?? '');
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(requestId)) {
+  if (!UUID.test(requestId)) {
     throw new Error('invalid badge mutation request id');
   }
   return requestId;
@@ -218,6 +268,69 @@ function badgeAuthorityFailure(cause: unknown) {
   return fail(503, { message: 'The badge authority could not complete this change.' });
 }
 
+async function administratorAuthorityCoordinates(event: RequestEvent) {
+  const owner = requireUser(event.locals);
+  if (owner.impersonatedBy !== undefined || !owner.authorityEnterpriseId) {
+    throw new Error('unreconciled administrator authority');
+  }
+  return { owner, enterpriseId: owner.authorityEnterpriseId, context: apiRequestContext(event) };
+}
+
+function administratorMutationApiFailure(result: { status: number; message: string }) {
+  const status = result.status === 400 || result.status === 404 || result.status === 409 ? result.status : 503;
+  return fail(status, {
+    message: status === 503 ? 'The administrator authority could not complete this change.' : result.message
+  });
+}
+
+function administratorAuthorityFailure(cause: unknown) {
+  console.error('[administrator-authority] mutation or projection failed', {
+    code:
+      cause instanceof AdministratorProjectionError ? cause.code : cause instanceof Error ? cause.message : 'unknown'
+  });
+  return fail(503, { message: 'The administrator authority could not complete this change.' });
+}
+
+async function customerApiKeyAuthorityCoordinates(event: RequestEvent) {
+  const owner = requireUser(event.locals);
+  if (owner.impersonatedBy !== undefined || !owner.authorityEnterpriseId) {
+    throw new Error('unreconciled customer API-key authority');
+  }
+  return { enterpriseId: owner.authorityEnterpriseId, context: apiRequestContext(event) };
+}
+
+function customerApiKeyMutationApiFailure(result: { status: number; message: string }) {
+  const status = result.status === 400 || result.status === 404 || result.status === 409 ? result.status : 503;
+  return fail(status, {
+    message: status === 503 ? 'The customer API-key authority could not complete this change.' : result.message
+  });
+}
+
+function customerApiKeyAuthorityFailure(cause: unknown) {
+  console.error('[customer-api-key-authority] mutation or projection failed', {
+    code:
+      cause instanceof CustomerApiKeyProjectionError ? cause.code : cause instanceof Error ? cause.message : 'unknown'
+  });
+  return fail(503, { message: 'The customer API-key authority could not complete this change.' });
+}
+
+async function readOwnedAuthorityApiKey(accountId: number, keyId: string) {
+  const [key] = await getDb()
+    .select()
+    .from(apiKeys)
+    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.accountId, accountId)))
+    .limit(1);
+  if (!key) return null;
+  if (key.authorityRevision === null || !key.authorityContentHash || !key.authorityReconciledAt) {
+    throw new CustomerApiKeyProjectionError('unreconciled-local-key');
+  }
+  return key as typeof key & {
+    authorityRevision: number;
+    authorityContentHash: string;
+    authorityReconciledAt: Date;
+  };
+}
+
 async function readOwnedRoomAuthorityMapping(accountId: number, roomId: number) {
   const [room] = await getDb()
     .select({ authorityRoomId: rooms.authorityRoomId, authorityReconciledAt: rooms.authorityReconciledAt })
@@ -243,7 +356,9 @@ export const load: PageServerLoad = async (event) => {
   let canonicalRooms: readonly ManagedRoom[] | null = null;
 
   if (profileAuthorityMode === 'rust' && localUser.impersonatedBy === undefined) {
-    const canonical = await readProfileAuthority(apiRequestContext(event));
+    const canonical = event.locals.authorityBootstrap
+      ? { ok: true as const, status: 200, data: event.locals.authorityBootstrap }
+      : await readProfileAuthority(apiRequestContext(event));
     if (!canonical.ok) {
       console.error('[profile-authority] canonical account read failed', {
         localUserId: localUser.id,
@@ -325,6 +440,66 @@ export const load: PageServerLoad = async (event) => {
     }
   }
 
+  if (administratorAuthorityMode === 'rust') {
+    if (user.impersonatedBy !== undefined || !user.authorityEnterpriseId) {
+      error(503, 'The administrator authority could not verify this account.');
+    }
+    const canonical = await readAdministratorAuthority(apiRequestContext(event), user.authorityEnterpriseId);
+    if (!canonical.ok) error(503, 'The administrator authority is temporarily unavailable.');
+    try {
+      await projectAuthorityAdministrators({
+        accountId,
+        administrators: canonical.data,
+        complete: true
+      });
+    } catch (cause) {
+      console.error('[administrator-authority] controller projection refused', {
+        localUserId: user.id,
+        code: cause instanceof AdministratorProjectionError ? cause.code : 'database'
+      });
+      error(503, 'The administrator authority projection is not reconciled.');
+    }
+  }
+
+  if (customerApiKeyAuthorityMode === 'rust') {
+    if (user.impersonatedBy !== undefined || !user.authorityEnterpriseId) {
+      error(503, 'The customer API-key authority could not verify this account.');
+    }
+    const canonical = await readCustomerApiKeyAuthority(apiRequestContext(event), user.authorityEnterpriseId);
+    if (!canonical.ok) error(503, 'The customer API-key authority is temporarily unavailable.');
+    try {
+      const local = await getDb()
+        .select({ id: apiKeys.id, lastFour: apiKeys.lastFour })
+        .from(apiKeys)
+        .where(eq(apiKeys.accountId, accountId));
+      const localLastFour = new Map(local.map((key) => [key.id, key.lastFour]));
+      const credentials = new Map<string, ProjectedCustomerApiKeyCredential>();
+      for (const key of canonical.data) {
+        if (localLastFour.get(key.id) === key.lastFour) continue;
+        const derived = canonicalApiKeyCredential(accountId, key.id, key.revision);
+        if (derived.secret.slice(-4) !== key.lastFour) {
+          throw new CustomerApiKeyProjectionError('unowned-canonical-credential');
+        }
+        credentials.set(key.id, {
+          secretHash: derived.secretHash,
+          secretCiphertext: derived.secretCiphertext
+        });
+      }
+      await projectAuthorityCustomerApiKeys({
+        accountId,
+        keys: canonical.data,
+        credentials,
+        complete: true
+      });
+    } catch (cause) {
+      console.error('[customer-api-key-authority] controller projection refused', {
+        localUserId: user.id,
+        code: cause instanceof CustomerApiKeyProjectionError ? cause.code : 'database'
+      });
+      error(503, 'The customer API-key authority projection is not reconciled.');
+    }
+  }
+
   // Complete API credentials are owner-visible by product contract. Do not let
   // browsers or intermediaries retain the authenticated account response.
   setHeaders({ 'cache-control': 'private, no-store' });
@@ -358,7 +533,8 @@ export const load: PageServerLoad = async (event) => {
       id: apiKeys.id,
       secretCiphertext: apiKeys.secretCiphertext,
       createdAt: apiKeys.createdAt,
-      restrictionsJson: apiKeys.restrictionsJson
+      restrictionsJson: apiKeys.restrictionsJson,
+      authorityRevision: apiKeys.authorityRevision
     })
     .from(apiKeys)
     .where(eq(apiKeys.accountId, accountId));
@@ -373,11 +549,8 @@ export const load: PageServerLoad = async (event) => {
     */
     emailUnproved: verificationEnforced() && !user.emailVerifiedAt,
     entitlements: resolveAccountEntitlements({ accountId }),
-    /*
-      `launchUrl` is minted here, at page load, because the reference puts the whole
-      `/session?id=…&jwtSite=…` into the anchor's `ng-href` rather than redirecting through a
-      route. One token per room per render, exactly as there.
-    */
+    // The page carries only the same-origin launch door. The 60-second handoff credential is
+    // minted after a click and after current canonical authorization, never into cached page HTML.
     rooms: (canonicalRooms ?? roomRows).map((canonicalOrLegacy) => {
       const r =
         canonicalRooms === null
@@ -393,11 +566,7 @@ export const load: PageServerLoad = async (event) => {
         maxUsers: canonical?.maxCapacity ?? r.maxUsers,
         archivedAt: canonical?.archivedAt ? new Date(canonical.archivedAt) : canonical ? null : r.archivedAt,
         userCount: canonical?.memberCount ?? counts.get(r.id) ?? 0,
-        launchUrl: launchHref(ROOM_BASE_URL, ROOM_JWT_SECRET, canonical?.shortCode ?? r.shortCode, {
-          name: user.displayName,
-          email: user.email,
-          id: String(user.id)
-        })
+        launchUrl: `/launch/${encodeURIComponent(canonical?.shortCode ?? r.shortCode)}`
       };
     }),
     roomCreateRequestId: randomUUID(),
@@ -407,18 +576,24 @@ export const load: PageServerLoad = async (event) => {
     })),
     badgeCreateRequestId: randomUUID(),
     imageBadgeCreateRequestId: randomUUID(),
-    admins: await getDb()
-      /* `createdAt` feeds the Added column — `{{au.created | date:'short'}}` in the reference
+    admins: (
+      await getDb()
+        /* `createdAt` feeds the Added column — `{{au.created | date:'short'}}` in the reference
          (page.welcome.html:1294). It was omitted, so that column rendered an em dash on every row.
          The password hash is still never selected. */
-      .select({
-        id: adminUsers.id,
-        name: adminUsers.name,
-        email: adminUsers.email,
-        createdAt: adminUsers.createdAt
-      })
-      .from(adminUsers)
-      .where(eq(adminUsers.accountId, accountId)),
+        .select({
+          id: adminUsers.id,
+          name: adminUsers.name,
+          email: adminUsers.email,
+          createdAt: adminUsers.createdAt,
+          authorityUserId: adminUsers.authorityUserId,
+          authorityRevision: adminUsers.authorityRevision
+        })
+        .from(adminUsers)
+        .where(eq(adminUsers.accountId, accountId))
+    ).map((administrator) => ({ ...administrator, mutationRequestId: randomUUID() })),
+    adminCreateRequestId: randomUUID(),
+    apiKeyCreateRequestId: randomUUID(),
     // Never select the verification hash or encrypted envelope into a page
     // payload. Only the account-scoped decrypted display value crosses the
     // server boundary required by the original product contract.
@@ -426,6 +601,10 @@ export const load: PageServerLoad = async (event) => {
       id: k.id,
       createdAt: k.createdAt,
       restrictionsJson: k.restrictionsJson,
+      authorityRevision: k.authorityRevision,
+      rotateRequestId: randomUUID(),
+      restrictionsRequestId: randomUUID(),
+      deleteRequestId: randomUUID(),
       restrictions: readRestrictions(k.restrictionsJson),
       ...readApiKeySecret(k.secretCiphertext, accountId, k.id)
     })),
@@ -1029,7 +1208,8 @@ export const actions: Actions = {
     return { deleted: true };
   },
 
-  addAdminUser: async ({ request, locals }) => {
+  addAdminUser: async (event) => {
+    const { request, locals } = event;
     const { accountId } = requireUser(locals);
     const form = await request.formData();
     const name = String(form.get('name') ?? '').trim();
@@ -1041,6 +1221,33 @@ export const actions: Actions = {
       return fail(400, {
         message: 'Name, email and password are all required.'
       });
+    if (password.length < MIN_PASSWORD) {
+      return fail(400, { message: `Passwords must be at least ${MIN_PASSWORD} characters.` });
+    }
+    if (administratorAuthorityMode === 'rust') {
+      const requestId = String(form.get('requestId') ?? '');
+      if (!UUID.test(requestId)) {
+        return fail(400, { message: 'The administrator request id is invalid. Reload and try again.' });
+      }
+      try {
+        const { enterpriseId, context } = await administratorAuthorityCoordinates(event);
+        const created = await createAdministratorAuthority(context, enterpriseId, {
+          requestId,
+          displayName: name,
+          email,
+          password
+        });
+        if (!created.ok) return administratorMutationApiFailure(created);
+        await projectAuthorityAdministrators({
+          accountId,
+          administrators: created.data.administrators,
+          removedUserIds: created.data.removedUserIds
+        });
+        return { created: true };
+      } catch (cause) {
+        return administratorAuthorityFailure(cause);
+      }
+    }
     await getDb()
       .insert(adminUsers)
       .values({
@@ -1053,17 +1260,95 @@ export const actions: Actions = {
     return { created: true };
   },
 
-  deleteAdminUser: async ({ request, locals }) => {
+  deleteAdminUser: async (event) => {
+    const { request, locals } = event;
     const { accountId } = requireUser(locals);
-    const id = Number((await request.formData()).get('id'));
+    const form = await request.formData();
+    const id = readRowId(form, 'id');
+    if (id === null) return fail(400, { message: 'That administrator id is not a row id.' });
+    if (administratorAuthorityMode === 'rust') {
+      const requestId = String(form.get('requestId') ?? '');
+      const expectedRevision = Number(form.get('expectedRevision'));
+      if (!UUID.test(requestId)) {
+        return fail(400, { message: 'The administrator request id is invalid. Reload and try again.' });
+      }
+      try {
+        const [local] = await getDb()
+          .select()
+          .from(adminUsers)
+          .where(and(eq(adminUsers.id, id), eq(adminUsers.accountId, accountId)))
+          .limit(1);
+        if (!local) return fail(404, { message: 'No such administrator.' });
+        if (
+          !local.authorityUserId ||
+          local.authorityRevision === null ||
+          !local.authorityContentHash ||
+          !local.authorityReconciledAt
+        ) {
+          throw new AdministratorProjectionError('unreconciled-local-administrator');
+        }
+        if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== local.authorityRevision) {
+          return fail(409, { message: 'This administrator changed. Reload and try again.' });
+        }
+        const { enterpriseId, context } = await administratorAuthorityCoordinates(event);
+        const deleted = await deleteAdministratorAuthority(context, enterpriseId, local.authorityUserId, {
+          requestId,
+          expectedRevision
+        });
+        if (!deleted.ok) return administratorMutationApiFailure(deleted);
+        await projectAuthorityAdministrators({
+          accountId,
+          administrators: deleted.data.administrators,
+          removedUserIds: deleted.data.removedUserIds
+        });
+        return { deleted: true };
+      } catch (cause) {
+        return administratorAuthorityFailure(cause);
+      }
+    }
     await getDb()
       .delete(adminUsers)
       .where(and(eq(adminUsers.id, id), eq(adminUsers.accountId, accountId)));
     return { deleted: true };
   },
 
-  createApiKey: async ({ locals }) => {
-    const { accountId } = requireUser(locals);
+  createApiKey: async (event) => {
+    const { accountId } = requireUser(event.locals);
+    if (customerApiKeyAuthorityMode === 'rust') {
+      const requestId = String((await event.request.formData()).get('requestId') ?? '');
+      if (!UUID.test(requestId)) {
+        return fail(400, { message: 'The API-key request id is invalid. Reload and try again.' });
+      }
+      try {
+        const id = deriveCanonicalApiKeyId(requestId, canonicalApiKeyMaster());
+        const credential = canonicalApiKeyCredential(accountId, id, 0);
+        const { enterpriseId, context } = await customerApiKeyAuthorityCoordinates(event);
+        const created = await createCustomerApiKeyAuthority(context, enterpriseId, {
+          requestId,
+          keyId: id,
+          secretHash: credential.secretHash,
+          lastFour: credential.secret.slice(-4)
+        });
+        if (!created.ok) return customerApiKeyMutationApiFailure(created);
+        await projectAuthorityCustomerApiKeys({
+          accountId,
+          keys: created.data.keys,
+          removedKeyIds: created.data.removedKeyIds,
+          credentials: new Map([
+            [
+              id,
+              {
+                secretHash: credential.secretHash,
+                secretCiphertext: credential.secretCiphertext
+              }
+            ]
+          ])
+        });
+        return { keyId: id };
+      } catch (cause) {
+        return customerApiKeyAuthorityFailure(cause);
+      }
+    }
     const id = randomBytes(12).toString('hex');
     const secret = randomBytes(32).toString('hex');
     await getDb()
@@ -1091,9 +1376,50 @@ export const actions: Actions = {
    * tenant between the two queries. Zero rows changed means the key was not
    * this account's.
    */
-  rotateApiKey: async ({ request, locals }) => {
-    const { accountId } = requireUser(locals);
-    const id = String((await request.formData()).get('id'));
+  rotateApiKey: async (event) => {
+    const { accountId } = requireUser(event.locals);
+    const form = await event.request.formData();
+    const id = String(form.get('id') ?? '');
+    if (customerApiKeyAuthorityMode === 'rust') {
+      const requestId = String(form.get('requestId') ?? '');
+      const expectedRevision = Number(form.get('expectedRevision'));
+      if (!UUID.test(requestId)) {
+        return fail(400, { message: 'The API-key request id is invalid. Reload and try again.' });
+      }
+      try {
+        const local = await readOwnedAuthorityApiKey(accountId, id);
+        if (!local) return fail(404, { message: 'No such API key.' });
+        if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== local.authorityRevision) {
+          return fail(409, { message: 'This API key changed. Reload and try again.' });
+        }
+        const credential = canonicalApiKeyCredential(accountId, id, expectedRevision + 1);
+        const { enterpriseId, context } = await customerApiKeyAuthorityCoordinates(event);
+        const rotated = await rotateCustomerApiKeyAuthority(context, enterpriseId, id, {
+          requestId,
+          expectedRevision,
+          secretHash: credential.secretHash,
+          lastFour: credential.secret.slice(-4)
+        });
+        if (!rotated.ok) return customerApiKeyMutationApiFailure(rotated);
+        await projectAuthorityCustomerApiKeys({
+          accountId,
+          keys: rotated.data.keys,
+          removedKeyIds: rotated.data.removedKeyIds,
+          credentials: new Map([
+            [
+              id,
+              {
+                secretHash: credential.secretHash,
+                secretCiphertext: credential.secretCiphertext
+              }
+            ]
+          ])
+        });
+        return { keyId: id };
+      } catch (cause) {
+        return customerApiKeyAuthorityFailure(cause);
+      }
+    }
     const secret = randomBytes(32).toString('hex');
     const changed = await getDb()
       .update(apiKeys)
@@ -1116,22 +1442,26 @@ export const actions: Actions = {
    * restriction list that silently accepts a malformed entry reads as protection
    * that is not there.
    */
-  saveApiKeyRestrictions: async ({ request, locals }) => {
-    const { accountId } = requireUser(locals);
-    const form = await request.formData();
+  saveApiKeyRestrictions: async (event) => {
+    const { accountId } = requireUser(event.locals);
+    const form = await event.request.formData();
     const id = String(form.get('id') ?? '');
     let ips: string[];
     try {
-      ips = parseIpList(String(form.get('ips') ?? ''));
+      ips = [...new Set(parseIpList(String(form.get('ips') ?? '')))].sort();
     } catch (e) {
       return fail(400, {
         message: e instanceof Error ? e.message : 'Invalid IP list.'
       });
     }
-    const scopes = form
-      .getAll('scopes')
-      .map(String)
-      .filter((s) => (API_SCOPES as readonly string[]).includes(s));
+    const scopes = [
+      ...new Set(
+        form
+          .getAll('scopes')
+          .map(String)
+          .filter((scope): scope is (typeof API_SCOPES)[number] => (API_SCOPES as readonly string[]).includes(scope))
+      )
+    ].sort();
 
     /*
       `restrictToSessions` — which ROOMS the key may act on, a different axis from which COMMANDS.
@@ -1147,10 +1477,41 @@ export const actions: Actions = {
         (r) => r.shortCode
       )
     );
-    const sessions = form
-      .getAll('sessions')
-      .map(String)
-      .filter((code) => ownRooms.has(code));
+    const requestedSessions = [...new Set(form.getAll('sessions').map(String))];
+    if (customerApiKeyAuthorityMode === 'rust' && requestedSessions.some((code) => !ownRooms.has(code))) {
+      return fail(400, { message: 'An API-key room restriction is not owned by this account.' });
+    }
+    const sessions = requestedSessions.filter((code) => ownRooms.has(code)).sort();
+
+    if (customerApiKeyAuthorityMode === 'rust') {
+      const requestId = String(form.get('requestId') ?? '');
+      const expectedRevision = Number(form.get('expectedRevision'));
+      if (!UUID.test(requestId)) {
+        return fail(400, { message: 'The API-key request id is invalid. Reload and try again.' });
+      }
+      try {
+        const local = await readOwnedAuthorityApiKey(accountId, id);
+        if (!local) return fail(404, { message: 'No such API key.' });
+        if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== local.authorityRevision) {
+          return fail(409, { message: 'This API key changed. Reload and try again.' });
+        }
+        const { enterpriseId, context } = await customerApiKeyAuthorityCoordinates(event);
+        const restricted = await restrictCustomerApiKeyAuthority(context, enterpriseId, id, {
+          requestId,
+          expectedRevision,
+          restrictions: { ips, scopes, sessions }
+        });
+        if (!restricted.ok) return customerApiKeyMutationApiFailure(restricted);
+        await projectAuthorityCustomerApiKeys({
+          accountId,
+          keys: restricted.data.keys,
+          removedKeyIds: restricted.data.removedKeyIds
+        });
+        return { restrictionsSaved: id };
+      } catch (cause) {
+        return customerApiKeyAuthorityFailure(cause);
+      }
+    }
 
     const changed = await getDb()
       .update(apiKeys)
@@ -1206,12 +1567,43 @@ export const actions: Actions = {
     return { verificationSent: true };
   },
 
-  deleteApiKey: async ({ request, locals }) => {
-    const { accountId } = requireUser(locals);
-    const id = String((await request.formData()).get('id'));
-    await getDb()
+  deleteApiKey: async (event) => {
+    const { accountId } = requireUser(event.locals);
+    const form = await event.request.formData();
+    const id = String(form.get('id') ?? '');
+    if (customerApiKeyAuthorityMode === 'rust') {
+      const requestId = String(form.get('requestId') ?? '');
+      const expectedRevision = Number(form.get('expectedRevision'));
+      if (!UUID.test(requestId)) {
+        return fail(400, { message: 'The API-key request id is invalid. Reload and try again.' });
+      }
+      try {
+        const local = await readOwnedAuthorityApiKey(accountId, id);
+        if (!local) return fail(404, { message: 'No such API key.' });
+        if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== local.authorityRevision) {
+          return fail(409, { message: 'This API key changed. Reload and try again.' });
+        }
+        const { enterpriseId, context } = await customerApiKeyAuthorityCoordinates(event);
+        const deleted = await deleteCustomerApiKeyAuthority(context, enterpriseId, id, {
+          requestId,
+          expectedRevision
+        });
+        if (!deleted.ok) return customerApiKeyMutationApiFailure(deleted);
+        await projectAuthorityCustomerApiKeys({
+          accountId,
+          keys: deleted.data.keys,
+          removedKeyIds: deleted.data.removedKeyIds
+        });
+        return { deleted: true };
+      } catch (cause) {
+        return customerApiKeyAuthorityFailure(cause);
+      }
+    }
+    const changed = await getDb()
       .delete(apiKeys)
-      .where(and(eq(apiKeys.id, id), eq(apiKeys.accountId, accountId)));
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.accountId, accountId)))
+      .returning({ id: apiKeys.id });
+    if (changed.length === 0) return fail(404, { message: 'No such API key.' });
     return { deleted: true };
   }
 };

@@ -173,6 +173,17 @@ impl<K: Eq + Hash + Clone + Send + Sync + 'static> KeyedLimiter<K> {
     pub fn per_minute(name: &'static str, per_minute: u32) -> Self {
         let quota = NonZeroU32::new(per_minute)
             .map_or_else(|| Quota::per_minute(NonZeroU32::MIN), Quota::per_minute);
+        Self::with_quota(name, quota)
+    }
+
+    /// One-cell burst with a per-second replenishment interval.
+    pub fn per_second(name: &'static str, per_second: u32) -> Self {
+        let quota = NonZeroU32::new(per_second)
+            .map_or_else(|| Quota::per_second(NonZeroU32::MIN), Quota::per_second);
+        Self::with_quota(name, quota)
+    }
+
+    fn with_quota(name: &'static str, quota: Quota) -> Self {
         let store = BoundedStateStore::new(limits::RATE_LIMIT_MAX_KEYS);
 
         Self {
@@ -394,6 +405,8 @@ pub struct Limiters {
     pub join_user: KeyedLimiter<String>,
     /// Keyed by IP: a guest has no identity until this endpoint gives them one.
     pub guest_ip: KeyedLimiter<String>,
+    /// Captured external contract: one call per second for each key/command pair.
+    pub customer_api_command: KeyedLimiter<String>,
 }
 
 impl Default for Limiters {
@@ -425,6 +438,10 @@ impl Default for Limiters {
                 limits::JOIN_ATTEMPTS_PER_USER_PER_MINUTE,
             ),
             guest_ip: KeyedLimiter::per_minute("guest_ip", limits::GUESTS_PER_IP_PER_MINUTE),
+            customer_api_command: KeyedLimiter::per_second(
+                "customer_api_command",
+                limits::CUSTOMER_API_COMMANDS_PER_SECOND,
+            ),
         }
     }
 }

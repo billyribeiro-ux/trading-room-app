@@ -140,6 +140,7 @@ allowed_columns(table_name, column_name, privilege_type) AS (
         ('users', 'is_platform_admin', 'SELECT'),
         ('users', 'preferences', 'SELECT'),
         ('users', 'is_guest', 'SELECT'),
+        ('users', 'last_login_at', 'SELECT'),
         ('users', 'email', 'INSERT'),
         ('users', 'email_hash', 'INSERT'),
         ('users', 'display_name', 'INSERT'),

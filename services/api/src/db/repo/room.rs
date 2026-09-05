@@ -161,6 +161,52 @@ pub struct UpdateRoomOutcome {
     pub changed: bool,
 }
 
+/// One canonical room entry. The identity fields are read from the database in the same
+/// transaction that records the visit; a stale access-token display name is never copied into
+/// the historical ledger.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchVisit {
+    pub visit_id: Uuid,
+    pub room_id: Uuid,
+    pub short_code: String,
+    pub user_id: Uuid,
+    pub email: String,
+    pub display_name: String,
+    #[serde(with = "time::serde::rfc3339")]
+    pub entered_at: OffsetDateTime,
+}
+
+#[derive(Debug)]
+pub struct LaunchOutcome {
+    pub visit: LaunchVisit,
+    pub replayed: bool,
+}
+
+/// Request identity and bounded client metadata recorded with a canonical room visit.
+///
+/// Keeping this as one value prevents the member and guest launch paths from silently swapping
+/// adjacent string/bool arguments while preserving a shared definition of the visit evidence.
+#[derive(Debug)]
+pub struct LaunchVisitInput<'a> {
+    pub request_id: Uuid,
+    pub ip: Option<std::net::IpAddr>,
+    pub user_agent: Option<&'a str>,
+    pub browser: &'a str,
+    pub is_mobile: bool,
+    pub now: OffsetDateTime,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LaunchError {
+    #[error(transparent)]
+    Database(#[from] DbError),
+    #[error("the request id was already used for a different room launch")]
+    RequestMismatch,
+    #[error("the current room membership does not permit entry")]
+    Denied,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsSnapshot {
@@ -522,6 +568,363 @@ pub async fn set_archived(
         room: account_room(tx, room_id).await?,
         changed,
     })
+}
+
+/// Authorizes and records one account user's room entry atomically.
+///
+/// `launch_request_id` is enterprise-wide and protected by an advisory transaction lock, so an
+/// uncertain HTTP retry cannot create two visits. A new genuine launch closes any abandoned open
+/// visit for the same user before inserting its successor; an explicit room logout closes the new
+/// row through [`close_visit_from_controller`].
+pub async fn launch_for_account(
+    tx: &mut TenantTx<'_>,
+    actor_user_id: Uuid,
+    room_id: Uuid,
+    input: LaunchVisitInput<'_>,
+) -> Result<LaunchOutcome, LaunchError> {
+    use sqlx::Row;
+    let LaunchVisitInput {
+        request_id,
+        ip,
+        user_agent,
+        browser,
+        is_mobile,
+        now,
+    } = input;
+
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 923))")
+        .bind(request_id)
+        .execute(tx.conn())
+        .await
+        .map_err(DbError::from)?;
+
+    let replay = sqlx::query_as::<_, LaunchVisit>(
+        "SELECT visit.id AS visit_id, visit.room_id, room.uuid_short AS short_code, \
+                visit.user_id, visit.email_snapshot::text AS email, \
+                visit.display_name_snapshot AS display_name, visit.entered_at \
+           FROM room_visit_sessions AS visit \
+           INNER JOIN rooms AS room ON room.id = visit.room_id \
+          WHERE visit.launch_request_id = $1",
+    )
+    .bind(request_id)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    if let Some(visit) = replay {
+        if visit.room_id != room_id || visit.user_id != actor_user_id {
+            return Err(LaunchError::RequestMismatch);
+        }
+        return Ok(LaunchOutcome {
+            visit,
+            replayed: true,
+        });
+    }
+
+    let room =
+        sqlx::query("SELECT uuid_short, state, archived_at FROM rooms WHERE id = $1 FOR UPDATE")
+            .bind(room_id)
+            .fetch_optional(tx.conn())
+            .await
+            .map_err(DbError::from)?
+            .ok_or(DbError::NotFound)?;
+    if room
+        .get::<Option<OffsetDateTime>, _>("archived_at")
+        .is_some()
+    {
+        return Err(DbError::NotFound.into());
+    }
+    let short_code: String = room.get("uuid_short");
+    let state: String = room.get("state");
+
+    let membership = sqlx::query(
+        "SELECT role, is_banned, is_paused, approval_status \
+           FROM room_members WHERE room_id = $1 AND user_id = $2 FOR UPDATE",
+    )
+    .bind(room_id)
+    .bind(actor_user_id)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?
+    .ok_or(LaunchError::Denied)?;
+    let role: String = membership.get("role");
+    let standing_is_valid = !membership.get::<bool, _>("is_banned")
+        && !membership.get::<bool, _>("is_paused")
+        && membership.get::<String, _>("approval_status") == "approved";
+    let state_allows_role = state == "open" || matches!(role.as_str(), "owner" | "presenter");
+    if !standing_is_valid || !state_allows_role {
+        return Err(LaunchError::Denied);
+    }
+
+    let identity = sqlx::query("SELECT email::text, display_name FROM users WHERE id = $1")
+        .bind(actor_user_id)
+        .fetch_optional(tx.conn())
+        .await
+        .map_err(DbError::from)?
+        .ok_or(DbError::NotFound)?;
+    let email: String = identity.get("email");
+    let display_name: String = identity.get("display_name");
+
+    // A process crash or a lost logout request must not leave two concurrent visits. Closing the
+    // stale row at the next authenticated launch makes the ledger self-healing.
+    sqlx::query(
+        "UPDATE room_visit_sessions SET exited_at = $3 \
+          WHERE room_id = $1 AND user_id = $2 AND exited_at IS NULL",
+    )
+    .bind(room_id)
+    .bind(actor_user_id)
+    .bind(now)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+
+    let visit_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO room_visit_sessions \
+           (id, enterprise_id, room_id, user_id, launch_request_id, email_snapshot, \
+            display_name_snapshot, ip, user_agent, browser, entered_at, is_mobile) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+    )
+    .bind(visit_id)
+    .bind(tx.ctx().enterprise_id)
+    .bind(room_id)
+    .bind(actor_user_id)
+    .bind(request_id)
+    .bind(&email)
+    .bind(&display_name)
+    .bind(ip.map(ipnetwork::IpNetwork::from))
+    .bind(user_agent)
+    .bind(browser)
+    .bind(now)
+    .bind(is_mobile)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+
+    sqlx::query(
+        "UPDATE room_members SET last_seen_at = $3, updated_at = GREATEST(updated_at, $3) \
+          WHERE room_id = $1 AND user_id = $2",
+    )
+    .bind(room_id)
+    .bind(actor_user_id)
+    .bind(now)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+
+    Ok(LaunchOutcome {
+        visit: LaunchVisit {
+            visit_id,
+            room_id,
+            short_code,
+            user_id: actor_user_id,
+            email,
+            display_name,
+            entered_at: now,
+        },
+        replayed: false,
+    })
+}
+
+/// Records an already-controller-authorized public guest without granting account authority.
+/// The synthetic canonical identity can never authenticate; the supplied email exists only as a
+/// visit snapshot for the customer's attendance report.
+pub async fn launch_guest_from_controller(
+    tx: &mut TenantTx<'_>,
+    room_id: Uuid,
+    email: &str,
+    display_name: &str,
+    input: LaunchVisitInput<'_>,
+) -> Result<LaunchOutcome, LaunchError> {
+    use sqlx::Row;
+    let LaunchVisitInput {
+        request_id,
+        ip,
+        user_agent,
+        browser,
+        is_mobile,
+        now,
+    } = input;
+
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 923))")
+        .bind(request_id)
+        .execute(tx.conn())
+        .await
+        .map_err(DbError::from)?;
+    let replay = sqlx::query_as::<_, LaunchVisit>(
+        "SELECT visit.id AS visit_id, visit.room_id, room.uuid_short AS short_code, \
+                visit.user_id, visit.email_snapshot::text AS email, \
+                visit.display_name_snapshot AS display_name, visit.entered_at \
+           FROM room_visit_sessions AS visit \
+           INNER JOIN rooms AS room ON room.id = visit.room_id \
+          WHERE visit.launch_request_id = $1",
+    )
+    .bind(request_id)
+    .fetch_optional(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    if let Some(visit) = replay {
+        if visit.room_id != room_id || visit.email != email || visit.display_name != display_name {
+            return Err(LaunchError::RequestMismatch);
+        }
+        return Ok(LaunchOutcome {
+            visit,
+            replayed: true,
+        });
+    }
+
+    let room =
+        sqlx::query("SELECT uuid_short, state, archived_at FROM rooms WHERE id = $1 FOR UPDATE")
+            .bind(room_id)
+            .fetch_optional(tx.conn())
+            .await
+            .map_err(DbError::from)?
+            .ok_or(DbError::NotFound)?;
+    if room
+        .get::<Option<OffsetDateTime>, _>("archived_at")
+        .is_some()
+    {
+        return Err(DbError::NotFound.into());
+    }
+    if room.get::<String, _>("state") != "open" {
+        return Err(LaunchError::Denied);
+    }
+    let short_code: String = room.get("uuid_short");
+
+    let guest_handle = Uuid::new_v4();
+    let synthetic_email = format!("guest.{}@guests.invalid", guest_handle.simple());
+    let user_id: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name, is_guest, guest_created_in_room_id) \
+         VALUES ($1, $2, $3, true, $4) RETURNING id",
+    )
+    .bind(&synthetic_email)
+    .bind(guest_handle.simple().to_string())
+    .bind(display_name)
+    .bind(room_id)
+    .fetch_one(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    sqlx::query(
+        "INSERT INTO room_members \
+           (enterprise_id, room_id, user_id, role, display_name, invited_at, joined_at, \
+            last_seen_at, created_at, updated_at) \
+         VALUES ($1, $2, $3, 'member', $4, $5, $5, $5, $5, $5)",
+    )
+    .bind(tx.ctx().enterprise_id)
+    .bind(room_id)
+    .bind(user_id)
+    .bind(display_name)
+    .bind(now)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+
+    let visit_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO room_visit_sessions \
+           (id, enterprise_id, room_id, user_id, launch_request_id, email_snapshot, \
+            display_name_snapshot, ip, user_agent, browser, entered_at, is_mobile) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+    )
+    .bind(visit_id)
+    .bind(tx.ctx().enterprise_id)
+    .bind(room_id)
+    .bind(user_id)
+    .bind(request_id)
+    .bind(email)
+    .bind(display_name)
+    .bind(ip.map(ipnetwork::IpNetwork::from))
+    .bind(user_agent)
+    .bind(browser)
+    .bind(now)
+    .bind(is_mobile)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+
+    Ok(LaunchOutcome {
+        visit: LaunchVisit {
+            visit_id,
+            room_id,
+            short_code,
+            user_id,
+            email: email.to_owned(),
+            display_name: display_name.to_owned(),
+            entered_at: now,
+        },
+        replayed: false,
+    })
+}
+
+/// Closes the newest open canonical visit after the live room authenticates through the
+/// controller. The room itself is re-read under tenant RLS, and the user id is matched to the
+/// tenant-bound visit rather than trusted as a globally writable coordinate.
+pub async fn close_visit_from_controller(
+    tx: &mut TenantTx<'_>,
+    room_id: Uuid,
+    user_id: Uuid,
+    now: OffsetDateTime,
+) -> Result<bool, DbError> {
+    let room_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (SELECT 1 FROM rooms WHERE id = $1 AND archived_at IS NULL)",
+    )
+    .bind(room_id)
+    .fetch_one(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    if !room_exists {
+        return Err(DbError::NotFound);
+    }
+
+    let closed = sqlx::query(
+        "WITH open AS ( \
+             SELECT id FROM room_visit_sessions \
+              WHERE room_id = $1 AND user_id = $2 AND exited_at IS NULL \
+              ORDER BY entered_at DESC, id DESC LIMIT 1 FOR UPDATE \
+         ) \
+         UPDATE room_visit_sessions AS visit SET exited_at = $3 \
+          FROM open WHERE visit.id = open.id",
+    )
+    .bind(room_id)
+    .bind(user_id)
+    .bind(now)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    Ok(closed.rows_affected() == 1)
+}
+
+pub async fn close_guest_visit_from_controller(
+    tx: &mut TenantTx<'_>,
+    room_id: Uuid,
+    email: &str,
+    now: OffsetDateTime,
+) -> Result<bool, DbError> {
+    let room_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (SELECT 1 FROM rooms WHERE id = $1 AND archived_at IS NULL)",
+    )
+    .bind(room_id)
+    .fetch_one(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    if !room_exists {
+        return Err(DbError::NotFound);
+    }
+    let closed = sqlx::query(
+        "WITH open AS ( \
+             SELECT id FROM room_visit_sessions \
+              WHERE room_id = $1 AND lower(email_snapshot) = lower($2) AND exited_at IS NULL \
+              ORDER BY entered_at DESC, id DESC LIMIT 1 FOR UPDATE \
+         ) \
+         UPDATE room_visit_sessions AS visit SET exited_at = $3 \
+          FROM open WHERE visit.id = open.id",
+    )
+    .bind(room_id)
+    .bind(email)
+    .bind(now)
+    .execute(tx.conn())
+    .await
+    .map_err(DbError::from)?;
+    Ok(closed.rows_affected() == 1)
 }
 
 /// The room itself, joined to its live state.

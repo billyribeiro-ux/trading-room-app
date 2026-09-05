@@ -37,6 +37,7 @@ import {
   roomPermissionsUrl,
   roomSettingUrl,
   roomStateUrl,
+  roomVisitExitUrl,
   streamIngestUrl,
   streamReadUrl,
   publicStreamReadUrl,
@@ -1332,6 +1333,34 @@ export async function writeRoomState(
     });
   }
 
+  if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
+}
+
+/** Best-effort caller used by logout to close the canonical visit ledger row. */
+export async function notifyRoomVisitExit(shortCode: string, email: string): Promise<void> {
+  const secret = ROOM_JWT_SECRET;
+  if (!secret) throw new RoomConfigUnavailable('ROOM_JWT_SECRET is not configured');
+  const url = roomVisitExitUrl(shortCode);
+  if (!url) throw new RoomConfigUnavailable('CONTROL_BASE_URL is not configured');
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${configWriteToken(secret, shortCode)}`,
+        'content-type': 'application/json'
+      },
+      // Identity belongs in a bounded body, never the URL where reverse-proxy access logs can
+      // retain member or guest PII independently of application log policy.
+      body: JSON.stringify({ email }),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+  } catch (cause) {
+    throw new RoomConfigUnavailable(`the visit close failed or timed out after ${TIMEOUT_MS}ms`, {
+      cause
+    });
+  }
   if (!response.ok) throw new RoomConfigUnavailable(`the controller answered ${response.status}`);
 }
 

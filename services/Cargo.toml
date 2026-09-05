@@ -28,7 +28,7 @@ thiserror = "2.0.20"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 uuid = { version = "1.26.0", features = ["v4", "serde"] }
-time = { version = "0.3.55", features = ["serde", "formatting"] }
+time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros"] }
 base64 = "0.23"
 ed25519-dalek = { version = "3.0.0", features = ["rand_core"] }
 # 0.11, not 0.10, because that is the line ed25519-dalek 3.0.0 itself depends on: its crates.io

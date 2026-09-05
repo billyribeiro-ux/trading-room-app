@@ -240,6 +240,27 @@ impl Harness {
         self.with_body("POST", path, cookie, body).await
     }
 
+    /// Authenticated JSON POST with additional already-validated test headers. Kept narrow so
+    /// launch tests exercise real peer/User-Agent attribution without exposing the raw request
+    /// helper to every integration test.
+    pub async fn post_json_with_user_agent(
+        &self,
+        path: &str,
+        cookie: &str,
+        body: &serde_json::Value,
+        user_agent: &str,
+    ) -> Response {
+        let payload = body.to_string();
+        self.request(&format!(
+            "POST {path} HTTP/1.1\r\nHost: localhost\r\nCookie: {cookie}\r\n\
+             Origin: {TEST_WEB_ORIGIN}\r\nSec-Fetch-Site: same-origin\r\n\
+             User-Agent: {user_agent}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\
+             Connection: close\r\n\r\n{payload}",
+            payload.len()
+        ))
+        .await
+    }
+
     pub async fn put_json(&self, path: &str, cookie: &str, body: &serde_json::Value) -> Response {
         self.with_body("PUT", path, cookie, body).await
     }
@@ -497,6 +518,31 @@ impl Harness {
             .expect("admin tenant scalar");
         tx.commit().await.expect("commit admin tenant read");
         value
+    }
+
+    /// Cleans up append-only or runtime-nondeletable tenant fixtures as the owner while retaining
+    /// the tenant GUC. Production code never receives this escape hatch.
+    pub async fn tenant_admin_execute<F>(&self, sql: &str, bind: F)
+    where
+        F: FnOnce(
+            sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>,
+        ) -> sqlx::query::Query<'_, sqlx::Postgres, sqlx::postgres::PgArguments>,
+    {
+        let mut tx = self
+            .admin
+            .begin()
+            .await
+            .expect("begin admin tenant cleanup");
+        sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+            .bind(ACME_ENTERPRISE.to_string())
+            .execute(&mut *tx)
+            .await
+            .expect("set admin tenant context");
+        bind(sqlx::query(sqlx::AssertSqlSafe(sql.to_owned())))
+            .execute(&mut *tx)
+            .await
+            .expect("admin tenant cleanup");
+        tx.commit().await.expect("commit admin tenant cleanup");
     }
 
     /// Reads a global identity-table fixture as the test owner. Production runtime SQL is

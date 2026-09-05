@@ -190,6 +190,34 @@
         ],
         "type": "object"
       },
+      "AdministratorMutationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "administrators": {
+            "items": {
+              "$ref": "#/components/schemas/ManagedAdministrator"
+            },
+            "type": "array"
+          },
+          "changed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "removedUserIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "administrators",
+          "removedUserIds",
+          "changed"
+        ],
+        "type": "object"
+      },
       "ArchiveAccountRoomRequest": {
         "additionalProperties": false,
         "properties": {
@@ -330,6 +358,39 @@
         ],
         "type": "object"
       },
+      "CreateAdministratorRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string",
+            "x-maxBytes": 160
+          },
+          "email": {
+            "format": "email",
+            "maxLength": 254,
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 512,
+            "minLength": 12,
+            "type": "string",
+            "writeOnly": true
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "displayName",
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
       "CreateBadgeRequest": {
         "additionalProperties": false,
         "properties": {
@@ -393,6 +454,35 @@
         ],
         "type": "object"
       },
+      "CreateCustomerApiKeyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "keyId": {
+            "pattern": "^[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "lastFour": {
+            "pattern": "^[0-9a-f]{4}$",
+            "type": "string"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "secretHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "requestId",
+          "keyId",
+          "secretHash",
+          "lastFour"
+        ],
+        "type": "object"
+      },
       "CurrentUser": {
         "additionalProperties": false,
         "properties": {
@@ -423,7 +513,122 @@
         ],
         "type": "object"
       },
+      "CustomerApiKeyMutationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/ManagedCustomerApiKey"
+            },
+            "type": "array"
+          },
+          "removedKeyIds": {
+            "items": {
+              "pattern": "^[0-9a-f]{24}$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "keys",
+          "removedKeyIds",
+          "changed"
+        ],
+        "type": "object"
+      },
+      "CustomerApiKeyRestrictions": {
+        "additionalProperties": false,
+        "properties": {
+          "ips": {
+            "items": {
+              "maxLength": 18,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "scopes": {
+            "items": {
+              "enum": [
+                "sessions/list",
+                "sessions/users",
+                "sessions/addUsers",
+                "sessions/delUsers",
+                "sessions/userstats",
+                "sessions/chatlogs",
+                "sessions/alertlogs",
+                "sessions/deletedlogs",
+                "sessions/archivedlogs",
+                "sessions/recordings",
+                "sessions/cloneSession"
+              ],
+              "type": "string"
+            },
+            "maxItems": 11,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "sessions": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "ips",
+          "scopes",
+          "sessions"
+        ],
+        "type": "object"
+      },
+      "DeleteAdministratorRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision"
+        ],
+        "type": "object"
+      },
       "DeleteBadgeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision"
+        ],
+        "type": "object"
+      },
+      "DeleteCustomerApiKeyRequest": {
         "additionalProperties": false,
         "properties": {
           "expectedRevision": {
@@ -488,6 +693,19 @@
           "requestId",
           "email",
           "displayName"
+        ],
+        "type": "object"
+      },
+      "LaunchAccountRoomRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId"
         ],
         "type": "object"
       },
@@ -889,6 +1107,47 @@
         ],
         "type": "object"
       },
+      "ManagedAdministrator": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "displayName": {
+            "maxLength": 160,
+            "minLength": 1,
+            "type": "string",
+            "x-maxBytes": 160
+          },
+          "email": {
+            "format": "email",
+            "maxLength": 254,
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "revision",
+          "displayName",
+          "email",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
       "ManagedBadge": {
         "additionalProperties": false,
         "properties": {
@@ -965,6 +1224,51 @@
           "autoAssignRoles",
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ManagedCustomerApiKey": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "lastFour": {
+            "pattern": "^[0-9a-f]{4}$",
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "restrictions": {
+            "$ref": "#/components/schemas/CustomerApiKeyRestrictions"
+          },
+          "revision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "lastFour",
+          "restrictions",
+          "createdAt",
+          "updatedAt",
+          "lastUsedAt"
         ],
         "type": "object"
       },
@@ -1292,9 +1596,105 @@
         ],
         "type": "object"
       },
+      "RestrictCustomerApiKeyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "restrictions": {
+            "$ref": "#/components/schemas/CustomerApiKeyRestrictions"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "restrictions"
+        ],
+        "type": "object"
+      },
+      "RoomLaunchVisit": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "enteredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "roomId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "shortCode": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "visitId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visitId",
+          "roomId",
+          "shortCode",
+          "userId",
+          "email",
+          "displayName",
+          "enteredAt"
+        ],
+        "type": "object"
+      },
       "RoomSettings": {
         "additionalProperties": true,
         "description": "A partial object whose names and scalar types are pinned by room-settings-manifest.json.",
+        "type": "object"
+      },
+      "RotateCustomerApiKeyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "lastFour": {
+            "pattern": "^[0-9a-f]{4}$",
+            "type": "string"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "secretHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "secretHash",
+          "lastFour"
+        ],
         "type": "object"
       },
       "Session": {
@@ -1320,6 +1720,764 @@
           "displayName",
           "isPlatformAdmin",
           "expiresAt"
+        ],
+        "type": "object"
+      },
+      "StatsAddUser": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "format": "email",
+            "maxLength": 254,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "name"
+        ],
+        "type": "object"
+      },
+      "StatsAddUsersRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/StatsAddUser"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "users"
+        ],
+        "type": "object"
+      },
+      "StatsAddUsersResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "added": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "freshen": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "added",
+          "freshen"
+        ],
+        "type": "object"
+      },
+      "StatsAlertLog": {
+        "additionalProperties": false,
+        "properties": {
+          "alertType": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "t": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionID",
+          "t",
+          "alertType",
+          "message"
+        ],
+        "type": "object"
+      },
+      "StatsAlertLogsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "chatlogs": {
+            "items": {
+              "$ref": "#/components/schemas/StatsAlertLog"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "chatlogs"
+        ],
+        "type": "object"
+      },
+      "StatsArchivedLog": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "logType": {
+            "enum": [
+              "chat",
+              "alerts"
+            ],
+            "type": "string"
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "updated": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionID",
+          "logType",
+          "channel",
+          "updated",
+          "content"
+        ],
+        "type": "object"
+      },
+      "StatsArchivedLogsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "archivedlogs": {
+            "items": {
+              "$ref": "#/components/schemas/StatsArchivedLog"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "archivedlogs"
+        ],
+        "type": "object"
+      },
+      "StatsChatLog": {
+        "additionalProperties": false,
+        "properties": {
+          "c": {
+            "type": "string"
+          },
+          "m": {
+            "type": "string"
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "t": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "u": {
+            "format": "email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionID",
+          "c",
+          "t",
+          "u",
+          "m"
+        ],
+        "type": "object"
+      },
+      "StatsChatLogsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "chatlogs": {
+            "items": {
+              "$ref": "#/components/schemas/StatsChatLog"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "chatlogs"
+        ],
+        "type": "object"
+      },
+      "StatsCloneSession": {
+        "additionalProperties": false,
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "clonedFrom": {
+            "type": "string"
+          },
+          "created": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currentState": {
+            "const": "inactive",
+            "type": "string"
+          },
+          "isClonedRoom": {
+            "const": true,
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerdID": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "updated": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "uuid": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "_id",
+          "uuid",
+          "name",
+          "isClonedRoom",
+          "clonedFrom",
+          "ownerdID",
+          "currentState",
+          "created",
+          "updated"
+        ],
+        "type": "object"
+      },
+      "StatsCloneSessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/StatsCloneSession"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "session"
+        ],
+        "type": "object"
+      },
+      "StatsDeleteUsersRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "delUsers": {
+            "items": {
+              "format": "email",
+              "maxLength": 254,
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "delUsers"
+        ],
+        "type": "object"
+      },
+      "StatsDeleteUsersResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "deletedUsers": {
+            "items": {
+              "format": "email",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "deletedUsers"
+        ],
+        "type": "object"
+      },
+      "StatsDeletedLog": {
+        "additionalProperties": false,
+        "properties": {
+          "eventType": {
+            "enum": [
+              "E",
+              "D"
+            ],
+            "type": "string"
+          },
+          "logType": {
+            "enum": [
+              "chat",
+              "alerts"
+            ],
+            "type": "string"
+          },
+          "originalMessage": {
+            "type": "string"
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionID",
+          "logType",
+          "eventType",
+          "time",
+          "originalMessage"
+        ],
+        "type": "object"
+      },
+      "StatsDeletedLogsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "deletedlogs": {
+            "items": {
+              "$ref": "#/components/schemas/StatsDeletedLog"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "deletedlogs"
+        ],
+        "type": "object"
+      },
+      "StatsRecording": {
+        "additionalProperties": false,
+        "properties": {
+          "_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "created": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "duration": {
+            "description": "Duration in whole minutes.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "fpath": {
+            "type": "string"
+          },
+          "isUpload": {
+            "type": "boolean"
+          },
+          "length": {
+            "description": "Duration in milliseconds.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "media_server": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ms": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "namemkv": {
+            "type": "string"
+          },
+          "sessionID": {
+            "type": "string"
+          },
+          "vidPath": {
+            "format": "uri",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "_id",
+          "sessionID",
+          "name",
+          "namemkv",
+          "contentType",
+          "created",
+          "duration",
+          "length",
+          "fpath",
+          "media_server",
+          "vidPath",
+          "ms",
+          "isUpload"
+        ],
+        "type": "object"
+      },
+      "StatsRecordingsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "recordings": {
+            "items": {
+              "$ref": "#/components/schemas/StatsRecording"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "recordings"
+        ],
+        "type": "object"
+      },
+      "StatsSession": {
+        "additionalProperties": false,
+        "properties": {
+          "_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "created": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currentState": {
+            "type": "string"
+          },
+          "current_capacity": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "current_max": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "isMainRoom": {
+            "type": "boolean"
+          },
+          "media": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "modCount": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "recPreviewLocation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recordedMaxCapacity": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "recording": {
+            "type": "boolean"
+          },
+          "s3Bucket": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "s3BucketFolderPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "uuid": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "_id",
+          "uuid",
+          "name",
+          "currentState",
+          "current_capacity",
+          "current_max",
+          "modCount",
+          "recordedMaxCapacity",
+          "created",
+          "updated",
+          "s3Bucket",
+          "s3BucketFolderPath",
+          "isMainRoom",
+          "recPreviewLocation",
+          "media",
+          "recording"
+        ],
+        "type": "object"
+      },
+      "StatsSessionsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/StatsSession"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          },
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "sessions"
+        ],
+        "type": "object"
+      },
+      "StatsUser": {
+        "additionalProperties": false,
+        "properties": {
+          "_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "activeDateAPI": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "alerterAppFCMUserOff": {
+            "type": "boolean"
+          },
+          "alerterAppTokens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "created": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "lastLogin": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "maximum": 4,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "updated": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "_id",
+          "email",
+          "userName",
+          "role",
+          "lastLogin",
+          "name",
+          "created",
+          "updated",
+          "alerterAppFCMUserOff",
+          "alerterAppTokens",
+          "activeDateAPI",
+          "active"
+        ],
+        "type": "object"
+      },
+      "StatsUsersResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/StatsUser"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "success",
+          "users"
+        ],
+        "type": "object"
+      },
+      "StatsVisit": {
+        "additionalProperties": false,
+        "properties": {
+          "duration": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "inTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isMobile": {
+            "type": "boolean"
+          },
+          "outTime": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "userName": {
+            "type": "string"
+          },
+          "uuid": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "userName",
+          "uuid",
+          "ip",
+          "inTime",
+          "outTime",
+          "duration",
+          "isMobile"
+        ],
+        "type": "object"
+      },
+      "StatsVisitsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean"
+          },
+          "userstats": {
+            "items": {
+              "$ref": "#/components/schemas/StatsVisit"
+            },
+            "maxItems": 10000,
+            "type": "array"
+          }
+        },
+        "required": [
+          "success",
+          "userstats"
         ],
         "type": "object"
       },
@@ -1398,6 +2556,18 @@
         "name": "__Host-tradingroom_access",
         "type": "apiKey"
       },
+      "customerApiKey": {
+        "description": "Canonical 24-character customer API key identifier.",
+        "in": "query",
+        "name": "apiKey",
+        "type": "apiKey"
+      },
+      "customerApiSecret": {
+        "description": "One-time-disclosed customer API secret. Never logged or returned.",
+        "in": "query",
+        "name": "apiSecret",
+        "type": "apiKey"
+      },
       "refreshCookie": {
         "in": "cookie",
         "name": "__Host-tradingroom_refresh",
@@ -1406,8 +2576,8 @@
     }
   },
   "info": {
-    "description": "Authoritative authentication, profile, preference, account-bootstrap, and account room-lifecycle contract. This intentionally does not claim to describe the remaining live-room runtime routes. Cookies are issued only through the same-origin SvelteKit boundary.",
-    "title": "Trading Room Account Authority API",
+    "description": "Authoritative authentication, profile, account-management, room-lifecycle, and customer statistics contract. This intentionally does not claim to describe the remaining live-room runtime routes. Browser cookies are issued only through the same-origin SvelteKit boundary; customer statistics use separately managed query credentials for legacy compatibility.",
+    "title": "Trading Room Authority API",
     "version": "0.1.0"
   },
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
@@ -1730,6 +2900,172 @@
         ]
       }
     },
+    "/api/v1/accounts/{enterprise_id}/administrators": {
+      "get": {
+        "operationId": "listAccountAdministrators",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManagedAdministrator"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Canonical account administrators; owner authority is intentionally excluded."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "createAccountAdministrator",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdministratorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministratorMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once administrator creation result."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/administrators/{user_id}": {
+      "delete": {
+        "operationId": "deleteAccountAdministrator",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAdministratorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministratorMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once revisioned administrator removal."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "user_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ]
+    },
     "/api/v1/accounts/{enterprise_id}/badges": {
       "get": {
         "operationId": "listAccountBadges",
@@ -1914,6 +3250,312 @@
               }
             },
             "description": "Exactly-once revisioned badge update."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/customer-api-keys": {
+      "get": {
+        "operationId": "listAccountCustomerApiKeys",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManagedCustomerApiKey"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Canonical secret-free customer API-key metadata."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "createAccountCustomerApiKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerApiKeyMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once customer API-key creation result; credential plaintext is never returned."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}": {
+      "delete": {
+        "operationId": "deleteAccountCustomerApiKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteCustomerApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerApiKeyMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once revisioned customer API-key revocation."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "key_id",
+          "required": true,
+          "schema": {
+            "pattern": "^[0-9a-f]{24}$",
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}/restrictions": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "key_id",
+          "required": true,
+          "schema": {
+            "pattern": "^[0-9a-f]{24}$",
+            "type": "string"
+          }
+        }
+      ],
+      "put": {
+        "operationId": "restrictAccountCustomerApiKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestrictCustomerApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerApiKeyMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once revisioned restriction update."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}/rotate": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "key_id",
+          "required": true,
+          "schema": {
+            "pattern": "^[0-9a-f]{24}$",
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "rotateAccountCustomerApiKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotateCustomerApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerApiKeyMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once revisioned verifier rotation."
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -2156,6 +3798,77 @@
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/launch": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "room_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "description": "Atomically authorizes room entry and records one idempotent canonical visit.",
+        "operationId": "launchAccountRoom",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LaunchAccountRoomRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomLaunchVisit"
+                }
+              }
+            },
+            "description": "Canonical identity and visit committed for the room handoff."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"
@@ -2422,6 +4135,836 @@
           "Account"
         ]
       }
+    },
+    "/stats/v1/sessions/addUsers": {
+      "post": {
+        "description": "Adds new canonical identities to a room or refreshes existing member activity.",
+        "operationId": "addCustomerStatsUsers",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatsAddUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsAddUsersResponse"
+                }
+              }
+            },
+            "description": "Adds new canonical identities to a room or refreshes existing member activity."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/alertlogs": {
+      "get": {
+        "description": "Lists at most 10,000 retained canonical alerts. The historical response field is chatlogs.",
+        "operationId": "listCustomerStatsAlertLogs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "toDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsAlertLogsResponse"
+                }
+              }
+            },
+            "description": "Lists at most 10,000 retained canonical alerts. The historical response field is chatlogs."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/archivedlogs": {
+      "get": {
+        "description": "Lists at most 10,000 retained canonical chat or alert archive records.",
+        "operationId": "listCustomerStatsArchivedLogs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "logType",
+            "required": false,
+            "schema": {
+              "default": "chat",
+              "enum": [
+                "chat",
+                "alerts"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "default": "main",
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "toDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsArchivedLogsResponse"
+                }
+              }
+            },
+            "description": "Lists at most 10,000 retained canonical chat or alert archive records."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/chatlogs": {
+      "get": {
+        "description": "Lists at most 10,000 retained canonical chat messages for one channel.",
+        "operationId": "listCustomerStatsChatLogs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "default": "main",
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "toDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsChatLogsResponse"
+                }
+              }
+            },
+            "description": "Lists at most 10,000 retained canonical chat messages for one channel."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/cloneSession": {
+      "get": {
+        "description": "Clones canonical room configuration and staff membership. This historical mutating GET is authenticated, scoped, rate-limited, audited, and non-cacheable.",
+        "operationId": "cloneCustomerStatsSession",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string",
+              "x-maxBytes": 160
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsCloneSessionResponse"
+                }
+              }
+            },
+            "description": "Clones canonical room configuration and staff membership. This historical mutating GET is authenticated, scoped, rate-limited, audited, and non-cacheable."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false,
+        "x-mutating-get": true
+      }
+    },
+    "/stats/v1/sessions/delUsers": {
+      "post": {
+        "description": "Removes non-owner canonical room memberships by normalized email.",
+        "operationId": "deleteCustomerStatsUsers",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatsDeleteUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsDeleteUsersResponse"
+                }
+              }
+            },
+            "description": "Removes non-owner canonical room memberships by normalized email."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/deletedlogs": {
+      "get": {
+        "description": "Lists at most 10,000 canonical edit/delete log records.",
+        "operationId": "listCustomerStatsDeletedLogs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "logType",
+            "required": false,
+            "schema": {
+              "enum": [
+                "chat",
+                "alerts"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "eventType",
+            "required": false,
+            "schema": {
+              "enum": [
+                "E",
+                "D"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "toDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsDeletedLogsResponse"
+                }
+              }
+            },
+            "description": "Lists at most 10,000 canonical edit/delete log records."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/list": {
+      "get": {
+        "description": "Lists canonical sessions visible to the key after session restrictions are applied.",
+        "operationId": "listCustomerStatsSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsSessionsResponse"
+                }
+              }
+            },
+            "description": "Lists canonical sessions visible to the key after session restrictions are applied."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/recordings": {
+      "get": {
+        "description": "Lists canonical ready recordings created during the preceding 21 days.",
+        "operationId": "listCustomerStatsRecordings",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsRecordingsResponse"
+                }
+              }
+            },
+            "description": "Lists canonical ready recordings created during the preceding 21 days."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/users": {
+      "get": {
+        "description": "Lists canonical members for one session.",
+        "operationId": "listCustomerStatsUsers",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsUsersResponse"
+                }
+              }
+            },
+            "description": "Lists canonical members for one session."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
+    },
+    "/stats/v1/sessions/userstats": {
+      "get": {
+        "description": "Lists at most 10,000 canonical room visits in the requested date window.",
+        "operationId": "listCustomerStatsVisits",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sessionID",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "toDate",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "isMobile",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsVisitsResponse"
+                }
+              }
+            },
+            "description": "Lists at most 10,000 canonical room visits in the requested date window."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "customerApiKey": [],
+            "customerApiSecret": []
+          }
+        ],
+        "tags": [
+          "Customer Statistics"
+        ],
+        "x-controller-client": false
+      }
     }
   },
   "tags": [
@@ -2430,6 +4973,9 @@
     },
     {
       "name": "Account"
+    },
+    {
+      "name": "Customer Statistics"
     }
   ]
 }

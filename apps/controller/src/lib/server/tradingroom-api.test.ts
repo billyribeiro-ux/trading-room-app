@@ -1,5 +1,6 @@
 import type { Cookies } from '@sveltejs/kit';
 import { describe, expect, it, vi } from 'vitest';
+import type { CustomerApiKeyRestrictions } from './tradingroom-api.generated';
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -8,30 +9,44 @@ import {
   applyApiCookies,
   assignAccountRoomBadges,
   clearApiCookies,
+  createAccountAdministrator,
   createAccountBadge,
+  createAccountCustomerApiKey,
   createAccountRoom,
   deleteAccountBadge,
+  deleteAccountCustomerApiKey,
+  deleteAccountAdministrator,
   getAccountRoomSettings,
   getAccountBootstrap,
   isArchiveAccountRoomRequest,
   isAssignBadgesRequest,
   isCreateBadgeRequest,
+  isCreateCustomerApiKeyRequest,
+  isCreateAdministratorRequest,
   isCreateAccountRoomRequest,
   isInviteMemberRequest,
+  isLaunchAccountRoomRequest,
   isLoginRequest,
   isManageMembersRequest,
   isPatchAccountRoomSettingsRequest,
+  isRestrictCustomerApiKeyRequest,
+  isRotateCustomerApiKeyRequest,
   isPreferenceRequest,
   isPreferencesRequest,
   isProfileUpdateRequest,
   inviteAccountRoomMember,
   listAccountBadges,
+  listAccountCustomerApiKeys,
+  listAccountAdministrators,
   listAccountRooms,
   listAccountRoomMembers,
+  launchAccountRoom,
   login,
   logout,
   manageAccountRoomMembers,
   patchAccountRoomSettings,
+  restrictAccountCustomerApiKey,
+  rotateAccountCustomerApiKey,
   setAccountRoomArchived,
   updateAccountBadge,
   updateAccountProfile
@@ -42,6 +57,7 @@ const ACCOUNT_ID = 'a0000000-0000-4000-8000-000000000001';
 const ROOM_ID = 'a0000003-0000-4000-8000-000000000001';
 const MEMBER_ID = 'a0000002-0000-4000-8000-000000000001';
 const BADGE_ID = 'a0000004-0000-4000-8000-000000000001';
+const KEY_ID = '0123456789abcdef01234567';
 
 function cookieJar(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial));
@@ -207,6 +223,8 @@ describe('typed Rust API transport', () => {
     expect(isArchiveAccountRoomRequest({ archived: true })).toBe(true);
     expect(isArchiveAccountRoomRequest({ archived: 'true' })).toBe(false);
     expect(isArchiveAccountRoomRequest({ archived: true, roomId: ROOM_ID })).toBe(false);
+    expect(isLaunchAccountRoomRequest({ requestId: USER_ID })).toBe(true);
+    expect(isLaunchAccountRoomRequest({ requestId: USER_ID, roomId: ROOM_ID })).toBe(false);
   });
 
   it('validates login before applying both host-only cookies', async () => {
@@ -686,6 +704,51 @@ describe('typed Rust API transport', () => {
     expect(jar.set).not.toHaveBeenCalled();
   });
 
+  it('forwards launch attribution and rejects any unreviewed authority response field', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const visit = {
+      visitId: 'a0000008-0000-4000-8000-000000000001',
+      roomId: ROOM_ID,
+      shortCode: '3627',
+      userId: USER_ID,
+      email: 'owner@example.test',
+      displayName: 'Ada Owner',
+      enteredAt: '2026-09-05T12:00:00Z'
+    };
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(`http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/rooms/${ROOM_ID}/launch`);
+      const headers = new Headers(init?.headers);
+      expect(headers.get('origin')).toBe('https://www.example.test');
+      expect(headers.get('x-forwarded-for')).toBe('203.0.113.10');
+      expect(headers.get('user-agent')).toBe('launch-contract-agent');
+      expect(JSON.parse(String(init?.body))).toEqual({ requestId: USER_ID });
+      return new Response(JSON.stringify(visit), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    const context = {
+      cookies: jar.cookies,
+      origin: 'https://www.example.test',
+      clientAddress: '203.0.113.10',
+      userAgent: 'launch-contract-agent',
+      fetch
+    };
+    await expect(launchAccountRoom(context, ACCOUNT_ID, ROOM_ID, { requestId: USER_ID })).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: visit
+    });
+
+    const invalid = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...visit, isPlatformAdmin: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    await expect(
+      launchAccountRoom({ ...context, fetch: invalid }, ACCOUNT_ID, ROOM_ID, { requestId: USER_ID })
+    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamResponse' });
+  });
+
   it('validates and transports revisioned room settings without accepting unknown values', async () => {
     const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
     const snapshot = { roomId: ROOM_ID, revision: 8, settings: { isLocked: true, customCSS: 'body{}' } };
@@ -1043,6 +1106,190 @@ describe('typed Rust API transport', () => {
         ROOM_ID
       )
     ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamResponse' });
+  });
+
+  it('transports administrator lifecycle data without accepting leaked credentials', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const administrator = {
+      userId: USER_ID,
+      revision: 3,
+      displayName: 'Account Operator',
+      email: 'operator@example.test',
+      createdAt: '2026-09-05T10:00:00Z',
+      updatedAt: '2026-09-05T11:00:00Z'
+    };
+    const creation = {
+      requestId: ACCOUNT_ID,
+      displayName: administrator.displayName,
+      email: administrator.email,
+      password: 'administrator-password'
+    };
+    const deletion = { requestId: MEMBER_ID, expectedRevision: administrator.revision };
+    const mutation = { administrators: [administrator], removedUserIds: [], changed: 1 };
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      expect(new Headers(init?.headers).get('cookie')).toBe(`${ACCESS_COOKIE}=access-only`);
+      if (init?.method === 'POST') {
+        expect(url).toBe(`http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/administrators`);
+        expect(JSON.parse(String(init.body))).toEqual(creation);
+        return new Response(JSON.stringify(mutation), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (init?.method === 'DELETE') {
+        expect(url).toBe(`http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/administrators/${USER_ID}`);
+        expect(JSON.parse(String(init.body))).toEqual(deletion);
+        return new Response(JSON.stringify(mutation), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify([administrator]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+    const context = { cookies: jar.cookies, origin: 'https://www.example.test', fetch };
+
+    expect(isCreateAdministratorRequest(creation)).toBe(true);
+    expect(isCreateAdministratorRequest({ ...creation, role: 'owner' })).toBe(false);
+    expect(isCreateAdministratorRequest({ ...creation, password: 'short' })).toBe(false);
+    await expect(listAccountAdministrators(context, ACCOUNT_ID)).resolves.toMatchObject({
+      ok: true,
+      data: [administrator]
+    });
+    await expect(createAccountAdministrator(context, ACCOUNT_ID, creation)).resolves.toMatchObject({
+      ok: true,
+      data: mutation
+    });
+    await expect(deleteAccountAdministrator(context, ACCOUNT_ID, USER_ID, deletion)).resolves.toMatchObject({
+      ok: true,
+      data: mutation
+    });
+    expect(fetch).toHaveBeenCalledTimes(3);
+
+    const leaking = vi.fn(
+      async () =>
+        new Response(JSON.stringify([{ ...administrator, passwordHash: 'must-not-cross' }]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    await expect(listAccountAdministrators({ ...context, fetch: leaking }, ACCOUNT_ID)).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamResponse'
+    });
+  });
+
+  it('validates and transports secret-free revisioned customer API-key authority', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const restrictions: CustomerApiKeyRestrictions = {
+      ips: ['203.0.113.7/32'],
+      scopes: ['sessions/list', 'sessions/users'],
+      sessions: ['1001']
+    };
+    const managed = {
+      id: KEY_ID,
+      revision: 4,
+      lastFour: 'cdef',
+      restrictions,
+      createdAt: '2026-09-05T10:00:00Z',
+      updatedAt: '2026-09-05T11:00:00Z',
+      lastUsedAt: null
+    };
+    const creation = {
+      requestId: USER_ID,
+      keyId: KEY_ID,
+      secretHash: 'a'.repeat(64),
+      lastFour: 'cdef'
+    };
+    const rotation = {
+      requestId: MEMBER_ID,
+      expectedRevision: 4,
+      secretHash: 'b'.repeat(64),
+      lastFour: '1234'
+    };
+    const restriction = { requestId: ROOM_ID, expectedRevision: 4, restrictions };
+    const deletion = { requestId: BADGE_ID, expectedRevision: 4 };
+    const mutation = { keys: [managed], removedKeyIds: [], changed: 1 };
+
+    expect(isCreateCustomerApiKeyRequest(creation)).toBe(true);
+    expect(isCreateCustomerApiKeyRequest({ ...creation, secret: 'must-not-cross' })).toBe(false);
+    expect(isCreateCustomerApiKeyRequest({ ...creation, secretHash: 'ABC' })).toBe(false);
+    expect(isRotateCustomerApiKeyRequest(rotation)).toBe(true);
+    expect(isRotateCustomerApiKeyRequest({ ...rotation, expectedRevision: -1 })).toBe(false);
+    expect(isRestrictCustomerApiKeyRequest(restriction)).toBe(true);
+    expect(
+      isRestrictCustomerApiKeyRequest({
+        ...restriction,
+        restrictions: { ...restrictions, scopes: ['rooms:write'] }
+      })
+    ).toBe(false);
+
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const base = `http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/customer-api-keys`;
+      expect(new Headers(init?.headers).get('cookie')).toBe(`${ACCESS_COOKIE}=access-only`);
+      if (init?.method === 'GET') {
+        expect(url).toBe(base);
+        return new Response(JSON.stringify([managed]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url === base) {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(String(init?.body))).toEqual(creation);
+      } else if (url.endsWith('/rotate')) {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(String(init?.body))).toEqual(rotation);
+      } else if (url.endsWith('/restrictions')) {
+        expect(init?.method).toBe('PUT');
+        expect(JSON.parse(String(init?.body))).toEqual(restriction);
+      } else {
+        expect(url).toBe(`${base}/${KEY_ID}`);
+        expect(init?.method).toBe('DELETE');
+        expect(JSON.parse(String(init?.body))).toEqual(deletion);
+      }
+      return new Response(JSON.stringify(mutation), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+    const context = { cookies: jar.cookies, origin: 'https://www.example.test', fetch };
+
+    await expect(listAccountCustomerApiKeys(context, ACCOUNT_ID)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: [managed]
+    });
+    await expect(createAccountCustomerApiKey(context, ACCOUNT_ID, creation)).resolves.toMatchObject({
+      ok: true,
+      data: mutation
+    });
+    await expect(rotateAccountCustomerApiKey(context, ACCOUNT_ID, KEY_ID, rotation)).resolves.toMatchObject({
+      ok: true,
+      data: mutation
+    });
+    await expect(restrictAccountCustomerApiKey(context, ACCOUNT_ID, KEY_ID, restriction)).resolves.toMatchObject({
+      ok: true,
+      data: mutation
+    });
+    await expect(deleteAccountCustomerApiKey(context, ACCOUNT_ID, KEY_ID, deletion)).resolves.toMatchObject({
+      ok: true,
+      data: mutation
+    });
+    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(jar.set).not.toHaveBeenCalled();
+
+    const leaking = vi.fn(
+      async () =>
+        new Response(JSON.stringify([{ ...managed, secretHash: 'a'.repeat(64) }]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    await expect(listAccountCustomerApiKeys({ ...context, fetch: leaking }, ACCOUNT_ID)).resolves.toMatchObject({
+      ok: false,
+      status: 502,
+      code: 'invalidUpstreamResponse'
+    });
   });
 
   it('preserves the API stable error without accepting response cookies', async () => {

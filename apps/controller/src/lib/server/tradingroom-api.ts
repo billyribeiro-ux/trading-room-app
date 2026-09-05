@@ -12,20 +12,30 @@ import { ROOM_SETTINGS_BY_NAME } from '#lib/room-settings-schema.js';
 import type {
   AccountBootstrap,
   AccountRoomSettings,
+  AdministratorMutationResponse,
   ArchiveAccountRoomRequest,
   AssignBadgesRequest,
   BadgeAssignmentOperation,
   BadgeMutationResponse,
   CreateAccountRoomRequest,
+  CreateAdministratorRequest,
   CreateBadgeRequest,
+  CreateCustomerApiKeyRequest,
   CurrentUser,
+  CustomerApiKeyMutationResponse,
+  CustomerApiKeyRestrictions,
   DeleteBadgeRequest,
+  DeleteCustomerApiKeyRequest,
+  DeleteAdministratorRequest,
   Error as ApiErrorBody,
   InviteMemberRequest,
+  LaunchAccountRoomRequest,
   LoginRequest,
   ManageMemberOperation,
   ManageMembersRequest,
   ManagedBadge,
+  ManagedCustomerApiKey,
+  ManagedAdministrator,
   ManagedMember,
   ManagedRoom,
   MembershipMutationResponse,
@@ -33,6 +43,9 @@ import type {
   PreferenceRequest,
   Preferences,
   ProfileUpdateRequest,
+  RestrictCustomerApiKeyRequest,
+  RotateCustomerApiKeyRequest,
+  RoomLaunchVisit,
   Session,
   TradingRoomApiOperation,
   TradingRoomApiOperations,
@@ -42,19 +55,29 @@ import type {
 export type {
   AccountBootstrap,
   AccountRoomSettings,
+  AdministratorMutationResponse,
   ArchiveAccountRoomRequest,
   AssignBadgesRequest,
   BadgeAssignmentOperation,
   BadgeMutationResponse,
   CreateAccountRoomRequest,
+  CreateAdministratorRequest,
   CreateBadgeRequest,
+  CreateCustomerApiKeyRequest,
   CurrentUser,
+  CustomerApiKeyMutationResponse,
+  CustomerApiKeyRestrictions,
   DeleteBadgeRequest,
+  DeleteCustomerApiKeyRequest,
+  DeleteAdministratorRequest,
   InviteMemberRequest,
+  LaunchAccountRoomRequest,
   LoginRequest,
   ManageMemberOperation,
   ManageMembersRequest,
   ManagedBadge,
+  ManagedCustomerApiKey,
+  ManagedAdministrator,
   ManagedMember,
   ManagedRoom,
   MembershipMutationResponse,
@@ -62,6 +85,9 @@ export type {
   PreferenceRequest,
   Preferences,
   ProfileUpdateRequest,
+  RestrictCustomerApiKeyRequest,
+  RotateCustomerApiKeyRequest,
+  RoomLaunchVisit,
   Session,
   UpdateBadgeRequest
 } from './tradingroom-api.generated';
@@ -111,6 +137,46 @@ const OPERATIONS: {
     path: '/api/v1/account/theme',
     successStatus: 200
   },
+  listAccountAdministrators: {
+    method: 'GET',
+    path: '/api/v1/accounts/{enterprise_id}/administrators',
+    successStatus: 200
+  },
+  createAccountAdministrator: {
+    method: 'POST',
+    path: '/api/v1/accounts/{enterprise_id}/administrators',
+    successStatus: 200
+  },
+  deleteAccountAdministrator: {
+    method: 'DELETE',
+    path: '/api/v1/accounts/{enterprise_id}/administrators/{user_id}',
+    successStatus: 200
+  },
+  listAccountCustomerApiKeys: {
+    method: 'GET',
+    path: '/api/v1/accounts/{enterprise_id}/customer-api-keys',
+    successStatus: 200
+  },
+  createAccountCustomerApiKey: {
+    method: 'POST',
+    path: '/api/v1/accounts/{enterprise_id}/customer-api-keys',
+    successStatus: 200
+  },
+  rotateAccountCustomerApiKey: {
+    method: 'POST',
+    path: '/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}/rotate',
+    successStatus: 200
+  },
+  restrictAccountCustomerApiKey: {
+    method: 'PUT',
+    path: '/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}/restrictions',
+    successStatus: 200
+  },
+  deleteAccountCustomerApiKey: {
+    method: 'DELETE',
+    path: '/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}',
+    successStatus: 200
+  },
   listAccountBadges: {
     method: 'GET',
     path: '/api/v1/accounts/{enterprise_id}/badges',
@@ -144,6 +210,11 @@ const OPERATIONS: {
   setAccountRoomArchived: {
     method: 'PATCH',
     path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}',
+    successStatus: 200
+  },
+  launchAccountRoom: {
+    method: 'POST',
+    path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/launch',
     successStatus: 200
   },
   assignAccountRoomBadges: {
@@ -500,6 +571,190 @@ function isManagedBadge(value: unknown): value is ManagedBadge {
   );
 }
 
+function isManagedAdministrator(value: unknown): value is ManagedAdministrator {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['userId', 'revision', 'displayName', 'email', 'createdAt', 'updatedAt']) &&
+    isUuid(value.userId) &&
+    Number.isSafeInteger(value.revision) &&
+    Number(value.revision) >= 0 &&
+    typeof value.displayName === 'string' &&
+    value.displayName.trim().length > 0 &&
+    utf8Bytes(value.displayName) <= 160 &&
+    typeof value.email === 'string' &&
+    isEmail(value.email) &&
+    isIsoDateTime(value.createdAt) &&
+    isIsoDateTime(value.updatedAt)
+  );
+}
+
+export function isCreateAdministratorRequest(value: unknown): value is CreateAdministratorRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'displayName', 'email', 'password']) &&
+    isUuid(value.requestId) &&
+    typeof value.displayName === 'string' &&
+    value.displayName.trim().length > 0 &&
+    utf8Bytes(value.displayName) <= 160 &&
+    typeof value.email === 'string' &&
+    isEmail(value.email) &&
+    typeof value.password === 'string' &&
+    utf8Bytes(value.password) >= 12 &&
+    utf8Bytes(value.password) <= 512
+  );
+}
+
+function isDeleteAdministratorRequest(value: unknown): value is DeleteAdministratorRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'expectedRevision']) &&
+    isUuid(value.requestId) &&
+    Number.isSafeInteger(value.expectedRevision) &&
+    Number(value.expectedRevision) >= 0
+  );
+}
+
+function isAdministratorMutationResponse(value: unknown): value is AdministratorMutationResponse {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['administrators', 'removedUserIds', 'changed']) &&
+    Array.isArray(value.administrators) &&
+    value.administrators.every(isManagedAdministrator) &&
+    Array.isArray(value.removedUserIds) &&
+    value.removedUserIds.every(isUuid) &&
+    Number.isSafeInteger(value.changed) &&
+    Number(value.changed) >= 0
+  );
+}
+
+const CUSTOMER_API_KEY_SCOPES = new Set([
+  'sessions/list',
+  'sessions/users',
+  'sessions/addUsers',
+  'sessions/delUsers',
+  'sessions/userstats',
+  'sessions/chatlogs',
+  'sessions/alertlogs',
+  'sessions/deletedlogs',
+  'sessions/archivedlogs',
+  'sessions/recordings',
+  'sessions/cloneSession'
+]);
+
+function isLowerHex(value: unknown, length: number): value is string {
+  return typeof value === 'string' && value.length === length && new RegExp(`^[0-9a-f]{${length}}$`, 'u').test(value);
+}
+
+function isCustomerApiKeyId(value: unknown): value is string {
+  return isLowerHex(value, 24);
+}
+
+function isCustomerApiKeyIp(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?:\/(\d|[12]\d|3[0-2]))?$/u.exec(value);
+  return Boolean(match && match.slice(1, 5).every((octet) => Number(octet) <= 255));
+}
+
+function isUniqueStringList(
+  value: unknown,
+  maxItems: number,
+  accepts: (entry: unknown) => entry is string
+): value is string[] {
+  return (
+    Array.isArray(value) && value.length <= maxItems && value.every(accepts) && new Set(value).size === value.length
+  );
+}
+
+export function isCustomerApiKeyRestrictions(value: unknown): value is CustomerApiKeyRestrictions {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['ips', 'scopes', 'sessions']) &&
+    isUniqueStringList(value.ips, 64, isCustomerApiKeyIp) &&
+    isUniqueStringList(
+      value.scopes,
+      CUSTOMER_API_KEY_SCOPES.size,
+      (scope): scope is string => typeof scope === 'string' && CUSTOMER_API_KEY_SCOPES.has(scope)
+    ) &&
+    isUniqueStringList(
+      value.sessions,
+      256,
+      (session): session is string => typeof session === 'string' && session.length > 0 && session.length <= 64
+    )
+  );
+}
+
+function isManagedCustomerApiKey(value: unknown): value is ManagedCustomerApiKey {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['id', 'revision', 'lastFour', 'restrictions', 'createdAt', 'updatedAt', 'lastUsedAt']) &&
+    isCustomerApiKeyId(value.id) &&
+    Number.isSafeInteger(value.revision) &&
+    Number(value.revision) >= 0 &&
+    isLowerHex(value.lastFour, 4) &&
+    isCustomerApiKeyRestrictions(value.restrictions) &&
+    isIsoDateTime(value.createdAt) &&
+    isIsoDateTime(value.updatedAt) &&
+    (value.lastUsedAt === null || isIsoDateTime(value.lastUsedAt))
+  );
+}
+
+export function isCreateCustomerApiKeyRequest(value: unknown): value is CreateCustomerApiKeyRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'keyId', 'secretHash', 'lastFour']) &&
+    isUuid(value.requestId) &&
+    isCustomerApiKeyId(value.keyId) &&
+    isLowerHex(value.secretHash, 64) &&
+    isLowerHex(value.lastFour, 4)
+  );
+}
+
+export function isRotateCustomerApiKeyRequest(value: unknown): value is RotateCustomerApiKeyRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'expectedRevision', 'secretHash', 'lastFour']) &&
+    isUuid(value.requestId) &&
+    Number.isSafeInteger(value.expectedRevision) &&
+    Number(value.expectedRevision) >= 0 &&
+    isLowerHex(value.secretHash, 64) &&
+    isLowerHex(value.lastFour, 4)
+  );
+}
+
+export function isRestrictCustomerApiKeyRequest(value: unknown): value is RestrictCustomerApiKeyRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'expectedRevision', 'restrictions']) &&
+    isUuid(value.requestId) &&
+    Number.isSafeInteger(value.expectedRevision) &&
+    Number(value.expectedRevision) >= 0 &&
+    isCustomerApiKeyRestrictions(value.restrictions)
+  );
+}
+
+function isDeleteCustomerApiKeyRequest(value: unknown): value is DeleteCustomerApiKeyRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'expectedRevision']) &&
+    isUuid(value.requestId) &&
+    Number.isSafeInteger(value.expectedRevision) &&
+    Number(value.expectedRevision) >= 0
+  );
+}
+
+function isCustomerApiKeyMutationResponse(value: unknown): value is CustomerApiKeyMutationResponse {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['keys', 'removedKeyIds', 'changed']) &&
+    Array.isArray(value.keys) &&
+    value.keys.every(isManagedCustomerApiKey) &&
+    Array.isArray(value.removedKeyIds) &&
+    value.removedKeyIds.every(isCustomerApiKeyId) &&
+    Number.isSafeInteger(value.changed) &&
+    Number(value.changed) >= 0
+  );
+}
+
 export function isCreateBadgeRequest(value: unknown): value is CreateBadgeRequest {
   return (
     isRecord(value) &&
@@ -736,6 +991,29 @@ export function isArchiveAccountRoomRequest(value: unknown): value is ArchiveAcc
   return isRecord(value) && hasExactKeys(value, ['archived']) && typeof value.archived === 'boolean';
 }
 
+export function isLaunchAccountRoomRequest(value: unknown): value is LaunchAccountRoomRequest {
+  return isRecord(value) && hasExactKeys(value, ['requestId']) && isUuid(value.requestId);
+}
+
+function isRoomLaunchVisit(value: unknown): value is RoomLaunchVisit {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['visitId', 'roomId', 'shortCode', 'userId', 'email', 'displayName', 'enteredAt']) &&
+    isUuid(value.visitId) &&
+    isUuid(value.roomId) &&
+    typeof value.shortCode === 'string' &&
+    value.shortCode.length > 0 &&
+    value.shortCode.length <= 64 &&
+    isUuid(value.userId) &&
+    typeof value.email === 'string' &&
+    isEmail(value.email) &&
+    typeof value.displayName === 'string' &&
+    value.displayName.trim().length > 0 &&
+    utf8Bytes(value.displayName) <= 200 &&
+    isIsoDateTime(value.enteredAt)
+  );
+}
+
 function isRoomSettingValue(name: string, value: unknown, allowNull: boolean): boolean {
   if (allowNull && value === null) return true;
   const definition = ROOM_SETTINGS_BY_NAME.get(name);
@@ -794,6 +1072,18 @@ function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, par
     case 'setAccountPreference':
     case 'updateAccountTheme':
       return isPreferences(parsed);
+    case 'listAccountAdministrators':
+      return Array.isArray(parsed) && parsed.every(isManagedAdministrator);
+    case 'createAccountAdministrator':
+    case 'deleteAccountAdministrator':
+      return isAdministratorMutationResponse(parsed);
+    case 'listAccountCustomerApiKeys':
+      return Array.isArray(parsed) && parsed.every(isManagedCustomerApiKey);
+    case 'createAccountCustomerApiKey':
+    case 'rotateAccountCustomerApiKey':
+    case 'restrictAccountCustomerApiKey':
+    case 'deleteAccountCustomerApiKey':
+      return isCustomerApiKeyMutationResponse(parsed);
     case 'listAccountBadges':
       return Array.isArray(parsed) && parsed.every(isManagedBadge);
     case 'createAccountBadge':
@@ -806,6 +1096,8 @@ function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, par
     case 'createAccountRoom':
     case 'setAccountRoomArchived':
       return isManagedRoom(parsed);
+    case 'launchAccountRoom':
+      return isRoomLaunchVisit(parsed);
     case 'listAccountRoomMembers':
       return Array.isArray(parsed) && parsed.every(isManagedMember);
     case 'manageAccountRoomMembers':
@@ -960,7 +1252,8 @@ async function call<Operation extends TradingRoomApiOperation>(
   let validPath = true;
   const path = contract.path.replace(/\{([^}]+)\}/g, (_match, name: string) => {
     const value = pathVariables[name];
-    if (!value || !isUuid(value)) {
+    const valid = name === 'key_id' ? isCustomerApiKeyId(value) : isUuid(value);
+    if (!valid) {
       validPath = false;
       return '';
     }
@@ -1120,6 +1413,132 @@ export function updateAccountTheme(context: RequestContext, request: Preferences
   return call('updateAccountTheme', context, request);
 }
 
+export function listAccountAdministrators(
+  context: RequestContext,
+  enterpriseId: string
+): Promise<ApiResult<ManagedAdministrator[]>> {
+  return call('listAccountAdministrators', context, undefined, { enterprise_id: enterpriseId });
+}
+
+export function createAccountAdministrator(
+  context: RequestContext,
+  enterpriseId: string,
+  request: CreateAdministratorRequest
+): Promise<ApiResult<AdministratorMutationResponse>> {
+  if (!isCreateAdministratorRequest(request)) {
+    return Promise.resolve({
+      ok: false,
+      status: 400,
+      code: 'invalid',
+      message: 'Invalid administrator creation.'
+    });
+  }
+  return call('createAccountAdministrator', context, request, { enterprise_id: enterpriseId });
+}
+
+export function deleteAccountAdministrator(
+  context: RequestContext,
+  enterpriseId: string,
+  userId: string,
+  request: DeleteAdministratorRequest
+): Promise<ApiResult<AdministratorMutationResponse>> {
+  if (!isUuid(userId) || !isDeleteAdministratorRequest(request)) {
+    return Promise.resolve({
+      ok: false,
+      status: 400,
+      code: 'invalid',
+      message: 'Invalid administrator deletion.'
+    });
+  }
+  return call('deleteAccountAdministrator', context, request, {
+    enterprise_id: enterpriseId,
+    user_id: userId
+  });
+}
+
+export function listAccountCustomerApiKeys(
+  context: RequestContext,
+  enterpriseId: string
+): Promise<ApiResult<ManagedCustomerApiKey[]>> {
+  return call('listAccountCustomerApiKeys', context, undefined, { enterprise_id: enterpriseId });
+}
+
+export function createAccountCustomerApiKey(
+  context: RequestContext,
+  enterpriseId: string,
+  request: CreateCustomerApiKeyRequest
+): Promise<ApiResult<CustomerApiKeyMutationResponse>> {
+  if (!isCreateCustomerApiKeyRequest(request)) {
+    return Promise.resolve({
+      ok: false,
+      status: 400,
+      code: 'invalid',
+      message: 'Invalid customer API-key creation.'
+    });
+  }
+  return call('createAccountCustomerApiKey', context, request, { enterprise_id: enterpriseId });
+}
+
+export function rotateAccountCustomerApiKey(
+  context: RequestContext,
+  enterpriseId: string,
+  keyId: string,
+  request: RotateCustomerApiKeyRequest
+): Promise<ApiResult<CustomerApiKeyMutationResponse>> {
+  if (!isCustomerApiKeyId(keyId) || !isRotateCustomerApiKeyRequest(request)) {
+    return Promise.resolve({
+      ok: false,
+      status: 400,
+      code: 'invalid',
+      message: 'Invalid customer API-key rotation.'
+    });
+  }
+  return call('rotateAccountCustomerApiKey', context, request, {
+    enterprise_id: enterpriseId,
+    key_id: keyId
+  });
+}
+
+export function restrictAccountCustomerApiKey(
+  context: RequestContext,
+  enterpriseId: string,
+  keyId: string,
+  request: RestrictCustomerApiKeyRequest
+): Promise<ApiResult<CustomerApiKeyMutationResponse>> {
+  if (!isCustomerApiKeyId(keyId) || !isRestrictCustomerApiKeyRequest(request)) {
+    return Promise.resolve({
+      ok: false,
+      status: 400,
+      code: 'invalid',
+      message: 'Invalid customer API-key restrictions.'
+    });
+  }
+  return call('restrictAccountCustomerApiKey', context, request, {
+    enterprise_id: enterpriseId,
+    key_id: keyId
+  });
+}
+
+export function deleteAccountCustomerApiKey(
+  context: RequestContext,
+  enterpriseId: string,
+  keyId: string,
+  request: DeleteCustomerApiKeyRequest
+): Promise<ApiResult<CustomerApiKeyMutationResponse>> {
+  if (!isCustomerApiKeyId(keyId) || !isDeleteCustomerApiKeyRequest(request)) {
+    return Promise.resolve({
+      ok: false,
+      status: 400,
+      code: 'invalid',
+      message: 'Invalid customer API-key deletion.'
+    });
+  }
+  return call('deleteAccountCustomerApiKey', context, request, {
+    enterprise_id: enterpriseId,
+    key_id: keyId
+  });
+}
+
 export function listAccountRooms(context: RequestContext, enterpriseId: string): Promise<ApiResult<ManagedRoom[]>> {
   return call('listAccountRooms', context, undefined, {
     enterprise_id: enterpriseId
@@ -1143,6 +1562,21 @@ export function setAccountRoomArchived(
   request: ArchiveAccountRoomRequest
 ): Promise<ApiResult<ManagedRoom>> {
   return call('setAccountRoomArchived', context, request, {
+    enterprise_id: enterpriseId,
+    room_id: roomId
+  });
+}
+
+export function launchAccountRoom(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string,
+  request: LaunchAccountRoomRequest
+): Promise<ApiResult<RoomLaunchVisit>> {
+  if (!isLaunchAccountRoomRequest(request)) {
+    return Promise.resolve({ ok: false, status: 400, code: 'invalid', message: 'Invalid room launch.' });
+  }
+  return call('launchAccountRoom', context, request, {
     enterprise_id: enterpriseId,
     room_id: roomId
   });

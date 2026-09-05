@@ -14,7 +14,7 @@ import {
   controlPlaneUnavailableResponse,
   decideControlPlaneRequest
 } from '#lib/server/control-plane-policy.js';
-import { controlPlaneMode } from '#lib/server/control-plane-runtime.js';
+import { controlPlaneMode, profileAuthorityMode } from '#lib/server/control-plane-runtime.js';
 
 export const init: ServerInit = async () => {
   if (controlPlaneMode !== 'postgres') return;
@@ -35,8 +35,58 @@ export const handle: Handle = async ({ event, resolve }) => {
   // page — including a reachable login form — with no CSP, no `nosniff`, no `DENY` and no
   // `noindex`. An enabled deployment needs those headers more than a marketing one, not less.
   if (controlPlaneMode === 'postgres') {
-    const { readUser } = await import('#lib/server/auth.js');
+    const { destroyLoginSession, readUser } = await import('#lib/server/auth.js');
     event.locals.user = await readUser(event.cookies);
+    if (
+      event.locals.user &&
+      event.locals.user.impersonatedBy === undefined &&
+      profileAuthorityMode === 'rust' &&
+      event.route.id?.startsWith('/(app)')
+    ) {
+      const [{ authorityBindingFailure }, { readProfileAuthority }, { apiRequestContext, clearApiCookies }] =
+        await Promise.all([
+          import('#lib/server/profile-authority-policy.js'),
+          import('#lib/server/profile-authority.js'),
+          import('#lib/server/tradingroom-api.js')
+        ]);
+      const canonical = await readProfileAuthority(apiRequestContext(event));
+      if (!canonical.ok) {
+        if (canonical.status === 401) {
+          await destroyLoginSession(event.cookies);
+          clearApiCookies(event.cookies);
+          event.locals.user = undefined;
+          return applySecurityHeaders(
+            new Response('Your session is no longer authorized.', {
+              status: 401,
+              headers: { 'cache-control': 'private, no-store' }
+            })
+          );
+        }
+        return applySecurityHeaders(
+          new Response('The account authority is temporarily unavailable.', {
+            status: 503,
+            headers: { 'cache-control': 'private, no-store' }
+          })
+        );
+      }
+      const refusal = authorityBindingFailure(event.locals.user, canonical.data);
+      if (refusal) {
+        console.error('[profile-authority] protected controller session binding refused', {
+          localUserId: event.locals.user.id,
+          reason: refusal
+        });
+        await destroyLoginSession(event.cookies);
+        clearApiCookies(event.cookies);
+        event.locals.user = undefined;
+        return applySecurityHeaders(
+          new Response('Your session is no longer authorized.', {
+            status: 401,
+            headers: { 'cache-control': 'private, no-store' }
+          })
+        );
+      }
+      event.locals.authorityBootstrap = canonical.data;
+    }
     return applySecurityHeaders(await resolve(event));
   }
 

@@ -1,5 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDb } from '#lib/server/db/index.js';
 import { rooms } from '#lib/server/db/schema.js';
@@ -12,7 +12,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 const IDENTITY = 'room_identity';
 
-type RoomIdentity = { name: string; email: string };
+type RoomIdentity = { name: string; email: string; launchRequestId?: string };
 
 const gravatar = (email: string) =>
   `https://www.gravatar.com/avatar/${createHash('md5').update(email.trim().toLowerCase()).digest('hex')}?d=mm`;
@@ -28,7 +28,9 @@ function readRoomIdentity(raw: string | undefined): RoomIdentity | null {
 
     const name = String(parsed.name).trim();
     const email = String(parsed.email).trim().toLowerCase();
-    return name && email ? { name, email } : null;
+    const launchRequestId =
+      'launchRequestId' in parsed && typeof parsed.launchRequestId === 'string' ? parsed.launchRequestId : undefined;
+    return name && email ? { name, email, launchRequestId } : null;
   } catch {
     return null;
   }
@@ -212,7 +214,7 @@ export const actions: Actions = {
       HttpOnly cookie cannot do. It is why the identity in here is treated as the LOWEST-trust of
       the three sources above rather than as proof of anything.
     */
-    cookies.set(IDENTITY, JSON.stringify({ name, email }), {
+    cookies.set(IDENTITY, JSON.stringify({ name, email, launchRequestId: randomUUID() }), {
       path: '/',
       httpOnly: false,
       sameSite: 'lax',

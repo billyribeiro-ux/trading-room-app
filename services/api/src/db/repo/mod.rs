@@ -9,9 +9,12 @@
 //! topology - `note_versions` is meaningless without `notes`, so they live together.
 
 pub mod alert;
+pub mod customer_api_key;
 pub mod event;
+pub mod external_stats;
 pub mod identity;
 pub mod join;
+pub mod managed_administrator;
 pub mod managed_badge;
 pub mod managed_membership;
 pub mod membership;

@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 
 const ENVELOPE_VERSION = 'v1';
 const IV_BYTES = 12;
@@ -22,6 +22,29 @@ function deriveEncryptionKey(masterSecret: string) {
 
 function associatedData({ accountId, keyId }: ApiKeySecretContext) {
   return Buffer.from(`account:${accountId}\0api-key:${keyId}`, 'utf8');
+}
+
+function deriveCredential(label: string, masterSecret: string): string {
+  if (!masterSecret) throw new Error('API_KEY_ENCRYPTION_KEY must be configured for canonical API-key authority.');
+  return createHmac('sha256', masterSecret)
+    .update('proroom-control:customer-api-key-authority:v1\0', 'utf8')
+    .update(label, 'utf8')
+    .digest('hex');
+}
+
+/**
+ * Stable key material for exactly-once cross-database mutations.
+ *
+ * Rust persists only SHA-256 verifier metadata. The create request derives the stable key id; that
+ * id plus the committed canonical revision derives the current secret. The controller can therefore
+ * repair a target-committed/source-failed projection without putting plaintext in the target ledger.
+ */
+export function deriveCanonicalApiKeyId(requestId: string, masterSecret: string): string {
+  return deriveCredential(`create-id\0${requestId}`, masterSecret).slice(0, 24);
+}
+
+export function deriveCanonicalApiKeySecret(input: { keyId: string; revision: number }, masterSecret: string): string {
+  return deriveCredential(`secret\0${input.keyId}\0revision\0${input.revision}`, masterSecret);
 }
 
 /**

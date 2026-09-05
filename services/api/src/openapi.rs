@@ -1,4 +1,4 @@
-//! OpenAPI 3.1 contract for the account-authority boundary.
+//! OpenAPI 3.1 contract for the account-authority and customer statistics boundaries.
 //!
 //! This document is generated from Rust-owned constants and served by the same binary as the
 //! handlers. The committed JSON snapshot feeds the SvelteKit type generator; the equality test
@@ -12,13 +12,14 @@ pub fn document() -> Value {
         "openapi": "3.1.1",
         "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
         "info": {
-            "title": "Trading Room Account Authority API",
+            "title": "Trading Room Authority API",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "Authoritative authentication, profile, preference, account-bootstrap, and account room-lifecycle contract. This intentionally does not claim to describe the remaining live-room runtime routes. Cookies are issued only through the same-origin SvelteKit boundary."
+            "description": "Authoritative authentication, profile, account-management, room-lifecycle, and customer statistics contract. This intentionally does not claim to describe the remaining live-room runtime routes. Browser cookies are issued only through the same-origin SvelteKit boundary; customer statistics use separately managed query credentials for legacy compatibility."
         },
         "tags": [
             { "name": "Authentication" },
-            { "name": "Account" }
+            { "name": "Account" },
+            { "name": "Customer Statistics" }
         ],
         "paths": {
             "/api/auth/login": {
@@ -288,6 +289,37 @@ pub fn document() -> Value {
                     }
                 }
             },
+            "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/launch": {
+                "parameters": [
+                    { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() },
+                    { "name": "room_id", "in": "path", "required": true, "schema": uuid_schema() }
+                ],
+                "post": {
+                    "operationId": "launchAccountRoom",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "description": "Atomically authorizes room entry and records one idempotent canonical visit.",
+                    "requestBody": {
+                        "required": true,
+                        "content": { "application/json": { "schema": {
+                            "$ref": "#/components/schemas/LaunchAccountRoomRequest"
+                        } } }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Canonical identity and visit committed for the room handoff.",
+                            "content": { "application/json": { "schema": {
+                                "$ref": "#/components/schemas/RoomLaunchVisit"
+                            } } }
+                        },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "403": { "$ref": "#/components/responses/Forbidden" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
             "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings": {
                 "parameters": [
                     { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() },
@@ -382,6 +414,175 @@ pub fn document() -> Value {
                     "responses": {
                         "200": { "description": "Exactly-once committed membership mutation.", "content": {
                             "application/json": { "schema": { "$ref": "#/components/schemas/MembershipMutationResponse" } }
+                        } },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "409": { "$ref": "#/components/responses/Conflict" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/accounts/{enterprise_id}/administrators": {
+                "parameters": [
+                    { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() }
+                ],
+                "get": {
+                    "operationId": "listAccountAdministrators",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "responses": {
+                        "200": { "description": "Canonical account administrators; owner authority is intentionally excluded.", "content": {
+                            "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ManagedAdministrator" } } }
+                        } },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                },
+                "post": {
+                    "operationId": "createAccountAdministrator",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "$ref": "#/components/schemas/CreateAdministratorRequest"
+                    } } } },
+                    "responses": {
+                        "200": { "description": "Exactly-once administrator creation result.", "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/AdministratorMutationResponse" } }
+                        } },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "409": { "$ref": "#/components/responses/Conflict" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/accounts/{enterprise_id}/administrators/{user_id}": {
+                "parameters": [
+                    { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() },
+                    { "name": "user_id", "in": "path", "required": true, "schema": uuid_schema() }
+                ],
+                "delete": {
+                    "operationId": "deleteAccountAdministrator",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "$ref": "#/components/schemas/DeleteAdministratorRequest"
+                    } } } },
+                    "responses": {
+                        "200": { "description": "Exactly-once revisioned administrator removal.", "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/AdministratorMutationResponse" } }
+                        } },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "409": { "$ref": "#/components/responses/Conflict" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/accounts/{enterprise_id}/customer-api-keys": {
+                "parameters": [{
+                    "name": "enterprise_id", "in": "path", "required": true,
+                    "schema": uuid_schema()
+                }],
+                "get": {
+                    "operationId": "listAccountCustomerApiKeys",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "responses": {
+                        "200": { "description": "Canonical secret-free customer API-key metadata.", "content": {
+                            "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ManagedCustomerApiKey" } } }
+                        } },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                },
+                "post": {
+                    "operationId": "createAccountCustomerApiKey",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "$ref": "#/components/schemas/CreateCustomerApiKeyRequest"
+                    } } } },
+                    "responses": {
+                        "200": { "description": "Exactly-once customer API-key creation result; credential plaintext is never returned.", "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/CustomerApiKeyMutationResponse" } }
+                        } },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "409": { "$ref": "#/components/responses/Conflict" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}/rotate": {
+                "parameters": [
+                    { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() },
+                    { "name": "key_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[0-9a-f]{24}$" } }
+                ],
+                "post": {
+                    "operationId": "rotateAccountCustomerApiKey",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "$ref": "#/components/schemas/RotateCustomerApiKeyRequest"
+                    } } } },
+                    "responses": {
+                        "200": { "description": "Exactly-once revisioned verifier rotation.", "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/CustomerApiKeyMutationResponse" } }
+                        } },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "409": { "$ref": "#/components/responses/Conflict" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}/restrictions": {
+                "parameters": [
+                    { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() },
+                    { "name": "key_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[0-9a-f]{24}$" } }
+                ],
+                "put": {
+                    "operationId": "restrictAccountCustomerApiKey",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "$ref": "#/components/schemas/RestrictCustomerApiKeyRequest"
+                    } } } },
+                    "responses": {
+                        "200": { "description": "Exactly-once revisioned restriction update.", "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/CustomerApiKeyMutationResponse" } }
+                        } },
+                        "400": { "$ref": "#/components/responses/BadRequest" },
+                        "401": { "$ref": "#/components/responses/Unauthorized" },
+                        "404": { "$ref": "#/components/responses/NotFound" },
+                        "409": { "$ref": "#/components/responses/Conflict" },
+                        "503": { "$ref": "#/components/responses/Unavailable" }
+                    }
+                }
+            },
+            "/api/v1/accounts/{enterprise_id}/customer-api-keys/{key_id}": {
+                "parameters": [
+                    { "name": "enterprise_id", "in": "path", "required": true, "schema": uuid_schema() },
+                    { "name": "key_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[0-9a-f]{24}$" } }
+                ],
+                "delete": {
+                    "operationId": "deleteAccountCustomerApiKey",
+                    "tags": ["Account"],
+                    "security": [{ "accessCookie": [] }],
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": {
+                        "$ref": "#/components/schemas/DeleteCustomerApiKeyRequest"
+                    } } } },
+                    "responses": {
+                        "200": { "description": "Exactly-once revisioned customer API-key revocation.", "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/CustomerApiKeyMutationResponse" } }
                         } },
                         "400": { "$ref": "#/components/responses/BadRequest" },
                         "401": { "$ref": "#/components/responses/Unauthorized" },
@@ -491,6 +692,121 @@ pub fn document() -> Value {
                         "503": { "$ref": "#/components/responses/Unavailable" }
                     }
                 }
+            },
+            "/stats/v1/sessions/list": {
+                "get": external_stats_get(
+                    "listCustomerStatsSessions",
+                    "Lists canonical sessions visible to the key after session restrictions are applied.",
+                    "StatsSessionsResponse",
+                    vec![],
+                )
+            },
+            "/stats/v1/sessions/users": {
+                "get": external_stats_get(
+                    "listCustomerStatsUsers",
+                    "Lists canonical members for one session.",
+                    "StatsUsersResponse",
+                    vec![stats_session_parameter()],
+                )
+            },
+            "/stats/v1/sessions/userstats": {
+                "get": external_stats_get(
+                    "listCustomerStatsVisits",
+                    "Lists at most 10,000 canonical room visits in the requested date window.",
+                    "StatsVisitsResponse",
+                    vec![
+                        stats_session_parameter(),
+                        stats_date_parameter("fromDate"),
+                        stats_date_parameter("toDate"),
+                        stats_query_parameter("isMobile", false, json!({ "type": "boolean" })),
+                    ],
+                )
+            },
+            "/stats/v1/sessions/chatlogs": {
+                "get": external_stats_get(
+                    "listCustomerStatsChatLogs",
+                    "Lists at most 10,000 retained canonical chat messages for one channel.",
+                    "StatsChatLogsResponse",
+                    vec![
+                        stats_session_parameter(),
+                        stats_query_parameter("channel", false, json!({ "type": "string", "minLength": 1, "maxLength": 120, "default": "main" })),
+                        stats_date_parameter("fromDate"),
+                        stats_date_parameter("toDate"),
+                    ],
+                )
+            },
+            "/stats/v1/sessions/alertlogs": {
+                "get": external_stats_get(
+                    "listCustomerStatsAlertLogs",
+                    "Lists at most 10,000 retained canonical alerts. The historical response field is chatlogs.",
+                    "StatsAlertLogsResponse",
+                    vec![stats_session_parameter(), stats_date_parameter("fromDate"), stats_date_parameter("toDate")],
+                )
+            },
+            "/stats/v1/sessions/deletedlogs": {
+                "get": external_stats_get(
+                    "listCustomerStatsDeletedLogs",
+                    "Lists at most 10,000 canonical edit/delete log records.",
+                    "StatsDeletedLogsResponse",
+                    vec![
+                        stats_session_parameter(),
+                        stats_query_parameter("logType", false, json!({ "type": "string", "enum": ["chat", "alerts"] })),
+                        stats_query_parameter("eventType", false, json!({ "type": "string", "enum": ["E", "D"] })),
+                        stats_date_parameter("fromDate"),
+                        stats_date_parameter("toDate"),
+                    ],
+                )
+            },
+            "/stats/v1/sessions/archivedlogs": {
+                "get": external_stats_get(
+                    "listCustomerStatsArchivedLogs",
+                    "Lists at most 10,000 retained canonical chat or alert archive records.",
+                    "StatsArchivedLogsResponse",
+                    vec![
+                        stats_session_parameter(),
+                        stats_query_parameter("logType", false, json!({ "type": "string", "enum": ["chat", "alerts"], "default": "chat" })),
+                        stats_query_parameter("channel", false, json!({ "type": "string", "minLength": 1, "maxLength": 120, "default": "main" })),
+                        stats_date_parameter("fromDate"),
+                        stats_date_parameter("toDate"),
+                    ],
+                )
+            },
+            "/stats/v1/sessions/recordings": {
+                "get": external_stats_get(
+                    "listCustomerStatsRecordings",
+                    "Lists canonical ready recordings created during the preceding 21 days.",
+                    "StatsRecordingsResponse",
+                    vec![stats_session_parameter()],
+                )
+            },
+            "/stats/v1/sessions/cloneSession": {
+                "get": external_stats_mutating_get(
+                    "cloneCustomerStatsSession",
+                    "Clones canonical room configuration and staff membership. This historical mutating GET is authenticated, scoped, rate-limited, audited, and non-cacheable.",
+                    "StatsCloneSessionResponse",
+                    vec![
+                        stats_session_parameter(),
+                        stats_query_parameter("name", true, json!({ "type": "string", "minLength": 1, "maxLength": crate::limits::ROOM_NAME_MAX_BYTES, "x-maxBytes": crate::limits::ROOM_NAME_MAX_BYTES })),
+                    ],
+                )
+            },
+            "/stats/v1/sessions/addUsers": {
+                "post": external_stats_post(
+                    "addCustomerStatsUsers",
+                    "Adds new canonical identities to a room or refreshes existing member activity.",
+                    "StatsAddUsersRequest",
+                    "StatsAddUsersResponse",
+                    vec![stats_session_parameter()],
+                )
+            },
+            "/stats/v1/sessions/delUsers": {
+                "post": external_stats_post(
+                    "deleteCustomerStatsUsers",
+                    "Removes non-owner canonical room memberships by normalized email.",
+                    "StatsDeleteUsersRequest",
+                    "StatsDeleteUsersResponse",
+                    vec![stats_session_parameter()],
+                )
             }
         },
         "components": {
@@ -504,6 +820,18 @@ pub fn document() -> Value {
                     "type": "apiKey",
                     "in": "cookie",
                     "name": crate::http::REFRESH_COOKIE
+                },
+                "customerApiKey": {
+                    "type": "apiKey",
+                    "in": "query",
+                    "name": "apiKey",
+                    "description": "Canonical 24-character customer API key identifier."
+                },
+                "customerApiSecret": {
+                    "type": "apiKey",
+                    "in": "query",
+                    "name": "apiSecret",
+                    "description": "One-time-disclosed customer API secret. Never logged or returned."
                 }
             },
             "responses": {
@@ -652,6 +980,26 @@ pub fn document() -> Value {
                     "required": ["archived"],
                     "properties": { "archived": { "type": "boolean" } }
                 },
+                "LaunchAccountRoomRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId"],
+                    "properties": { "requestId": uuid_schema() }
+                },
+                "RoomLaunchVisit": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["visitId", "roomId", "shortCode", "userId", "email", "displayName", "enteredAt"],
+                    "properties": {
+                        "visitId": uuid_schema(),
+                        "roomId": uuid_schema(),
+                        "shortCode": { "type": "string", "minLength": 1, "maxLength": 64 },
+                        "userId": uuid_schema(),
+                        "email": { "type": "string", "format": "email" },
+                        "displayName": { "type": "string", "minLength": 1, "maxLength": 200 },
+                        "enteredAt": { "type": "string", "format": "date-time" }
+                    }
+                },
                 "RoomSettings": {
                     "type": "object",
                     "additionalProperties": true,
@@ -782,6 +1130,330 @@ pub fn document() -> Value {
                         "changed": { "type": "integer", "minimum": 0 }
                     }
                 },
+                "ManagedAdministrator": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["userId", "revision", "displayName", "email", "createdAt", "updatedAt"],
+                    "properties": {
+                        "userId": uuid_schema(),
+                        "revision": { "type": "integer", "minimum": 0 },
+                        "displayName": { "type": "string", "minLength": 1, "maxLength": 160, "x-maxBytes": 160 },
+                        "email": { "type": "string", "format": "email", "maxLength": 254 },
+                        "createdAt": { "type": "string", "format": "date-time" },
+                        "updatedAt": { "type": "string", "format": "date-time" }
+                    }
+                },
+                "CreateAdministratorRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "displayName", "email", "password"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "displayName": { "type": "string", "minLength": 1, "maxLength": 160, "x-maxBytes": 160 },
+                        "email": { "type": "string", "format": "email", "maxLength": 254 },
+                        "password": { "type": "string", "minLength": crate::provision::MIN_PASSWORD_BYTES, "maxLength": crate::limits::PASSWORD_MAX_BYTES, "writeOnly": true }
+                    }
+                },
+                "DeleteAdministratorRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "expectedRevision"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "expectedRevision": { "type": "integer", "minimum": 0 }
+                    }
+                },
+                "AdministratorMutationResponse": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["administrators", "removedUserIds", "changed"],
+                    "properties": {
+                        "administrators": { "type": "array", "items": { "$ref": "#/components/schemas/ManagedAdministrator" } },
+                        "removedUserIds": { "type": "array", "items": uuid_schema() },
+                        "changed": { "type": "integer", "minimum": 0 }
+                    }
+                },
+                "CustomerApiKeyRestrictions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["ips", "scopes", "sessions"],
+                    "properties": {
+                        "ips": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "maxLength": 18 } },
+                        "scopes": { "type": "array", "maxItems": 11, "uniqueItems": true, "items": { "type": "string", "enum": [
+                            "sessions/list", "sessions/users", "sessions/addUsers", "sessions/delUsers",
+                            "sessions/userstats", "sessions/chatlogs", "sessions/alertlogs",
+                            "sessions/deletedlogs", "sessions/archivedlogs", "sessions/recordings",
+                            "sessions/cloneSession"
+                        ] } },
+                        "sessions": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } }
+                    }
+                },
+                "ManagedCustomerApiKey": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "revision", "lastFour", "restrictions", "createdAt", "updatedAt", "lastUsedAt"],
+                    "properties": {
+                        "id": { "type": "string", "pattern": "^[0-9a-f]{24}$" },
+                        "revision": { "type": "integer", "minimum": 0 },
+                        "lastFour": { "type": "string", "pattern": "^[0-9a-f]{4}$" },
+                        "restrictions": { "$ref": "#/components/schemas/CustomerApiKeyRestrictions" },
+                        "createdAt": { "type": "string", "format": "date-time" },
+                        "updatedAt": { "type": "string", "format": "date-time" },
+                        "lastUsedAt": { "type": ["string", "null"], "format": "date-time" }
+                    }
+                },
+                "CreateCustomerApiKeyRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "keyId", "secretHash", "lastFour"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "keyId": { "type": "string", "pattern": "^[0-9a-f]{24}$" },
+                        "secretHash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "writeOnly": true },
+                        "lastFour": { "type": "string", "pattern": "^[0-9a-f]{4}$" }
+                    }
+                },
+                "RotateCustomerApiKeyRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "expectedRevision", "secretHash", "lastFour"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "expectedRevision": { "type": "integer", "minimum": 0 },
+                        "secretHash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "writeOnly": true },
+                        "lastFour": { "type": "string", "pattern": "^[0-9a-f]{4}$" }
+                    }
+                },
+                "RestrictCustomerApiKeyRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "expectedRevision", "restrictions"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "expectedRevision": { "type": "integer", "minimum": 0 },
+                        "restrictions": { "$ref": "#/components/schemas/CustomerApiKeyRestrictions" }
+                    }
+                },
+                "DeleteCustomerApiKeyRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["requestId", "expectedRevision"],
+                    "properties": {
+                        "requestId": uuid_schema(),
+                        "expectedRevision": { "type": "integer", "minimum": 0 }
+                    }
+                },
+                "CustomerApiKeyMutationResponse": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["keys", "removedKeyIds", "changed"],
+                    "properties": {
+                        "keys": { "type": "array", "items": { "$ref": "#/components/schemas/ManagedCustomerApiKey" } },
+                        "removedKeyIds": { "type": "array", "items": { "type": "string", "pattern": "^[0-9a-f]{24}$" } },
+                        "changed": { "type": "integer", "minimum": 0 }
+                    }
+                },
+                "StatsSession": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["_id", "uuid", "name", "currentState", "current_capacity", "current_max", "modCount", "recordedMaxCapacity", "created", "updated", "s3Bucket", "s3BucketFolderPath", "isMainRoom", "recPreviewLocation", "media", "recording"],
+                    "properties": {
+                        "_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+                        "uuid": uuid_schema(),
+                        "name": { "type": "string" },
+                        "currentState": { "type": "string" },
+                        "current_capacity": { "type": "integer", "minimum": 0 },
+                        "current_max": { "type": "integer", "minimum": 0 },
+                        "modCount": { "type": "integer", "minimum": 0 },
+                        "recordedMaxCapacity": { "type": "integer", "minimum": 0 },
+                        "created": { "type": "string", "format": "date-time" },
+                        "updated": { "type": "string", "format": "date-time" },
+                        "s3Bucket": { "type": ["string", "null"] },
+                        "s3BucketFolderPath": { "type": ["string", "null"] },
+                        "isMainRoom": { "type": "boolean" },
+                        "recPreviewLocation": { "type": ["string", "null"] },
+                        "media": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                        "recording": { "type": "boolean" }
+                    }
+                },
+                "StatsSessionsResponse": stats_array_response("sessions", "StatsSession"),
+                "StatsUser": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["_id", "email", "userName", "role", "lastLogin", "name", "created", "updated", "alerterAppFCMUserOff", "alerterAppTokens", "activeDateAPI", "active"],
+                    "properties": {
+                        "_id": uuid_schema(),
+                        "email": { "type": "string", "format": "email" },
+                        "userName": { "type": "string" },
+                        "role": { "type": "integer", "minimum": 0, "maximum": 4 },
+                        "lastLogin": { "type": ["string", "null"], "format": "date-time" },
+                        "name": { "type": "string" },
+                        "created": { "type": "string", "format": "date-time" },
+                        "updated": { "type": "string", "format": "date-time" },
+                        "alerterAppFCMUserOff": { "type": "boolean" },
+                        "alerterAppTokens": { "type": "array", "items": { "type": "string" } },
+                        "activeDateAPI": { "type": ["string", "null"], "format": "date-time" },
+                        "active": { "type": "boolean" }
+                    }
+                },
+                "StatsUsersResponse": stats_array_response("users", "StatsUser"),
+                "StatsVisit": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["email", "userName", "uuid", "ip", "inTime", "outTime", "duration", "isMobile"],
+                    "properties": {
+                        "email": { "type": "string", "format": "email" },
+                        "userName": { "type": "string" },
+                        "uuid": uuid_schema(),
+                        "ip": { "type": ["string", "null"] },
+                        "inTime": { "type": "string", "format": "date-time" },
+                        "outTime": { "type": ["string", "null"], "format": "date-time" },
+                        "duration": { "type": "integer", "format": "int64", "minimum": 0 },
+                        "isMobile": { "type": "boolean" }
+                    }
+                },
+                "StatsVisitsResponse": stats_array_response("userstats", "StatsVisit"),
+                "StatsChatLog": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["sessionID", "c", "t", "u", "m"],
+                    "properties": {
+                        "sessionID": { "type": "string" },
+                        "c": { "type": "string" },
+                        "t": { "type": "string", "format": "date-time" },
+                        "u": { "type": "string", "format": "email" },
+                        "m": { "type": "string" }
+                    }
+                },
+                "StatsChatLogsResponse": stats_array_response("chatlogs", "StatsChatLog"),
+                "StatsAlertLog": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["sessionID", "t", "alertType", "message"],
+                    "properties": {
+                        "sessionID": { "type": "string" },
+                        "t": { "type": "string", "format": "date-time" },
+                        "alertType": { "type": "string" },
+                        "message": { "type": "string" }
+                    }
+                },
+                "StatsAlertLogsResponse": stats_array_response("chatlogs", "StatsAlertLog"),
+                "StatsDeletedLog": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["sessionID", "logType", "eventType", "time", "originalMessage"],
+                    "properties": {
+                        "sessionID": { "type": "string" },
+                        "logType": { "type": "string", "enum": ["chat", "alerts"] },
+                        "eventType": { "type": "string", "enum": ["E", "D"] },
+                        "time": { "type": "string", "format": "date-time" },
+                        "originalMessage": { "type": "string" }
+                    }
+                },
+                "StatsDeletedLogsResponse": stats_array_response("deletedlogs", "StatsDeletedLog"),
+                "StatsArchivedLog": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["sessionID", "logType", "channel", "updated", "content"],
+                    "properties": {
+                        "sessionID": { "type": "string" },
+                        "logType": { "type": "string", "enum": ["chat", "alerts"] },
+                        "channel": { "type": "string" },
+                        "updated": { "type": "string", "format": "date-time" },
+                        "content": { "type": "string" }
+                    }
+                },
+                "StatsArchivedLogsResponse": stats_array_response("archivedlogs", "StatsArchivedLog"),
+                "StatsRecording": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["_id", "sessionID", "name", "namemkv", "contentType", "created", "duration", "length", "fpath", "media_server", "vidPath", "ms", "isUpload"],
+                    "properties": {
+                        "_id": uuid_schema(),
+                        "sessionID": { "type": "string" },
+                        "name": { "type": "string" },
+                        "namemkv": { "type": "string" },
+                        "contentType": { "type": "string" },
+                        "created": { "type": "string", "format": "date-time" },
+                        "duration": { "type": "integer", "format": "int64", "minimum": 0, "description": "Duration in whole minutes." },
+                        "length": { "type": "integer", "format": "int64", "minimum": 0, "description": "Duration in milliseconds." },
+                        "fpath": { "type": "string" },
+                        "media_server": { "type": ["string", "null"] },
+                        "vidPath": { "type": ["string", "null"], "format": "uri" },
+                        "ms": { "type": ["string", "null"] },
+                        "isUpload": { "type": "boolean" }
+                    }
+                },
+                "StatsRecordingsResponse": stats_array_response("recordings", "StatsRecording"),
+                "StatsAddUser": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["email", "name"],
+                    "properties": {
+                        "email": { "type": "string", "format": "email", "maxLength": crate::limits::LOGIN_EMAIL_MAX_BYTES },
+                        "name": { "type": "string", "minLength": 1, "maxLength": crate::limits::DISPLAY_NAME_MAX_BYTES }
+                    }
+                },
+                "StatsAddUsersRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["users"],
+                    "properties": {
+                        "users": { "type": "array", "minItems": 1, "maxItems": 500, "items": { "$ref": "#/components/schemas/StatsAddUser" } }
+                    }
+                },
+                "StatsAddUsersResponse": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["success", "added", "freshen"],
+                    "properties": {
+                        "success": { "type": "boolean", "const": true },
+                        "added": { "type": "integer", "minimum": 0 },
+                        "freshen": { "type": "integer", "minimum": 0 }
+                    }
+                },
+                "StatsDeleteUsersRequest": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["delUsers"],
+                    "properties": {
+                        "delUsers": { "type": "array", "minItems": 1, "maxItems": 500, "uniqueItems": true, "items": { "type": "string", "format": "email", "maxLength": crate::limits::LOGIN_EMAIL_MAX_BYTES } }
+                    }
+                },
+                "StatsDeleteUsersResponse": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["success", "deletedUsers"],
+                    "properties": {
+                        "success": { "type": "boolean", "const": true },
+                        "deletedUsers": { "type": "array", "items": { "type": "string", "format": "email" } }
+                    }
+                },
+                "StatsCloneSession": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["_id", "uuid", "name", "isClonedRoom", "clonedFrom", "ownerdID", "currentState", "created", "updated"],
+                    "properties": {
+                        "_id": { "type": "string" },
+                        "uuid": uuid_schema(),
+                        "name": { "type": "string" },
+                        "isClonedRoom": { "type": "boolean", "const": true },
+                        "clonedFrom": { "type": "string" },
+                        "ownerdID": uuid_schema(),
+                        "currentState": { "type": "string", "const": "inactive" },
+                        "created": { "type": "string", "format": "date-time" },
+                        "updated": { "type": "string", "format": "date-time" }
+                    }
+                },
+                "StatsCloneSessionResponse": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["success", "session"],
+                    "properties": {
+                        "success": { "type": "boolean", "const": true },
+                        "session": { "$ref": "#/components/schemas/StatsCloneSession" }
+                    }
+                },
                 "ManagedBadge": {
                     "type": "object",
                     "additionalProperties": false,
@@ -897,6 +1569,119 @@ fn uuid_schema() -> Value {
     json!({ "type": "string", "format": "uuid" })
 }
 
+fn stats_query_parameter(name: &str, required: bool, schema: Value) -> Value {
+    json!({
+        "name": name,
+        "in": "query",
+        "required": required,
+        "schema": schema
+    })
+}
+
+fn stats_array_response(field: &str, item_schema: &str) -> Value {
+    json!({
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["success", field],
+        "properties": {
+            "success": { "type": "boolean", "const": true },
+            (field): {
+                "type": "array",
+                "maxItems": 10_000,
+                "items": { "$ref": format!("#/components/schemas/{item_schema}") }
+            }
+        }
+    })
+}
+
+fn stats_session_parameter() -> Value {
+    stats_query_parameter(
+        "sessionID",
+        true,
+        json!({ "type": "string", "minLength": 1, "maxLength": 64 }),
+    )
+}
+
+fn stats_date_parameter(name: &str) -> Value {
+    stats_query_parameter(
+        name,
+        false,
+        json!({
+            "oneOf": [
+                { "type": "string", "format": "date" },
+                { "type": "string", "format": "date-time" }
+            ]
+        }),
+    )
+}
+
+fn external_stats_responses(description: &str, response_schema: &str) -> Value {
+    json!({
+        "200": {
+            "description": description,
+            "content": { "application/json": { "schema": {
+                "$ref": format!("#/components/schemas/{response_schema}")
+            } } }
+        },
+        "400": { "$ref": "#/components/responses/BadRequest" },
+        "403": { "$ref": "#/components/responses/Forbidden" },
+        "429": { "$ref": "#/components/responses/RateLimited" },
+        "503": { "$ref": "#/components/responses/Unavailable" }
+    })
+}
+
+fn external_stats_get(
+    operation_id: &str,
+    description: &str,
+    response_schema: &str,
+    parameters: Vec<Value>,
+) -> Value {
+    json!({
+        "operationId": operation_id,
+        "tags": ["Customer Statistics"],
+        "description": description,
+        "x-controller-client": false,
+        "security": [{ "customerApiKey": [], "customerApiSecret": [] }],
+        "parameters": parameters,
+        "responses": external_stats_responses(description, response_schema)
+    })
+}
+
+fn external_stats_mutating_get(
+    operation_id: &str,
+    description: &str,
+    response_schema: &str,
+    parameters: Vec<Value>,
+) -> Value {
+    let mut operation = external_stats_get(operation_id, description, response_schema, parameters);
+    operation["x-mutating-get"] = Value::Bool(true);
+    operation
+}
+
+fn external_stats_post(
+    operation_id: &str,
+    description: &str,
+    request_schema: &str,
+    response_schema: &str,
+    parameters: Vec<Value>,
+) -> Value {
+    json!({
+        "operationId": operation_id,
+        "tags": ["Customer Statistics"],
+        "description": description,
+        "x-controller-client": false,
+        "security": [{ "customerApiKey": [], "customerApiSecret": [] }],
+        "parameters": parameters,
+        "requestBody": {
+            "required": true,
+            "content": { "application/json": { "schema": {
+                "$ref": format!("#/components/schemas/{request_schema}")
+            } } }
+        },
+        "responses": external_stats_responses(description, response_schema)
+    })
+}
+
 fn error_response(description: &str) -> Value {
     json!({
         "description": description,
@@ -946,27 +1731,79 @@ mod tests {
             operation_ids,
             std::collections::BTreeSet::from([
                 "createAccountRoom",
+                "createAccountAdministrator",
                 "createAccountBadge",
+                "createAccountCustomerApiKey",
+                "deleteAccountAdministrator",
                 "deleteAccountBadge",
+                "deleteAccountCustomerApiKey",
                 "getAccountBootstrap",
                 "getAccountPreferences",
                 "getAccountRoomSettings",
                 "inviteAccountRoomMember",
                 "listAccountRooms",
+                "listAccountAdministrators",
+                "listAccountCustomerApiKeys",
                 "listAccountRoomMembers",
+                "launchAccountRoom",
                 "listAccountBadges",
                 "login",
                 "logout",
                 "manageAccountRoomMembers",
                 "assignAccountRoomBadges",
+                "addCustomerStatsUsers",
+                "cloneCustomerStatsSession",
+                "deleteCustomerStatsUsers",
+                "listCustomerStatsAlertLogs",
+                "listCustomerStatsArchivedLogs",
+                "listCustomerStatsChatLogs",
+                "listCustomerStatsDeletedLogs",
+                "listCustomerStatsRecordings",
+                "listCustomerStatsSessions",
+                "listCustomerStatsUsers",
+                "listCustomerStatsVisits",
                 "refreshSession",
                 "setAccountPreference",
                 "setAccountRoomArchived",
                 "patchAccountRoomSettings",
+                "restrictAccountCustomerApiKey",
+                "rotateAccountCustomerApiKey",
                 "updateAccountProfile",
                 "updateAccountBadge",
                 "updateAccountTheme",
             ])
+        );
+    }
+
+    #[test]
+    fn customer_statistics_operations_require_both_query_credentials_and_never_generate_a_bff() {
+        let document = document();
+        let paths = document["paths"].as_object().expect("OpenAPI paths object");
+        let mut commands = 0;
+        for (path, path_item) in paths {
+            if !path.starts_with("/stats/v1/sessions/") {
+                continue;
+            }
+            for (method, operation) in path_item.as_object().expect("stats path item") {
+                assert!(matches!(method.as_str(), "get" | "post"));
+                assert_eq!(operation["x-controller-client"], false, "{path}");
+                assert_eq!(
+                    operation["security"],
+                    json!([{ "customerApiKey": [], "customerApiSecret": [] }]),
+                    "{path}",
+                );
+                for status in ["400", "403", "429", "503"] {
+                    assert!(
+                        operation["responses"].get(status).is_some(),
+                        "{path} {status}"
+                    );
+                }
+                commands += 1;
+            }
+        }
+        assert_eq!(
+            commands, 11,
+            "the captured contract has exactly eleven commands"
         );
     }
 

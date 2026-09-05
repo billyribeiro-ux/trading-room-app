@@ -103,7 +103,12 @@ assert.doesNotMatch(managePage, /disabled=\{!data\.features/);
 assert.doesNotMatch(page, /<p class="acc-notice">[\s\S]*?secret/);
 assert.doesNotMatch(page, /••••|lastFour/);
 assert.match(page, /\{#if key\.secret\}[\s\S]*?\{key\.secret\}[\s\S]*?Secret unavailable — regen secret/);
-assert.doesNotMatch(pageServer, /lastFour:\s*apiKeys\.lastFour/);
+/*
+  Canonical reconciliation is allowed to compare the non-secret last-four display proof. Keep the
+  query field-minimal: pulling the verifier or ciphertext into this comparison would make a
+  credential-bearing value live longer and travel farther than the projection requires.
+*/
+assert.match(pageServer, /\.select\(\{ id:\s*apiKeys\.id, lastFour:\s*apiKeys\.lastFour \}\)/);
 assert.match(pageServer, /secretCiphertext:\s*encryptApiKeySecret/);
 /*
   WHAT THIS GUARDS: the secret handed to the client is the DECRYPTED value, never the stored

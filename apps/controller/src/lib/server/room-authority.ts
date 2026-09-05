@@ -1,6 +1,13 @@
-import type { ArchiveAccountRoomRequest, CreateAccountRoomRequest, ManagedRoom } from './tradingroom-api.generated';
+import type {
+  ArchiveAccountRoomRequest,
+  CreateAccountRoomRequest,
+  LaunchAccountRoomRequest,
+  ManagedRoom,
+  RoomLaunchVisit
+} from './tradingroom-api.generated';
 import {
   createAccountRoom,
+  launchAccountRoom,
   listAccountRooms,
   refreshSession,
   setAccountRoomArchived,
@@ -18,6 +25,15 @@ async function onceAfterExpiredAccess<T>(
   const refreshed = await refreshSession(context);
   if (!refreshed.ok) return refreshed as ApiFailure;
   return operation();
+}
+
+export function launchRoomInAuthority(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string,
+  request: LaunchAccountRoomRequest
+): Promise<ApiResult<RoomLaunchVisit>> {
+  return onceAfterExpiredAccess(context, () => launchAccountRoom(context, enterpriseId, roomId, request));
 }
 
 export function readRoomAuthority(context: RequestContext, enterpriseId: string): Promise<ApiResult<ManagedRoom[]>> {

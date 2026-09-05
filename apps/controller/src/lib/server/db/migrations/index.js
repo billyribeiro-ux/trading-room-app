@@ -21,6 +21,8 @@ import { sql as authorityRoomMappings } from './0019-authority-room-mappings.js'
 import { sql as authorityRoomSettingsProjection } from './0020-authority-room-settings-projection.js';
 import { sql as authorityMembershipProjection } from './0021-authority-membership-projection.js';
 import { sql as authorityBadgeProjection } from './0022-authority-badge-projection.js';
+import { sql as authorityAdministratorProjection } from './0023-authority-administrator-projection.js';
+import { sql as authorityCustomerApiKeyProjection } from './0024-authority-customer-api-key-projection.js';
 
 /**
  * Versioned, forward-only, apply-exactly-once migrations.
@@ -185,6 +187,16 @@ export const MIGRATIONS = [
     version: 22,
     name: 'authority_badge_projection',
     sql: authorityBadgeProjection
+  },
+  {
+    version: 23,
+    name: 'authority_administrator_projection',
+    sql: authorityAdministratorProjection
+  },
+  {
+    version: 24,
+    name: 'authority_customer_api_key_projection',
+    sql: authorityCustomerApiKeyProjection
   }
 ];
 
