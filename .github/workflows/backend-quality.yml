@@ -180,10 +180,12 @@ jobs:
           # proved by the gate it defines, or it could disable itself.
           # The verifier paths are `apps/controller/scripts/…`. They were written as
           # `scripts/…`, which is where they live in the sibling repository this gate
-          # came from — so a change to any of the three matched NOTHING and skipped the
-          # very gate that proves it. `scripts/build-api-release-evidence.sh` is the one
-          # that genuinely sits at the root, and it is listed separately.
-          if printf '%s\n' "$changed" | grep -qE '^(services/|ops/|apps/controller/scripts/(verify-backend|verify-api-release-artifact|verify-rust-advisories|cutover-(profile|room)-authority|verify-(profile|room)-cutover-e2e)|apps/controller/src/lib/server/db/migrations/|scripts/build-api-release-evidence\.sh|\.github/workflows/backend-quality\.yml)'; then
+          # came from — so changes to them matched NOTHING and skipped the very gate
+          # that proves them. Every authority converter is matched by shape, rather
+          # than an enumerated authority list that silently omitted room-settings and
+          # membership when those slices were added. The release-evidence builder is
+          # the one verifier that genuinely sits at the root, and is listed separately.
+          if printf '%s\n' "$changed" | grep -qE '^(services/|ops/|apps/controller/scripts/(verify-backend|verify-api-release-artifact|verify-rust-advisories|cutover-[^/]+-authority|verify-[^/]+-cutover-e2e)|apps/controller/src/lib/server/db/migrations/|scripts/build-api-release-evidence\.sh|\.github/workflows/backend-quality\.yml)'; then
             echo "reason=backend paths changed" >> "$GITHUB_OUTPUT"
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else

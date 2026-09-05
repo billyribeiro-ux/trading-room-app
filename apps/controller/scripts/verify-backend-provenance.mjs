@@ -83,9 +83,13 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   `http/v1/rooms.rs`, and `limits.rs`. Each is individually pinned below with the exact measured
   behavior. The intervening count changes remain recorded in Git history; this paragraph names the
   current reviewed move rather than duplicating every prior ledger entry.
+
+  Moved 2026-09-04, 49 -> 46: membership authority registered `db/repo/mod.rs` and propagated its
+  controller credential through `main.rs`; the final-owner invariant also required `tests/join.rs`
+  to build the same owner foundation as production. Each now has an individual reviewed seal.
 */
-const EXPECTED_UNTOUCHED_COUNT = 49;
-const EXPECTED_MANIFEST_SHA256 = '3386bc6b31525925e28e2816dac1479f703496ea708862ff5a4646e87508f750';
+const EXPECTED_UNTOUCHED_COUNT = 46;
+const EXPECTED_MANIFEST_SHA256 = 'd0208f260ee7b87d5c72a1d956596c8f3803604f601b3518857ebeb1e2a86581';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -208,10 +212,22 @@ const LOCALLY_AUTHORED = new Map([
     // 2026-09-04 when room lifecycle joined that boundary and the room-name schema explicitly
     // named its UTF-8 byte ceiling rather than implying `maxLength` alone carried that meaning.
     'services/api/openapi/v1.json',
-    'b0e99c9ce7343a9f87f06c1cecdf2f3467f7590282647d0fbe011530f4cefb6f'
+    '1a68a7cec5d3127874eec0c4444f18c6bd0d2e1065b8582f9b884cad6dd01fae'
   ],
-  ['services/api/src/bin/openapi.rs', '41d74030069228e6b42cd1259f22b05c10f58a665ccfec4dce3830082bf3923e'],
-  ['services/api/src/openapi.rs', '4727df1c335ab0f147e81530dbcb6d6a9baea4153b15937d1407ae83643194be']
+  ['services/api/src/bin/openapi.rs', 'fd0f4f7fae4167c1081dda1ce757e7f0ccdf98e8169a6cd513885f876779ed42'],
+  ['services/api/src/openapi.rs', '1515f93952cb3abcc0292808b0956bfd7b09347b3118a87a05246e0658ba9653'],
+  [
+    // Authored 2026-09-04 for canonical membership authority: the forward-only schema,
+    // repository, account/service HTTP boundary, and real PostgreSQL behavioral proof.
+    'services/api/migrations/0017_membership_authority.sql',
+    'fa97e4f2bd787d4e0f19d3503ae4104baa933f5ec8963922ad99e3eb0933182e'
+  ],
+  [
+    'services/api/src/db/repo/managed_membership.rs',
+    'cc8151f98a9f28197265070484729b22b9a82f25a362dce197f774d760727704'
+  ],
+  ['services/api/src/http/v1/managed_members.rs', '455d78ebd3d9fbf109b79ef1e5cdd620f69effb617ff4c03eb14b8c55c517aaa'],
+  ['services/api/tests/account_members.rs', '4f6c0ce24ab608d5436c024f224ec004829ae2e118d39a74ccc9c59a643d74ee']
 ]);
 
 /*
@@ -281,10 +297,17 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/provision.rs', '53970226a80c603d0df63a0bcb6ce00814dd3754e167b8a05f531fc3b246e342'],
   ['services/api/tests/actions.rs', '09f948477b318d626ad00d5b5b4b8307b3130a8f725c411ca2061b06851eb29c'],
   ['services/api/src/db/repo/identity.rs', '5dbeb02a354f6d7910943c9c179c23b84858c065efb248afdc620ec81aceecef'],
-  ['services/api/src/http/mod.rs', '6b9290757ab752310fb6a8e42324cb13b144d6a68c5bb773391057f1083c4aed'],
+  ['services/api/src/http/mod.rs', 'd72f90c2d5b9de1ea3ab1b2a9247614a7fa7ec63b4238e4d3dbd3bfba80ddfcd'],
   ['services/api/src/http/v1/account.rs', 'c13b4636538fabd6598ce82603761e3a2c43bb9c563e771f9b7dfbbac5c58334'],
-  ['services/api/src/http/v1/mod.rs', '448f0ae66ab0bdbf12c6fb847242547ba91b8c60fad806097d207134f8392ae2'],
-  ['services/api/src/lib.rs', '38ace2813b41619b8d633aada92e64278ed06a242448855d2e0e27c8f10fcb99'],
+  ['services/api/src/http/v1/mod.rs', '80377d7af15ac70cbe498f9bcf074dc4ca7a3e26e15febc07d6635e789868467'],
+  ['services/api/src/lib.rs', '167222ece8de85f86beb5fd86ec85e3cd20f86dec8c7641a951ac9faab4dd89b'],
+  [
+    // Diverged 2026-09-04 for membership authority module registration and propagation of the
+    // controller service credential into the immutable application state.
+    'services/api/src/db/repo/mod.rs',
+    '8653a8f55393cf82d60740d1ded9143f65cbcd328e9dbb968ebe7d31ac1127ee'
+  ],
+  ['services/api/src/main.rs', 'a2048fa4822c0763f42706edd2290eb5303d92971216f989ee4d76de7b9e3c73'],
   [
     // Diverged 2026-09-04 to expose HTTP 409 as an explicit optimistic-concurrency response
     // instead of collapsing a same-field settings conflict into an internal error.
@@ -526,7 +549,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '5b575d90f1078adf641f8643f81b4bcba4e83e69cc4e6d35d680474cf48d5a9a'
+    '9e3e6853781c1e78562ef800a2a2dbcfbcea5c296920f292f882392abae46913'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -539,7 +562,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   // anyone following this file produced a connection string the API's startup check now refuses -
   // and PostgreSQL reports a nonexistent role as `28P01 password authentication failed`, naming the
   // wrong cause. Found by `naming-boundary.test.ts` on the day it was written.
-  ['services/.env.example', '67ec3560d9c8e9674f3c3c4c9e18a47023bc245a57036ea00e574e31a1529f0d'],
+  ['services/.env.example', 'd00485bf5222b533014012e7482eb81159adbaba68fcaa72663f84128d482f2d'],
   /*
     Re-pinned 2026-08-31: `RUNTIME_OBJECT_PRIVILEGES_SQL` names `MAINTAIN` only where the server has
     it. `has_table_privilege` RAISES `22023 unrecognized privilege type` on a name the server does
@@ -580,7 +603,7 @@ const DIVERGED_FROM_IMPORT = new Map([
     `--all-targets` cannot run in that container because api's dev-dependency on `tradingroom-media`
     builds `mediasoup-sys`'s C++ worker, which fails there.
   */
-  ['services/api/src/config.rs', 'ac51a3adf24a66371fdd6c380d77289ae7865fa660b78b0f193ac210448dda61'],
+  ['services/api/src/config.rs', 'ef353667e03d20bd97863f9b11effadb2f3d29de5446c304b336e3ca087e68d1'],
   /*
     Re-pinned 2026-08-31 (PR #177, first live run of the merged tree):
     `run_rejects_a_non_owner_before_creating_the_migration_ledger` asserted the rejection's
@@ -607,7 +630,7 @@ const DIVERGED_FROM_IMPORT = new Map([
     path, VOLATILE lock semantics, PUBLIC denial, runtime execution, tenant omission, and an actual
     55P03 concurrent revocation timeout while the authorized tenant transaction holds FOR SHARE.
   */
-  ['services/api/tests/migrations.rs', 'c484c27195dace9ab76fa67f7d51388e9671b80286774679a0c06cdd1ed9e390'],
+  ['services/api/tests/migrations.rs', '30c3ad71688a3cfe69c65b2f6da8363fdc7908dae05bb3b80499a610e504f2f2'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
@@ -666,7 +689,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/tenancy.rs', 'f2f10d1e8b099d115525485e8b5b18957e0cab542e80f7bfa492a1d8c0d97ccb'],
   [
     'services/api/tests/support/mod.rs',
-    'ae4ad1060e16eacd02e5571d8b1f69c8d81bd359398a2c0804fefd600ad48c85'
+    'c6415ecc9353e217be257ae481a5ffe3307a821d994c00f7ca1ef56873215846'
     /*
       Re-pinned 2026-08-31: `Scratch::sweep` now excludes the names THIS process created.
       Its safety argument — a live database keeps a backend attached, so its DROP fails — held only
@@ -704,6 +727,12 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/realtime.rs', '62c6629bed604164b3f9709220f737da51708c794e1b0062210a18d7ee7d0056'],
   ['services/api/tests/refresh_rotation.rs', '65531ae9d457eacedb87755fd673a6999fa607ea4822e37081d2a553637c49d7'],
   ['services/api/tests/room_api.rs', 'd4c507b29d7dc8335de398ac0c655941ad8321d0c0abe9385986768e57738e67'],
+  [
+    // Diverged 2026-09-04 with the membership last-owner invariant. Join fixtures now reproduce
+    // the production room graph by seating a distinct owner before testing non-owner admission.
+    'services/api/tests/join.rs',
+    '3b29292a3f2c7e4eb17b6a48ed2c3e34f50793f08034225d1f9dbabfee9b20c8'
+  ],
   ['services/compose.yml', '22d5aeef341b15ee1ae45041faaa142864a91aba0cb45557d68f9b051a08cc98'],
   ['services/deny.toml', '57165267aa3ccb0eec647a01232e10c13ab920aa3aaf9293bd2a701e21fa9d14'],
   // Re-pinned 2026-08-30: builder and runtime base images moved to the digests current that day

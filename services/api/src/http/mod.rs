@@ -24,6 +24,8 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use ed25519_dalek::SigningKey;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 use time::OffsetDateTime;
 
 use crate::auth::{login, password, refresh, token};
@@ -56,6 +58,8 @@ pub struct AppState {
     pub shutdown: tokio::sync::broadcast::Sender<()>,
     /// RED counters and gauges. Labels come from a static lookup, never from a path.
     pub metrics: metrics::Metrics,
+    /// SHA-256 of the independent controller credential; the plaintext never enters shared state.
+    controller_internal_secret_hash: Option<[u8; 32]>,
     /// True only while this instance owns an established PostgreSQL `LISTEN` connection.
     /// Readiness includes it because a process without the relay silently misses live events
     /// written by every other API instance.
@@ -83,7 +87,30 @@ impl AppState {
             bytes[0] ^= 0xff;
             bytes
         });
-        Self::configured(db, signing_key, grant_key, 0, trusted_web_origin)
+        Self::configured(db, signing_key, grant_key, 0, trusted_web_origin, None)
+    }
+
+    /// Integration-only constructor for exercising the service-authenticated controller seam.
+    #[cfg(feature = "testing")]
+    pub fn new_with_controller_secret(
+        db: Db,
+        signing_key: SigningKey,
+        trusted_web_origin: String,
+        controller_internal_secret: &str,
+    ) -> Self {
+        let grant_key = SigningKey::from_bytes(&{
+            let mut bytes = signing_key.to_bytes();
+            bytes[0] ^= 0xff;
+            bytes
+        });
+        Self::configured(
+            db,
+            signing_key,
+            grant_key,
+            0,
+            trusted_web_origin,
+            Some(controller_internal_secret),
+        )
     }
 
     /// Production construction with both independently managed signing keys and the verified
@@ -94,6 +121,7 @@ impl AppState {
         grant_key: SigningKey,
         trusted_proxy_hops: usize,
         trusted_web_origin: String,
+        controller_internal_secret: Option<&str>,
     ) -> Self {
         Self {
             db,
@@ -105,6 +133,10 @@ impl AppState {
             hub: crate::realtime::hub::Hub::new(),
             shutdown: tokio::sync::broadcast::channel(1).0,
             metrics: metrics::Metrics::new(),
+            controller_internal_secret_hash: controller_internal_secret.map(|secret| {
+                let digest = Sha256::digest(secret.as_bytes());
+                digest.into()
+            }),
             relay_ready: AtomicBool::new(false),
         }
     }
@@ -116,6 +148,17 @@ impl AppState {
 
     pub(crate) fn set_relay_ready(&self, ready: bool) {
         self.relay_ready.store(ready, Ordering::Release);
+    }
+
+    /// Constant-time verification for the controller's fixed service credential.
+    #[must_use]
+    pub fn controller_is_authorized(&self, presented: Option<&str>) -> bool {
+        let (Some(expected), Some(presented)) = (self.controller_internal_secret_hash, presented)
+        else {
+            return false;
+        };
+        let actual: [u8; 32] = Sha256::digest(presented.as_bytes()).into();
+        bool::from(expected.ct_eq(&actual))
     }
 
     /// Integration harnesses that intentionally do not consume a PostgreSQL connection for a

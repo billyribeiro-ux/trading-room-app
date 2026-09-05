@@ -645,7 +645,16 @@ async function assertRollbackSafe(targetSql, plan) {
       }
     }
     const owner = await targetSql`
-      SELECT role, user_id::text AS "userId", created_at AS "createdAt", updated_at AS "updatedAt"
+      SELECT role, user_id::text AS "userId", revision::bigint AS revision, badges,
+             can_publish_mic AS "canPublishMic", can_publish_screen AS "canPublishScreen",
+             can_publish_cam AS "canPublishCam", can_use_admin_chat AS "canUseAdminChat",
+             can_edit_notes AS "canEditNotes", can_access_files AS "canAccessFiles",
+             can_access_archives AS "canAccessArchives", is_muted AS "isMuted",
+             is_banned AS "isBanned", is_pm_restricted AS "isPmRestricted", is_trial AS "isTrial",
+             hide_personal_info AS "hidePersonalInfo", hide_user_count AS "hideUserCount",
+             is_paused AS "isPaused", admin_note AS "adminNote", approval_status AS "approvalStatus",
+             has_mobile_app AS "hasMobileApp", last_seen_at AS "lastSeenAt", invited_at AS "invitedAt",
+             joined_at AS "joinedAt", created_at AS "createdAt", updated_at AS "updatedAt"
         FROM room_members WHERE room_id = ${mapping.targetId}::uuid
     `;
     const state = await targetSql`
@@ -660,8 +669,30 @@ async function assertRollbackSafe(targetSql, plan) {
       owner.length !== 1 ||
       owner[0].role !== 'owner' ||
       owner[0].userId !== row.ownerUserId ||
+      Number(owner[0].revision) !== 0 ||
+      JSON.stringify(owner[0].badges) !== '[]' ||
+      owner[0].canPublishMic ||
+      owner[0].canPublishScreen ||
+      owner[0].canPublishCam ||
+      owner[0].canUseAdminChat ||
+      owner[0].canEditNotes ||
+      owner[0].canAccessFiles ||
+      !owner[0].canAccessArchives ||
+      owner[0].isMuted ||
+      owner[0].isBanned ||
+      owner[0].isPmRestricted ||
+      owner[0].isTrial ||
+      owner[0].hidePersonalInfo ||
+      owner[0].hideUserCount ||
+      owner[0].isPaused ||
+      owner[0].adminNote !== null ||
+      owner[0].approvalStatus !== 'approved' ||
+      owner[0].hasMobileApp ||
+      owner[0].lastSeenAt !== null ||
+      owner[0].invitedAt !== null ||
+      iso(owner[0].joinedAt) !== row.createdAt ||
       iso(owner[0].createdAt) !== row.createdAt ||
-      iso(owner[0].updatedAt) !== row.createdAt ||
+      new Date(owner[0].updatedAt).getTime() < new Date(owner[0].createdAt).getTime() ||
       state.length !== 1 ||
       state[0].rosterCount !== 0 ||
       state[0].isRecording ||

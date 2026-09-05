@@ -95,7 +95,7 @@ permit real signup, login, account, room, API-key, or payment traffic.
       and `api/fixtures/seed.sql` loaded. 413 passed, 0 failed — 155 API library,
       126 API PostgreSQL integration, 9 release-attestor, 112 media library, 11
       media binary — plus full-workspace Clippy with warnings denied and
-      `pnpm quality` locally with 1303
+      `pnpm quality` locally with 1320
       Vitest tests, 9 Playwright tests in Chromium, and the Vercel production
       build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
@@ -213,7 +213,13 @@ No Svelte route may directly reproduce authorization policy.
       reads/writes; local projection migration `0020`; fail-closed dependency-ordered switch; and a
       plan/apply/verify/guarded-rollback converter proven against real PostgreSQL. See
       `ops/ROOM-SETTINGS-AUTHORITY-CUTOVER.md`. Staging activation remains operator-owned.
-- [ ] Membership.
+- [x] Membership repository slice: migration `0017` adds revisioned managed-member state, owner
+      invariants, runtime-access filtering, and an exactly-once mutation ledger; account-scoped and
+      service-authenticated Rust routes lock and reauthorize every write; strict OpenAPI/generated
+      controller transports drive the full manage page and live room ban/mute/permission paths;
+      controller migration `0021` holds monotonic UUID/revision/content proofs; and the dependency-
+      ordered plan/apply/verify/guarded-rollback converter is proven on real PostgreSQL. See
+      `ops/MEMBERSHIP-AUTHORITY-CUTOVER.md`. Staging activation remains operator-owned.
 - [ ] Badges.
 - [ ] Account administrators.
 - [ ] Customer API keys.

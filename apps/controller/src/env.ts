@@ -7,6 +7,7 @@ const optionalControlPlaneMode = v.optional(v.union([v.literal(''), v.picklist([
 const optionalProfileAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 const optionalRoomAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 const optionalRoomSettingsAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
+const optionalMembershipAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 
 /**
  * The application environment contract.
@@ -31,6 +32,11 @@ export const variables = defineEnvVars({
       'Private origin of the Rust authority service. Browser requests stay same-origin and reach it only through the reviewed SvelteKit proxy endpoints.',
     schema: optionalUrl
   },
+  TRADINGROOM_INTERNAL_SECRET: {
+    description:
+      'Independent controller-to-Rust service credential for live-room membership writes. Required only when MEMBERSHIP_AUTHORITY_MODE=rust; never reuse another signing or encryption key.',
+    schema: optionalText
+  },
   PROFILE_AUTHORITY_MODE: {
     description:
       'Reversible Gate 3 profile authority switch. legacy is the safe default; rust requires reconciled UUID mappings and TRADINGROOM_API_URL and refuses mismatches.',
@@ -45,6 +51,11 @@ export const variables = defineEnvVars({
     description:
       'Reversible Gate 3 room-settings authority switch. rust requires profile and room authority, reconciled setting revisions, and TRADINGROOM_API_URL.',
     schema: optionalRoomSettingsAuthorityMode
+  },
+  MEMBERSHIP_AUTHORITY_MODE: {
+    description:
+      'Reversible Gate 3 membership authority switch. rust requires profile, room, and room-settings authority plus reconciled membership UUID/revision mappings.',
+    schema: optionalMembershipAuthorityMode
   },
   SUPERADMIN_EMAILS: {
     description:

@@ -42,13 +42,13 @@ const BASELINE_PUBLIC_TABLES: i64 = 23;
 /// ...and how many of those carry FORCE ROW LEVEL SECURITY.
 const BASELINE_FORCE_RLS: i64 = 20;
 
-/// What the **whole** migration set leaves behind: four tenant tables plus the two owner-only
+/// What the **whole** migration set leaves behind: five tenant tables plus the two owner-only
 /// Gate 3 conversion-ledger tables. Spelled as `BASELINE + n` rather than as a literal so a table
 /// addition is a deliberate review point instead of a count somebody updates without reading.
-const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 6;
-/// The four request-path tables are FORCE RLS. The two conversion tables deliberately are not:
+const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 7;
+/// The five request-path tables are FORCE RLS. The two conversion tables deliberately are not:
 /// they are offline owner-only operational evidence and the runtime role receives no privilege.
-const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 4;
+const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 5;
 
 async fn public_table_count(pool: &PgPool) -> i64 {
     sqlx::query_scalar(
@@ -760,9 +760,9 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
         .expect("the baseline should apply");
 
     // `migrate::run` applies the whole set, so this is the post-migration shape: the 23 tables
-    // pinned by the baseline plus four request-path additions and two owner-only conversion
-    // ledgers. The fourth is 0016's append-only settings-mutation ledger; 0014 and 0015 add room
-    // columns/indexes and a bounded function, not tables.
+    // pinned by the baseline plus five request-path additions and two owner-only conversion
+    // ledgers. Migrations 0016 and 0017 add the settings and membership mutation ledgers; 0014
+    // and 0015 add room columns/indexes and a bounded function, not tables.
     assert_eq!(
         public_table_count(&pool).await,
         MIGRATED_PUBLIC_TABLES,
@@ -1130,6 +1130,137 @@ async fn room_settings_revision_and_mutation_ledger_are_bounded_append_only_and_
     hidden.rollback().await.expect("close cross-tenant read");
 
     runtime.close().await;
+    scratch.finish(owner).await;
+}
+
+#[tokio::test]
+async fn membership_authority_is_revisioned_append_only_and_preserves_a_room_owner() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    let columns: Vec<String> = sqlx::query_scalar(
+        "SELECT column_name::text FROM information_schema.columns \
+         WHERE table_schema = 'public' AND table_name = 'room_members' \
+           AND column_name IN ('revision', 'is_banned', 'is_paused', 'hide_user_count', \
+                               'admin_note', 'approval_status', 'has_mobile_app') \
+         ORDER BY column_name",
+    )
+    .fetch_all(&owner)
+    .await
+    .expect("inspect membership columns");
+    assert_eq!(
+        columns.len(),
+        7,
+        "every managed membership field is installed"
+    );
+
+    let rls: (bool, bool) = sqlx::query_as(
+        "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class \
+         WHERE oid = 'public.membership_mutations'::regclass",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect membership ledger RLS");
+    assert_eq!(rls, (true, true));
+    for (privilege, expected) in [
+        ("SELECT", true),
+        ("INSERT", true),
+        ("UPDATE", false),
+        ("DELETE", false),
+        ("TRUNCATE", false),
+        ("REFERENCES", false),
+        ("TRIGGER", false),
+    ] {
+        assert_eq!(
+            has_table_privilege(
+                &owner,
+                migrate::EXPECTED_RUNTIME_ROLE,
+                "membership_mutations",
+                privilege,
+            )
+            .await,
+            expected,
+            "unexpected membership ledger {privilege} privilege"
+        );
+    }
+
+    let enterprise: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Membership Guard', 'membership-guard') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create enterprise");
+    let owner_user: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) \
+         VALUES ('membership-owner@example.test', md5('membership-owner@example.test'), 'Owner') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create owner");
+    let member_user: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) \
+         VALUES ('membership-member@example.test', md5('membership-member@example.test'), 'Member') RETURNING id",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("create member");
+    let room: Uuid = sqlx::query_scalar(
+        "INSERT INTO rooms (enterprise_id, owner_id, uuid_short, name, config) \
+         VALUES ($1, $2, 'member-guard', 'Membership Guard', '{\"access\":{\"tiers\":[]}}'::jsonb) \
+         RETURNING id",
+    )
+    .bind(enterprise)
+    .bind(owner_user)
+    .fetch_one(&owner)
+    .await
+    .expect("create room");
+    sqlx::query(
+        "INSERT INTO room_members (enterprise_id, room_id, user_id, role) \
+         VALUES ($1, $2, $3, 'owner'), ($1, $2, $4, 'member')",
+    )
+    .bind(enterprise)
+    .bind(room)
+    .bind(owner_user)
+    .bind(member_user)
+    .execute(&owner)
+    .await
+    .expect("create memberships");
+
+    sqlx::query("UPDATE room_members SET approval_status = 'pending', is_paused = true WHERE user_id = $1 AND room_id = $2")
+        .bind(member_user)
+        .bind(room)
+        .execute(&owner)
+        .await
+        .expect("pause member");
+    let resolved: Option<Uuid> =
+        sqlx::query_scalar("SELECT member_id FROM auth_resolve_membership($1, $2)")
+            .bind(member_user)
+            .bind(room)
+            .fetch_optional(&owner)
+            .await
+            .expect("resolve paused member");
+    assert!(resolved.is_none(), "a paused member must fail closed");
+
+    let mut remove_owner = owner.begin().await.expect("begin owner removal");
+    sqlx::query("DELETE FROM room_members WHERE user_id = $1 AND room_id = $2")
+        .bind(owner_user)
+        .bind(room)
+        .execute(&mut *remove_owner)
+        .await
+        .expect("deferred trigger permits the statement");
+    let error = remove_owner
+        .commit()
+        .await
+        .expect_err("the final owner cannot be removed at commit");
+    assert_eq!(
+        error
+            .as_database_error()
+            .and_then(|database_error| database_error.code())
+            .as_deref(),
+        Some("23514")
+    );
+
     scratch.finish(owner).await;
 }
 

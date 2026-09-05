@@ -17,6 +17,7 @@
 pub mod account;
 pub mod alerts;
 pub mod join;
+pub mod managed_members;
 pub mod media;
 pub mod messages;
 pub mod moderation;
@@ -46,6 +47,16 @@ pub fn router() -> Router<Arc<AppState>> {
         .route(
             "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings",
             get(rooms::account_room_settings).patch(rooms::patch_account_room_settings),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/members",
+            get(managed_members::list)
+                .post(managed_members::invite)
+                .patch(managed_members::manage),
+        )
+        .route(
+            "/internal/v1/accounts/{enterprise_id}/rooms/{room_id}/members",
+            axum::routing::post(managed_members::room_control),
         )
         .route("/api/v1/rooms/{room_id}", get(rooms::overview))
         // Creates a membership rather than requiring one, so it takes CurrentUser not RoomMember.

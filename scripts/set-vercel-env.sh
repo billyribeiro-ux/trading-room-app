@@ -59,7 +59,7 @@ read_value() {
 # characters in production, signing 360-day handoff tokens that travel in URLs.
 min_length_for() {
   case "$1" in
-    ROOM_JWT_SECRET|API_KEY_ENCRYPTION_KEY) echo 32 ;;
+    ROOM_JWT_SECRET|API_KEY_ENCRYPTION_KEY|TRADINGROOM_INTERNAL_SECRET) echo 32 ;;
     RECAPTCHA_SECRET_KEY|RESEND_API_KEY) echo 20 ;;
     *) echo 0 ;;
   esac
@@ -127,9 +127,11 @@ set_var CONTROL_PLANE_MODE       "postgres"
 set_var PROFILE_AUTHORITY_MODE   "$(read_value PROFILE_AUTHORITY_MODE "$DEPLOYENV")" "apps/controller/.env.deploy"
 set_var ROOM_AUTHORITY_MODE      "$(read_value ROOM_AUTHORITY_MODE "$DEPLOYENV")"    "apps/controller/.env.deploy"
 set_var ROOM_SETTINGS_AUTHORITY_MODE "$(read_value ROOM_SETTINGS_AUTHORITY_MODE "$DEPLOYENV")" "apps/controller/.env.deploy"
+set_var MEMBERSHIP_AUTHORITY_MODE "$(read_value MEMBERSHIP_AUTHORITY_MODE "$DEPLOYENV")" "apps/controller/.env.deploy"
 set_var PUBLIC_SITE_ORIGIN       "https://www.tradingroom.app"
 set_var DATABASE_URL             "$(read_value DATABASE_URL "$PULL")"              ".env.vercel-pull"
 set_var TRADINGROOM_API_URL      "$(read_value TRADINGROOM_API_URL "$DEPLOYENV")"   "apps/controller/.env.deploy"
+set_var TRADINGROOM_INTERNAL_SECRET "$(read_value TRADINGROOM_INTERNAL_SECRET "$DEPLOYENV")" "apps/controller/.env.deploy"
 set_var ROOM_JWT_SECRET          "$(read_value ROOM_JWT_SECRET "$ENVF")"           ".env"
 set_var ROOM_BASE_URL            "$(read_value ROOM_BASE_URL "$ENVF")"             ".env"
 set_var RECAPTCHA_SECRET_KEY     "$(read_value RECAPTCHA_SECRET_KEY "$ENVF")"      ".env"

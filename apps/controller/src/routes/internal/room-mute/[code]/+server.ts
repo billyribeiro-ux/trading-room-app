@@ -6,6 +6,8 @@ import { ACCOUNT_ACTIVE, accounts, roomUsers, rooms, users } from '#lib/server/d
 import { isRoomPresenter } from '#lib/room-member-role.js';
 import { userOpcodePatch } from '#lib/server/rooms.js';
 import { verifyConfigWriteToken } from '#lib/server/room-handoff.js';
+import { membershipAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import { applyRoomMembershipControl, RoomMembershipControlError } from '#lib/server/room-membership-control.js';
 import type { RequestHandler } from './$types';
 
 /**
@@ -99,7 +101,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
 
   // A suspended account's rooms stop serving, reads and writes alike — `internal/room-config`'s rule.
   const [account] = await getDb()
-    .select({ status: accounts.status })
+    .select({ status: accounts.status, authorityEnterpriseId: accounts.authorityEnterpriseId })
     .from(accounts)
     .where(eq(accounts.id, room.accountId))
     .limit(1);
@@ -146,6 +148,25 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
   if (target.roomUser.role === 0) {
     console.warn('[room-mute] refused: target is the owner', { code: params.code });
     error(403, "You cannot mute this room's owner.");
+  }
+
+  if (membershipAuthorityMode === 'rust') {
+    try {
+      const committed = await applyRoomMembershipControl({
+        accountId: room.accountId,
+        authorityEnterpriseId: account.authorityEnterpriseId,
+        authorityRoomId: room.authorityRoomId,
+        actor: caller.roomUser,
+        target: target.roomUser,
+        operation: { type: 'setMuted', muted }
+      });
+      const canonical = committed.members.find((member) => member.id === target.roomUser.authorityMemberId);
+      if (!canonical) error(502, 'Membership authority returned no target member.');
+      return json({ muted: canonical.isMuted });
+    } catch (reason) {
+      if (reason instanceof RoomMembershipControlError) error(reason.status, reason.message);
+      throw reason;
+    }
   }
 
   /*

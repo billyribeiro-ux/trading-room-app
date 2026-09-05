@@ -12,14 +12,19 @@ import {
   getAccountBootstrap,
   isArchiveAccountRoomRequest,
   isCreateAccountRoomRequest,
+  isInviteMemberRequest,
   isLoginRequest,
+  isManageMembersRequest,
   isPatchAccountRoomSettingsRequest,
   isPreferenceRequest,
   isPreferencesRequest,
   isProfileUpdateRequest,
+  inviteAccountRoomMember,
   listAccountRooms,
+  listAccountRoomMembers,
   login,
   logout,
+  manageAccountRoomMembers,
   patchAccountRoomSettings,
   setAccountRoomArchived,
   updateAccountProfile
@@ -712,6 +717,180 @@ describe('typed Rust API transport', () => {
       })
     ).resolves.toMatchObject({ ok: false, status: 400, code: 'invalid' });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('validates every membership mutation envelope before transport', () => {
+    expect(
+      isInviteMemberRequest({
+        requestId: USER_ID,
+        email: ' Member@Example.Test ',
+        displayName: ' Member '
+      })
+    ).toBe(true);
+    expect(isInviteMemberRequest({ requestId: USER_ID, email: 'member@@example.test', displayName: 'Member' })).toBe(
+      false
+    );
+    expect(isInviteMemberRequest({ requestId: USER_ID, email: 'member@example.test', displayName: '   ' })).toBe(false);
+    expect(
+      isInviteMemberRequest({
+        requestId: USER_ID,
+        email: 'member@example.test',
+        displayName: 'Member',
+        role: 'owner'
+      })
+    ).toBe(false);
+
+    const target = { memberId: MEMBER_ID, expectedRevision: 7 };
+    const operations = [
+      { type: 'setRole', role: 'presenter' },
+      { type: 'setMuted', muted: true },
+      { type: 'setBanned', banned: true },
+      { type: 'setTrial', trial: true },
+      { type: 'setHideUserCount', hidden: true },
+      { type: 'setHidePersonalInfo', hidden: true },
+      { type: 'setArchiveAccess', allowed: false },
+      { type: 'setPmRestricted', restricted: true },
+      { type: 'setApproval', status: 'approved' },
+      { type: 'setMobileApp', allowed: true },
+      { type: 'setFileAccess', allowed: true },
+      { type: 'setNote', note: 'reviewed' },
+      {
+        type: 'setPermissions',
+        publishMic: true,
+        publishScreen: false,
+        publishCam: true,
+        useAdminChat: false,
+        editNotes: true
+      },
+      { type: 'freshenLogin' },
+      { type: 'rename', displayName: 'Canonical Member' },
+      { type: 'setPassword', password: 'ten-chars+' },
+      { type: 'remove' }
+    ];
+    for (const operation of operations) {
+      expect(isManageMembersRequest({ requestId: USER_ID, targets: [target], allRooms: false, operation })).toBe(true);
+    }
+
+    expect(
+      isManageMembersRequest({
+        requestId: USER_ID,
+        targets: [target, target],
+        operation: { type: 'remove' }
+      })
+    ).toBe(false);
+    expect(
+      isManageMembersRequest({
+        requestId: USER_ID,
+        targets: [target],
+        operation: { type: 'setRole', role: 'owner' }
+      })
+    ).toBe(false);
+    expect(
+      isManageMembersRequest({
+        requestId: USER_ID,
+        targets: [target],
+        operation: { type: 'setPassword', password: 'short' }
+      })
+    ).toBe(false);
+    expect(
+      isManageMembersRequest({
+        requestId: USER_ID,
+        targets: [target],
+        operation: { type: 'setNote', note: 'x'.repeat(501) }
+      })
+    ).toBe(false);
+  });
+
+  it('transports membership reads, invitations, and revision-locked writes without credential leakage', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const managed = {
+      id: MEMBER_ID,
+      roomId: ROOM_ID,
+      userId: USER_ID,
+      email: 'member@example.test',
+      displayName: 'Member',
+      role: 'member' as const,
+      revision: 7,
+      badges: [],
+      canPublishMic: false,
+      canPublishScreen: false,
+      canPublishCam: false,
+      canUseAdminChat: false,
+      canEditNotes: false,
+      canAccessFiles: false,
+      canAccessArchives: true,
+      isMuted: false,
+      isBanned: false,
+      isPmRestricted: false,
+      isTrial: false,
+      hidePersonalInfo: false,
+      hideUserCount: false,
+      isPaused: false,
+      adminNote: null,
+      approvalStatus: 'approved' as const,
+      hasMobileApp: false,
+      hasPassword: false,
+      lastSeenAt: null,
+      invitedAt: '2026-01-01T00:00:00Z',
+      joinedAt: null,
+      createdAt: '2026-01-01T00:00:00Z'
+    };
+    const mutation = { members: [managed], removedMemberIds: [], changed: 1 };
+    const invitation = {
+      requestId: USER_ID,
+      email: 'member@example.test',
+      displayName: 'Member'
+    };
+    const update = {
+      requestId: USER_ID,
+      targets: [{ memberId: MEMBER_ID, expectedRevision: 7 }],
+      operation: { type: 'setMuted' as const, muted: true }
+    };
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(`http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/rooms/${ROOM_ID}/members`);
+      expect(new Headers(init?.headers).get('cookie')).toBe(`${ACCESS_COOKIE}=access-only`);
+      if (init?.method === 'POST') expect(JSON.parse(String(init.body))).toEqual(invitation);
+      if (init?.method === 'PATCH') expect(JSON.parse(String(init.body))).toEqual(update);
+      const body = init?.method === 'GET' ? [managed] : mutation;
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+    const context = { cookies: jar.cookies, origin: 'https://www.example.test', fetch };
+
+    await expect(listAccountRoomMembers(context, ACCOUNT_ID, ROOM_ID)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: [managed]
+    });
+    await expect(inviteAccountRoomMember(context, ACCOUNT_ID, ROOM_ID, invitation)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: mutation
+    });
+    await expect(manageAccountRoomMembers(context, ACCOUNT_ID, ROOM_ID, update)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: mutation
+    });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(jar.set).not.toHaveBeenCalled();
+
+    const leakingFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify([{ ...managed, passwordHash: 'must-not-cross' }]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    await expect(
+      listAccountRoomMembers(
+        { cookies: jar.cookies, origin: 'https://www.example.test', fetch: leakingFetch },
+        ACCOUNT_ID,
+        ROOM_ID
+      )
+    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamResponse' });
   });
 
   it('preserves the API stable error without accepting response cookies', async () => {
