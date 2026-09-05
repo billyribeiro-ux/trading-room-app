@@ -253,7 +253,7 @@ pub async fn create_account_room(
             &mut tx,
             crate::db::repo::moderation::AuditEntry {
                 enterprise_id: path.enterprise_id,
-                room_id: outcome.room.id,
+                room_id: Some(outcome.room.id),
                 actor_user_id: user.user_id,
                 actor_name: &user.display_name,
                 event_name: "room.created",
@@ -296,7 +296,7 @@ pub async fn set_account_room_archived(
             &mut tx,
             crate::db::repo::moderation::AuditEntry {
                 enterprise_id: path.enterprise_id,
-                room_id: path.room_id,
+                room_id: Some(path.room_id),
                 actor_user_id: user.user_id,
                 actor_name: &user.display_name,
                 event_name: if request.archived {
@@ -395,7 +395,7 @@ pub async fn patch_account_room_settings(
             &mut tx,
             crate::db::repo::moderation::AuditEntry {
                 enterprise_id: path.enterprise_id,
-                room_id: path.room_id,
+                room_id: Some(path.room_id),
                 actor_user_id: user.user_id,
                 actor_name: &user.display_name,
                 event_name: "room.settings.updated",

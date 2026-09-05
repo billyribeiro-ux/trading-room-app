@@ -45,6 +45,48 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-05 11:32 EDT — badges became the fifth reversible canonical authority slice
+
+**Runtime impact: yes only when `BADGE_AUTHORITY_MODE=rust`; `legacy` remains the default and
+one-switch request rollback.** Forward migration `0018` adds stable tenant-bound badge definitions,
+normalized room-member assignments, optimistic revisions, composite account/room/member foreign
+keys, forced RLS, and an append-only exactly-once mutation ledger. Account owners and administrators
+can list/create/update/delete definitions and mutate assignments only through transactions that
+lock and reauthorize every referenced tenant row. Exact request replay converges; payload mismatch,
+cross-tenant relations, unexplained target state, invalid dark-theme links, and stale revisions fail
+closed. Definition deletion clears bounded references and assignments while advancing affected
+revisions and producing one audit record.
+
+The OpenAPI contract now carries 21 operations and 30 exact schemas. The generated server-only
+SvelteKit transport validates every definition and assignment request/response, forwards only the
+Rust session cookie, permits one bounded refresh, and refuses response-cookie mutation. Account
+badge CRUD and all room-management single/selected/all-room assignment paths use that contract in
+canonical mode. Controller migration `0022` stores unique canonical badge UUIDs, monotonic
+revisions, definition hashes, and reconciliation timestamps; member content proofs now include
+normalized assignment UUIDs. Projection refuses stale/equal-revision disagreement, partial proof,
+unmapped members or definitions, and cross-account state. Startup refuses badge authority unless
+membership authority is already canonical.
+
+The fifth source-fingerprinted converter imports definition links and assignments only after the
+profile, room, and membership ledgers verify. It owns target rows before committing source proof,
+resumes that explicit cross-database window, and never adopts unexplained target rows. Guarded
+source-first rollback requires revision-zero unused state, clears source proof first, removes only
+ledger-owned rows, and converges after process loss. `ops/BADGE-AUTHORITY-CUTOVER.md` records the
+dependency, activation, observation, incident rollback, and offline rollback procedures. Deployment
+configuration and hosted workflow topology now validate the mode and run all five converters.
+
+Measured local evidence: controller formatting, lint, every deterministic contract,
+zero-error/zero-warning Svelte diagnostics, 1,330 Vitest assertions across 140 files, 70 real-
+PostgreSQL assertions across 11 files, all 9 Chromium journeys, and the Vercel build passed. Rust
+formatting and strict full-workspace Clippy passed. A fresh 18-migration PostgreSQL 17 database
+passed all 474 workspace assertions—174 API library, 156 API HTTP/database integration, 19
+release-attestor, 114 media library, and 11 media binary—and the independent attestor proved the
+exact chain, 28 forced-RLS relations/policies, restricted runtime identity, composite assignment
+foreign keys, and append-only badge-ledger ACL. All five converters passed their complete
+plan/apply/verify, drift/no-overwrite, crash-resume, guarded-rollback, and cleanup matrices against
+a newly migrated isolated database. Exact-revision protected hosted proof remains required after
+push; no staging or production activation is claimed.
+
 ### 2026-09-05 10:13 EDT — exact-SHA CI removed a redundant reference-owner literal from membership migration 0017
 
 **Runtime impact: no semantic database change.** Frontend quality run `33970951463` passed both

@@ -39,6 +39,7 @@ const PINNED_ENV = Object.freeze({
   ROOM_AUTHORITY_MODE: '',
   ROOM_SETTINGS_AUTHORITY_MODE: '',
   MEMBERSHIP_AUTHORITY_MODE: '',
+  BADGE_AUTHORITY_MODE: '',
   TRADINGROOM_INTERNAL_SECRET: ''
 });
 const staleSessionHeaders = { cookie: 'control_session=stale-preview-session' };

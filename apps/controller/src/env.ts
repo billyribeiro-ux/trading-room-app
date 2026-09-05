@@ -8,6 +8,7 @@ const optionalProfileAuthorityMode = v.optional(v.union([v.literal(''), v.pickli
 const optionalRoomAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 const optionalRoomSettingsAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 const optionalMembershipAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
+const optionalBadgeAuthorityMode = v.optional(v.union([v.literal(''), v.picklist(['legacy', 'rust'])]));
 
 /**
  * The application environment contract.
@@ -56,6 +57,11 @@ export const variables = defineEnvVars({
     description:
       'Reversible Gate 3 membership authority switch. rust requires profile, room, and room-settings authority plus reconciled membership UUID/revision mappings.',
     schema: optionalMembershipAuthorityMode
+  },
+  BADGE_AUTHORITY_MODE: {
+    description:
+      'Reversible Gate 3 badge authority switch. rust requires membership authority, reconciled badge UUID/revision mappings, and TRADINGROOM_API_URL.',
+    schema: optionalBadgeAuthorityMode
   },
   SUPERADMIN_EMAILS: {
     description:

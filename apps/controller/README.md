@@ -82,6 +82,11 @@ converter verifies. Rust membership mode requires the exact same 32–256 charac
 `TRADINGROOM_INTERNAL_SECRET` in the controller and API, and fails closed when any prerequisite or
 mapping is absent. See [`ops/MEMBERSHIP-AUTHORITY-CUTOVER.md`](../../ops/MEMBERSHIP-AUTHORITY-CUTOVER.md).
 
+Badge definition and room-member assignment authority follows membership. Keep
+`BADGE_AUTHORITY_MODE=legacy` until its converter independently verifies the complete definition and
+assignment snapshot. Rust badge mode requires membership mode to already be `rust`; see
+[`ops/BADGE-AUTHORITY-CUTOVER.md`](../../ops/BADGE-AUTHORITY-CUTOVER.md).
+
 ```bash
 createdb tradingroom_dev
 # DATABASE_URL=postgres://<user>@localhost:5432/tradingroom_dev

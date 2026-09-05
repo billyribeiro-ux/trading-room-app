@@ -62,8 +62,12 @@ pub async fn insert(tx: &mut TenantTx<'_>, new: NewMessage<'_>) -> Result<Messag
     sqlx::query_as(
         "INSERT INTO messages \
            (enterprise_id, room_id, channel_id, user_id, member_id, display_name, body, \
-            reply_to_id, is_presenter_message, is_trial_author, created_at, updated_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11) \
+            reply_to_id, is_presenter_message, is_trial_author, badges, created_at, updated_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, \
+            COALESCE((SELECT jsonb_agg(rmb.badge_id::text ORDER BY rmb.badge_id) \
+                FROM room_member_badges rmb \
+                WHERE rmb.enterprise_id = $1 AND rmb.room_id = $2 AND rmb.member_id = $5), \
+                '[]'::jsonb), $11, $11) \
          RETURNING id, channel_id, user_id, member_id, display_name, body, \
                    is_presenter_message, is_trial_author, badges, bg_color, font_color, \
                    reply_to_id, mentions, attachments, edited_at, is_answered, created_at",

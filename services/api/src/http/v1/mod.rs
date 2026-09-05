@@ -17,6 +17,7 @@
 pub mod account;
 pub mod alerts;
 pub mod join;
+pub mod managed_badges;
 pub mod managed_members;
 pub mod media;
 pub mod messages;
@@ -53,6 +54,18 @@ pub fn router() -> Router<Arc<AppState>> {
             get(managed_members::list)
                 .post(managed_members::invite)
                 .patch(managed_members::manage),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/badges",
+            get(managed_badges::list).post(managed_badges::create),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/badges/{badge_id}",
+            axum::routing::patch(managed_badges::update).delete(managed_badges::remove),
+        )
+        .route(
+            "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/badge-assignments",
+            post(managed_badges::assign),
         )
         .route(
             "/internal/v1/accounts/{enterprise_id}/rooms/{room_id}/members",

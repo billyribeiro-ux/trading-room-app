@@ -25,7 +25,7 @@ import {
   saveSetting,
   saveTextList,
   parseBadgeIds,
-  toggleUserBadge,
+  toggleUserBadge as toggleLegacyUserBadge,
   setUserRestrictPm,
   setInviteStatus,
   setUserNote,
@@ -60,11 +60,16 @@ import { FEATURES, resolveFeatureReadiness, type FeatureId } from '#lib/features
 import { resolveAccountEntitlements } from '#lib/server/account-entitlements.js';
 import { sanitizeHtml } from '#lib/server/sanitize-html.js';
 import {
+  badgeAuthorityMode,
   membershipAuthorityMode,
   roomAuthorityMode,
   roomSettingsAuthorityMode
 } from '#lib/server/control-plane-runtime.js';
-import { apiRequestContext, type ManageMemberOperation } from '#lib/server/tradingroom-api.js';
+import {
+  apiRequestContext,
+  type BadgeAssignmentOperation,
+  type ManageMemberOperation
+} from '#lib/server/tradingroom-api.js';
 import { patchRoomSettingsAuthority, readRoomSettingsAuthority } from '#lib/server/room-settings-authority.js';
 import { createRoomInAuthority } from '#lib/server/room-authority.js';
 import { projectAuthorityRooms, RoomAuthorityProjectionError } from '#lib/server/provision-room.js';
@@ -74,6 +79,8 @@ import {
   readMembershipAuthority
 } from '#lib/server/membership-authority.js';
 import { MembershipProjectionError, projectAuthorityMemberships } from '#lib/server/membership-projection.js';
+import { assignBadgeAuthority, readBadgeAuthority } from '#lib/server/badge-authority.js';
+import { BadgeProjectionError, projectAuthorityBadges } from '#lib/server/badge-projection.js';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -133,6 +140,17 @@ class MembershipAuthorityError extends Error {
   ) {
     super(message);
     this.name = 'MembershipAuthorityError';
+  }
+}
+
+class BadgeAuthorityError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'BadgeAuthorityError';
   }
 }
 
@@ -251,9 +269,41 @@ function membershipCoordinates(event: RequestEvent, room: LocalRoom): { enterpri
   return { enterpriseId: actor.authorityEnterpriseId, roomId: room.authorityRoomId };
 }
 
-async function managedRoomUsers(event: RequestEvent, room: LocalRoom) {
+function badgeCoordinates(event: RequestEvent): { accountId: number; enterpriseId: string } {
+  const actor = requireUser(event.locals);
+  if (actor.impersonatedBy !== undefined || !actor.authorityEnterpriseId) {
+    throw new BadgeAuthorityError(409, 'unreconciledAuthority', 'This account is not reconciled to badge authority.');
+  }
+  return { accountId: actor.accountId, enterpriseId: actor.authorityEnterpriseId };
+}
+
+async function managedAccountBadges(event: RequestEvent) {
+  const actor = requireUser(event.locals);
+  if (badgeAuthorityMode === 'legacy') {
+    return getDb().select().from(badges).where(eq(badges.accountId, actor.accountId));
+  }
+  const coordinates = badgeCoordinates(event);
+  const result = await readBadgeAuthority(apiRequestContext(event), coordinates.enterpriseId);
+  if (!result.ok) throw new BadgeAuthorityError(result.status, result.code, result.message);
+  try {
+    await projectAuthorityBadges({
+      accountId: coordinates.accountId,
+      definitions: result.data,
+      complete: true
+    });
+  } catch (reason) {
+    if (reason instanceof BadgeProjectionError) {
+      throw new BadgeAuthorityError(409, reason.code, reason.message);
+    }
+    throw reason;
+  }
+  return getDb().select().from(badges).where(eq(badges.accountId, actor.accountId));
+}
+
+async function managedRoomUsers(event: RequestEvent, room: LocalRoom, badgeProjectionReady = false) {
   if (membershipAuthorityMode === 'legacy') return listRoomUsers(room.id);
   const actor = requireUser(event.locals);
+  if (badgeAuthorityMode === 'rust' && !badgeProjectionReady) await managedAccountBadges(event);
   const coordinates = membershipCoordinates(event, room);
   const result = await readMembershipAuthority(apiRequestContext(event), coordinates.enterpriseId, coordinates.roomId);
   if (!result.ok) throw new MembershipAuthorityError(result.status, result.code, result.message);
@@ -261,7 +311,8 @@ async function managedRoomUsers(event: RequestEvent, room: LocalRoom) {
     await projectAuthorityMemberships({
       accountId: actor.accountId,
       members: result.data,
-      completeAuthorityRoomId: coordinates.roomId
+      completeAuthorityRoomId: coordinates.roomId,
+      projectBadges: badgeAuthorityMode === 'rust'
     });
   } catch (reason) {
     if (reason instanceof MembershipProjectionError) {
@@ -318,7 +369,8 @@ async function mutateManagedRoomUsers(
     await projectAuthorityMemberships({
       accountId: actor.accountId,
       members: result.data.members,
-      removedMemberIds: result.data.removedMemberIds
+      removedMemberIds: result.data.removedMemberIds,
+      projectBadges: badgeAuthorityMode === 'rust'
     });
   } catch (reason) {
     if (reason instanceof MembershipProjectionError) {
@@ -348,7 +400,8 @@ async function inviteManagedRoomUser(
     const mapping = await projectAuthorityMemberships({
       accountId: actor.accountId,
       members: result.data.members,
-      removedMemberIds: result.data.removedMemberIds
+      removedMemberIds: result.data.removedMemberIds,
+      projectBadges: badgeAuthorityMode === 'rust'
     });
     return mapping.values().next().value ?? 0;
   } catch (reason) {
@@ -364,6 +417,97 @@ function membershipFailure(reason: unknown) {
     return fail(reason.status, { message: reason.message, code: reason.code });
   }
   throw reason;
+}
+
+function badgeFailure(reason: unknown) {
+  if (reason instanceof BadgeAuthorityError) {
+    return fail(reason.status, { message: reason.message, code: reason.code });
+  }
+  throw reason;
+}
+
+function badgeRequestId(form: FormData): string | null {
+  const value = String(form.get('requestId') ?? '');
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value) ? value : null;
+}
+
+async function mutateManagedBadges(
+  event: RequestEvent,
+  room: LocalRoom,
+  localMemberIds: readonly number[],
+  operation: { type: 'clearBadges' } | { type: 'setBadge'; localBadgeId: number; assigned: boolean },
+  requestId: string,
+  allRooms = false,
+  availableOverride?: readonly ManagedLocalMember[]
+): Promise<number> {
+  const actor = requireUser(event.locals);
+  const coordinates = membershipCoordinates(event, room);
+  const localBadges = await managedAccountBadges(event);
+  const ids = [...new Set(localMemberIds)];
+  if (ids.length === 0) return 0;
+  const available = availableOverride ?? (await managedRoomUsers(event, room, true));
+  const selected = ids.map((id) => available.find((member) => member.id === id));
+  if (
+    selected.some(
+      (member) =>
+        !member || !member.authorityMemberId || member.authorityRevision === null || !member.authorityReconciledAt
+    )
+  ) {
+    throw new BadgeAuthorityError(
+      409,
+      'unreconciledMember',
+      'Reload this page after the membership conversion before changing that member.'
+    );
+  }
+
+  let canonicalOperation: BadgeAssignmentOperation;
+  if (operation.type === 'clearBadges') {
+    canonicalOperation = operation;
+  } else {
+    const badge = localBadges.find((candidate) => candidate.id === operation.localBadgeId);
+    if (!badge) throw new BadgeAuthorityError(404, 'badgeNotFound', 'No such badge.');
+    if (!badge.authorityBadgeId || badge.authorityRevision === null || !badge.authorityReconciledAt) {
+      throw new BadgeAuthorityError(
+        409,
+        'unreconciledBadge',
+        'Reload this page after the badge conversion before assigning that badge.'
+      );
+    }
+    canonicalOperation = {
+      type: 'setBadge',
+      badgeId: badge.authorityBadgeId,
+      assigned: operation.assigned
+    };
+  }
+
+  const result = await assignBadgeAuthority(apiRequestContext(event), coordinates.enterpriseId, coordinates.roomId, {
+    requestId,
+    targets: selected.map((member) => ({
+      memberId: member!.authorityMemberId!,
+      expectedRevision: member!.authorityRevision!
+    })),
+    ...(allRooms ? { allRooms: true } : {}),
+    operation: canonicalOperation
+  });
+  if (!result.ok) throw new BadgeAuthorityError(result.status, result.code, result.message);
+  try {
+    await projectAuthorityBadges({
+      accountId: actor.accountId,
+      definitions: result.data.badges,
+      removedBadgeIds: result.data.removedBadgeIds
+    });
+    await projectAuthorityMemberships({
+      accountId: actor.accountId,
+      members: result.data.members,
+      projectBadges: true
+    });
+  } catch (reason) {
+    if (reason instanceof BadgeProjectionError || reason instanceof MembershipProjectionError) {
+      throw new BadgeAuthorityError(409, reason.code, reason.message);
+    }
+    throw reason;
+  }
+  return result.data.changed;
 }
 
 const AUTHORITY_USER_OPERATIONS = {
@@ -519,10 +663,13 @@ export const load: PageServerLoad = async (event) => {
 
   const q = (url.searchParams.get('q') ?? '').trim().toLowerCase();
   const filter = url.searchParams.get('filter');
+  let accountBadges: Awaited<ReturnType<typeof managedAccountBadges>>;
   let authorityUsers: Awaited<ReturnType<typeof managedRoomUsers>>;
   try {
-    authorityUsers = await managedRoomUsers(event, room);
+    accountBadges = await managedAccountBadges(event);
+    authorityUsers = await managedRoomUsers(event, room, badgeAuthorityMode === 'rust');
   } catch (reason) {
+    if (reason instanceof BadgeAuthorityError) error(reason.status, reason.message);
     if (reason instanceof MembershipAuthorityError) error(reason.status, reason.message);
     throw reason;
   }
@@ -778,7 +925,8 @@ export const load: PageServerLoad = async (event) => {
     /* Credentials are returned only by the password-reauthenticated reveal action below. */
     wordpressShortcode: null as string | null,
     /** the account's badges, for the row menu's Badges submenu */
-    badges: await getDb().select().from(badges).where(eq(badges.accountId, user.accountId)),
+    badges: accountBadges,
+    badgeAssignmentRequestId: randomUUID(),
     // Sent once, used by every tab that renders fields.
     schema: ROOM_SETTINGS,
     /** the two fields the room form edits directly, looked up by name */
@@ -1174,23 +1322,45 @@ export const actions: Actions = {
   },
 
   /** `updateManyUsersBadgePrompt('add'|'remove')` applied to the selection */
-  updateManyUsersBadge: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  updateManyUsersBadge: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const mode = String(form.get('mode'));
     if (mode !== 'add' && mode !== 'remove') {
       return fail(400, { message: `Unknown badge mode ${mode}.` });
     }
     const badgeId = Number(form.get('badgeId'));
+    if (!Number.isSafeInteger(badgeId) || badgeId <= 0) {
+      return fail(400, { message: 'That badge id is invalid.' });
+    }
     const ids = form
       .getAll('roomUserId')
       .map(Number)
       .filter((n) => Number.isFinite(n));
     const allRooms = form.get('applyToAllRooms') === 'on';
-    return {
-      badgesChanged: await setBadgeForUsers(roomId, ids, badgeId, mode === 'add', { allRooms }),
-      allRooms
-    };
+    if (badgeAuthorityMode === 'legacy') {
+      return {
+        badgesChanged: await setBadgeForUsers(room.id, ids, badgeId, mode === 'add', { allRooms }),
+        allRooms
+      };
+    }
+    const requestId = badgeRequestId(form);
+    if (!requestId) return fail(400, { message: 'The badge request id is invalid. Reload and try again.' });
+    try {
+      return {
+        badgesChanged: await mutateManagedBadges(
+          event,
+          room,
+          ids,
+          { type: 'setBadge', localBadgeId: badgeId, assigned: mode === 'add' },
+          requestId,
+          allRooms
+        ),
+        allRooms
+      };
+    } catch (reason) {
+      return badgeFailure(reason);
+    }
   },
 
   /**
@@ -1253,9 +1423,28 @@ export const actions: Actions = {
     }
   },
 
-  removeBadgesForUsers: async ({ params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    return { cleared: await clearUserBadges(roomId) };
+  removeBadgesForUsers: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    if (badgeAuthorityMode === 'legacy') return { cleared: await clearUserBadges(room.id) };
+    const form = await event.request.formData();
+    const requestId = badgeRequestId(form);
+    if (!requestId) return fail(400, { message: 'The badge request id is invalid. Reload and try again.' });
+    try {
+      const available = await managedRoomUsers(event, room);
+      return {
+        cleared: await mutateManagedBadges(
+          event,
+          room,
+          available.map((member) => member.id),
+          { type: 'clearBadges' },
+          requestId,
+          false,
+          available
+        )
+      };
+    } catch (reason) {
+      return badgeFailure(reason);
+    }
   },
 
   /** `setUserRestrictPM(bool, …)` — member-to-member DMs */
@@ -1358,14 +1547,37 @@ export const actions: Actions = {
   },
 
   /** the row menu's Badges submenu */
-  toggleUserBadge: async ({ request, params, locals }) => {
-    const roomId = await ownedRoomId(locals, params.id);
-    const form = await request.formData();
+  toggleUserBadge: async (event) => {
+    const room = await ownedRoom(event.locals, event.params.id);
+    const form = await event.request.formData();
     const roomUserId = Number(form.get('roomUserId'));
     const badgeId = Number(form.get('badgeId'));
+    if (!Number.isSafeInteger(roomUserId) || roomUserId <= 0 || !Number.isSafeInteger(badgeId) || badgeId <= 0) {
+      return fail(400, { message: 'That member or badge id is invalid.' });
+    }
     try {
-      return { badges: await toggleUserBadge(roomId, roomUserId, badgeId) };
+      if (badgeAuthorityMode === 'legacy') {
+        return { badges: await toggleLegacyUserBadge(room.id, roomUserId, badgeId) };
+      }
+      const requestId = badgeRequestId(form);
+      if (!requestId) return fail(400, { message: 'The badge request id is invalid. Reload and try again.' });
+      const available = await managedRoomUsers(event, room);
+      const member = available.find((candidate) => candidate.id === roomUserId);
+      if (!member) return fail(404, { message: 'No such member.' });
+      const assigned = !parseBadgeIds(member.badgesJson).includes(badgeId);
+      return {
+        badgesChanged: await mutateManagedBadges(
+          event,
+          room,
+          [roomUserId],
+          { type: 'setBadge', localBadgeId: badgeId, assigned },
+          requestId,
+          false,
+          available
+        )
+      };
     } catch (e) {
+      if (e instanceof BadgeAuthorityError) return badgeFailure(e);
       return fail(404, { message: e instanceof Error ? e.message : 'No such member.' });
     }
   },

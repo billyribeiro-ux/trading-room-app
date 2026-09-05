@@ -87,9 +87,13 @@ const EXPECTED_PATH_LIST_SHA256 = '66ab4696e3d3685daaa5ba27e28137a1cc038a71a32fc
   Moved 2026-09-04, 49 -> 46: membership authority registered `db/repo/mod.rs` and propagated its
   controller credential through `main.rs`; the final-owner invariant also required `tests/join.rs`
   to build the same owner foundation as production. Each now has an individual reviewed seal.
+
+  Moved 2026-09-05, 45 -> 43: canonical badge definition writes made the shared audit record
+  explicitly account- or room-scoped. `db/repo/moderation.rs` now models that nullable room and
+  `http/v1/moderation.rs` marks every existing room event explicitly; both have reviewed seals.
 */
-const EXPECTED_UNTOUCHED_COUNT = 46;
-const EXPECTED_MANIFEST_SHA256 = 'd0208f260ee7b87d5c72a1d956596c8f3803604f601b3518857ebeb1e2a86581';
+const EXPECTED_UNTOUCHED_COUNT = 43;
+const EXPECTED_MANIFEST_SHA256 = '4e41fa0e057ad5e3343dbe87c5ea23e31f0a29a3dc16440be64ebcf042fb970e';
 
 /*
   Files under `services/**` that were AUTHORED HERE and never imported.
@@ -212,10 +216,10 @@ const LOCALLY_AUTHORED = new Map([
     // 2026-09-04 when room lifecycle joined that boundary and the room-name schema explicitly
     // named its UTF-8 byte ceiling rather than implying `maxLength` alone carried that meaning.
     'services/api/openapi/v1.json',
-    '1a68a7cec5d3127874eec0c4444f18c6bd0d2e1065b8582f9b884cad6dd01fae'
+    '867975fdaa7c22afcbb8d7bd53daf70ada454dd0c9e2253792df4935ddcc7c97'
   ],
   ['services/api/src/bin/openapi.rs', 'fd0f4f7fae4167c1081dda1ce757e7f0ccdf98e8169a6cd513885f876779ed42'],
-  ['services/api/src/openapi.rs', '1515f93952cb3abcc0292808b0956bfd7b09347b3118a87a05246e0658ba9653'],
+  ['services/api/src/openapi.rs', 'e0125115216a15f0f285e6458304acc925fe2e1956ad4fadaea3c615899426bd'],
   [
     // Authored 2026-09-04 for canonical membership authority: the forward-only schema,
     // repository, account/service HTTP boundary, and real PostgreSQL behavioral proof.
@@ -224,10 +228,20 @@ const LOCALLY_AUTHORED = new Map([
   ],
   [
     'services/api/src/db/repo/managed_membership.rs',
-    'cc8151f98a9f28197265070484729b22b9a82f25a362dce197f774d760727704'
+    '731058964194e5cd13d8e2d2be0157dc02a8ed4511baa8a4447e731b6c3dabf2'
   ],
-  ['services/api/src/http/v1/managed_members.rs', '455d78ebd3d9fbf109b79ef1e5cdd620f69effb617ff4c03eb14b8c55c517aaa'],
-  ['services/api/tests/account_members.rs', '4f6c0ce24ab608d5436c024f224ec004829ae2e118d39a74ccc9c59a643d74ee']
+  ['services/api/src/http/v1/managed_members.rs', '06eac58486a9505e99134a4cf93c25512ee57d758d0453b9fe01857631c70eda'],
+  ['services/api/tests/account_members.rs', '4f6c0ce24ab608d5436c024f224ec004829ae2e118d39a74ccc9c59a643d74ee'],
+  [
+    // Authored 2026-09-05 for canonical badge authority: referential tenant-paired definitions,
+    // assignments, append-only exactly-once evidence, account-scoped audit, and the complete
+    // HTTP/RLS proof.
+    'services/api/migrations/0018_badge_authority.sql',
+    '847f9b465741f86bd5a44ad7a415e5a39e0401f188452e7ba7322697ec95f9ff'
+  ],
+  ['services/api/src/db/repo/managed_badge.rs', 'c32f020769909d9c9c677b30a4034ffb98112293748e5515570eb0a4ef2c9bb1'],
+  ['services/api/src/http/v1/managed_badges.rs', '5209a7b284f460077de4907a7402f039734148aad6f8ed256b2f2431474357a5'],
+  ['services/api/tests/account_badges.rs', 'ad0305587d9eee950dcb8a4a6a4a12b994bd28cdb1d7fc1ccdf37f34ad3074aa']
 ]);
 
 /*
@@ -268,6 +282,19 @@ const LOCALLY_AUTHORED = new Map([
   with it — the same rule `LOCALLY_AUTHORED` carries, for the same reason.
 */
 const DIVERGED_FROM_IMPORT = new Map([
+  [
+    // Diverged 2026-09-05 for truthful enterprise-scoped badge audit. The baseline schema forced
+    // every audit row to name a room, which would require an account-level badge mutation to
+    // fabricate provenance. The type now permits no room while enterprise_id remains mandatory.
+    'services/api/src/db/repo/moderation.rs',
+    'dfa165d6fe828795fed76a0e363cac1c99d980dba23b60752b378d4a9e122954'
+  ],
+  [
+    // All pre-existing moderation events remain explicitly room-scoped after AuditEntry gained
+    // its account-level form; the Option cannot silently turn a room event into a global one.
+    'services/api/src/http/v1/moderation.rs',
+    '2b5af8187e6dd6af4129f05ea331b365a0d68b05deefc58f35f98f1b8a3f8d6e'
+  ],
   /*
     Re-pinned 2026-09-03 as one Gate 2 vertical slice, with the reviewed behavior and measured
     negative controls in the CHANGELOG entry at that timestamp.
@@ -299,13 +326,19 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/src/db/repo/identity.rs', '5dbeb02a354f6d7910943c9c179c23b84858c065efb248afdc620ec81aceecef'],
   ['services/api/src/http/mod.rs', 'd72f90c2d5b9de1ea3ab1b2a9247614a7fa7ec63b4238e4d3dbd3bfba80ddfcd'],
   ['services/api/src/http/v1/account.rs', 'c13b4636538fabd6598ce82603761e3a2c43bb9c563e771f9b7dfbbac5c58334'],
-  ['services/api/src/http/v1/mod.rs', '80377d7af15ac70cbe498f9bcf074dc4ca7a3e26e15febc07d6635e789868467'],
+  ['services/api/src/http/v1/mod.rs', 'ae1b41a1100ae460964fca16348d283cd337d7c0211b5596245608bb63eec08f'],
   ['services/api/src/lib.rs', '167222ece8de85f86beb5fd86ec85e3cd20f86dec8c7641a951ac9faab4dd89b'],
   [
     // Diverged 2026-09-04 for membership authority module registration and propagation of the
     // controller service credential into the immutable application state.
     'services/api/src/db/repo/mod.rs',
-    '8653a8f55393cf82d60740d1ded9143f65cbcd328e9dbb968ebe7d31ac1127ee'
+    'c222d1914f45785aa45ddb4bcb3bd6cacfe165d711682fad36ec0bd1060da51f'
+  ],
+  [
+    // Diverged 2026-09-05 so every new message snapshots its normalized canonical badge UUIDs;
+    // historical messages remain immutable when an assignment or definition is later removed.
+    'services/api/src/db/repo/message.rs',
+    '5a7b85b469214d2da831f42a1791b4782b06b6df973e5dc28dcea027b04f3492'
   ],
   ['services/api/src/main.rs', 'a2048fa4822c0763f42706edd2290eb5303d92971216f989ee4d76de7b9e3c73'],
   [
@@ -328,7 +361,7 @@ const DIVERGED_FROM_IMPORT = new Map([
       limits.rs         names the shared 160-byte room-name ceiling used by the handler.
   */
   ['services/api/src/db/repo/room.rs', '1462c8df9025e9860ce8c0fd9f6206b4ae91fb9f641aac6cf9a4a7cc621ee826'],
-  ['services/api/src/http/v1/rooms.rs', '86511e4328359f37027cf53bfe238ef9d1f8b631b97303e688a36f343c5aaacd'],
+  ['services/api/src/http/v1/rooms.rs', '2ce8ab47bc0215646a3c9b935b2ec2369d292a813cddd813d4cfd94882e566fa'],
   ['services/api/src/limits.rs', '0d48402ef62d5c9ff25e914df97c5e93b54e36e3f61af524c6af36423ff4d4eb'],
   /*
     Diverged 2026-08-15 21:40. Three prose claims in `services/README.md` still named
@@ -549,7 +582,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   */
   [
     'services/api/src/bin/postgres-release-attestation.rs',
-    '9e3e6853781c1e78562ef800a2a2dbcfbcea5c296920f292f882392abae46913'
+    '8ee9b569df9e5e00b7dc59e5fada06c4f0322b30e4c0d27473459d803cd329f1'
   ],
   // Diverged 2026-08-15 by the runtime-role cutover. Each was an untouched import until then.
   //   db/mod.rs                 EXPECTED_RUNTIME_ROLE -> tradingroom_app, and its unit-test
@@ -630,7 +663,7 @@ const DIVERGED_FROM_IMPORT = new Map([
     path, VOLATILE lock semantics, PUBLIC denial, runtime execution, tenant omission, and an actual
     55P03 concurrent revocation timeout while the authorized tenant transaction holds FOR SHARE.
   */
-  ['services/api/tests/migrations.rs', '30c3ad71688a3cfe69c65b2f6da8363fdc7908dae05bb3b80499a610e504f2f2'],
+  ['services/api/tests/migrations.rs', '1aace321cc3db7e441868300e570e8ca30bee93569219930dbfaeb4ea50a9421'],
   [
     'services/docker/postgres/10-provision-roles.sh',
     '36031a9f9fb09d597dc58e3b50c59e3c7cb56918cda12dcfce01e959cc406e6d'
@@ -689,7 +722,7 @@ const DIVERGED_FROM_IMPORT = new Map([
   ['services/api/tests/tenancy.rs', 'f2f10d1e8b099d115525485e8b5b18957e0cab542e80f7bfa492a1d8c0d97ccb'],
   [
     'services/api/tests/support/mod.rs',
-    'c6415ecc9353e217be257ae481a5ffe3307a821d994c00f7ca1ef56873215846'
+    '6f0c83369f885ef7590c43e7494bf1a118d89be6f0d7e830fd14ec4d028e7cad'
     /*
       Re-pinned 2026-08-31: `Scratch::sweep` now excludes the names THIS process created.
       Its safety argument — a live database keeps a backend attached, so its DROP fails — held only

@@ -1,4 +1,5 @@
 import {
+  BADGE_AUTHORITY_MODE,
   CONTROL_PLANE_MODE,
   DATABASE_URL,
   MEMBERSHIP_AUTHORITY_MODE,
@@ -14,6 +15,7 @@ import { assertControlPlaneConfiguration, resolveControlPlaneMode } from './cont
 import { assertRecaptchaConfiguration } from './recaptcha';
 import { assertProfileAuthorityConfiguration, resolveProfileAuthorityMode } from './profile-authority-policy';
 import { assertMembershipAuthorityConfiguration, resolveMembershipAuthorityMode } from './membership-authority-policy';
+import { assertBadgeAuthorityConfiguration, resolveBadgeAuthorityMode } from './badge-authority-policy';
 import { assertRoomAuthorityConfiguration, resolveRoomAuthorityMode } from './room-authority-policy';
 import {
   assertRoomSettingsAuthorityConfiguration,
@@ -25,6 +27,7 @@ export const profileAuthorityMode = resolveProfileAuthorityMode(PROFILE_AUTHORIT
 export const roomAuthorityMode = resolveRoomAuthorityMode(ROOM_AUTHORITY_MODE);
 export const roomSettingsAuthorityMode = resolveRoomSettingsAuthorityMode(ROOM_SETTINGS_AUTHORITY_MODE);
 export const membershipAuthorityMode = resolveMembershipAuthorityMode(MEMBERSHIP_AUTHORITY_MODE);
+export const badgeAuthorityMode = resolveBadgeAuthorityMode(BADGE_AUTHORITY_MODE);
 
 assertControlPlaneConfiguration(controlPlaneMode, DATABASE_URL);
 assertProfileAuthorityConfiguration(profileAuthorityMode, TRADINGROOM_API_URL);
@@ -43,6 +46,7 @@ assertMembershipAuthorityConfiguration(
   TRADINGROOM_API_URL,
   TRADINGROOM_INTERNAL_SECRET
 );
+assertBadgeAuthorityConfiguration(badgeAuthorityMode, membershipAuthorityMode, TRADINGROOM_API_URL);
 
 /*
   Beside the database assertion because it answers the same question: is this deployment configured

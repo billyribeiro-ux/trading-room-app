@@ -16,7 +16,8 @@ use crate::db::{DbError, TenantTx};
 /// wrong in a table nobody reads until it matters.
 pub struct AuditEntry<'a> {
     pub enterprise_id: Uuid,
-    pub room_id: Uuid,
+    /// The affected room, or `None` for an enterprise-scoped control-plane event.
+    pub room_id: Option<Uuid>,
     pub actor_user_id: Uuid,
     pub actor_name: &'a str,
     /// The machine-readable action, e.g. `message.deleted`.

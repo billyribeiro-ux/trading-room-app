@@ -203,6 +203,16 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   Object.freeze({
     path: 'services/api/migrations/0017_membership_authority.sql',
     sha256: 'fa97e4f2bd787d4e0f19d3503ae4104baa933f5ec8963922ad99e3eb0933182e'
+  }),
+  /*
+    Authored and reviewed 2026-09-05 for canonical badge authority. It replaces JSON-only member
+    assignments with composite-tenant foreign keys, revisioned definitions, and a forced-RLS,
+    append-only exactly-once ledger. Real PostgreSQL tests prove ACLs, RLS omission, cross-tenant
+    actor/badge refusal, message snapshot immutability, and referential cleanup on deletion.
+  */
+  Object.freeze({
+    path: 'services/api/migrations/0018_badge_authority.sql',
+    sha256: '847f9b465741f86bd5a44ad7a415e5a39e0401f188452e7ba7322697ec95f9ff'
   })
 ]);
 

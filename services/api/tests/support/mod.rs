@@ -253,6 +253,15 @@ impl Harness {
             .await
     }
 
+    pub async fn delete_json(
+        &self,
+        path: &str,
+        cookie: &str,
+        body: &serde_json::Value,
+    ) -> Response {
+        self.with_body("DELETE", path, cookie, body).await
+    }
+
     /// A POST with no cookie, for the auth endpoints.
     pub async fn post_anonymous(&self, path: &str, body: &serde_json::Value) -> Response {
         let payload = body.to_string();
@@ -463,6 +472,30 @@ impl Harness {
             .await
             .expect("tenant scalar");
         tx.commit().await.expect("commit");
+        value
+    }
+
+    /// Reads a tenant-scoped administrative projection that the runtime role is intentionally
+    /// denied, such as the append-only audit log. The owner still receives the same tenant GUC;
+    /// this helper does not turn a cross-tenant assertion into an RLS-bypassing global query.
+    pub async fn tenant_admin_scalar_i32<F>(&self, sql: &str, bind: F) -> i32
+    where
+        F: FnOnce(
+            sqlx::query::QueryScalar<'_, sqlx::Postgres, i32, sqlx::postgres::PgArguments>,
+        )
+            -> sqlx::query::QueryScalar<'_, sqlx::Postgres, i32, sqlx::postgres::PgArguments>,
+    {
+        let mut tx = self.admin.begin().await.expect("begin admin tenant read");
+        sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+            .bind(ACME_ENTERPRISE.to_string())
+            .execute(&mut *tx)
+            .await
+            .expect("set admin tenant context");
+        let value = bind(sqlx::query_scalar(sqlx::AssertSqlSafe(sql.to_owned())))
+            .fetch_one(&mut *tx)
+            .await
+            .expect("admin tenant scalar");
+        tx.commit().await.expect("commit admin tenant read");
         value
     }
 

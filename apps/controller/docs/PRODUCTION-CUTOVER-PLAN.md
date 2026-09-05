@@ -95,7 +95,7 @@ permit real signup, login, account, room, API-key, or payment traffic.
       and `api/fixtures/seed.sql` loaded. 413 passed, 0 failed — 155 API library,
       126 API PostgreSQL integration, 9 release-attestor, 112 media library, 11
       media binary — plus full-workspace Clippy with warnings denied and
-      `pnpm quality` locally with 1320
+      `pnpm quality` locally with 1330
       Vitest tests, 9 Playwright tests in Chromium, and the Vercel production
       build. This is source-tree
       evidence; the protected hosted PostgreSQL workflow remains the authority
@@ -116,6 +116,13 @@ permit real signup, login, account, room, API-key, or payment traffic.
       live identity/RLS/ACL/LISTEN attestation. The controller passed 1,303
       Vitest assertions across 132 files, 64 PostgreSQL assertions across 10
       files, all 9 Chromium journeys, and the Vercel production build.
+      After the membership and badge slices, a fresh 18-migration PostgreSQL 17
+      run passed all 474 Rust tests (174 API library, 156 PostgreSQL/HTTP
+      integration, 19 attestor, 114 media library, 11 media binary) and the live
+      identity/RLS/ACL/LISTEN attestation across 28 forced-RLS relations. The
+      controller passed 1,330 Vitest assertions across 140 files, 70 PostgreSQL
+      assertions across 11 files, all 9 Chromium journeys, and the Vercel build
+      with zero Svelte diagnostics.
 - [x] Obtain the first successful default-branch backend workflow result. Run
       [`30767258722`](https://github.com/billyribeiro-ux/trading-app-main/actions/runs/30767258722)
       passed for exact revision
@@ -220,7 +227,13 @@ No Svelte route may directly reproduce authorization policy.
       controller migration `0021` holds monotonic UUID/revision/content proofs; and the dependency-
       ordered plan/apply/verify/guarded-rollback converter is proven on real PostgreSQL. See
       `ops/MEMBERSHIP-AUTHORITY-CUTOVER.md`. Staging activation remains operator-owned.
-- [ ] Badges.
+- [x] Badge repository slice: migration `0018` adds tenant-bound revisioned definitions,
+      normalized room-member assignments, composite foreign keys, forced RLS, and an append-only
+      exactly-once mutation ledger; strict Rust/OpenAPI/generated-controller routes own account
+      CRUD and room assignment paths; controller migration `0022` holds monotonic UUID/revision/
+      content proofs; and the dependency-ordered plan/apply/verify/guarded-rollback converter is
+      proven on real PostgreSQL. See `ops/BADGE-AUTHORITY-CUTOVER.md`. Staging activation remains
+      operator-owned.
 - [ ] Account administrators.
 - [ ] Customer API keys.
 - [ ] Room launch.

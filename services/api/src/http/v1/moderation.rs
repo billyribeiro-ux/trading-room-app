@@ -67,7 +67,7 @@ pub async fn delete_message(
         &mut tx,
         moderation::AuditEntry {
             enterprise_id: member.enterprise_id,
-            room_id: member.room_id,
+            room_id: Some(member.room_id),
             actor_user_id: member.user.user_id,
             actor_name: &member.user.display_name,
             event_name: "message.deleted",
@@ -225,7 +225,7 @@ async fn apply_mute(
         &mut tx,
         moderation::AuditEntry {
             enterprise_id: member.enterprise_id,
-            room_id: member.room_id,
+            room_id: Some(member.room_id),
             actor_user_id: member.user.user_id,
             actor_name: &member.user.display_name,
             event_name: if muted {

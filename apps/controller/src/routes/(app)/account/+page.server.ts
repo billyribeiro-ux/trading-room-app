@@ -1,4 +1,4 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, type RequestEvent } from '@sveltejs/kit';
 import { API_KEY_ENCRYPTION_KEY, ROOM_BASE_URL, ROOM_JWT_SECRET } from '$app/env/private';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
@@ -16,12 +16,25 @@ import {
   projectAuthorityRooms,
   provisionRoom
 } from '#lib/server/provision-room.js';
-import { profileAuthorityMode, roomAuthorityMode } from '#lib/server/control-plane-runtime.js';
+import { badgeAuthorityMode, profileAuthorityMode, roomAuthorityMode } from '#lib/server/control-plane-runtime.js';
 import { authorityBindingFailure } from '#lib/server/profile-authority-policy.js';
 import { readProfileAuthority } from '#lib/server/profile-authority.js';
-import { apiRequestContext, updateAccountProfile } from '#lib/server/tradingroom-api.js';
+import {
+  apiRequestContext,
+  updateAccountProfile,
+  type BadgeMutationResponse,
+  type CreateBadgeRequest
+} from '#lib/server/tradingroom-api.js';
 import { archiveRoomInAuthority, createRoomInAuthority, readRoomAuthority } from '#lib/server/room-authority.js';
 import type { ManagedRoom } from '#lib/server/tradingroom-api.generated.js';
+import {
+  createBadgeAuthority,
+  deleteBadgeAuthority,
+  readBadgeAuthority,
+  updateBadgeAuthority
+} from '#lib/server/badge-authority.js';
+import { BadgeProjectionError, projectAuthorityBadges } from '#lib/server/badge-projection.js';
+import { MembershipProjectionError, projectAuthorityMemberships } from '#lib/server/membership-projection.js';
 import type { Actions, PageServerLoad } from './$types';
 
 function apiKeyEncryptionMaster() {
@@ -81,6 +94,128 @@ function readRowId(form: FormData, field: string): number | null {
   if (typeof raw !== 'string' || raw.trim() === '') return null;
   const id = Number(raw);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+function normalizeBadgeRoles(raw: FormDataEntryValue | null): string[] {
+  return [
+    ...new Set(
+      String(raw ?? '')
+        .split(',')
+        .map((role) => role.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  ].sort();
+}
+
+function storedBadgeRoles(raw: string): string[] {
+  try {
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value) && value.every((role) => typeof role === 'string') ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function badgeRequestId(form: FormData): string {
+  const requestId = String(form.get('requestId') ?? '');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(requestId)) {
+    throw new Error('invalid badge mutation request id');
+  }
+  return requestId;
+}
+
+function canonicalBadgeFields(row: typeof badges.$inferSelect): Omit<CreateBadgeRequest, 'requestId'> {
+  return {
+    label: row.label,
+    textColor: row.textColor,
+    backgroundColor: row.backgroundColor,
+    emoji: row.emoji,
+    imageDataUrl: row.imageUrl,
+    darkThemeBadgeId: null,
+    autoAssignRoles: storedBadgeRoles(row.autoAssignRolesJson)
+  };
+}
+
+async function badgeAuthorityCoordinates(event: RequestEvent) {
+  const owner = requireUser(event.locals);
+  if (owner.impersonatedBy !== undefined || !owner.authorityEnterpriseId) {
+    throw new Error('unreconciled badge authority');
+  }
+  return { owner, enterpriseId: owner.authorityEnterpriseId, context: apiRequestContext(event) };
+}
+
+async function projectBadgeMutation(accountId: number, response: BadgeMutationResponse) {
+  await projectAuthorityBadges({
+    accountId,
+    definitions: response.badges,
+    removedBadgeIds: response.removedBadgeIds
+  });
+  if (response.members.length > 0) {
+    await projectAuthorityMemberships({
+      accountId,
+      members: response.members,
+      projectBadges: true
+    });
+  }
+}
+
+type AuthorityBadgeRow = typeof badges.$inferSelect & {
+  authorityBadgeId: string;
+  authorityRevision: number;
+  authorityReconciledAt: Date;
+};
+
+async function readOwnedAuthorityBadge(accountId: number, id: number): Promise<AuthorityBadgeRow | null> {
+  const [row] = await getDb()
+    .select()
+    .from(badges)
+    .where(and(eq(badges.id, id), eq(badges.accountId, accountId)))
+    .limit(1);
+  if (!row) return null;
+  if (!row.authorityBadgeId || row.authorityRevision === null || !row.authorityReconciledAt) {
+    throw new BadgeProjectionError('unreconciled-local-badge');
+  }
+  return row as AuthorityBadgeRow;
+}
+
+async function canonicalBadgeFieldsForUpdate(
+  accountId: number,
+  row: AuthorityBadgeRow
+): Promise<Omit<CreateBadgeRequest, 'requestId'>> {
+  let darkThemeBadgeId: string | null = null;
+  if (row.darkThemeBadgeId !== null) {
+    const target = await readOwnedAuthorityBadge(accountId, row.darkThemeBadgeId);
+    if (!target) throw new BadgeProjectionError('dark-theme-local-badge-missing');
+    darkThemeBadgeId = target.authorityBadgeId;
+  }
+  return { ...canonicalBadgeFields(row), darkThemeBadgeId };
+}
+
+function badgeMutationRequestId(form: FormData): string | null {
+  try {
+    return badgeRequestId(form);
+  } catch {
+    return null;
+  }
+}
+
+function badgeMutationApiFailure(result: { status: number; message: string }) {
+  const status = result.status === 400 || result.status === 404 || result.status === 409 ? result.status : 503;
+  return fail(status, {
+    message: status === 503 ? 'The badge authority could not complete this change.' : result.message
+  });
+}
+
+function badgeAuthorityFailure(cause: unknown) {
+  console.error('[badge-authority] mutation or projection failed', {
+    code:
+      cause instanceof BadgeProjectionError || cause instanceof MembershipProjectionError
+        ? cause.code
+        : cause instanceof Error
+          ? cause.message
+          : 'unknown'
+  });
+  return fail(503, { message: 'The badge authority could not complete this change.' });
 }
 
 async function readOwnedRoomAuthorityMapping(accountId: number, roomId: number) {
@@ -172,6 +307,24 @@ export const load: PageServerLoad = async (event) => {
     }
   }
 
+  if (badgeAuthorityMode === 'rust') {
+    if (user.impersonatedBy !== undefined || !user.authorityEnterpriseId) {
+      error(503, 'The badge authority could not verify this account.');
+    }
+    const canonical = await readBadgeAuthority(apiRequestContext(event), user.authorityEnterpriseId);
+    if (!canonical.ok) error(503, 'The badge authority is temporarily unavailable.');
+    const canonicalBadges = canonical.data;
+    try {
+      await projectAuthorityBadges({ accountId, definitions: canonicalBadges, complete: true });
+    } catch (cause) {
+      console.error('[badge-authority] controller projection refused', {
+        localUserId: user.id,
+        code: cause instanceof BadgeProjectionError ? cause.code : 'database'
+      });
+      error(503, 'The badge authority projection is not reconciled.');
+    }
+  }
+
   // Complete API credentials are owner-visible by product contract. Do not let
   // browsers or intermediaries retain the authenticated account response.
   setHeaders({ 'cache-control': 'private, no-store' });
@@ -248,7 +401,12 @@ export const load: PageServerLoad = async (event) => {
       };
     }),
     roomCreateRequestId: randomUUID(),
-    badges: await getDb().select().from(badges).where(eq(badges.accountId, accountId)),
+    badges: (await getDb().select().from(badges).where(eq(badges.accountId, accountId))).map((badge) => ({
+      ...badge,
+      mutationRequestId: randomUUID()
+    })),
+    badgeCreateRequestId: randomUUID(),
+    imageBadgeCreateRequestId: randomUUID(),
     admins: await getDb()
       /* `createdAt` feeds the Added column — `{{au.created | date:'short'}}` in the reference
          (page.welcome.html:1294). It was omitted, so that column rendered an em dash on every row.
@@ -531,19 +689,49 @@ export const actions: Actions = {
     return { archived: changed[0].archivedAt !== null };
   },
 
-  createBadge: async ({ request, locals }) => {
+  createBadge: async (event) => {
+    const { request, locals } = event;
     const { accountId } = requireUser(locals);
     const form = await request.formData();
     const label = String(form.get('label') ?? '').trim();
     if (!label) return fail(400, { message: 'A badge needs a label.' });
+    const textColor = String(form.get('textColor') ?? '#ffffff');
+    const backgroundColor = String(form.get('backgroundColor') ?? '#777777');
+    const emoji = String(form.get('emoji') ?? '') || null;
+    const autoAssignRoles = normalizeBadgeRoles(form.get('roles'));
+
+    if (badgeAuthorityMode === 'rust') {
+      const requestId = badgeMutationRequestId(form);
+      if (!requestId) return fail(400, { message: 'The badge request id is invalid. Reload and try again.' });
+      try {
+        const { enterpriseId, context } = await badgeAuthorityCoordinates(event);
+        const created = await createBadgeAuthority(context, enterpriseId, {
+          requestId,
+          label,
+          textColor,
+          backgroundColor,
+          emoji,
+          imageDataUrl: null,
+          darkThemeBadgeId: null,
+          autoAssignRoles
+        });
+        if (!created.ok) return badgeMutationApiFailure(created);
+        await projectBadgeMutation(accountId, created.data);
+        return { created: true };
+      } catch (cause) {
+        return badgeAuthorityFailure(cause);
+      }
+    }
+
     await getDb()
       .insert(badges)
       .values({
         accountId,
         label,
-        textColor: String(form.get('textColor') ?? '#ffffff'),
-        backgroundColor: String(form.get('backgroundColor') ?? '#777777'),
-        emoji: String(form.get('emoji') ?? '') || null,
+        textColor,
+        backgroundColor,
+        emoji,
+        autoAssignRolesJson: JSON.stringify(autoAssignRoles),
         createdAt: new Date()
       });
     return { created: true };
@@ -561,7 +749,8 @@ export const actions: Actions = {
    * excluded: an SVG is a document, it can carry script, and these are rendered
    * back into the page.
    */
-  uploadImageBadge: async ({ request, locals }) => {
+  uploadImageBadge: async (event) => {
+    const { request, locals } = event;
     const { accountId } = requireUser(locals);
     const form = await request.formData();
     // The original upload prompt explicitly marks the badge name as optional.
@@ -586,6 +775,30 @@ export const actions: Actions = {
     }
 
     const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`;
+
+    if (badgeAuthorityMode === 'rust') {
+      const requestId = badgeMutationRequestId(form);
+      if (!requestId) return fail(400, { message: 'The badge request id is invalid. Reload and try again.' });
+      try {
+        const { enterpriseId, context } = await badgeAuthorityCoordinates(event);
+        const created = await createBadgeAuthority(context, enterpriseId, {
+          requestId,
+          label,
+          textColor: '#ffffff',
+          backgroundColor: '#777777',
+          emoji: null,
+          imageDataUrl: dataUrl,
+          darkThemeBadgeId: null,
+          autoAssignRoles: []
+        });
+        if (!created.ok) return badgeMutationApiFailure(created);
+        await projectBadgeMutation(accountId, created.data);
+        return { created: true };
+      } catch (cause) {
+        return badgeAuthorityFailure(cause);
+      }
+    }
+
     await getDb().insert(badges).values({
       accountId,
       label,
@@ -612,7 +825,8 @@ export const actions: Actions = {
    * indistinguishable from "no such badge", because telling somebody their id named a real row in
    * another account is itself a leak.
    */
-  updateBadge: async ({ request, locals }) => {
+  updateBadge: async (event) => {
+    const { request, locals } = event;
     const { accountId } = requireUser(locals);
     const form = await request.formData();
     const id = readRowId(form, 'id');
@@ -622,14 +836,45 @@ export const actions: Actions = {
     // request to store an empty string.
     const label = String(form.get('label') ?? '').trim();
     if (!label) return fail(400, { message: 'A badge needs a label.' });
+    const textColor = String(form.get('textColor') ?? '#ffffff');
+    const backgroundColor = String(form.get('backgroundColor') ?? '#777777');
+    const emoji = String(form.get('emoji') ?? '') || null;
+    const autoAssignRoles = normalizeBadgeRoles(form.get('roles'));
+
+    if (badgeAuthorityMode === 'rust') {
+      const requestId = badgeMutationRequestId(form);
+      if (!requestId) return fail(400, { message: 'The badge request id is invalid. Reload and try again.' });
+      try {
+        const { enterpriseId, context } = await badgeAuthorityCoordinates(event);
+        const current = await readOwnedAuthorityBadge(accountId, id);
+        if (!current) return fail(404, { message: 'No such badge.' });
+        const fields = await canonicalBadgeFieldsForUpdate(accountId, current);
+        const updated = await updateBadgeAuthority(context, enterpriseId, current.authorityBadgeId, {
+          ...fields,
+          requestId,
+          expectedRevision: current.authorityRevision,
+          label,
+          textColor,
+          backgroundColor,
+          emoji,
+          autoAssignRoles
+        });
+        if (!updated.ok) return badgeMutationApiFailure(updated);
+        await projectBadgeMutation(accountId, updated.data);
+        return { updated: id };
+      } catch (cause) {
+        return badgeAuthorityFailure(cause);
+      }
+    }
 
     const changed = await getDb()
       .update(badges)
       .set({
         label,
-        textColor: String(form.get('textColor') ?? '#ffffff'),
-        backgroundColor: String(form.get('backgroundColor') ?? '#777777'),
-        emoji: String(form.get('emoji') ?? '') || null
+        textColor,
+        backgroundColor,
+        emoji,
+        autoAssignRolesJson: JSON.stringify(autoAssignRoles)
       })
       .where(and(eq(badges.id, id), eq(badges.accountId, accountId)))
       .returning({ id: badges.id });
@@ -640,10 +885,8 @@ export const actions: Actions = {
       would clear the image of any badge that has one. The reference passes `b.imgURL` back INTO
       `editBadge`, i.e. it carries the existing value rather than replacing it.
 
-      `roles` is likewise absent, and that is an honest gap rather than a decision: the reference's
-      editor has an "Auto assign this badge to this WP roles" textarea bound to `badges.roles`, and
-      this schema has no column for it — `createBadge` does not store one either. Storing it here
-      would be the only writer of a field nothing reads.
+      Auto-assignment roles are written in this same update. They are normalized before either
+      writer receives them so legacy projection and canonical authority have identical semantics.
     */
     return { updated: id };
   },
@@ -673,7 +916,8 @@ export const actions: Actions = {
    * UPDATE is a lost-update race between two tabs — and `.returning()` reports what was committed
    * rather than what was predicted.
    */
-  addBadgeDarkTheme: async ({ request, locals }) => {
+  addBadgeDarkTheme: async (event) => {
+    const { request, locals } = event;
     const { accountId } = requireUser(locals);
     const form = await request.formData();
     const id = readRowId(form, 'id');
@@ -692,6 +936,30 @@ export const actions: Actions = {
         return fail(400, { message: 'A badge cannot be its own dark theme.' });
       }
       parsed = asNumber;
+    }
+
+    if (badgeAuthorityMode === 'rust') {
+      const requestId = badgeMutationRequestId(form);
+      if (!requestId) return fail(400, { message: 'The badge request id is invalid. Reload and try again.' });
+      try {
+        const { enterpriseId, context } = await badgeAuthorityCoordinates(event);
+        const current = await readOwnedAuthorityBadge(accountId, id);
+        if (!current) return fail(404, { message: 'No such badge.' });
+        const target = parsed === null ? null : await readOwnedAuthorityBadge(accountId, parsed);
+        if (parsed !== null && !target) return fail(404, { message: 'No badge with that id.' });
+        const fields = await canonicalBadgeFieldsForUpdate(accountId, current);
+        const updated = await updateBadgeAuthority(context, enterpriseId, current.authorityBadgeId, {
+          ...fields,
+          requestId,
+          expectedRevision: current.authorityRevision,
+          darkThemeBadgeId: target?.authorityBadgeId ?? null
+        });
+        if (!updated.ok) return badgeMutationApiFailure(updated);
+        await projectBadgeMutation(accountId, updated.data);
+        return { darkThemeBadgeId: parsed };
+      } catch (cause) {
+        return badgeAuthorityFailure(cause);
+      }
     }
 
     /*
@@ -727,12 +995,37 @@ export const actions: Actions = {
     return { darkThemeBadgeId: changed[0].darkThemeBadgeId };
   },
 
-  deleteBadge: async ({ request, locals }) => {
+  deleteBadge: async (event) => {
+    const { request, locals } = event;
     const { accountId } = requireUser(locals);
-    const id = Number((await request.formData()).get('id'));
-    await getDb()
+    const form = await request.formData();
+    const id = readRowId(form, 'id');
+    if (id === null) return fail(400, { message: 'That badge id is not a row id.' });
+
+    if (badgeAuthorityMode === 'rust') {
+      const requestId = badgeMutationRequestId(form);
+      if (!requestId) return fail(400, { message: 'The badge request id is invalid. Reload and try again.' });
+      try {
+        const { enterpriseId, context } = await badgeAuthorityCoordinates(event);
+        const current = await readOwnedAuthorityBadge(accountId, id);
+        if (!current) return fail(404, { message: 'No such badge.' });
+        const deleted = await deleteBadgeAuthority(context, enterpriseId, current.authorityBadgeId, {
+          requestId,
+          expectedRevision: current.authorityRevision
+        });
+        if (!deleted.ok) return badgeMutationApiFailure(deleted);
+        await projectBadgeMutation(accountId, deleted.data);
+        return { deleted: true };
+      } catch (cause) {
+        return badgeAuthorityFailure(cause);
+      }
+    }
+
+    const changed = await getDb()
       .delete(badges)
-      .where(and(eq(badges.id, id), eq(badges.accountId, accountId)));
+      .where(and(eq(badges.id, id), eq(badges.accountId, accountId)))
+      .returning({ id: badges.id });
+    if (changed.length === 0) return fail(404, { message: 'No such badge.' });
     return { deleted: true };
   },
 

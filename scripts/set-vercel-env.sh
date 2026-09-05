@@ -128,6 +128,7 @@ set_var PROFILE_AUTHORITY_MODE   "$(read_value PROFILE_AUTHORITY_MODE "$DEPLOYEN
 set_var ROOM_AUTHORITY_MODE      "$(read_value ROOM_AUTHORITY_MODE "$DEPLOYENV")"    "apps/controller/.env.deploy"
 set_var ROOM_SETTINGS_AUTHORITY_MODE "$(read_value ROOM_SETTINGS_AUTHORITY_MODE "$DEPLOYENV")" "apps/controller/.env.deploy"
 set_var MEMBERSHIP_AUTHORITY_MODE "$(read_value MEMBERSHIP_AUTHORITY_MODE "$DEPLOYENV")" "apps/controller/.env.deploy"
+set_var BADGE_AUTHORITY_MODE    "$(read_value BADGE_AUTHORITY_MODE "$DEPLOYENV")" "apps/controller/.env.deploy"
 set_var PUBLIC_SITE_ORIGIN       "https://www.tradingroom.app"
 set_var DATABASE_URL             "$(read_value DATABASE_URL "$PULL")"              ".env.vercel-pull"
 set_var TRADINGROOM_API_URL      "$(read_value TRADINGROOM_API_URL "$DEPLOYENV")"   "apps/controller/.env.deploy"

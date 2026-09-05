@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { and, eq, or, sql } from 'drizzle-orm';
 import type { ManagedMember } from './tradingroom-api.generated.js';
 import { getDb } from './db/index.js';
-import { roomUsers, rooms, users } from './db/schema.js';
+import { badges, roomUsers, rooms, users } from './db/schema.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -83,7 +83,7 @@ function legacyRole(member: ManagedMember): { role: number; nonPresenter: boolea
   }
 }
 
-function projectedFields(member: ManagedMember, now: Date) {
+function projectedFields(member: ManagedMember, now: Date, badgesJson?: string) {
   const role = legacyRole(member);
   return {
     authorityMemberId: member.id,
@@ -112,15 +112,16 @@ function projectedFields(member: ManagedMember, now: Date) {
       hasAdminChat: member.canUseAdminChat,
       canEditNotes: member.canEditNotes
     }),
-    lastLoginAt: date(member.lastSeenAt, 'invalid-last-seen-time')
+    lastLoginAt: date(member.lastSeenAt, 'invalid-last-seen-time'),
+    ...(badgesJson === undefined ? {} : { badgesJson })
   };
 }
 
 /**
  * Converges the controller's temporary read model after a canonical membership read or mutation.
- * Canonical core fields win; badge, notification, phone, Discord, and marketplace columns are left
- * untouched until their own authority slices. Revisions are monotonic and equal revisions must
- * carry the same full canonical content hash.
+ * Canonical core fields win. Badge ids are projected only when `projectBadges` is explicit, so the
+ * membership cutover cannot erase still-legacy assignments before the badge converter runs.
+ * Revisions are monotonic and equal revisions must carry the same full canonical content hash.
  */
 export async function projectAuthorityMemberships(input: {
   accountId: number;
@@ -128,6 +129,7 @@ export async function projectAuthorityMemberships(input: {
   removedMemberIds?: readonly string[];
   completeAuthorityRoomId?: string;
   now?: Date;
+  projectBadges?: boolean;
 }): Promise<Map<string, number>> {
   const now = input.now ?? new Date();
   const memberIds = new Set<string>();
@@ -160,6 +162,15 @@ export async function projectAuthorityMemberships(input: {
   }
 
   return getDb().transaction(async (tx) => {
+    let localBadgeIds: Map<string, number> | undefined;
+    if (input.projectBadges) {
+      const localBadges = await tx.select().from(badges).where(eq(badges.accountId, input.accountId));
+      localBadgeIds = new Map(
+        localBadges
+          .filter((badge) => badge.authorityBadgeId && badge.authorityReconciledAt)
+          .map((badge) => [badge.authorityBadgeId!, badge.id])
+      );
+    }
     const localRooms = await tx.select().from(rooms).where(eq(rooms.accountId, input.accountId));
     const byAuthorityRoom = new Map(
       localRooms
@@ -175,6 +186,21 @@ export async function projectAuthorityMemberships(input: {
     for (const member of input.members) {
       const localRoom = byAuthorityRoom.get(member.roomId);
       if (!localRoom) throw new MembershipProjectionError('room-mapping-mismatch');
+      let badgesJson: string | undefined;
+      if (localBadgeIds) {
+        const ids: number[] = [];
+        const seen = new Set<string>();
+        for (const authorityBadgeId of member.badges) {
+          if (!UUID.test(authorityBadgeId) || seen.has(authorityBadgeId)) {
+            throw new MembershipProjectionError('invalid-canonical-badge-list');
+          }
+          seen.add(authorityBadgeId);
+          const localBadgeId = localBadgeIds.get(authorityBadgeId);
+          if (localBadgeId === undefined) throw new MembershipProjectionError('badge-mapping-mismatch');
+          ids.push(localBadgeId);
+        }
+        badgesJson = JSON.stringify(ids);
+      }
       const normalizedEmail = member.email.trim().toLowerCase();
       const identityCandidates = await tx
         .select()
@@ -248,7 +274,7 @@ export async function projectAuthorityMemberships(input: {
         }
         const [updated] = await tx
           .update(roomUsers)
-          .set(projectedFields(member, now))
+          .set(projectedFields(member, now, badgesJson))
           .where(and(eq(roomUsers.id, existing.id), eq(roomUsers.roomId, localRoom.id)))
           .returning({ id: roomUsers.id });
         if (!updated) throw new MembershipProjectionError('membership-update-race');
@@ -260,7 +286,7 @@ export async function projectAuthorityMemberships(input: {
           .values({
             roomId: localRoom.id,
             userId: identity.id,
-            ...projectedFields(member, now),
+            ...projectedFields(member, now, badgesJson),
             createdAt
           })
           .returning({ id: roomUsers.id });

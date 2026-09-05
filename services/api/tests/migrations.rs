@@ -42,13 +42,13 @@ const BASELINE_PUBLIC_TABLES: i64 = 23;
 /// ...and how many of those carry FORCE ROW LEVEL SECURITY.
 const BASELINE_FORCE_RLS: i64 = 20;
 
-/// What the **whole** migration set leaves behind: five tenant tables plus the two owner-only
+/// What the **whole** migration set leaves behind: eight tenant tables plus the two owner-only
 /// Gate 3 conversion-ledger tables. Spelled as `BASELINE + n` rather than as a literal so a table
 /// addition is a deliberate review point instead of a count somebody updates without reading.
-const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 7;
-/// The five request-path tables are FORCE RLS. The two conversion tables deliberately are not:
+const MIGRATED_PUBLIC_TABLES: i64 = BASELINE_PUBLIC_TABLES + 10;
+/// The eight request-path tables are FORCE RLS. The two conversion tables deliberately are not:
 /// they are offline owner-only operational evidence and the runtime role receives no privilege.
-const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 5;
+const MIGRATED_FORCE_RLS: i64 = BASELINE_FORCE_RLS + 8;
 
 async fn public_table_count(pool: &PgPool) -> i64 {
     sqlx::query_scalar(
@@ -760,9 +760,9 @@ async fn the_baseline_applies_cleanly_to_an_empty_database() {
         .expect("the baseline should apply");
 
     // `migrate::run` applies the whole set, so this is the post-migration shape: the 23 tables
-    // pinned by the baseline plus five request-path additions and two owner-only conversion
-    // ledgers. Migrations 0016 and 0017 add the settings and membership mutation ledgers; 0014
-    // and 0015 add room columns/indexes and a bounded function, not tables.
+    // pinned by the baseline plus eight request-path additions and two owner-only conversion
+    // ledgers. Migration 0018 adds normalized badge definitions, assignments, and its mutation
+    // ledger; 0014 and 0015 add room columns/indexes and a bounded function, not tables.
     assert_eq!(
         public_table_count(&pool).await,
         MIGRATED_PUBLIC_TABLES,
@@ -1261,6 +1261,285 @@ async fn membership_authority_is_revisioned_append_only_and_preserves_a_room_own
         Some("23514")
     );
 
+    scratch.finish(owner).await;
+}
+
+#[tokio::test]
+async fn badge_authority_is_tenant_paired_referential_and_append_only() {
+    let scratch = Scratch::create().await;
+    let owner = scratch.pool().await;
+    migrate::run(&owner).await.expect("migrations apply");
+
+    let account_audit_is_nullable: bool = sqlx::query_scalar(
+        "SELECT is_nullable = 'YES' FROM information_schema.columns \
+         WHERE table_schema = 'public' AND table_name = 'audit_log' AND column_name = 'room_id'",
+    )
+    .fetch_one(&owner)
+    .await
+    .expect("inspect audit_log.room_id nullability");
+    assert!(
+        account_audit_is_nullable,
+        "enterprise-scoped badge events must not invent a room"
+    );
+
+    for table in ["enterprise_badges", "room_member_badges", "badge_mutations"] {
+        let rls: (bool, bool) = sqlx::query_as(
+            "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class \
+             WHERE oid = to_regclass('public.' || $1)",
+        )
+        .bind(table)
+        .fetch_one(&owner)
+        .await
+        .unwrap_or_else(|error| panic!("inspect {table} RLS: {error}"));
+        assert_eq!(rls, (true, true), "{table} must force tenant RLS");
+    }
+    for (table, privilege, expected) in [
+        ("enterprise_badges", "SELECT", true),
+        ("enterprise_badges", "INSERT", true),
+        ("enterprise_badges", "UPDATE", true),
+        ("enterprise_badges", "DELETE", true),
+        ("room_member_badges", "SELECT", true),
+        ("room_member_badges", "INSERT", true),
+        ("room_member_badges", "UPDATE", false),
+        ("room_member_badges", "DELETE", true),
+        ("badge_mutations", "SELECT", true),
+        ("badge_mutations", "INSERT", true),
+        ("badge_mutations", "UPDATE", false),
+        ("badge_mutations", "DELETE", false),
+    ] {
+        assert_eq!(
+            has_table_privilege(&owner, migrate::EXPECTED_RUNTIME_ROLE, table, privilege,).await,
+            expected,
+            "unexpected {table} {privilege} privilege"
+        );
+    }
+
+    let enterprise_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Badge Account A', $1) RETURNING id",
+    )
+    .bind(format!("badge-a-{}", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create enterprise A");
+    let enterprise_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprises (name, slug) VALUES ('Badge Account B', $1) RETURNING id",
+    )
+    .bind(format!("badge-b-{}", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create enterprise B");
+    let owner_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) VALUES ($1, md5($1), 'Owner A') RETURNING id",
+    )
+    .bind(format!("badge-a-{}@example.test", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create owner A");
+    let owner_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO users (email, email_hash, display_name) VALUES ($1, md5($1), 'Owner B') RETURNING id",
+    )
+    .bind(format!("badge-b-{}@example.test", Uuid::new_v4().simple()))
+    .fetch_one(&owner)
+    .await
+    .expect("create owner B");
+    sqlx::query(
+        "INSERT INTO enterprise_memberships (enterprise_id, user_id, role) \
+         VALUES ($1, $2, 'owner'), ($3, $4, 'owner')",
+    )
+    .bind(enterprise_a)
+    .bind(owner_a)
+    .bind(enterprise_b)
+    .bind(owner_b)
+    .execute(&owner)
+    .await
+    .expect("create owner memberships");
+    let room_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO rooms (enterprise_id, owner_id, uuid_short, name, config) \
+         VALUES ($1, $2, $3, 'Badge Room A', '{\"access\":{\"tiers\":[]}}'::jsonb) RETURNING id",
+    )
+    .bind(enterprise_a)
+    .bind(owner_a)
+    .bind(format!("ba-{}", &Uuid::new_v4().simple().to_string()[..12]))
+    .fetch_one(&owner)
+    .await
+    .expect("create room A");
+    let member_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO room_members (enterprise_id, room_id, user_id, role) \
+         VALUES ($1, $2, $3, 'owner') RETURNING id",
+    )
+    .bind(enterprise_a)
+    .bind(room_a)
+    .bind(owner_a)
+    .fetch_one(&owner)
+    .await
+    .expect("create room owner");
+    let badge_a: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprise_badges (enterprise_id, label) VALUES ($1, 'Badge A') RETURNING id",
+    )
+    .bind(enterprise_a)
+    .fetch_one(&owner)
+    .await
+    .expect("create badge A");
+    let badge_b: Uuid = sqlx::query_scalar(
+        "INSERT INTO enterprise_badges (enterprise_id, label) VALUES ($1, 'Badge B') RETURNING id",
+    )
+    .bind(enterprise_b)
+    .fetch_one(&owner)
+    .await
+    .expect("create badge B");
+
+    let runtime_database_url = scratch_url(&runtime_url(), &scratch.name);
+    let runtime = PgPool::connect(&runtime_database_url)
+        .await
+        .expect("connect runtime to scratch database");
+    let mut tenant_a = runtime.begin().await.expect("begin tenant A");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *tenant_a)
+        .await
+        .expect("set tenant A");
+    sqlx::query(
+        "INSERT INTO room_member_badges \
+         (enterprise_id, room_id, member_id, badge_id, assigned_by_user_id) \
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(enterprise_a)
+    .bind(room_a)
+    .bind(member_a)
+    .bind(badge_a)
+    .bind(owner_a)
+    .execute(&mut *tenant_a)
+    .await
+    .expect("runtime inserts a fully tenant-paired assignment");
+    let request_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO badge_mutations \
+         (enterprise_id, request_id, actor_user_id, mutation_kind, request_digest, response) \
+         VALUES ($1, $2, $3, 'badge.created', repeat('a', 64), '{}'::jsonb)",
+    )
+    .bind(enterprise_a)
+    .bind(request_id)
+    .bind(owner_a)
+    .execute(&mut *tenant_a)
+    .await
+    .expect("runtime appends badge mutation evidence");
+    sqlx::query(
+        "INSERT INTO audit_log \
+         (enterprise_id, room_id, actor_user_id, actor_name, event_name, event_detail, \
+          target_type, target_id, metadata) \
+         VALUES ($1, NULL, $2, 'Owner A', 'badge.created', \
+                 'account administrator created a badge definition', 'badge', $3, '{}'::jsonb)",
+    )
+    .bind(enterprise_a)
+    .bind(owner_a)
+    .bind(badge_a)
+    .execute(&mut *tenant_a)
+    .await
+    .expect("runtime appends an enterprise-scoped audit without a fabricated room");
+    tenant_a.commit().await.expect("commit tenant A writes");
+
+    let account_audits: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM audit_log \
+         WHERE enterprise_id = $1 AND room_id IS NULL AND event_name = 'badge.created'",
+    )
+    .bind(enterprise_a)
+    .fetch_one(&owner)
+    .await
+    .expect("read enterprise-scoped audit as owner");
+    assert_eq!(account_audits, 1);
+
+    let mut forbidden = runtime.begin().await.expect("begin forbidden update");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *forbidden)
+        .await
+        .expect("set tenant A");
+    let error = sqlx::query("UPDATE badge_mutations SET response = '{\"changed\":9}'::jsonb")
+        .execute(&mut *forbidden)
+        .await
+        .expect_err("badge mutation evidence must be append-only");
+    assert_insufficient_privilege(error, "update badge mutation evidence");
+    forbidden
+        .rollback()
+        .await
+        .expect("rollback forbidden update");
+
+    let mut crossed = runtime
+        .begin()
+        .await
+        .expect("begin cross-tenant badge attempt");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *crossed)
+        .await
+        .expect("set tenant A");
+    let error = sqlx::query(
+        "INSERT INTO room_member_badges \
+         (enterprise_id, room_id, member_id, badge_id, assigned_by_user_id) \
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(enterprise_a)
+    .bind(room_a)
+    .bind(member_a)
+    .bind(badge_b)
+    .bind(owner_a)
+    .execute(&mut *crossed)
+    .await
+    .expect_err("cross-tenant badge must be rejected");
+    assert_eq!(
+        error
+            .as_database_error()
+            .and_then(|database_error| database_error.code())
+            .as_deref(),
+        Some("23503"),
+        "cross-tenant badge must fail its composite foreign key"
+    );
+    crossed.rollback().await.expect("rollback badge attempt");
+
+    let mut crossed = runtime
+        .begin()
+        .await
+        .expect("begin cross-tenant actor attempt");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_a.to_string())
+        .execute(&mut *crossed)
+        .await
+        .expect("set tenant A");
+    let error = sqlx::query(
+        "INSERT INTO badge_mutations \
+         (enterprise_id, request_id, actor_user_id, mutation_kind, request_digest, response) \
+         VALUES ($1, $2, $3, 'badge.created', repeat('b', 64), '{}'::jsonb)",
+    )
+    .bind(enterprise_a)
+    .bind(Uuid::new_v4())
+    .bind(owner_b)
+    .execute(&mut *crossed)
+    .await
+    .expect_err("cross-tenant actor must be rejected");
+    assert_eq!(
+        error
+            .as_database_error()
+            .and_then(|database_error| database_error.code())
+            .as_deref(),
+        Some("23503"),
+        "cross-tenant actor must fail its composite foreign key"
+    );
+    crossed.rollback().await.expect("rollback actor attempt");
+
+    let mut hidden = runtime.begin().await.expect("begin tenant B read");
+    sqlx::query("SELECT set_config('app.enterprise_id', $1, true)")
+        .bind(enterprise_b.to_string())
+        .execute(&mut *hidden)
+        .await
+        .expect("set tenant B");
+    let visible: i64 = sqlx::query_scalar("SELECT count(*) FROM badge_mutations")
+        .fetch_one(&mut *hidden)
+        .await
+        .expect("read tenant B ledger projection");
+    assert_eq!(visible, 0, "tenant B must not see tenant A badge evidence");
+    hidden.rollback().await.expect("close tenant B read");
+
+    runtime.close().await;
     scratch.finish(owner).await;
 }
 

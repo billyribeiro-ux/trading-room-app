@@ -13,7 +13,10 @@ use uuid::Uuid;
 use crate::db::{DbError, TenantTx};
 
 const MEMBER_SELECT: &str = "SELECT m.id, m.room_id, m.user_id, u.email::text AS email, \
-    COALESCE(m.display_name, u.display_name) AS display_name, m.role, m.revision, m.badges, \
+    COALESCE(m.display_name, u.display_name) AS display_name, m.role, m.revision, \
+    COALESCE((SELECT jsonb_agg(rmb.badge_id::text ORDER BY rmb.badge_id) \
+        FROM room_member_badges rmb WHERE rmb.enterprise_id = m.enterprise_id \
+        AND rmb.member_id = m.id), '[]'::jsonb) AS badges, \
     m.can_publish_mic, m.can_publish_screen, m.can_publish_cam, m.can_use_admin_chat, \
     m.can_edit_notes, m.can_access_files, m.can_access_archives, m.is_muted, m.is_banned, \
     m.is_pm_restricted, m.is_trial, m.hide_personal_info, m.hide_user_count, m.is_paused, \

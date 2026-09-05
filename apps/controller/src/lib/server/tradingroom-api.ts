@@ -13,13 +13,19 @@ import type {
   AccountBootstrap,
   AccountRoomSettings,
   ArchiveAccountRoomRequest,
+  AssignBadgesRequest,
+  BadgeAssignmentOperation,
+  BadgeMutationResponse,
   CreateAccountRoomRequest,
+  CreateBadgeRequest,
   CurrentUser,
+  DeleteBadgeRequest,
   Error as ApiErrorBody,
   InviteMemberRequest,
   LoginRequest,
   ManageMemberOperation,
   ManageMembersRequest,
+  ManagedBadge,
   ManagedMember,
   ManagedRoom,
   MembershipMutationResponse,
@@ -29,19 +35,26 @@ import type {
   ProfileUpdateRequest,
   Session,
   TradingRoomApiOperation,
-  TradingRoomApiOperations
+  TradingRoomApiOperations,
+  UpdateBadgeRequest
 } from './tradingroom-api.generated';
 
 export type {
   AccountBootstrap,
   AccountRoomSettings,
   ArchiveAccountRoomRequest,
+  AssignBadgesRequest,
+  BadgeAssignmentOperation,
+  BadgeMutationResponse,
   CreateAccountRoomRequest,
+  CreateBadgeRequest,
   CurrentUser,
+  DeleteBadgeRequest,
   InviteMemberRequest,
   LoginRequest,
   ManageMemberOperation,
   ManageMembersRequest,
+  ManagedBadge,
   ManagedMember,
   ManagedRoom,
   MembershipMutationResponse,
@@ -49,7 +62,8 @@ export type {
   PreferenceRequest,
   Preferences,
   ProfileUpdateRequest,
-  Session
+  Session,
+  UpdateBadgeRequest
 } from './tradingroom-api.generated';
 
 export const ACCESS_COOKIE = '__Host-tradingroom_access';
@@ -97,6 +111,26 @@ const OPERATIONS: {
     path: '/api/v1/account/theme',
     successStatus: 200
   },
+  listAccountBadges: {
+    method: 'GET',
+    path: '/api/v1/accounts/{enterprise_id}/badges',
+    successStatus: 200
+  },
+  createAccountBadge: {
+    method: 'POST',
+    path: '/api/v1/accounts/{enterprise_id}/badges',
+    successStatus: 200
+  },
+  deleteAccountBadge: {
+    method: 'DELETE',
+    path: '/api/v1/accounts/{enterprise_id}/badges/{badge_id}',
+    successStatus: 200
+  },
+  updateAccountBadge: {
+    method: 'PATCH',
+    path: '/api/v1/accounts/{enterprise_id}/badges/{badge_id}',
+    successStatus: 200
+  },
   listAccountRooms: {
     method: 'GET',
     path: '/api/v1/accounts/{enterprise_id}/rooms',
@@ -110,6 +144,11 @@ const OPERATIONS: {
   setAccountRoomArchived: {
     method: 'PATCH',
     path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}',
+    successStatus: 200
+  },
+  assignAccountRoomBadges: {
+    method: 'POST',
+    path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/badge-assignments',
     successStatus: 200
   },
   listAccountRoomMembers: {
@@ -400,6 +439,158 @@ function isManagedMember(value: unknown): value is ManagedMember {
   );
 }
 
+const MANAGED_BADGE_KEYS = [
+  'id',
+  'revision',
+  'label',
+  'textColor',
+  'backgroundColor',
+  'emoji',
+  'imageDataUrl',
+  'darkThemeBadgeId',
+  'autoAssignRoles',
+  'createdAt',
+  'updatedAt'
+] as const;
+
+const BADGE_FIELD_KEYS = [
+  'label',
+  'textColor',
+  'backgroundColor',
+  'emoji',
+  'imageDataUrl',
+  'darkThemeBadgeId',
+  'autoAssignRoles'
+] as const;
+
+function isBadgeColor(value: unknown, transparent: boolean): value is string {
+  return (typeof value === 'string' && /^#[0-9a-f]{6}$/iu.test(value)) || (transparent && value === 'rgba(1,0,0,0)');
+}
+
+function isCanonicalBadgeFields(value: Record<string, unknown>): boolean {
+  return (
+    typeof value.label === 'string' &&
+    utf8Bytes(value.label) <= 160 &&
+    isBadgeColor(value.textColor, false) &&
+    isBadgeColor(value.backgroundColor, true) &&
+    (value.emoji === null || (typeof value.emoji === 'string' && utf8Bytes(value.emoji) <= 128)) &&
+    (value.imageDataUrl === null ||
+      (typeof value.imageDataUrl === 'string' &&
+        value.imageDataUrl.length <= 360_000 &&
+        /^data:image\/(?:png|jpeg|gif|webp);base64,[a-z0-9+/]+={0,2}$/iu.test(value.imageDataUrl))) &&
+    (value.label.trim().length > 0 || value.imageDataUrl !== null) &&
+    (value.darkThemeBadgeId === null || isUuid(value.darkThemeBadgeId)) &&
+    Array.isArray(value.autoAssignRoles) &&
+    value.autoAssignRoles.length <= 32 &&
+    value.autoAssignRoles.every((role) => typeof role === 'string' && /^[a-z0-9_-]{1,64}$/u.test(role)) &&
+    new Set(value.autoAssignRoles).size === value.autoAssignRoles.length
+  );
+}
+
+function isManagedBadge(value: unknown): value is ManagedBadge {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, MANAGED_BADGE_KEYS) &&
+    isUuid(value.id) &&
+    Number.isSafeInteger(value.revision) &&
+    Number(value.revision) >= 0 &&
+    isCanonicalBadgeFields(value) &&
+    isIsoDateTime(value.createdAt) &&
+    isIsoDateTime(value.updatedAt)
+  );
+}
+
+export function isCreateBadgeRequest(value: unknown): value is CreateBadgeRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', ...BADGE_FIELD_KEYS]) &&
+    isUuid(value.requestId) &&
+    isCanonicalBadgeFields(value)
+  );
+}
+
+export function isUpdateBadgeRequest(value: unknown): value is UpdateBadgeRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'expectedRevision', ...BADGE_FIELD_KEYS]) &&
+    isUuid(value.requestId) &&
+    Number.isSafeInteger(value.expectedRevision) &&
+    Number(value.expectedRevision) >= 0 &&
+    isCanonicalBadgeFields(value)
+  );
+}
+
+function isDeleteBadgeRequest(value: unknown): value is DeleteBadgeRequest {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['requestId', 'expectedRevision']) &&
+    isUuid(value.requestId) &&
+    Number.isSafeInteger(value.expectedRevision) &&
+    Number(value.expectedRevision) >= 0
+  );
+}
+
+function isBadgeAssignmentOperation(value: unknown): value is BadgeAssignmentOperation {
+  if (!isRecord(value) || typeof value.type !== 'string') return false;
+  if (value.type === 'clearBadges') return hasExactKeys(value, ['type']);
+  return (
+    value.type === 'setBadge' &&
+    hasExactKeys(value, ['type', 'badgeId', 'assigned']) &&
+    isUuid(value.badgeId) &&
+    typeof value.assigned === 'boolean'
+  );
+}
+
+export function isAssignBadgesRequest(value: unknown): value is AssignBadgesRequest {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, [
+      'requestId',
+      'targets',
+      'operation',
+      ...(value.allRooms === undefined ? [] : ['allRooms'])
+    ]) ||
+    !isUuid(value.requestId) ||
+    !Array.isArray(value.targets) ||
+    value.targets.length === 0 ||
+    value.targets.length > 1_000 ||
+    (value.allRooms !== undefined && typeof value.allRooms !== 'boolean') ||
+    !isBadgeAssignmentOperation(value.operation)
+  ) {
+    return false;
+  }
+  const ids = new Set<string>();
+  for (const target of value.targets) {
+    if (
+      !isRecord(target) ||
+      !hasExactKeys(target, ['memberId', 'expectedRevision']) ||
+      !isUuid(target.memberId) ||
+      ids.has(target.memberId) ||
+      !Number.isSafeInteger(target.expectedRevision) ||
+      Number(target.expectedRevision) < 0
+    ) {
+      return false;
+    }
+    ids.add(target.memberId);
+  }
+  return true;
+}
+
+function isBadgeMutationResponse(value: unknown): value is BadgeMutationResponse {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['badges', 'members', 'removedBadgeIds', 'changed']) &&
+    Array.isArray(value.badges) &&
+    value.badges.every(isManagedBadge) &&
+    Array.isArray(value.members) &&
+    value.members.every(isManagedMember) &&
+    Array.isArray(value.removedBadgeIds) &&
+    value.removedBadgeIds.every(isUuid) &&
+    Number.isSafeInteger(value.changed) &&
+    Number(value.changed) >= 0
+  );
+}
+
 export function isInviteMemberRequest(value: unknown): value is InviteMemberRequest {
   return (
     isRecord(value) &&
@@ -603,6 +794,13 @@ function isOperationSuccess(operation: TradingRoomApiOperation, raw: string, par
     case 'setAccountPreference':
     case 'updateAccountTheme':
       return isPreferences(parsed);
+    case 'listAccountBadges':
+      return Array.isArray(parsed) && parsed.every(isManagedBadge);
+    case 'createAccountBadge':
+    case 'deleteAccountBadge':
+    case 'updateAccountBadge':
+    case 'assignAccountRoomBadges':
+      return isBadgeMutationResponse(parsed);
     case 'listAccountRooms':
       return Array.isArray(parsed) && parsed.every(isManagedRoom);
     case 'createAccountRoom':
@@ -945,6 +1143,60 @@ export function setAccountRoomArchived(
   request: ArchiveAccountRoomRequest
 ): Promise<ApiResult<ManagedRoom>> {
   return call('setAccountRoomArchived', context, request, {
+    enterprise_id: enterpriseId,
+    room_id: roomId
+  });
+}
+
+export function listAccountBadges(context: RequestContext, enterpriseId: string): Promise<ApiResult<ManagedBadge[]>> {
+  return call('listAccountBadges', context, undefined, { enterprise_id: enterpriseId });
+}
+
+export function createAccountBadge(
+  context: RequestContext,
+  enterpriseId: string,
+  request: CreateBadgeRequest
+): Promise<ApiResult<BadgeMutationResponse>> {
+  if (!isCreateBadgeRequest(request)) {
+    return Promise.resolve({ ok: false, status: 400, code: 'invalid', message: 'Invalid badge creation.' });
+  }
+  return call('createAccountBadge', context, request, { enterprise_id: enterpriseId });
+}
+
+export function updateAccountBadge(
+  context: RequestContext,
+  enterpriseId: string,
+  badgeId: string,
+  request: UpdateBadgeRequest
+): Promise<ApiResult<BadgeMutationResponse>> {
+  if (!isUuid(badgeId) || !isUpdateBadgeRequest(request)) {
+    return Promise.resolve({ ok: false, status: 400, code: 'invalid', message: 'Invalid badge update.' });
+  }
+  return call('updateAccountBadge', context, request, { enterprise_id: enterpriseId, badge_id: badgeId });
+}
+
+export function deleteAccountBadge(
+  context: RequestContext,
+  enterpriseId: string,
+  badgeId: string,
+  request: DeleteBadgeRequest
+): Promise<ApiResult<BadgeMutationResponse>> {
+  if (!isUuid(badgeId) || !isDeleteBadgeRequest(request)) {
+    return Promise.resolve({ ok: false, status: 400, code: 'invalid', message: 'Invalid badge deletion.' });
+  }
+  return call('deleteAccountBadge', context, request, { enterprise_id: enterpriseId, badge_id: badgeId });
+}
+
+export function assignAccountRoomBadges(
+  context: RequestContext,
+  enterpriseId: string,
+  roomId: string,
+  request: AssignBadgesRequest
+): Promise<ApiResult<BadgeMutationResponse>> {
+  if (!isAssignBadgesRequest(request)) {
+    return Promise.resolve({ ok: false, status: 400, code: 'invalid', message: 'Invalid badge assignment.' });
+  }
+  return call('assignAccountRoomBadges', context, request, {
     enterprise_id: enterpriseId,
     room_id: roomId
   });

@@ -625,115 +625,126 @@ export const impersonations = pgTable(
 export const IMPERSONATION_TTL_MS = 15 * 60 * 1000;
 
 /** Account-level badges. The reference renders Badge / Actions columns. */
-export const badges = pgTable('badges', {
-  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-  accountId: integer('account_id')
-    .notNull()
-    .references(() => accounts.id),
-  label: text('label').notNull(),
-  textColor: text('text_color').notNull().default('#ffffff'),
-  backgroundColor: text('background_color').notNull().default('#777777'),
-  emoji: text('emoji'),
-  /** An image badge, stored inline as a data URL — see the uploadImageBadge action. */
-  imageUrl: text('image_url'),
-  /**
-   * The third of the reference's three badge row actions, "Dark Theme" —
-   * `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` (#759/#760/#761). It hands the
-   * badge's CURRENT value back to the handler, which is the shape of a toggle rather than a setter.
-   *
-   * NOT NULL with a `false` default, so every badge that predates the column is valid and reads as
-   * "not marked", which is what a badge nobody has pressed the control on is.
-   *
-   * HONEST GAP, recorded rather than papered over. The reference's stylesheet carries
-   * `.dark-theme-badge-id { font-size: 10px }` (evidence-dumps/NEXT-STEP/gaps/sheet-9.css:2564),
-   * sitting in the same group as `.room-badge-id` and `.room-badge-name` — a class whose name is
-   * about rendering an ID. That is consistent with `darkTheme` holding the id of a SEPARATE
-   * dark-theme variant badge rather than a flag. It cannot be settled from what is here: the
-   * account capture's badges `<tbody>` is empty (evidence-dumps/login-page/logged-in-page:604), so
-   * the row markup #754–#761 is not in this repository at all. A boolean is the least the handler
-   * signature supports and the most the evidence proves; if that markup is captured later and shows
-   * an id, that is a new migration, not a rewrite.
-   *
-   * ## IT IS NOW CAPTURED, AND IT SHOWS AN ID. This column is the wrong type. (2026-08-13)
-   *
-   * `evidence-dumps/TIER1-fetched/views/page.welcome.html:1191-1211` — the fetched TEMPLATE, which
-   * the empty capture could never have shown — renders the Dark Theme cell as a nested repeat over
-   * the badge list, filtered by:
-   *
-   *     ng-if="roomBadge._id === b.darkTheme"
-   *
-   * and draws that badge's own chip inline, with its `bkcolor` and `color`. **A boolean cannot be
-   * compared to an `_id`.** `darkTheme` holds the id of another badge — the dark-theme VARIANT of
-   * this one — exactly as the `.dark-theme-badge-id` class name suggested.
-   *
-   * NOT changed here yet, and that is deliberate. The STORAGE is proven and so is the DISPLAY, but
-   * the control that SETS it is not: `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` hands
-   * back the current value, which is the shape of a picker, and no picker appears in any capture.
-   * Migrating to an id column now would leave a column nothing can write — the defect T5-20 was,
-   * for four months, until the room started reporting its own subscriber count on 2026-08-31. Tracked as **T5-27** with the migration plan; the boolean stays until the setter is
-   * evidenced, and is now known to be a placeholder rather than the model.
-   *
-   * Equally honest: nothing here invents what a dark-theme badge LOOKS like. No CSS in our evidence
-   * describes a dark-theme chip, so the flag is stored, round-tripped and surfaced as the control's
-   * pressed state — and the chip renders exactly as it did before.
-   *
-   * It is NOT in Export Badges any more, and that changed on 2026-08-09. That export used to be a
-   * JSON dump of these rows, so every column rode along. The reference's `exportBadges()` was then
-   * captured and it writes CSV through a `convertToCSV` with ELEVEN fixed keys, none of them this
-   * one. Matching that key list matters more than carrying an extra flag into a file whose purpose
-   * is to interchange with the original's.
-   */
-  /**
-   * SUPERSEDED 2026-08-15 by `darkThemeBadgeId`, and kept because migrations are forward-only.
-   *
-   * Nothing reads it. It records only that somebody once pressed a control this repository had
-   * modelled as a toggle, and it cannot say WHICH badge they meant — see the column below.
-   *
-   * THAT SENTENCE WAS FALSE FOR TWO DAYS, WHICH IS WHY IT NOW NAMES ITS ONE FORMER READER.
-   * `internal/room-config/[code]/+server.ts` went on reading THIS column after `darkThemeBadgeId`
-   * landed, as `typeof badge.darkTheme === 'number' ? … : undefined` — an expression that is
-   * unsatisfiable against a boolean, so the room was sent `undefined` every time and the dark-theme
-   * variant never rendered. Corrected 2026-08-17; the endpoint now reads the column below. A
-   * "nothing reads it" comment is exactly the kind this repository requires to match the next line,
-   * and this one did not.
-   */
-  darkTheme: boolean('dark_theme').notNull().default(false),
-  /**
-   * The badge shown INSTEAD of this one in the dark theme, and the setter is now captured verbatim.
-   *
-   * `$scope.addBadgeDarkTheme`, byte 202828 of the live `app.min.js`, opens a `bootbox.dialog` whose
-   * body is a free-text input SEEDED with the current value and posts what was typed:
-   *
-   * ```js
-   * message: "<p>Add a badge id to show in the dark theme instead of this badge: " + b +
-   *   '</p><p><input type="text" value="' + darkThemeID + '" id="darkThemeID" class="form-control"/></p>'
-   * confirm: { label: "Set", className: "btn btn-inverse",
-   *            callback: … args.darkTheme = $("#darkThemeID").val() … }
-   * ```
-   *
-   * So it is neither a picker nor a toggle, and the note above this column read the current value
-   * being passed back as proof of a toggle — which is exactly the inference the evidence refutes.
-   * It is passed back to SEED THE FIELD.
-   *
-   * That also explains the badge table's `ng-dblclick="showBadgeID=!showBadgeID"` header and the
-   * hidden `.room-badge-id` span on each row: double-clicking reveals the ids so an admin has one to
-   * paste in here. Two captured details that only make sense together.
-   *
-   * NULL means no variant is set, which is every row until somebody nominates one — the boolean it
-   * supersedes never recorded which badge, so `true` backfills to NULL and nothing is invented.
-   */
-  darkThemeBadgeId: integer('dark_theme_badge_id').references(
-    /*
+export const badges = pgTable(
+  'badges',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    accountId: integer('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    label: text('label').notNull(),
+    textColor: text('text_color').notNull().default('#ffffff'),
+    backgroundColor: text('background_color').notNull().default('#777777'),
+    emoji: text('emoji'),
+    /** An image badge, stored inline as a data URL — see the uploadImageBadge action. */
+    imageUrl: text('image_url'),
+    /** Canonical Rust badge identity and the exact revision represented by this projection. */
+    authorityBadgeId: uuid('authority_badge_id'),
+    authorityRevision: bigint('authority_revision', { mode: 'number' }),
+    authorityContentHash: text('authority_content_hash'),
+    authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true }),
+    /** Captured comma-separated role assignment, normalized into a JSON string array. */
+    autoAssignRolesJson: text('auto_assign_roles_json').notNull().default('[]'),
+    /**
+     * The third of the reference's three badge row actions, "Dark Theme" —
+     * `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` (#759/#760/#761). It hands the
+     * badge's CURRENT value back to the handler, which is the shape of a toggle rather than a setter.
+     *
+     * NOT NULL with a `false` default, so every badge that predates the column is valid and reads as
+     * "not marked", which is what a badge nobody has pressed the control on is.
+     *
+     * HONEST GAP, recorded rather than papered over. The reference's stylesheet carries
+     * `.dark-theme-badge-id { font-size: 10px }` (evidence-dumps/NEXT-STEP/gaps/sheet-9.css:2564),
+     * sitting in the same group as `.room-badge-id` and `.room-badge-name` — a class whose name is
+     * about rendering an ID. That is consistent with `darkTheme` holding the id of a SEPARATE
+     * dark-theme variant badge rather than a flag. It cannot be settled from what is here: the
+     * account capture's badges `<tbody>` is empty (evidence-dumps/login-page/logged-in-page:604), so
+     * the row markup #754–#761 is not in this repository at all. A boolean is the least the handler
+     * signature supports and the most the evidence proves; if that markup is captured later and shows
+     * an id, that is a new migration, not a rewrite.
+     *
+     * ## IT IS NOW CAPTURED, AND IT SHOWS AN ID. This column is the wrong type. (2026-08-13)
+     *
+     * `evidence-dumps/TIER1-fetched/views/page.welcome.html:1191-1211` — the fetched TEMPLATE, which
+     * the empty capture could never have shown — renders the Dark Theme cell as a nested repeat over
+     * the badge list, filtered by:
+     *
+     *     ng-if="roomBadge._id === b.darkTheme"
+     *
+     * and draws that badge's own chip inline, with its `bkcolor` and `color`. **A boolean cannot be
+     * compared to an `_id`.** `darkTheme` holds the id of another badge — the dark-theme VARIANT of
+     * this one — exactly as the `.dark-theme-badge-id` class name suggested.
+     *
+     * NOT changed here yet, and that is deliberate. The STORAGE is proven and so is the DISPLAY, but
+     * the control that SETS it is not: `addBadgeDarkTheme(b._id, b.text, b.imgURL, b.darkTheme)` hands
+     * back the current value, which is the shape of a picker, and no picker appears in any capture.
+     * Migrating to an id column now would leave a column nothing can write — the defect T5-20 was,
+     * for four months, until the room started reporting its own subscriber count on 2026-08-31. Tracked as **T5-27** with the migration plan; the boolean stays until the setter is
+     * evidenced, and is now known to be a placeholder rather than the model.
+     *
+     * Equally honest: nothing here invents what a dark-theme badge LOOKS like. No CSS in our evidence
+     * describes a dark-theme chip, so the flag is stored, round-tripped and surfaced as the control's
+     * pressed state — and the chip renders exactly as it did before.
+     *
+     * It is NOT in Export Badges any more, and that changed on 2026-08-09. That export used to be a
+     * JSON dump of these rows, so every column rode along. The reference's `exportBadges()` was then
+     * captured and it writes CSV through a `convertToCSV` with ELEVEN fixed keys, none of them this
+     * one. Matching that key list matters more than carrying an extra flag into a file whose purpose
+     * is to interchange with the original's.
+     */
+    /**
+     * SUPERSEDED 2026-08-15 by `darkThemeBadgeId`, and kept because migrations are forward-only.
+     *
+     * Nothing reads it. It records only that somebody once pressed a control this repository had
+     * modelled as a toggle, and it cannot say WHICH badge they meant — see the column below.
+     *
+     * THAT SENTENCE WAS FALSE FOR TWO DAYS, WHICH IS WHY IT NOW NAMES ITS ONE FORMER READER.
+     * `internal/room-config/[code]/+server.ts` went on reading THIS column after `darkThemeBadgeId`
+     * landed, as `typeof badge.darkTheme === 'number' ? … : undefined` — an expression that is
+     * unsatisfiable against a boolean, so the room was sent `undefined` every time and the dark-theme
+     * variant never rendered. Corrected 2026-08-17; the endpoint now reads the column below. A
+     * "nothing reads it" comment is exactly the kind this repository requires to match the next line,
+     * and this one did not.
+     */
+    darkTheme: boolean('dark_theme').notNull().default(false),
+    /**
+     * The badge shown INSTEAD of this one in the dark theme, and the setter is now captured verbatim.
+     *
+     * `$scope.addBadgeDarkTheme`, byte 202828 of the live `app.min.js`, opens a `bootbox.dialog` whose
+     * body is a free-text input SEEDED with the current value and posts what was typed:
+     *
+     * ```js
+     * message: "<p>Add a badge id to show in the dark theme instead of this badge: " + b +
+     *   '</p><p><input type="text" value="' + darkThemeID + '" id="darkThemeID" class="form-control"/></p>'
+     * confirm: { label: "Set", className: "btn btn-inverse",
+     *            callback: … args.darkTheme = $("#darkThemeID").val() … }
+     * ```
+     *
+     * So it is neither a picker nor a toggle, and the note above this column read the current value
+     * being passed back as proof of a toggle — which is exactly the inference the evidence refutes.
+     * It is passed back to SEED THE FIELD.
+     *
+     * That also explains the badge table's `ng-dblclick="showBadgeID=!showBadgeID"` header and the
+     * hidden `.room-badge-id` span on each row: double-clicking reveals the ids so an admin has one to
+     * paste in here. Two captured details that only make sense together.
+     *
+     * NULL means no variant is set, which is every row until somebody nominates one — the boolean it
+     * supersedes never recorded which badge, so `true` backfills to NULL and nothing is invented.
+     */
+    darkThemeBadgeId: integer('dark_theme_badge_id').references(
+      /*
       `AnyPgColumn` and not an inferred return, because this is the schema's only SELF-reference and
       without the annotation `badges` is defined in terms of itself: TypeScript gives up and types
       the whole table `any`, which then silently unt-types every badge read in the application. This
       is Drizzle's documented shape for a self-referencing key, and it cost four errors to find.
     */
-    (): AnyPgColumn => badges.id,
-    { onDelete: 'set null' }
-  ),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull()
-});
+      (): AnyPgColumn => badges.id,
+      { onDelete: 'set null' }
+    ),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull()
+  },
+  (t) => [uniqueIndex('badges_authority_badge_idx').on(t.authorityBadgeId)]
+);
 
 /** Account-level extra admins. Reference empty state: "No admin users added yet". */
 export const adminUsers = pgTable('admin_users', {

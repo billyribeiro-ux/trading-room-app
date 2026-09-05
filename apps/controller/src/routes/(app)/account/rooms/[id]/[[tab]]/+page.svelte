@@ -695,8 +695,15 @@
    * constraint in that wording is real — the value becomes a URL path segment — so it is also
    * enforced here rather than only described.
    */
-  let vanityForm = $state<HTMLFormElement | null>(null);
+  let vanityForm: HTMLFormElement | null = null;
   let vanitySlug = $state('');
+
+  function attachVanityForm(element: HTMLFormElement) {
+    vanityForm = element;
+    return () => {
+      if (vanityForm === element) vanityForm = null;
+    };
+  }
 
   async function editVanity() {
     const entered = await bootbox.prompt(
@@ -1221,7 +1228,7 @@ Please click this link to attend: ______ unique link will be here_____
             action="?/setCustomRoomURL"
             use:enhance={save}
             id="vanity-editor"
-            bind:this={vanityForm}
+            {@attach attachVanityForm}
             hidden
           >
             <input type="hidden" name="slug" bind:value={vanitySlug} />
@@ -1355,6 +1362,7 @@ Please click this link to attend: ______ unique link will be here_____
                         </li>
                         <li>
                           <form method="POST" action="?/removeBadgesForUsers" use:enhance={confirmThen('Remove all badges from every user in this room?')}>
+                            <input type="hidden" name="requestId" value={data.badgeAssignmentRequestId} />
                             <button type="submit"><i class="fa fa-trash-o"></i> Remove All User Badges</button>
                           </form>
                         </li>
@@ -1468,6 +1476,7 @@ Please click this link to attend: ______ unique link will be here_____
                               {#each data.badges as badge (badge.id)}
                                 <li>
                                   <form method="POST" action="?/updateManyUsersBadge" use:enhance={save}>
+                                    <input type="hidden" name="requestId" value={data.badgeAssignmentRequestId} />
                                     <input type="hidden" name="mode" value={mode} />
                                     <input type="hidden" name="badgeId" value={badge.id} />
                                     {#if applyToAllRooms}
@@ -2101,6 +2110,7 @@ Please click this link to attend: ______ unique link will be here_____
                                         {#each data.badges as badge (badge.id)}
                                           <li>
                                             <form method="POST" action="?/toggleUserBadge" use:enhance={save}>
+                                              <input type="hidden" name="requestId" value={data.badgeAssignmentRequestId} />
                                               <input type="hidden" name="roomUserId" value={member.id} />
                                               <input type="hidden" name="badgeId" value={badge.id} />
                                               <button type="submit">
@@ -3374,7 +3384,7 @@ Please click this link to attend: ______ unique link will be here_____
               type="password"
               autocomplete="current-password"
               required
-              use:focusOnMount
+              {@attach focusOnMount}
             />
           </div>
           <div class="modal-footer text-right">

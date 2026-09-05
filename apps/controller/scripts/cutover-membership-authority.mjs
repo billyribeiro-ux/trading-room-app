@@ -439,7 +439,7 @@ export function resolveMembershipPlan(rows, mappings, allocate) {
 }
 
 /** @param {TargetMember} member */
-function canonicalContentHash(member) {
+export function canonicalMembershipContentHash(member) {
   return digest([
     member.id,
     member.roomId,
@@ -513,13 +513,19 @@ function targetMember(raw) {
 }
 
 /** @param {SqlHandle} sql @param {string} targetId @param {boolean} [lock] @returns {Promise<TargetMember | null>} */
-async function targetState(sql, targetId, lock = false) {
+export async function readCanonicalMembership(sql, targetId, lock = false) {
   const suffix = lock ? sql` FOR UPDATE OF member` : sql``;
   const rows = await sql`
     SELECT member.id::text AS id, member.enterprise_id::text AS "enterpriseId",
            member.room_id::text AS "roomId", member.user_id::text AS "userId", identity.email::text AS email,
            COALESCE(member.display_name, identity.display_name) AS "displayName", member.role,
-           member.revision::bigint AS revision, member.badges, member.can_publish_mic AS "canPublishMic",
+           member.revision::bigint AS revision,
+           COALESCE((SELECT jsonb_agg(assignment.badge_id::text ORDER BY assignment.badge_id)
+                     FROM room_member_badges AS assignment
+                    WHERE assignment.enterprise_id = member.enterprise_id
+                      AND assignment.room_id = member.room_id
+                      AND assignment.member_id = member.id), '[]'::jsonb) AS badges,
+           member.can_publish_mic AS "canPublishMic",
            member.can_publish_screen AS "canPublishScreen", member.can_publish_cam AS "canPublishCam",
            member.can_use_admin_chat AS "canUseAdminChat", member.can_edit_notes AS "canEditNotes",
            member.can_access_files AS "canAccessFiles", member.can_access_archives AS "canAccessArchives",
@@ -667,14 +673,14 @@ async function verifyState(sourceSql, targetSql, fingerprint, expectedRunId = nu
   const { plan, state } = await planState(sourceSql, targetSql, fingerprint);
   if (plan.some((item) => !item.mapped)) refuse('missing-target-mapping', 'A source membership is not mapped.');
   for (const item of plan) {
-    const target = await targetState(targetSql, item.targetId);
+    const target = await readCanonicalMembership(targetSql, item.targetId);
     if (!target || !coreMatches(item.row, target)) {
       refuse('membership-reconciliation-failed', 'A canonical membership differs from its source projection.');
     }
     if (
       item.row.targetId !== item.targetId ||
       item.row.authorityRevision !== 0 ||
-      item.row.authorityContentHash !== canonicalContentHash(target)
+      item.row.authorityContentHash !== canonicalMembershipContentHash(target)
     ) {
       refuse('source-projection-incomplete', 'A controller membership proof differs from canonical state.');
     }
@@ -697,9 +703,9 @@ async function verifyState(sourceSql, targetSql, fingerprint, expectedRunId = nu
   const targetDigest = digest(
     await Promise.all(
       plan.map(async (item) => {
-        const target = await targetState(targetSql, item.targetId);
+        const target = await readCanonicalMembership(targetSql, item.targetId);
         if (!target) refuse('missing-target-membership', 'A mapped canonical membership is missing.');
-        return canonicalContentHash(target);
+        return canonicalMembershipContentHash(target);
       })
     )
   );
@@ -751,7 +757,7 @@ async function applyCommand(sourceSql, targetSql, fingerprint) {
           if (relation.length !== 1 || relation[0].id !== item.targetId) {
             refuse('target-relation-disagreement', 'A mapped target membership relation changed concurrently.');
           }
-          const target = await targetState(tx, item.targetId, true);
+          const target = await readCanonicalMembership(tx, item.targetId, true);
           if (!coreMatches(item.row, target)) {
             refuse('target-changed-during-resume', 'Canonical membership changed after the import commit.');
           }
@@ -767,7 +773,7 @@ async function applyCommand(sourceSql, targetSql, fingerprint) {
           if (relation.length !== 1 || relation[0].id !== item.targetId) {
             refuse('missing-target-owner', 'The room converter owner foundation changed concurrently.');
           }
-          const foundation = await targetState(tx, item.targetId, true);
+          const foundation = await readCanonicalMembership(tx, item.targetId, true);
           if (!foundation || foundation.role !== 'owner' || foundation.revision !== 0) {
             refuse('unproven-existing-target', 'The canonical owner membership has already been used.');
           }
@@ -810,7 +816,7 @@ async function applyCommand(sourceSql, targetSql, fingerprint) {
                     ${item.row.createdAt}, ${item.row.createdAt}, ${item.row.createdAt})
           `;
         }
-        const target = await targetState(tx, item.targetId, true);
+        const target = await readCanonicalMembership(tx, item.targetId, true);
         if (!coreMatches(item.row, target)) {
           refuse('target-write-disagreement', 'Canonical membership did not reproduce the source state.');
         }
@@ -837,10 +843,10 @@ async function applyCommand(sourceSql, targetSql, fingerprint) {
     );
     const projection = new Map();
     for (const item of committedPlan) {
-      const target = await targetState(targetSql, item.targetId);
+      const target = await readCanonicalMembership(targetSql, item.targetId);
       if (!target || !coreMatches(item.row, target))
         refuse('target-write-disagreement', 'Canonical target changed before projection.');
-      projection.set(item.row.legacyId, { id: item.targetId, hash: canonicalContentHash(target) });
+      projection.set(item.row.legacyId, { id: item.targetId, hash: canonicalMembershipContentHash(target) });
     }
     await sourceSql.begin('isolation level serializable', async (/** @type {TransactionSql} */ tx) => {
       const current = await readSource(tx);
@@ -884,7 +890,7 @@ async function rollbackSafe(sql, plan) {
      ORDER BY source.relname, source_attribute.attname
   `;
   for (const item of plan) {
-    const target = await targetState(sql, item.targetId, true);
+    const target = await readCanonicalMembership(sql, item.targetId, true);
     if (!target || !coreMatches(item.row, target) || JSON.stringify(target.badges) !== '[]') {
       refuse('rollback-after-use', 'Membership authority changed after conversion; rollback is refused.');
     }

@@ -31,4 +31,15 @@ describe('Gate 3 authority identity mapping', () => {
     expect(migration?.sql).toContain('room_users_authority_revision_nonnegative');
     expect(migration?.sql).not.toMatch(/NOT NULL/);
   });
+
+  it('adds badge identity, revision, content proof, and captured roles forward-only', () => {
+    const migration = MIGRATIONS.find(({ version }) => version === 22);
+    expect(migration?.name).toBe('authority_badge_projection');
+    expect(migration?.sql).toContain('ADD COLUMN authority_badge_id UUID');
+    expect(migration?.sql).toContain('ADD COLUMN authority_revision BIGINT');
+    expect(migration?.sql).toContain('ADD COLUMN authority_content_hash TEXT');
+    expect(migration?.sql).toContain('ADD COLUMN auto_assign_roles_json TEXT');
+    expect(migration?.sql).toContain('badges_authority_badge_idx');
+    expect(migration?.sql).toContain('badges_authority_revision_nonnegative');
+  });
 });

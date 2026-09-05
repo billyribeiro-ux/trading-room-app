@@ -419,7 +419,7 @@ pub async fn invite(
         &mut tx,
         moderation::AuditEntry {
             enterprise_id: path.enterprise_id,
-            room_id: path.room_id,
+            room_id: Some(path.room_id),
             actor_user_id: user.user_id,
             actor_name: &user.display_name,
             event_name: "room.members.invited",
@@ -509,7 +509,7 @@ pub async fn manage(
             &mut tx,
             moderation::AuditEntry {
                 enterprise_id: path.enterprise_id,
-                room_id: path.room_id,
+                room_id: Some(path.room_id),
                 actor_user_id: user.user_id,
                 actor_name: &user.display_name,
                 event_name: mutation.event_name(),
@@ -642,7 +642,7 @@ pub async fn room_control(
             &mut tx,
             moderation::AuditEntry {
                 enterprise_id: path.enterprise_id,
-                room_id: path.room_id,
+                room_id: Some(path.room_id),
                 actor_user_id: actor.user_id,
                 actor_name: &actor.display_name,
                 event_name: mutation.event_name(),

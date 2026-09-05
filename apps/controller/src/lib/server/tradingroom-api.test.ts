@@ -6,11 +6,16 @@ import {
   UnsafeApiCookieError,
   apiCookieHeader,
   applyApiCookies,
+  assignAccountRoomBadges,
   clearApiCookies,
+  createAccountBadge,
   createAccountRoom,
+  deleteAccountBadge,
   getAccountRoomSettings,
   getAccountBootstrap,
   isArchiveAccountRoomRequest,
+  isAssignBadgesRequest,
+  isCreateBadgeRequest,
   isCreateAccountRoomRequest,
   isInviteMemberRequest,
   isLoginRequest,
@@ -20,6 +25,7 @@ import {
   isPreferencesRequest,
   isProfileUpdateRequest,
   inviteAccountRoomMember,
+  listAccountBadges,
   listAccountRooms,
   listAccountRoomMembers,
   login,
@@ -27,6 +33,7 @@ import {
   manageAccountRoomMembers,
   patchAccountRoomSettings,
   setAccountRoomArchived,
+  updateAccountBadge,
   updateAccountProfile
 } from './tradingroom-api';
 
@@ -34,6 +41,7 @@ const USER_ID = 'a0000001-0000-4000-8000-000000000001';
 const ACCOUNT_ID = 'a0000000-0000-4000-8000-000000000001';
 const ROOM_ID = 'a0000003-0000-4000-8000-000000000001';
 const MEMBER_ID = 'a0000002-0000-4000-8000-000000000001';
+const BADGE_ID = 'a0000004-0000-4000-8000-000000000001';
 
 function cookieJar(initial: Record<string, string> = {}) {
   const values = new Map(Object.entries(initial));
@@ -717,6 +725,150 @@ describe('typed Rust API transport', () => {
       })
     ).resolves.toMatchObject({ ok: false, status: 400, code: 'invalid' });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('validates exact canonical badge and assignment envelopes', () => {
+    const fields = {
+      requestId: USER_ID,
+      label: 'Desk',
+      textColor: '#ffffff',
+      backgroundColor: 'rgba(1,0,0,0)',
+      emoji: 'D',
+      imageDataUrl: null,
+      darkThemeBadgeId: null,
+      autoAssignRoles: ['moderator', 'presenter']
+    };
+    expect(isCreateBadgeRequest(fields)).toBe(true);
+    expect(isCreateBadgeRequest({ ...fields, label: '', imageDataUrl: null })).toBe(false);
+    expect(isCreateBadgeRequest({ ...fields, autoAssignRoles: ['Presenter'] })).toBe(false);
+    expect(isCreateBadgeRequest({ ...fields, authorityRevision: 1 })).toBe(false);
+
+    const target = { memberId: MEMBER_ID, expectedRevision: 7 };
+    expect(
+      isAssignBadgesRequest({
+        requestId: USER_ID,
+        targets: [target],
+        allRooms: true,
+        operation: { type: 'setBadge', badgeId: BADGE_ID, assigned: true }
+      })
+    ).toBe(true);
+    expect(
+      isAssignBadgesRequest({
+        requestId: USER_ID,
+        targets: [target, target],
+        operation: { type: 'clearBadges' }
+      })
+    ).toBe(false);
+    expect(
+      isAssignBadgesRequest({
+        requestId: USER_ID,
+        targets: [target],
+        operation: { type: 'setBadge', badgeId: 'local-row-7', assigned: true }
+      })
+    ).toBe(false);
+  });
+
+  it('transports badge CRUD and revision-locked assignments only on their exact paths', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const managed = {
+      id: BADGE_ID,
+      revision: 3,
+      label: 'Desk',
+      textColor: '#ffffff',
+      backgroundColor: '#123456',
+      emoji: 'D',
+      imageDataUrl: null,
+      darkThemeBadgeId: null,
+      autoAssignRoles: ['moderator'],
+      createdAt: '2026-09-05T12:00:00Z',
+      updatedAt: '2026-09-05T12:00:00Z'
+    };
+    const create = {
+      requestId: USER_ID,
+      label: managed.label,
+      textColor: managed.textColor,
+      backgroundColor: managed.backgroundColor,
+      emoji: managed.emoji,
+      imageDataUrl: managed.imageDataUrl,
+      darkThemeBadgeId: managed.darkThemeBadgeId,
+      autoAssignRoles: managed.autoAssignRoles
+    };
+    const update = { ...create, expectedRevision: 3 };
+    const deletion = { requestId: USER_ID, expectedRevision: 3 };
+    const assignment = {
+      requestId: USER_ID,
+      targets: [{ memberId: MEMBER_ID, expectedRevision: 7 }],
+      operation: { type: 'setBadge' as const, badgeId: BADGE_ID, assigned: true }
+    };
+    const mutation = { badges: [managed], members: [], removedBadgeIds: [], changed: 1 };
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const expectedBase = `http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}`;
+      expect(new Headers(init?.headers).get('cookie')).toBe(`${ACCESS_COOKIE}=access-only`);
+      if (init?.method === 'GET') {
+        expect(url).toBe(`${expectedBase}/badges`);
+        return new Response(JSON.stringify([managed]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (init?.method === 'POST' && url === `${expectedBase}/badges`) {
+        expect(JSON.parse(String(init.body))).toEqual(create);
+      } else if (init?.method === 'PATCH') {
+        expect(url).toBe(`${expectedBase}/badges/${BADGE_ID}`);
+        expect(JSON.parse(String(init.body))).toEqual(update);
+      } else if (init?.method === 'DELETE') {
+        expect(url).toBe(`${expectedBase}/badges/${BADGE_ID}`);
+        expect(JSON.parse(String(init.body))).toEqual(deletion);
+      } else {
+        expect(init?.method).toBe('POST');
+        expect(url).toBe(`${expectedBase}/rooms/${ROOM_ID}/badge-assignments`);
+        expect(JSON.parse(String(init?.body))).toEqual(assignment);
+      }
+      return new Response(JSON.stringify(mutation), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+    const context = { cookies: jar.cookies, origin: 'https://www.example.test', fetch };
+
+    await expect(listAccountBadges(context, ACCOUNT_ID)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: [managed]
+    });
+    await expect(createAccountBadge(context, ACCOUNT_ID, create)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: mutation
+    });
+    await expect(updateAccountBadge(context, ACCOUNT_ID, BADGE_ID, update)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: mutation
+    });
+    await expect(deleteAccountBadge(context, ACCOUNT_ID, BADGE_ID, deletion)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: mutation
+    });
+    await expect(assignAccountRoomBadges(context, ACCOUNT_ID, ROOM_ID, assignment)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: mutation
+    });
+    expect(fetch).toHaveBeenCalledTimes(5);
+
+    const leakingFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify([{ ...managed, accountId: ACCOUNT_ID }]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    await expect(
+      listAccountBadges({ cookies: jar.cookies, origin: 'https://www.example.test', fetch: leakingFetch }, ACCOUNT_ID)
+    ).resolves.toMatchObject({ ok: false, status: 502, code: 'invalidUpstreamResponse' });
   });
 
   it('validates every membership mutation envelope before transport', () => {

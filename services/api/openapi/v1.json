@@ -202,6 +202,113 @@
         ],
         "type": "object"
       },
+      "AssignBadgesRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allRooms": {
+            "type": "boolean"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/BadgeAssignmentOperation"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/MemberTarget"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "requestId",
+          "targets",
+          "operation"
+        ],
+        "type": "object"
+      },
+      "BadgeAssignmentOperation": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "assigned": {
+                "type": "boolean"
+              },
+              "badgeId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "setBadge"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "badgeId",
+              "assigned"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "enum": [
+                  "clearBadges"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "BadgeMutationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "badges": {
+            "items": {
+              "$ref": "#/components/schemas/ManagedBadge"
+            },
+            "type": "array"
+          },
+          "changed": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/ManagedMember"
+            },
+            "type": "array"
+          },
+          "removedBadgeIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "badges",
+          "members",
+          "removedBadgeIds",
+          "changed"
+        ],
+        "type": "object"
+      },
       "CreateAccountRoomRequest": {
         "additionalProperties": false,
         "properties": {
@@ -220,6 +327,69 @@
         "required": [
           "requestId",
           "name"
+        ],
+        "type": "object"
+      },
+      "CreateBadgeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "autoAssignRoles": {
+            "items": {
+              "maxLength": 64,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "backgroundColor": {
+            "pattern": "^(#[0-9A-Fa-f]{6}|rgba\\(1,0,0,0\\))$",
+            "type": "string"
+          },
+          "darkThemeBadgeId": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "emoji": {
+            "maxLength": 128,
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-maxBytes": 128
+          },
+          "imageDataUrl": {
+            "maxLength": 360000,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "maxLength": 160,
+            "type": "string",
+            "x-maxBytes": 160
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "textColor": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "label",
+          "textColor",
+          "backgroundColor",
+          "emoji",
+          "imageDataUrl",
+          "darkThemeBadgeId",
+          "autoAssignRoles"
         ],
         "type": "object"
       },
@@ -250,6 +420,24 @@
           "isPlatformAdmin",
           "isGuest",
           "preferences"
+        ],
+        "type": "object"
+      },
+      "DeleteBadgeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision"
         ],
         "type": "object"
       },
@@ -701,6 +889,85 @@
         ],
         "type": "object"
       },
+      "ManagedBadge": {
+        "additionalProperties": false,
+        "properties": {
+          "autoAssignRoles": {
+            "items": {
+              "maxLength": 64,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "backgroundColor": {
+            "pattern": "^(#[0-9A-Fa-f]{6}|rgba\\(1,0,0,0\\))$",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "darkThemeBadgeId": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "emoji": {
+            "maxLength": 128,
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-maxBytes": 128
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "imageDataUrl": {
+            "maxLength": 360000,
+            "type": [
+              "string",
+              "null"
+            ],
+            "writeOnly": false
+          },
+          "label": {
+            "maxLength": 160,
+            "type": "string",
+            "x-maxBytes": 160
+          },
+          "revision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "textColor": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "label",
+          "textColor",
+          "backgroundColor",
+          "emoji",
+          "imageDataUrl",
+          "darkThemeBadgeId",
+          "autoAssignRoles",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
       "ManagedMember": {
         "additionalProperties": false,
         "properties": {
@@ -1055,6 +1322,74 @@
           "expiresAt"
         ],
         "type": "object"
+      },
+      "UpdateBadgeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "autoAssignRoles": {
+            "items": {
+              "maxLength": 64,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "backgroundColor": {
+            "pattern": "^(#[0-9A-Fa-f]{6}|rgba\\(1,0,0,0\\))$",
+            "type": "string"
+          },
+          "darkThemeBadgeId": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "emoji": {
+            "maxLength": 128,
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-maxBytes": 128
+          },
+          "expectedRevision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "imageDataUrl": {
+            "maxLength": 360000,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "maxLength": 160,
+            "type": "string",
+            "x-maxBytes": 160
+          },
+          "requestId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "textColor": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "expectedRevision",
+          "label",
+          "textColor",
+          "backgroundColor",
+          "emoji",
+          "imageDataUrl",
+          "darkThemeBadgeId",
+          "autoAssignRoles"
+        ],
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -1395,6 +1730,217 @@
         ]
       }
     },
+    "/api/v1/accounts/{enterprise_id}/badges": {
+      "get": {
+        "operationId": "listAccountBadges",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManagedBadge"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Canonical enterprise badge definitions."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "createAccountBadge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBadgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once badge creation result."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/badges/{badge_id}": {
+      "delete": {
+        "operationId": "deleteAccountBadge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteBadgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once badge deletion and affected projections."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "badge_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "patch": {
+        "operationId": "updateAccountBadge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBadgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once revisioned badge update."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
     "/api/v1/accounts/{enterprise_id}/rooms": {
       "get": {
         "operationId": "listAccountRooms",
@@ -1540,6 +2086,76 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{enterprise_id}/rooms/{room_id}/badge-assignments": {
+      "parameters": [
+        {
+          "in": "path",
+          "name": "enterprise_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        {
+          "in": "path",
+          "name": "room_id",
+          "required": true,
+          "schema": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "assignAccountRoomBadges",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignBadgesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadgeMutationResponse"
+                }
+              }
+            },
+            "description": "Exactly-once revisioned member badge assignment."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"

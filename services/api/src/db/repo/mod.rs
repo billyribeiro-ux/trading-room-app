@@ -12,6 +12,7 @@ pub mod alert;
 pub mod event;
 pub mod identity;
 pub mod join;
+pub mod managed_badge;
 pub mod managed_membership;
 pub mod membership;
 pub mod message;

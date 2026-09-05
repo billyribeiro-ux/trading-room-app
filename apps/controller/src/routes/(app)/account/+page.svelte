@@ -129,6 +129,8 @@
   let badgeBk = $state('#ffcc00');
   let badgeFg = $state('#ffffff');
   let badgeText = $state('');
+  let badgeRoles = $state('');
+  let badgeMutationRequestId = $state('');
   /** Whether the emoji picker is open. Ours — the reference's button is bound by a script that is
       not in the capture, so the open/close mechanism is not evidenced; the PICKER is. */
   let showEmojiPicker = $state(false);
@@ -142,6 +144,8 @@
     emoji: string | null;
     backgroundColor: string;
     textColor: string;
+    autoAssignRolesJson: string;
+    mutationRequestId: string;
   }) {
     badgeId = badge.id;
     badgeMode = 'edit';
@@ -149,19 +153,22 @@
     badgeFg = badge.textColor;
     badgeText = badge.emoji ?? '';
     badgeName = badge.label;
+    try {
+      const roles: unknown = JSON.parse(badge.autoAssignRolesJson);
+      badgeRoles = Array.isArray(roles) && roles.every((role) => typeof role === 'string') ? roles.join(', ') : '';
+    } catch {
+      badgeRoles = '';
+    }
+    badgeMutationRequestId = badge.mutationRequestId;
     showAddBadge = true;
-    /*
-      `roles` is NOT prefilled, and that is an honest gap rather than an oversight: the reference
-      passes `b.roles` into editBadge, but this schema has no roles column and `createBadge` never
-      stored one, so there is nothing to read back. Prefilling it with anything would be inventing a
-      value.
-    */
   }
 
   /** The reference's Close: `badges.badgeID=''; badges.mode='add'; showAddBadge=false;` */
   function closeBadgeEditor() {
     badgeId = null;
     badgeMode = 'add';
+    badgeRoles = '';
+    badgeMutationRequestId = '';
     showAddBadge = false;
   }
 
@@ -381,10 +388,9 @@
    *   - a cell is quoted **only** when it is a string containing a comma. Nothing else is quoted,
    *     and an inner quote is never escaped.
    *
-   * Three of the eleven have no source in this application and are written empty, which is what the
+   * Two of the eleven have no source in this application and are written empty, which is what the
    * reference itself emits for a key an object does not carry: `type` and `onlyP` have no
-   * equivalent, and `roles` is collected by the editor but never stored — an honest gap already
-   * recorded at `+page.server.ts:345`.
+   * equivalent. `roles` is normalized and persisted by both authority modes.
    *
    * `darkTheme` is OURS and is deliberately NOT a twelfth column: the reference's key list is fixed,
    * and matching it matters more here than carrying one extra flag into a file whose whole purpose
@@ -419,7 +425,14 @@
       name: b.label,
       uploadTime: b.createdAt ? new Date(b.createdAt).toISOString() : '',
       onlyP: '',
-      roles: ''
+      roles: (() => {
+        try {
+          const value: unknown = JSON.parse(b.autoAssignRolesJson);
+          return Array.isArray(value) && value.every((role) => typeof role === 'string') ? value.join(',') : '';
+        } catch {
+          return '';
+        }
+      })()
     })) as Record<string, unknown>[];
 
     let csv = BADGE_CSV_KEYS.join(',') + '\n';
@@ -866,6 +879,11 @@
                `badges.mode` (logged-in-page:527-532), and it keeps the add path a plain static
                action rather than a computed string. -->
           <form method="POST" action="?/createBadge" use:enhance={saveBadge}>
+            <input
+              type="hidden"
+              name="requestId"
+              value={badgeMode === 'edit' ? badgeMutationRequestId : data.badgeCreateRequestId}
+            />
             <div class="acc-badge-row">
               <span>Background: </span>
               <input name="backgroundColor" type="color" bind:value={badgeBk} aria-label="Background" />
@@ -942,7 +960,14 @@
               />
             </div>
             <label for="badgeRolesTxt">Auto assign this badge to this WP roles (comma separated):</label>
-            <textarea class="input-text" id="badgeRolesTxt" name="roles" cols="70" rows="2"></textarea>
+            <textarea
+              class="input-text"
+              id="badgeRolesTxt"
+              name="roles"
+              cols="70"
+              rows="2"
+              bind:value={badgeRoles}
+            ></textarea>
             <hr />
             {#if badgeMode === 'edit'}
               <!-- `addBadge(true)` against `badges.badgeID`. The id travels as a field rather than
@@ -1002,6 +1027,7 @@
         hidden
       >
         <input type="hidden" name="label" bind:value={imageLabel} />
+        <input type="hidden" name="requestId" value={data.imageBadgeCreateRequestId} />
         <input
           {@attach attachImageInput}
           type="file"
@@ -1081,6 +1107,7 @@
                       use:enhance={confirmThen(`Delete badge "${badge.label}"? This cannot be undone.`)}
                     >
                       <input type="hidden" name="id" value={badge.id} />
+                      <input type="hidden" name="requestId" value={badge.mutationRequestId} />
                       <button class="acc-link" type="submit">Delete</button>
                     </form></span
                   >
@@ -1106,6 +1133,7 @@
                   <span class="acc-row-action"
                     ><form method="POST" action="?/addBadgeDarkTheme" use:enhance={saveDarkTheme}>
                       <input type="hidden" name="id" value={badge.id} />
+                      <input type="hidden" name="requestId" value={badge.mutationRequestId} />
                       <button
                         class="acc-link"
                         type="button"

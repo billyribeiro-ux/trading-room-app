@@ -32,7 +32,36 @@ export type AccountRoomSettings = {
 
 export type ArchiveAccountRoomRequest = { readonly archived: boolean };
 
+export type AssignBadgesRequest = {
+  readonly allRooms?: boolean;
+  readonly operation: BadgeAssignmentOperation;
+  readonly requestId: string;
+  readonly targets: Array<MemberTarget>;
+};
+
+export type BadgeAssignmentOperation =
+  | { readonly assigned: boolean; readonly badgeId: string; readonly type: 'setBadge' }
+  | { readonly type: 'clearBadges' };
+
+export type BadgeMutationResponse = {
+  readonly badges: Array<ManagedBadge>;
+  readonly changed: number;
+  readonly members: Array<ManagedMember>;
+  readonly removedBadgeIds: Array<string>;
+};
+
 export type CreateAccountRoomRequest = { readonly name: string; readonly requestId: string };
+
+export type CreateBadgeRequest = {
+  readonly autoAssignRoles: Array<string>;
+  readonly backgroundColor: string;
+  readonly darkThemeBadgeId: string | null;
+  readonly emoji: string | null;
+  readonly imageDataUrl: string | null;
+  readonly label: string;
+  readonly requestId: string;
+  readonly textColor: string;
+};
 
 export type CurrentUser = {
   readonly displayName: string;
@@ -41,6 +70,8 @@ export type CurrentUser = {
   readonly isPlatformAdmin: boolean;
   readonly preferences: { readonly [key: string]: unknown };
 };
+
+export type DeleteBadgeRequest = { readonly expectedRevision: number; readonly requestId: string };
 
 export type Error = { readonly error: { readonly code: string; readonly message: string } };
 
@@ -79,6 +110,20 @@ export type ManageMembersRequest = {
   readonly operation: ManageMemberOperation;
   readonly requestId: string;
   readonly targets: Array<MemberTarget>;
+};
+
+export type ManagedBadge = {
+  readonly autoAssignRoles: Array<string>;
+  readonly backgroundColor: string;
+  readonly createdAt: string;
+  readonly darkThemeBadgeId: string | null;
+  readonly emoji: string | null;
+  readonly id: string;
+  readonly imageDataUrl: string | null;
+  readonly label: string;
+  readonly revision: number;
+  readonly textColor: string;
+  readonly updatedAt: string;
 };
 
 export type ManagedMember = {
@@ -155,6 +200,18 @@ export type Session = {
   readonly userId: string;
 };
 
+export type UpdateBadgeRequest = {
+  readonly autoAssignRoles: Array<string>;
+  readonly backgroundColor: string;
+  readonly darkThemeBadgeId: string | null;
+  readonly emoji: string | null;
+  readonly expectedRevision: number;
+  readonly imageDataUrl: string | null;
+  readonly label: string;
+  readonly requestId: string;
+  readonly textColor: string;
+};
+
 export interface TradingRoomApiOperations {
   readonly login: {
     readonly method: 'POST';
@@ -212,6 +269,34 @@ export interface TradingRoomApiOperations {
     readonly response: Preferences;
     readonly successStatus: 200;
   };
+  readonly listAccountBadges: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/accounts/{enterprise_id}/badges';
+    readonly request: undefined;
+    readonly response: Array<ManagedBadge>;
+    readonly successStatus: 200;
+  };
+  readonly createAccountBadge: {
+    readonly method: 'POST';
+    readonly path: '/api/v1/accounts/{enterprise_id}/badges';
+    readonly request: CreateBadgeRequest;
+    readonly response: BadgeMutationResponse;
+    readonly successStatus: 200;
+  };
+  readonly deleteAccountBadge: {
+    readonly method: 'DELETE';
+    readonly path: '/api/v1/accounts/{enterprise_id}/badges/{badge_id}';
+    readonly request: DeleteBadgeRequest;
+    readonly response: BadgeMutationResponse;
+    readonly successStatus: 200;
+  };
+  readonly updateAccountBadge: {
+    readonly method: 'PATCH';
+    readonly path: '/api/v1/accounts/{enterprise_id}/badges/{badge_id}';
+    readonly request: UpdateBadgeRequest;
+    readonly response: BadgeMutationResponse;
+    readonly successStatus: 200;
+  };
   readonly listAccountRooms: {
     readonly method: 'GET';
     readonly path: '/api/v1/accounts/{enterprise_id}/rooms';
@@ -231,6 +316,13 @@ export interface TradingRoomApiOperations {
     readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}';
     readonly request: ArchiveAccountRoomRequest;
     readonly response: ManagedRoom;
+    readonly successStatus: 200;
+  };
+  readonly assignAccountRoomBadges: {
+    readonly method: 'POST';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/badge-assignments';
+    readonly request: AssignBadgesRequest;
+    readonly response: BadgeMutationResponse;
     readonly successStatus: 200;
   };
   readonly listAccountRoomMembers: {
