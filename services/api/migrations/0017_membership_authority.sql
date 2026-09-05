@@ -128,7 +128,6 @@ RETURNS TABLE(enterprise_id uuid, member_id uuid, member_role text)
   WHERE room.id = p_room_id
 $$;
 
-ALTER FUNCTION public.auth_resolve_membership(uuid, uuid) OWNER TO ptr_clone;
 REVOKE ALL ON FUNCTION public.auth_resolve_membership(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.auth_resolve_membership(uuid, uuid) TO tradingroom_app;
 
@@ -156,6 +155,5 @@ RETURNS TABLE(
   ORDER BY room.name ASC, room.id ASC
 $$;
 
-ALTER FUNCTION public.auth_list_memberships(uuid) OWNER TO ptr_clone;
 REVOKE ALL ON FUNCTION public.auth_list_memberships(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.auth_list_memberships(uuid) TO tradingroom_app;

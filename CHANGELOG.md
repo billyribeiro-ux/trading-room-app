@@ -45,6 +45,17 @@ because it cannot gate one. So a **merge** to `main` is a production release. Tw
 
 ---
 
+### 2026-09-05 10:13 EDT — exact-SHA CI removed a redundant reference-owner literal from membership migration 0017
+
+**Runtime impact: no semantic database change.** Frontend quality run `33970951463` passed both
+production-artifact browser suites and the complete room job, then its controller naming-boundary
+test identified `services/api/migrations/0017_membership_authority.sql` as the only unapproved use
+of the reference owner name. The two `ALTER FUNCTION ... OWNER TO` statements were redundant: a
+migration-created function already belongs to the authenticated migrator. They are removed rather
+than weakening the closed naming allow-list. The migration-integrity and provenance hashes were
+re-pinned to the corrected pre-release bytes; the exact-SHA frontend and backend workflows are
+rerun before this checkpoint is accepted.
+
 ### 2026-09-04 21:53 EDT — membership became the fourth reversible canonical authority slice
 
 **Runtime impact: yes only when `MEMBERSHIP_AUTHORITY_MODE=rust`; legacy remains the default and

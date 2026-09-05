@@ -202,7 +202,7 @@ const REVIEWED_FORWARD_MIGRATIONS = Object.freeze([
   */
   Object.freeze({
     path: 'services/api/migrations/0017_membership_authority.sql',
-    sha256: 'dc47c5f7f18f1c3ea86acd7248f7285d928d103a71687801fa75365d8b722ef6'
+    sha256: 'fa97e4f2bd787d4e0f19d3503ae4104baa933f5ec8963922ad99e3eb0933182e'
   })
 ]);
 

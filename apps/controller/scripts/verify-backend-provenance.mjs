@@ -220,7 +220,7 @@ const LOCALLY_AUTHORED = new Map([
     // Authored 2026-09-04 for canonical membership authority: the forward-only schema,
     // repository, account/service HTTP boundary, and real PostgreSQL behavioral proof.
     'services/api/migrations/0017_membership_authority.sql',
-    'dc47c5f7f18f1c3ea86acd7248f7285d928d103a71687801fa75365d8b722ef6'
+    'fa97e4f2bd787d4e0f19d3503ae4104baa933f5ec8963922ad99e3eb0933182e'
   ],
   [
     'services/api/src/db/repo/managed_membership.rs',
