@@ -70,6 +70,13 @@ offline converter has completed `plan`, `apply`, and `verify`; `rust` additional
 `TRADINGROOM_API_URL` and exact UUID mappings. See
 [`ops/PROFILE-AUTHORITY-CUTOVER.md`](../../ops/PROFILE-AUTHORITY-CUTOVER.md).
 
+Room lifecycle and room settings are separately reversible, ordered authority slices. Keep
+`ROOM_AUTHORITY_MODE=legacy` until the room converter verifies, then keep
+`ROOM_SETTINGS_AUTHORITY_MODE=legacy` until the settings converter verifies. Rust settings mode
+requires both profile and room modes to already be `rust`; see
+[`ops/ROOM-AUTHORITY-CUTOVER.md`](../../ops/ROOM-AUTHORITY-CUTOVER.md) and
+[`ops/ROOM-SETTINGS-AUTHORITY-CUTOVER.md`](../../ops/ROOM-SETTINGS-AUTHORITY-CUTOVER.md).
+
 ```bash
 createdb tradingroom_dev
 # DATABASE_URL=postgres://<user>@localhost:5432/tradingroom_dev

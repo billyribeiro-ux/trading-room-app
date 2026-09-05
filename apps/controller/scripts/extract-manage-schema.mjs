@@ -24,7 +24,7 @@
  * previous generated file: the same tracked inputs must always produce the same
  * bytes, including when the output path does not exist.
  *
- * Usage: node scripts/extract-manage-schema.mjs [--out <path>]
+ * Usage: node scripts/extract-manage-schema.mjs [--out <path>] [--manifest-out <path>]
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -38,18 +38,34 @@ const SOURCE_RELATIVE = 'evidence-dumps/login-page/manage';
 const SOURCE = resolve(REPO_ROOT, SOURCE_RELATIVE);
 const OUTLINE_SCRIPT = resolve(SCRIPT_DIR, 'outline.mjs');
 const DEFAULT_OUT = resolve(REPO_ROOT, 'src/lib/room-settings-schema.ts');
+const DEFAULT_MANIFEST_OUT = resolve(REPO_ROOT, '../../services/api/src/room-settings-manifest.json');
 
 const args = process.argv.slice(2);
-if (args.length !== 0 && (args.length !== 2 || args[0] !== '--out')) {
-  console.error('usage: node scripts/extract-manage-schema.mjs [--out <path>]');
-  process.exit(1);
+/** @type {Map<string, string>} */
+const options = new Map();
+for (let index = 0; index < args.length; index += 2) {
+  const flag = args[index];
+  const value = args[index + 1];
+  if (!['--out', '--manifest-out'].includes(flag) || value === undefined || options.has(flag)) {
+    console.error('usage: node scripts/extract-manage-schema.mjs [--out <path>] [--manifest-out <path>]');
+    process.exit(1);
+  }
+  options.set(flag, value);
 }
-const requestedOut = args[1];
+const requestedOut = options.get('--out');
 const OUT = requestedOut
   ? isAbsolute(requestedOut)
     ? requestedOut
     : resolve(process.cwd(), requestedOut)
   : DEFAULT_OUT;
+const requestedManifestOut = options.get('--manifest-out');
+const MANIFEST_OUT = requestedManifestOut
+  ? isAbsolute(requestedManifestOut)
+    ? requestedManifestOut
+    : resolve(process.cwd(), requestedManifestOut)
+  : args.length === 0
+    ? DEFAULT_MANIFEST_OUT
+    : null;
 
 /**
  * Reviewed consumers, in either application.
@@ -1226,6 +1242,20 @@ ${defs
 `;
 
 writeFileSync(OUT, body);
+if (MANIFEST_OUT) {
+  const manifest = `${JSON.stringify(
+    {
+      schemaVersion: 1,
+      settings: defs.map((definition) => ({
+        name: definition.name,
+        valueType: definition.type === 'checkbox' ? 'boolean' : definition.type === 'number' ? 'number' : 'string'
+      }))
+    },
+    null,
+    2
+  )}\n`;
+  writeFileSync(MANIFEST_OUT, manifest);
+}
 console.log(
-  `${defs.length} settings -> ${OUT}\n  sections: ${JSON.stringify(sections)}\n  types: ${JSON.stringify(counts)}\n  captured: ${capturedSetCount}, wired: ${wiredCount}`
+  `${defs.length} settings -> ${OUT}${MANIFEST_OUT ? ` + ${MANIFEST_OUT}` : ''}\n  sections: ${JSON.stringify(sections)}\n  types: ${JSON.stringify(counts)}\n  captured: ${capturedSetCount}, wired: ${wiredCount}`
 );

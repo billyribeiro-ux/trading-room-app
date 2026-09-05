@@ -343,6 +343,9 @@ export const roomSettings = pgTable('room_settings', {
     .primaryKey()
     .references(() => rooms.id),
   settingsJson: text('settings_json').notNull().default('{}'),
+  /** Exact Rust settings revision represented by this local runtime projection. */
+  authorityRevision: bigint('authority_revision', { mode: 'number' }),
+  authorityReconciledAt: timestamp('authority_reconciled_at', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull()
 });
 

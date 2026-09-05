@@ -8,16 +8,19 @@ import {
   applyApiCookies,
   clearApiCookies,
   createAccountRoom,
+  getAccountRoomSettings,
   getAccountBootstrap,
   isArchiveAccountRoomRequest,
   isCreateAccountRoomRequest,
   isLoginRequest,
+  isPatchAccountRoomSettingsRequest,
   isPreferenceRequest,
   isPreferencesRequest,
   isProfileUpdateRequest,
   listAccountRooms,
   login,
   logout,
+  patchAccountRoomSettings,
   setAccountRoomArchived,
   updateAccountProfile
 } from './tradingroom-api';
@@ -668,6 +671,47 @@ describe('typed Rust API transport', () => {
     ).resolves.toEqual({ ok: true, status: 200, data: managed });
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(jar.set).not.toHaveBeenCalled();
+  });
+
+  it('validates and transports revisioned room settings without accepting unknown values', async () => {
+    const jar = cookieJar({ [ACCESS_COOKIE]: 'access-only' });
+    const snapshot = { roomId: ROOM_ID, revision: 8, settings: { isLocked: true, customCSS: 'body{}' } };
+    const request = {
+      requestId: USER_ID,
+      expectedRevision: 7,
+      base: { isLocked: false },
+      updates: { isLocked: true }
+    };
+    expect(isPatchAccountRoomSettingsRequest(request)).toBe(true);
+    expect(
+      isPatchAccountRoomSettingsRequest({ ...request, updates: { invented: true }, base: { invented: null } })
+    ).toBe(false);
+    expect(isPatchAccountRoomSettingsRequest({ ...request, base: {} })).toBe(false);
+
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(`http://127.0.0.1:8080/api/v1/accounts/${ACCOUNT_ID}/rooms/${ROOM_ID}/settings`);
+      if (init?.method === 'PATCH') expect(JSON.parse(String(init.body))).toEqual(request);
+      return new Response(JSON.stringify(snapshot), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    const context = { cookies: jar.cookies, origin: 'https://www.example.test', fetch };
+    await expect(getAccountRoomSettings(context, ACCOUNT_ID, ROOM_ID)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: snapshot
+    });
+    await expect(patchAccountRoomSettings(context, ACCOUNT_ID, ROOM_ID, request)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      data: snapshot
+    });
+    await expect(
+      patchAccountRoomSettings(context, ACCOUNT_ID, ROOM_ID, {
+        ...request,
+        base: { invented: null },
+        updates: { invented: true }
+      })
+    ).resolves.toMatchObject({ ok: false, status: 400, code: 'invalid' });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('preserves the API stable error without accepting response cookies', async () => {

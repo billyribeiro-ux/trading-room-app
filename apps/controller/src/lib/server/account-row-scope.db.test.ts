@@ -43,9 +43,11 @@ vi.mock('$app/env/private', () => ({
   CONTROL_PLANE_MODE: '',
   PROFILE_AUTHORITY_MODE: '',
   ROOM_AUTHORITY_MODE: '',
+  ROOM_SETTINGS_AUTHORITY_MODE: '',
   TRADINGROOM_API_URL: '',
   FCM_SERVICE_ACCOUNT_JSON: ''
 }));
+vi.mock('$app/env/public', () => ({ PUBLIC_RECAPTCHA_SITE_KEY: '' }));
 
 function run(binary: string, args: string[]) {
   const result = spawnSync(binary, args, { encoding: 'utf8' });

@@ -154,6 +154,11 @@ pub const DISPLAY_NAME_MAX_BYTES: usize = 80;
 /// A room title shown in navigation, tables, and browser titles; not a document field.
 pub const ROOM_NAME_MAX_BYTES: usize = 160;
 
+/// One owner-authored room setting. Custom HTML/CSS legitimately exceeds a chat payload, while
+/// the complete room-settings document must remain below the global request ceiling.
+pub const ROOM_SETTING_VALUE_MAX_BYTES: usize = 256 * 1024;
+pub const ROOM_SETTINGS_MAX_BYTES: usize = 768 * 1024;
+
 /// `users.preferences` is jsonb on a table with **no RLS and no other ceiling**, so without
 /// these it is an unbounded per-user store that any signed-in caller can grow.
 pub const PREFERENCE_KEY_MAX_BYTES: usize = 64;

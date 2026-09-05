@@ -35,6 +35,8 @@ pub enum ApiError {
     Denied(crate::capability::Denied),
     #[error("not found")]
     NotFound,
+    #[error("conflict")]
+    Conflict,
     #[error("{0}")]
     Invalid(String),
     #[error("too many requests")]
@@ -53,6 +55,7 @@ impl ApiError {
             Self::Forbidden => "forbidden",
             Self::Denied(denied) => denied.code(),
             Self::NotFound => "notFound",
+            Self::Conflict => "conflict",
             Self::Invalid(_) => "invalid",
             Self::RateLimited => "rateLimited",
             Self::Unavailable => "unavailable",
@@ -65,6 +68,7 @@ impl ApiError {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Forbidden | Self::Denied(_) => StatusCode::FORBIDDEN,
             Self::NotFound => StatusCode::NOT_FOUND,
+            Self::Conflict => StatusCode::CONFLICT,
             Self::Invalid(_) => StatusCode::BAD_REQUEST,
             Self::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable => StatusCode::SERVICE_UNAVAILABLE,

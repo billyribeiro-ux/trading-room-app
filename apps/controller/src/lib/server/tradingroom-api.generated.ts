@@ -24,6 +24,12 @@ export type AccountRoom = {
   readonly state: string;
 };
 
+export type AccountRoomSettings = {
+  readonly revision: number;
+  readonly roomId: string;
+  readonly settings: RoomSettings;
+};
+
 export type ArchiveAccountRoomRequest = { readonly archived: boolean };
 
 export type CreateAccountRoomRequest = { readonly name: string; readonly requestId: string };
@@ -51,11 +57,20 @@ export type ManagedRoom = {
   readonly state: 'open' | 'closed' | 'locked';
 };
 
+export type PatchAccountRoomSettingsRequest = {
+  readonly base: RoomSettings;
+  readonly expectedRevision: number;
+  readonly requestId: string;
+  readonly updates: RoomSettings;
+};
+
 export type PreferenceRequest = { readonly key: string; readonly value: unknown };
 
 export type Preferences = { readonly [key: string]: unknown };
 
 export type ProfileUpdateRequest = { readonly displayName: string; readonly preferences: Preferences };
+
+export type RoomSettings = { readonly [key: string]: unknown };
 
 export type Session = {
   readonly displayName: string;
@@ -140,6 +155,20 @@ export interface TradingRoomApiOperations {
     readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}';
     readonly request: ArchiveAccountRoomRequest;
     readonly response: ManagedRoom;
+    readonly successStatus: 200;
+  };
+  readonly getAccountRoomSettings: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings';
+    readonly request: undefined;
+    readonly response: AccountRoomSettings;
+    readonly successStatus: 200;
+  };
+  readonly patchAccountRoomSettings: {
+    readonly method: 'PATCH';
+    readonly path: '/api/v1/accounts/{enterprise_id}/rooms/{room_id}/settings';
+    readonly request: PatchAccountRoomSettingsRequest;
+    readonly response: AccountRoomSettings;
     readonly successStatus: 200;
   };
 }

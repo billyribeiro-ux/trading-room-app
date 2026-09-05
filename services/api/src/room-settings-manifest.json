@@ -1,0 +1,1081 @@
+{
+  "schemaVersion": 1,
+  "settings": [
+    {
+      "name": "name",
+      "valueType": "string"
+    },
+    {
+      "name": "webinarDate",
+      "valueType": "string"
+    },
+    {
+      "name": "authMode",
+      "valueType": "string"
+    },
+    {
+      "name": "ssoHost",
+      "valueType": "string"
+    },
+    {
+      "name": "ssoJWTSecret",
+      "valueType": "string"
+    },
+    {
+      "name": "allowPWLoginWithSSO",
+      "valueType": "boolean"
+    },
+    {
+      "name": "tokenExpiresIn",
+      "valueType": "string"
+    },
+    {
+      "name": "webinarPW",
+      "valueType": "string"
+    },
+    {
+      "name": "webinarPW2",
+      "valueType": "string"
+    },
+    {
+      "name": "webinarPW3",
+      "valueType": "string"
+    },
+    {
+      "name": "webinarPWFreeTrial",
+      "valueType": "string"
+    },
+    {
+      "name": "deleteAlertPW",
+      "valueType": "string"
+    },
+    {
+      "name": "allRoomsWelcomeMatPW",
+      "valueType": "string"
+    },
+    {
+      "name": "needPasswordForUserNotes",
+      "valueType": "string"
+    },
+    {
+      "name": "nickFilter",
+      "valueType": "string"
+    },
+    {
+      "name": "customFaviconURL",
+      "valueType": "string"
+    },
+    {
+      "name": "overwriteCashRegisterSound",
+      "valueType": "string"
+    },
+    {
+      "name": "login_webhook_url",
+      "valueType": "string"
+    },
+    {
+      "name": "logout_webhook_url",
+      "valueType": "string"
+    },
+    {
+      "name": "allowedMemberships",
+      "valueType": "string"
+    },
+    {
+      "name": "allowedProducts",
+      "valueType": "string"
+    },
+    {
+      "name": "allowedPerms",
+      "valueType": "string"
+    },
+    {
+      "name": "secTok",
+      "valueType": "string"
+    },
+    {
+      "name": "custRoomDriveURL",
+      "valueType": "string"
+    },
+    {
+      "name": "custLogoutURL",
+      "valueType": "string"
+    },
+    {
+      "name": "rosterVisibleToViewers",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hideWelcomeTo",
+      "valueType": "boolean"
+    },
+    {
+      "name": "openLoginLink",
+      "valueType": "string"
+    },
+    {
+      "name": "loginErrorURL",
+      "valueType": "string"
+    },
+    {
+      "name": "loginErrorMsg",
+      "valueType": "string"
+    },
+    {
+      "name": "onlyPresentersVisibleToViewers",
+      "valueType": "boolean"
+    },
+    {
+      "name": "rosterCountVisibleToViewers",
+      "valueType": "boolean"
+    },
+    {
+      "name": "simUserCount",
+      "valueType": "number"
+    },
+    {
+      "name": "userPM",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enablePrivateMessageHistory",
+      "valueType": "boolean"
+    },
+    {
+      "name": "dingOnNewMessage",
+      "valueType": "boolean"
+    },
+    {
+      "name": "beepOnUserJoin",
+      "valueType": "boolean"
+    },
+    {
+      "name": "userJoinAndLeavePopup",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hideAvatars",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hideAppInfo",
+      "valueType": "boolean"
+    },
+    {
+      "name": "alwaysShowRoster",
+      "valueType": "boolean"
+    },
+    {
+      "name": "showOnlyUsernames",
+      "valueType": "boolean"
+    },
+    {
+      "name": "allowUsersToChangeUsername",
+      "valueType": "boolean"
+    },
+    {
+      "name": "disableEditingUsername",
+      "valueType": "boolean"
+    },
+    {
+      "name": "usernameInstructions",
+      "valueType": "string"
+    },
+    {
+      "name": "forgotRoomPassword",
+      "valueType": "boolean"
+    },
+    {
+      "name": "tawkPresenterSupport",
+      "valueType": "boolean"
+    },
+    {
+      "name": "userToPresenterPM",
+      "valueType": "boolean"
+    },
+    {
+      "name": "playChatMessageSoundFor",
+      "valueType": "string"
+    },
+    {
+      "name": "alertsChatOnBottom",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasQAOnAlerts",
+      "valueType": "boolean"
+    },
+    {
+      "name": "alertsOverlayOnScreenshare",
+      "valueType": "boolean"
+    },
+    {
+      "name": "copyTrades",
+      "valueType": "boolean"
+    },
+    {
+      "name": "disableCopy",
+      "valueType": "boolean"
+    },
+    {
+      "name": "claimNickName",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasTypingIndicator",
+      "valueType": "boolean"
+    },
+    {
+      "name": "presenterMsgsOnTheRight",
+      "valueType": "boolean"
+    },
+    {
+      "name": "altChatRender",
+      "valueType": "boolean"
+    },
+    {
+      "name": "altRoomRender",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasAppPairLink",
+      "valueType": "boolean"
+    },
+    {
+      "name": "pairSecretKey",
+      "valueType": "string"
+    },
+    {
+      "name": "pairOKRedirect",
+      "valueType": "string"
+    },
+    {
+      "name": "pairErrorRedirect",
+      "valueType": "string"
+    },
+    {
+      "name": "hideChatAlerts",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasSwingTradeAlerts",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasDayTradeAlerts",
+      "valueType": "boolean"
+    },
+    {
+      "name": "usersPublicReply",
+      "valueType": "boolean"
+    },
+    {
+      "name": "chatDisabledForTrials",
+      "valueType": "boolean"
+    },
+    {
+      "name": "disablePMForTrials",
+      "valueType": "boolean"
+    },
+    {
+      "name": "usersCanDeleteOwnMsgs",
+      "valueType": "boolean"
+    },
+    {
+      "name": "smallerImagePreview",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hideNotes",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hideFiles",
+      "valueType": "boolean"
+    },
+    {
+      "name": "darkThemeAsDefault",
+      "valueType": "boolean"
+    },
+    {
+      "name": "saveWebinarModeChat",
+      "valueType": "boolean"
+    },
+    {
+      "name": "showArchivesToUsers",
+      "valueType": "boolean"
+    },
+    {
+      "name": "showArchivesToSpecificPresenters",
+      "valueType": "string"
+    },
+    {
+      "name": "disalowSporadicMultiLogins",
+      "valueType": "boolean"
+    },
+    {
+      "name": "disalowMultiLogins",
+      "valueType": "boolean"
+    },
+    {
+      "name": "sendReportEmails",
+      "valueType": "boolean"
+    },
+    {
+      "name": "banIPList",
+      "valueType": "string"
+    },
+    {
+      "name": "reportEmail",
+      "valueType": "string"
+    },
+    {
+      "name": "customJWTErrorMessage",
+      "valueType": "string"
+    },
+    {
+      "name": "sendOpenCloseEmail",
+      "valueType": "string"
+    },
+    {
+      "name": "autoOpenTime",
+      "valueType": "string"
+    },
+    {
+      "name": "autoCloseTime",
+      "valueType": "string"
+    },
+    {
+      "name": "ignoreAutoOpenCloseOnWeekend",
+      "valueType": "boolean"
+    },
+    {
+      "name": "alertSoundOff",
+      "valueType": "boolean"
+    },
+    {
+      "name": "styckyNonTradeAlert",
+      "valueType": "boolean"
+    },
+    {
+      "name": "fileAccessCaseByCase",
+      "valueType": "boolean"
+    },
+    {
+      "name": "isChatOnlyRoom",
+      "valueType": "boolean"
+    },
+    {
+      "name": "chatAutoClear",
+      "valueType": "boolean"
+    },
+    {
+      "name": "alertsAutoClear",
+      "valueType": "boolean"
+    },
+    {
+      "name": "chatAutoClearSpecialHour",
+      "valueType": "string"
+    },
+    {
+      "name": "chatAutoClearWeekend",
+      "valueType": "boolean"
+    },
+    {
+      "name": "archiveAlertsLog",
+      "valueType": "boolean"
+    },
+    {
+      "name": "archiveChatLog",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hideChatLog",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasAlertScheduler",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableVideoPlayer",
+      "valueType": "boolean"
+    },
+    {
+      "name": "userUploads",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableDiscord",
+      "valueType": "boolean"
+    },
+    {
+      "name": "disableEmojis",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableRTE",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableReactions",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableQAReactions",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableEditMessage",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableEditAlerts",
+      "valueType": "boolean"
+    },
+    {
+      "name": "alertLabels",
+      "valueType": "string"
+    },
+    {
+      "name": "advancedSearchAlerts",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableDeleteLog",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableBadges",
+      "valueType": "boolean"
+    },
+    {
+      "name": "enableTokenBadges",
+      "valueType": "boolean"
+    },
+    {
+      "name": "remToken",
+      "valueType": "boolean"
+    },
+    {
+      "name": "showBadgesToPresentersOnly",
+      "valueType": "boolean"
+    },
+    {
+      "name": "dontFollowPresenters",
+      "valueType": "boolean"
+    },
+    {
+      "name": "disableStarYears",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasRequiredPhoneInLogin",
+      "valueType": "boolean"
+    },
+    {
+      "name": "showPasswordField",
+      "valueType": "boolean"
+    },
+    {
+      "name": "isMainRoom",
+      "valueType": "boolean"
+    },
+    {
+      "name": "isArchivedRoom",
+      "valueType": "boolean"
+    },
+    {
+      "name": "isNewIndicatorOn",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasBenzingaNews",
+      "valueType": "boolean"
+    },
+    {
+      "name": "altBenzingaLogoURL",
+      "valueType": "string"
+    },
+    {
+      "name": "altBenzingaLinkURL",
+      "valueType": "string"
+    },
+    {
+      "name": "imgurClientID",
+      "valueType": "string"
+    },
+    {
+      "name": "imgurApiKey",
+      "valueType": "string"
+    },
+    {
+      "name": "imgurRapidKey",
+      "valueType": "string"
+    },
+    {
+      "name": "xuserAccessToken",
+      "valueType": "string"
+    },
+    {
+      "name": "xuserAccessTokenSecret",
+      "valueType": "string"
+    },
+    {
+      "name": "subscriptionPlans",
+      "valueType": "string"
+    },
+    {
+      "name": "stripeEmail",
+      "valueType": "string"
+    },
+    {
+      "name": "enableLiveStats",
+      "valueType": "boolean"
+    },
+    {
+      "name": "collectsUserStats",
+      "valueType": "boolean"
+    },
+    {
+      "name": "apiSecret",
+      "valueType": "string"
+    },
+    {
+      "name": "slackPostURL",
+      "valueType": "string"
+    },
+    {
+      "name": "diasableFCMAlerts",
+      "valueType": "boolean"
+    },
+    {
+      "name": "modMessage",
+      "valueType": "string"
+    },
+    {
+      "name": "positionsIframeUrl",
+      "valueType": "string"
+    },
+    {
+      "name": "positionsIframe",
+      "valueType": "boolean"
+    },
+    {
+      "name": "tipMeBtnEnabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "tipMeBtnTxt",
+      "valueType": "string"
+    },
+    {
+      "name": "tipMeBtnUrl",
+      "valueType": "string"
+    },
+    {
+      "name": "salesBanner",
+      "valueType": "string"
+    },
+    {
+      "name": "modAdminLoginList",
+      "valueType": "string"
+    },
+    {
+      "name": "isAlertOnly",
+      "valueType": "boolean"
+    },
+    {
+      "name": "customClientAlertPostURL",
+      "valueType": "string"
+    },
+    {
+      "name": "customClientAlertPostSecret",
+      "valueType": "string"
+    },
+    {
+      "name": "strictBrowserMode",
+      "valueType": "boolean"
+    },
+    {
+      "name": "chatFloodDisabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "privMessageHugePopup",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasChannelTabs",
+      "valueType": "boolean"
+    },
+    {
+      "name": "autoSwitchToOfftopics",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasAdminOnlyChannel",
+      "valueType": "boolean"
+    },
+    {
+      "name": "extraAdminChannels",
+      "valueType": "string"
+    },
+    {
+      "name": "extraRegChannels",
+      "valueType": "string"
+    },
+    {
+      "name": "altGenChannelName",
+      "valueType": "string"
+    },
+    {
+      "name": "altOffTopicChannelName",
+      "valueType": "string"
+    },
+    {
+      "name": "chatTabsWithBadges",
+      "valueType": "string"
+    },
+    {
+      "name": "hasProfanityFilter",
+      "valueType": "boolean"
+    },
+    {
+      "name": "ingnoreBadWordsList",
+      "valueType": "string"
+    },
+    {
+      "name": "additionalBadWordsList",
+      "valueType": "string"
+    },
+    {
+      "name": "simplifiedEditor",
+      "valueType": "boolean"
+    },
+    {
+      "name": "audioMeterDisabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hideWebcamForRoom",
+      "valueType": "boolean"
+    },
+    {
+      "name": "recordChat",
+      "valueType": "boolean"
+    },
+    {
+      "name": "autoRecord",
+      "valueType": "boolean"
+    },
+    {
+      "name": "blinkingRec",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hideRecs",
+      "valueType": "boolean"
+    },
+    {
+      "name": "recordingReminder",
+      "valueType": "boolean"
+    },
+    {
+      "name": "recsInRoom",
+      "valueType": "boolean"
+    },
+    {
+      "name": "downloadRecordingsDisabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hasSpeechRecognitionDisabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "dontShowRecInfoToUsers",
+      "valueType": "boolean"
+    },
+    {
+      "name": "runawayRecMinutes",
+      "valueType": "number"
+    },
+    {
+      "name": "runawayRecAutoKill",
+      "valueType": "boolean"
+    },
+    {
+      "name": "runawayRecPostURL",
+      "valueType": "string"
+    },
+    {
+      "name": "stickyGiveMicAndCam",
+      "valueType": "boolean"
+    },
+    {
+      "name": "overlayUserIdOnScreenshare",
+      "valueType": "boolean"
+    },
+    {
+      "name": "regUserCanPresent",
+      "valueType": "boolean"
+    },
+    {
+      "name": "dontStopRecOnMicMute",
+      "valueType": "boolean"
+    },
+    {
+      "name": "individualVolumeControls",
+      "valueType": "boolean"
+    },
+    {
+      "name": "remote_recording",
+      "valueType": "boolean"
+    },
+    {
+      "name": "saveRecsToS3",
+      "valueType": "boolean"
+    },
+    {
+      "name": "s3KeyID",
+      "valueType": "string"
+    },
+    {
+      "name": "s3KeySecret",
+      "valueType": "string"
+    },
+    {
+      "name": "s3Bucket",
+      "valueType": "string"
+    },
+    {
+      "name": "s3BucketFolderPath",
+      "valueType": "string"
+    },
+    {
+      "name": "saveRecsToVimeo",
+      "valueType": "boolean"
+    },
+    {
+      "name": "vimeoClientID",
+      "valueType": "string"
+    },
+    {
+      "name": "vimeoClientSecret",
+      "valueType": "string"
+    },
+    {
+      "name": "vimeoToken",
+      "valueType": "string"
+    },
+    {
+      "name": "vimeoFolderPath",
+      "valueType": "string"
+    },
+    {
+      "name": "obsBroadcastRoom",
+      "valueType": "boolean"
+    },
+    {
+      "name": "obsStreamKey",
+      "valueType": "string"
+    },
+    {
+      "name": "obsStreamSatusWebHookURL",
+      "valueType": "string"
+    },
+    {
+      "name": "restreamToURL",
+      "valueType": "string"
+    },
+    {
+      "name": "restreamToURLKey",
+      "valueType": "string"
+    },
+    {
+      "name": "x264_encArgs",
+      "valueType": "string"
+    },
+    {
+      "name": "twillioApiSID",
+      "valueType": "string"
+    },
+    {
+      "name": "twillioApiToken",
+      "valueType": "string"
+    },
+    {
+      "name": "twilioPhone",
+      "valueType": "string"
+    },
+    {
+      "name": "protextingSecretTok",
+      "valueType": "string"
+    },
+    {
+      "name": "protextingGroupIDs",
+      "valueType": "string"
+    },
+    {
+      "name": "h264Enabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "vp9Enabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hqVideo",
+      "valueType": "boolean"
+    },
+    {
+      "name": "customPlayerURL",
+      "valueType": "string"
+    },
+    {
+      "name": "iframeSSOTFix",
+      "valueType": "boolean"
+    },
+    {
+      "name": "autoResetSession",
+      "valueType": "boolean"
+    },
+    {
+      "name": "doNotAutoSoftReset",
+      "valueType": "boolean"
+    },
+    {
+      "name": "sendFcmAlertsNew",
+      "valueType": "boolean"
+    },
+    {
+      "name": "ptrMobileAppExpirePairCodeDays",
+      "valueType": "number"
+    },
+    {
+      "name": "mobileAppExpireNotificationsDays",
+      "valueType": "number"
+    },
+    {
+      "name": "customEnterDisclosure",
+      "valueType": "string"
+    },
+    {
+      "name": "customUserInfoURL",
+      "valueType": "string"
+    },
+    {
+      "name": "stAppScheduleID",
+      "valueType": "string"
+    },
+    {
+      "name": "invalidTokens",
+      "valueType": "string"
+    },
+    {
+      "name": "useV3",
+      "valueType": "boolean"
+    },
+    {
+      "name": "useV5",
+      "valueType": "boolean"
+    },
+    {
+      "name": "clusterID",
+      "valueType": "string"
+    },
+    {
+      "name": "backupClusterID",
+      "valueType": "string"
+    },
+    {
+      "name": "superClusterID",
+      "valueType": "string"
+    },
+    {
+      "name": "superClusterExpectedServerCount",
+      "valueType": "number"
+    },
+    {
+      "name": "useFFmpegRecording",
+      "valueType": "boolean"
+    },
+    {
+      "name": "useLessBusyVsRoundRobin",
+      "valueType": "boolean"
+    },
+    {
+      "name": "useMediaMTX",
+      "valueType": "boolean"
+    },
+    {
+      "name": "mediaMTXClusterID",
+      "valueType": "string"
+    },
+    {
+      "name": "backupMediaMTXClustterID",
+      "valueType": "string"
+    },
+    {
+      "name": "media_max_bitrate",
+      "valueType": "string"
+    },
+    {
+      "name": "media_fir_rate",
+      "valueType": "string"
+    },
+    {
+      "name": "hasYTStreaming",
+      "valueType": "boolean"
+    },
+    {
+      "name": "media_relays",
+      "valueType": "string"
+    },
+    {
+      "name": "isLocked",
+      "valueType": "boolean"
+    },
+    {
+      "name": "chatServerURL",
+      "valueType": "string"
+    },
+    {
+      "name": "force_jpeg_screenshare",
+      "valueType": "boolean"
+    },
+    {
+      "name": "force_mp3_audio",
+      "valueType": "boolean"
+    },
+    {
+      "name": "node_media_relays",
+      "valueType": "string"
+    },
+    {
+      "name": "node_ws_media_relays",
+      "valueType": "string"
+    },
+    {
+      "name": "altCodeVendorJS",
+      "valueType": "string"
+    },
+    {
+      "name": "altCodeAppJS",
+      "valueType": "string"
+    },
+    {
+      "name": "customJanus",
+      "valueType": "string"
+    },
+    {
+      "name": "alt_roomjs",
+      "valueType": "string"
+    },
+    {
+      "name": "modAlertFilterList",
+      "valueType": "string"
+    },
+    {
+      "name": "customCSS",
+      "valueType": "string"
+    },
+    {
+      "name": "darkThemeStyle",
+      "valueType": "string"
+    },
+    {
+      "name": "hideLogo",
+      "valueType": "boolean"
+    },
+    {
+      "name": "hidePoweredBy",
+      "valueType": "boolean"
+    },
+    {
+      "name": "linkedRoomAlerts",
+      "valueType": "string"
+    },
+    {
+      "name": "linkedRoomSwingAlerts",
+      "valueType": "string"
+    },
+    {
+      "name": "linkedRoomSwingAlertsOther",
+      "valueType": "string"
+    },
+    {
+      "name": "linkedRoomDayTradeAlerts",
+      "valueType": "string"
+    },
+    {
+      "name": "linkedRoomDayTradeAlertsOther",
+      "valueType": "string"
+    },
+    {
+      "name": "linkedRoomRecordings",
+      "valueType": "string"
+    },
+    {
+      "name": "linkedStreamsAPIKey",
+      "valueType": "string"
+    },
+    {
+      "name": "ptrMobileAppEnabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "freeTrialsGetApp",
+      "valueType": "boolean"
+    },
+    {
+      "name": "customMobileAppEnabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "customMobileAppV3Name",
+      "valueType": "string"
+    },
+    {
+      "name": "customMobileAppIOSUrl",
+      "valueType": "string"
+    },
+    {
+      "name": "customMobileAppAndroidUrl",
+      "valueType": "string"
+    },
+    {
+      "name": "customMobileAppLaunchWord",
+      "valueType": "string"
+    },
+    {
+      "name": "hideMobileCredentials",
+      "valueType": "boolean"
+    },
+    {
+      "name": "ptrMobileAppCaseByCaseEnabled",
+      "valueType": "boolean"
+    },
+    {
+      "name": "nqNewsFeedURL",
+      "valueType": "string"
+    },
+    {
+      "name": "generateRandomUDPPort",
+      "valueType": "boolean"
+    },
+    {
+      "name": "streamingThreads",
+      "valueType": "boolean"
+    },
+    {
+      "name": "roomType",
+      "valueType": "string"
+    },
+    {
+      "name": "description",
+      "valueType": "string"
+    }
+  ]
+}

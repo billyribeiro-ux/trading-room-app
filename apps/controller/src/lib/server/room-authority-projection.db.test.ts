@@ -26,6 +26,7 @@ vi.mock('$app/env/private', () => ({
   CONTROL_PLANE_MODE: '',
   PROFILE_AUTHORITY_MODE: '',
   ROOM_AUTHORITY_MODE: '',
+  ROOM_SETTINGS_AUTHORITY_MODE: '',
   TRADINGROOM_API_URL: '',
   FCM_SERVICE_ACCOUNT_JSON: ''
 }));
@@ -224,5 +225,48 @@ describe('canonical room projection, against real PostgreSQL', () => {
         complete: false
       })
     ).rejects.toMatchObject({ code: 'owner-account-mismatch' });
+  });
+
+  it('projects only monotonic, content-stable canonical settings revisions', async () => {
+    const { projectAuthorityRooms } = await import('./provision-room');
+    const { projectAuthoritySettings } = await import('./rooms');
+    const { roomSettings, rooms } = await import('./db/schema');
+    const { db, accountId, ownerUserId } = await tenant();
+    const authorityId = 'd0000000-0000-4000-8000-000000000001';
+    const mapping = await projectAuthorityRooms(db, {
+      accountId,
+      ownerUserId,
+      rooms: [
+        {
+          id: authorityId,
+          shortCode: 'settings-projection',
+          name: 'Before',
+          state: 'open',
+          maxCapacity: 100,
+          memberCount: 1,
+          archivedAt: null,
+          createdAt: '2026-09-04T10:00:00Z'
+        }
+      ],
+      complete: false
+    });
+    const roomId = mapping.get(authorityId)!;
+
+    await projectAuthoritySettings(roomId, authorityId, 4, { name: 'Canonical', isLocked: true });
+    const [projected] = await db.select().from(roomSettings).where(eq(roomSettings.roomId, roomId));
+    expect(projected.authorityRevision).toBe(4);
+    expect(projected.authorityReconciledAt).toBeInstanceOf(Date);
+    expect(JSON.parse(projected.settingsJson)).toEqual({ name: 'Canonical', isLocked: true });
+    expect((await db.select().from(rooms).where(eq(rooms.id, roomId)))[0].name).toBe('Canonical');
+
+    await expect(projectAuthoritySettings(roomId, authorityId, 3, { name: 'Old' })).rejects.toThrow(
+      'stale authority settings response'
+    );
+    await expect(projectAuthoritySettings(roomId, authorityId, 4, { name: 'Different' })).rejects.toThrow(
+      'authority settings revision content mismatch'
+    );
+    await expect(
+      projectAuthoritySettings(roomId, 'e0000000-0000-4000-8000-000000000001', 5, { name: 'Wrong room' })
+    ).rejects.toThrow('room authority mapping mismatch');
   });
 });
